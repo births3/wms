@@ -443,6 +443,10 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
         <TabsContent value="print-suites">
           <H9PrintSuitePanel
             canWrite={canWrite}
+            canReadPdf={currentUser.permissions.includes("h9.print_pdf.read")}
+            canPreparePdf={currentUser.permissions.includes("h9.print_pdf.prepare")}
+            canDownloadPdf={currentUser.permissions.includes("h9.print_pdf.download")}
+            canEmergencyPrintPdf={currentUser.permissions.includes("h9.print_pdf.emergency_print")}
             warehouses={warehouseOptions}
             customers={customerOptions}
             groups={groupsQuery.data ?? []}

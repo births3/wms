@@ -99,4 +99,38 @@ for (const token of [
   }
 }
 
+// US-H9-009：分类 PDF、H-FILE 留存、选择下载与应急打印
+const categoryPdfPanel = source("src/pages/print-orchestration/H9CategoryPdfPanel.tsx");
+for (const path of [
+  "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs",
+  "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare",
+  "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download",
+  "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print",
+]) {
+  if (!feature.includes(path)) throw new Error(`H9 分类 PDF feature 缺少 ${path}`);
+}
+for (const token of [
+  "H9CategoryPdfPanel",
+  "生成分类 PDF",
+  "下载所选分类",
+  "应急打印所选",
+  "源数据版本 / 权威文件",
+  "模板版本 ID",
+  "内容 SHA-256",
+  "GSP 五年归档",
+  "短期缓存",
+]) {
+  if (!categoryPdfPanel.includes(token) && !suitePanel.includes(token)) {
+    throw new Error(`H9 分类 PDF 面板缺少 ${token}`);
+  }
+}
+for (const permission of [
+  "h9.print_pdf.read",
+  "h9.print_pdf.prepare",
+  "h9.print_pdf.download",
+  "h9.print_pdf.emergency_print",
+]) {
+  if (!page.includes(permission)) throw new Error(`H9 分类 PDF 页面缺少权限 ${permission}`);
+}
+
 console.log("h9-delivery-note-aggregation-self-check: ok");

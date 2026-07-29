@@ -26,6 +26,10 @@ export type CreatePrintSuiteDraftRequest =
   components["schemas"]["CreatePrintSuiteDraftRequest"];
 export type PrintSuiteTestResult = components["schemas"]["PrintSuiteTestResult"];
 export type PrintSuiteInstance = components["schemas"]["PrintSuiteInstance"];
+export type CategoryPdfOutput = components["schemas"]["CategoryPdfOutput"];
+export type CategoryPdfPreparation = components["schemas"]["CategoryPdfPreparation"];
+export type CategoryPdfOutputListResponse =
+  components["schemas"]["CategoryPdfOutputListResponse"];
 
 const printOrchestrationQueryKey = ["h9", "print-orchestration"] as const;
 
@@ -316,6 +320,86 @@ export function usePrintSuiteInstancesQuery(groupId: string | null) {
         throw new ApiError(result.error, "读取组套实例失败", result.response.status);
       }
       return result.data.data;
+    },
+  });
+}
+
+export function useCategoryPdfsQuery(instanceId: string | null) {
+  return useQuery<CategoryPdfOutputListResponse, ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "category-pdfs", instanceId ?? "none"],
+    queryFn: async () => {
+      if (!instanceId) {
+        return { data: [], preparation_status: null, retry_idempotency_key: null };
+      }
+      const result = await api.GET(
+        "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs",
+        { params: { path: { instance_id: instanceId } } },
+      );
+      if (!result.data) {
+        throw new ApiError(result.error, "读取分类 PDF 失败", result.response.status);
+      }
+      return result.data;
+    },
+    enabled: Boolean(instanceId),
+  });
+}
+
+export function usePrepareCategoryPdfsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    CategoryPdfPreparation,
+    ApiError,
+    { instanceId: string; idempotencyKey: string }
+  >({
+    mutationFn: async ({ instanceId, idempotencyKey: requestKey }) => {
+      const result = await api.POST(
+        "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare",
+        {
+          params: {
+            path: { instance_id: instanceId },
+            header: { "Idempotency-Key": requestKey },
+          },
+        },
+      );
+      if (!result.data) {
+        throw new ApiError(result.error, "生成分类 PDF 失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: [...printOrchestrationQueryKey, "category-pdfs", variables.instanceId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...printOrchestrationQueryKey, "suite-instances"],
+      });
+    },
+  });
+}
+
+export function useDownloadCategoryPdfsMutation(emergencyPrint: boolean) {
+  return useMutation<
+    Blob,
+    ApiError,
+    { instanceId: string; categoryPdfIds: string[] }
+  >({
+    mutationFn: async ({ instanceId, categoryPdfIds }) => {
+      const path = emergencyPrint
+        ? "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print"
+        : "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download";
+      const result = await api.POST(path, {
+        params: { path: { instance_id: instanceId } },
+        body: { category_pdf_ids: categoryPdfIds },
+        parseAs: "blob",
+      });
+      if (!result.data) {
+        throw new ApiError(
+          result.error,
+          emergencyPrint ? "打开应急打印 PDF 失败" : "下载分类 PDF 失败",
+          result.response.status,
+        );
+      }
+      return result.data;
     },
   });
 }

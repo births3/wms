@@ -41,6 +41,7 @@ import {
   H9LifecycleConfirmDialog,
   type H9LifecycleConfirmation,
 } from "./H9LifecycleConfirmDialog";
+import { H9CategoryPdfPanel } from "./H9CategoryPdfPanel";
 
 /**
  * US-H9-008 打印组套页签：版本列表 + 冻结组套实例；新建/测试走 Dialog。
@@ -55,6 +56,10 @@ export interface H9SuiteSelectOption {
 
 interface H9PrintSuitePanelProps {
   canWrite: boolean;
+  canReadPdf: boolean;
+  canPreparePdf: boolean;
+  canDownloadPdf: boolean;
+  canEmergencyPrintPdf: boolean;
   warehouses: H9SuiteSelectOption[];
   customers: H9SuiteSelectOption[];
   groups: DeliveryNoteGroupListItem[];
@@ -68,6 +73,10 @@ interface SuiteLifecycleAction {
 
 export function H9PrintSuitePanel({
   canWrite,
+  canReadPdf,
+  canPreparePdf,
+  canDownloadPdf,
+  canEmergencyPrintPdf,
   warehouses,
   customers,
   groups,
@@ -193,6 +202,15 @@ export function H9PrintSuitePanel({
           tableClassName="min-w-[1200px]"
         />
       </section>
+      <H9CategoryPdfPanel
+        instances={instancesQuery.data ?? []}
+        categories={categoriesQuery.data ?? []}
+        canRead={canReadPdf}
+        canPrepare={canPreparePdf}
+        canDownload={canDownloadPdf}
+        canEmergencyPrint={canEmergencyPrintPdf}
+        onNotice={onNotice}
+      />
       <PrintSuiteCreateDialog
         open={createOpen}
         pending={createSuite.isPending}
@@ -707,7 +725,7 @@ function suiteStatusLabel(status: string) {
 }
 
 function instanceStatusLabel(status: string) {
-  return status === "queued" ? "待打印" : status === "cancelled" ? "已取消" : "等待单据";
+  return status === "queued" ? "待打印" : status === "cancelled" ? "已取消" : "等待分类 PDF";
 }
 
 export function scopeLabel(scope: PrintSuiteVersion["scope"]) {
