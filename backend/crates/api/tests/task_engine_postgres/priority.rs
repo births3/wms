@@ -22,7 +22,7 @@ async fn seed_product(pool: &PgPool, owner_id: Uuid, storage_condition: &str) ->
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn priority_rules_apply_configured_factors_sort_waiting_and_audit(pool: PgPool) {
+async fn upsert_task_priority_rule_applies_configured_factors_sort_waiting_and_audit(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     seed_owner(&pool, owner_id).await;
     let warehouse_id = seed_warehouse(&pool, owner_id).await;

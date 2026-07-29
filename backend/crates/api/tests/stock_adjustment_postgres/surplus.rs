@@ -190,6 +190,18 @@ async fn surplus_quality_approval_and_dual_person_policy_are_enforced(pool: PgPo
         .expect("same quality approval should replay");
     assert!(approval_replay.replayed);
     assert_eq!(approved.value.status.as_str(), "pending_execution");
+    let approval_audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1
+           AND action = 'record_stock_surplus_quality_approval'
+           AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(created.value.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("surplus quality approval audit should query");
+    assert_eq!(approval_audit_count, 1);
     repository
         .start_surplus_order(
             &ctx,
