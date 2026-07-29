@@ -552,3 +552,36 @@ pub async fn seed_h8_interface_connector(pool: &PgPool) -> Result<(), sqlx::Erro
     .await?;
     Ok(())
 }
+
+/// US-H8-001 AC9：E2E 入站 API Key，scopes 覆盖默认消息类型
+/// （asn→inbound:push、outbound_order→outbound:push，另含主数据/退货最小 scope）。
+/// 固定 id 与 h8-real 用例引用的 00000000-0000-0000-0000-000000000099 对齐。
+pub async fn seed_h8_api_key(pool: &PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO auth_api_keys (
+            id, owner_id, caller_name, purpose, scopes, responsible_user_id,
+            key_hash, status, expires_at
+        )
+        VALUES (
+            '00000000-0000-0000-0000-000000000099',
+            '00000000-0000-0000-0000-000000000001',
+            'e2e-h8-erp', 'H8 E2E 入站消息推送',
+            ARRAY['inbound:push', 'outbound:push', 'master-data:write', 'return:push'],
+            '00000000-0000-0000-0000-000000000101',
+            'wms-e2e-h8-api-key-hash', 'active', now() + interval '10 years'
+        )
+        ON CONFLICT (id) DO UPDATE
+        SET scopes = EXCLUDED.scopes,
+            status = 'active',
+            expires_at = EXCLUDED.expires_at,
+            grace_expires_at = NULL,
+            revoked_at = NULL,
+            temporarily_disabled_until = NULL,
+            updated_at = now()
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}

@@ -252,7 +252,7 @@ pub async fn seed_h9_delivery_note_aggregation(pool: &PgPool) -> Result<(), Box<
             "INV-H9-E2E-008",
         ),
     ] {
-        let rule_sample_order_id = Uuid::parse_str(order_uuid).expect("valid rule sample order id");
+        let rule_sample_order_id = Uuid::parse_str(order_uuid)?;
         sqlx::query(
             r#"
             INSERT INTO outbound_orders (

@@ -357,6 +357,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     .execute(pool)
     .await?;
     crate::wms_api_e2e_seed::seed_h8_interface_connector(pool).await?;
+    crate::wms_api_e2e_seed::seed_h8_api_key(pool).await?;
     sqlx::raw_sql(
         r#"
         INSERT INTO auth_owners (id, owner_code, owner_name)

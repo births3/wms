@@ -22,7 +22,9 @@ use wms_api::{
     ApiDoc,
 };
 use wms_domain::{
-    DisableSystemDictionaryItemRequest, PRINT_TEMPLATE_TYPE_ASN,
+    DisableSystemDictionaryItemRequest, PRINT_TEMPLATE_TYPE_ACCEPTANCE_RECORD,
+    PRINT_TEMPLATE_TYPE_ASN, PRINT_TEMPLATE_TYPE_DELIVERY_NOTE, PRINT_TEMPLATE_TYPE_LOCATION_LABEL,
+    PRINT_TEMPLATE_TYPE_LPN_LABEL, PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
     SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
 };
 
@@ -124,7 +126,7 @@ fn template_request(field_library_version_id: Uuid) -> SavePrintTemplateRequest 
         template_code: "m2_asn_default".to_string(),
         template_name: "M2 ASN 默认模板".to_string(),
         template_type_code: PRINT_TEMPLATE_TYPE_ASN.to_string(),
-        scope: PrintTemplateScope::Global,
+        scope: PrintTemplateScope::Owner,
         is_default: true,
         remark: Some("H9 hiprint 测试模板".to_string()),
         field_library_version_id,
@@ -361,6 +363,7 @@ async fn print_template_versions_are_listed_by_template_and_owner(pool: PgPool) 
 
 include!("print_template_postgres/version_lifecycle.rs");
 include!("print_template_postgres/browser_print.rs");
+include!("print_template_postgres/business_integration.rs");
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn template_http_separates_write_publish_and_enabled_permissions(pool: PgPool) {
