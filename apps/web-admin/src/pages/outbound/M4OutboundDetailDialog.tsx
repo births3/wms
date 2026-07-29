@@ -20,23 +20,14 @@ import {
 } from "@wms/ui";
 import type { components } from "@wms/api-client";
 
+import { formatDateTime } from "@/lib/format";
+import { statusLabel } from "./m4-outbound-page-model";
+
+export { statusLabel };
+
 export type OutboundOrder = components["schemas"]["OutboundOrder"];
 export type OutboundWave = components["schemas"]["OutboundWave"];
-
-export interface PurchaseReturnOrder {
-  id: string;
-  return_no: string;
-  document_type: "purchase_return_outbound";
-  source_purchase_order_no: string;
-  supplier_name: string;
-  reason: string;
-  approval_source: "purchase_return_approval";
-  status: string;
-  product_code: string;
-  qty: number;
-  created_at: string;
-  updated_at: string;
-}
+export type PurchaseReturnOrder = components["schemas"]["PurchaseReturnOrder"];
 
 export type DetailTarget =
   | { kind: "order"; value: OutboundOrder }
@@ -80,7 +71,8 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
             ["WMS 单号", order.wms_order_no],
             ["ERP 单号", order.erp_order_no ?? "-"],
             ["订单类型", documentTypeLabel(order.document_type)],
-            ["客户 / 门店", `${shortId(order.customer_id)} / 门店A`],
+            // 门店名尚无真实字段：只展示客户 ID，不得虚构「门店A」
+            ["客户", shortId(order.customer_id)],
             ["要求发货", formatDateTime(order.required_ship_at)],
           ]}
         />
@@ -96,19 +88,21 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
         <DetailBlock
           title="校验与配送"
           rows={[
-            ["校验结果", order.status === "validation_exception" ? "校验异常" : "指定批号库存充足"],
-            ["复核模式", "包装站复核"],
-            ["配送方", "第三方快递"],
-            ["包裹数量", "1"],
+            // 复核模式 / 配送方 / 包裹数量尚无真实字段：展示「-」，不得虚构
+            ["校验结果", order.status === "validation_exception" ? "校验异常" : "通过"],
+            ["复核模式", "-"],
+            ["配送方", "-"],
+            ["包裹数量", "-"],
           ]}
         />
         <DetailBlock
           title="交接字段"
           rows={[
+            // 车牌 / 装车温度 / 签字尚未随订单返回：展示「—」，不得按状态虚构
             ["交接时间", order.status === "shipped" ? formatDateTime(order.updated_at) : "—"],
-            ["车牌号", order.status === "shipped" ? "沪A-12345" : "—"],
+            ["车牌号", "—"],
             ["装车温度", "—"],
-            ["签字", order.status === "shipped" ? "已签字" : "—"],
+            ["签字", "—"],
           ]}
         />
       </div>
@@ -134,9 +128,10 @@ function WaveDetail({ wave, orders }: { wave: OutboundWave; orders: OutboundOrde
           ["当前状态", statusLabel(wave.status)],
           ["订单数", `${(wave.order_ids ?? []).length}`],
           ["明细行数", `${orders.reduce((sum, order) => sum + (order.lines ?? []).length, 0)}`],
-          ["路径策略", "S 型最短路径"],
-          ["温区", "常温"],
-          ["容量上限", "100 单 / 10000 件"],
+          // 路径策略 / 温区 / 容量上限尚无真实字段：展示「-」，不得虚构
+          ["路径策略", "-"],
+          ["温区", "-"],
+          ["容量上限", "-"],
           ["创建时间", formatDateTime(wave.created_at)],
         ]}
       />
@@ -240,8 +235,9 @@ function Lines({ title, lines }: { title: string; lines: Array<{ key: string; ce
       <div className="divide-y">
         {lines.map((line) => (
           <div key={line.key} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-4">
-            {line.cells.map((cell) => (
-              <span key={cell} className="truncate">{cell}</span>
+            {/* 单元格内容可能重复（如批号=商品编码），必须用列序号作 key */}
+            {line.cells.map((cell, index) => (
+              <span key={index} className="truncate">{cell}</span>
             ))}
           </div>
         ))}
@@ -291,30 +287,6 @@ function stageIndex(target: DetailTarget) {
   return 0;
 }
 
-export function statusLabel(status: string | null | undefined) {
-  if (!status) return "-";
-  const labels: Record<string, string> = {
-    pending_validation: "待校验",
-    validation_exception: "校验异常",
-    confirmed: "已确认",
-    in_wave: "已入波次",
-    inventory_locked: "库存锁定",
-    reviewed: "已复核",
-    shipped: "已发货",
-    signed: "已签收",
-    void_requested: "作废申请",
-    draft: "待下发",
-    released: "已下发",
-    cancelled: "已取消",
-    picking: "拣选中",
-    pending_approval: "待审批",
-    approved: "已审批",
-    pickup: "提货中",
-    inspecting: "验收中",
-    completed: "已完成",
-  };
-  return labels[status] ?? status;
-}
 
 function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["document_type"]) {
   return value === "purchase_return_outbound" ? "采购退货出库" : value;
@@ -331,11 +303,4 @@ function totalPlannedQty(order: OutboundOrder) {
 
 function shortId(value: string) {
   return value.slice(0, 8);
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
 }

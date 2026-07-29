@@ -24,7 +24,6 @@ export type ActionKind =
   | "release-wave"
   | "cancel-wave"
   | "review"
-  | "print"
   | "ship"
   | "create-return"
   | "approve-return"
@@ -50,11 +49,29 @@ export interface OutboundCreateForm {
   wmsOrderNo: string;
   erpOrderNo: string;
   documentType: string;
-  customerName: string;
+  warehouseId: string;
+  customerId: string;
+  deliveryAddressId: string;
   productCode: string;
   batchNo: string;
   plannedQty: string;
   requiredShipDate: string;
+}
+
+export interface PurchaseReturnCreateForm {
+  returnNo: string;
+  sourcePurchaseOrderNo: string;
+  supplierName: string;
+  reason: string;
+  warehouseId: string;
+  productCode: string;
+  qty: string;
+}
+
+export interface OutboundShipForm {
+  carrierType: string;
+  handoverTo: string;
+  packageCount: string;
 }
 
 export function outboundPrivateActions(
@@ -119,7 +136,8 @@ function canReviewOrder(status: string | undefined) {
 }
 
 function canShipOrder(status: string | undefined) {
-  return status === "reviewed";
+  // 与后端发货前置一致：reviewed | reviewed_short。
+  return status === "reviewed" || status === "reviewed_short";
 }
 
 function canApproveReturn(status: string | undefined) {
@@ -163,11 +181,16 @@ function toolbarAction(
   };
 }
 
-export function M4OutboundActionDialog({ action, target, createForm, documentTypeOptions, reviewOrder, reviewLoading, reviewError, reviewPolicy, reviewPolicyLoading, secondReviewerId, note, actionError, pending, setCreateForm, setSecondReviewerId, setNote, onClose, onSubmit }: {
+export function M4OutboundActionDialog({ action, target, createForm, purchaseReturnForm, shipForm, documentTypeOptions, warehouseOptions, customerOptions, addressOptions, reviewOrder, reviewLoading, reviewError, reviewPolicy, reviewPolicyLoading, secondReviewerId, note, actionError, pending, setCreateForm, setPurchaseReturnForm, setShipForm, setSecondReviewerId, setNote, onClose, onSubmit }: {
   action: ActionState | null;
   target: ActionTargetContext | null;
   createForm: OutboundCreateForm;
+  purchaseReturnForm: PurchaseReturnCreateForm;
+  shipForm: OutboundShipForm;
   documentTypeOptions: Array<{ value: string; label: string }>;
+  warehouseOptions: Array<{ value: string; label: string }>;
+  customerOptions: Array<{ value: string; label: string }>;
+  addressOptions: Array<{ value: string; label: string }>;
   reviewOrder: OutboundOrder | null;
   reviewLoading: boolean;
   reviewError: string | null;
@@ -178,6 +201,8 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
   actionError: string | null;
   pending: boolean;
   setCreateForm: React.Dispatch<React.SetStateAction<OutboundCreateForm>>;
+  setPurchaseReturnForm: React.Dispatch<React.SetStateAction<PurchaseReturnCreateForm>>;
+  setShipForm: React.Dispatch<React.SetStateAction<OutboundShipForm>>;
   setSecondReviewerId: (value: string) => void;
   setNote: (value: string) => void;
   onClose: () => void;
@@ -240,11 +265,38 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
                   {documentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <TextField label="客户 / 门店" value={createForm.customerName} onChange={(customerName) => setCreateForm((value) => ({ ...value, customerName }))} />
+              <SelectField label="仓库" value={createForm.warehouseId} options={warehouseOptions} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
+              <SelectField label="客户 / 门店" value={createForm.customerId} options={customerOptions} onChange={(customerId) => setCreateForm((value) => ({ ...value, customerId, deliveryAddressId: "" }))} />
+              <SelectField label="送货地址" value={createForm.deliveryAddressId} options={addressOptions} onChange={(deliveryAddressId) => setCreateForm((value) => ({ ...value, deliveryAddressId }))} />
               <TextField label="商品编码" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
               <TextField label="批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
               <TextField label="计划数量" type="number" value={createForm.plannedQty} onChange={(plannedQty) => setCreateForm((value) => ({ ...value, plannedQty }))} />
               <TextField label="要求发货" type="date" value={createForm.requiredShipDate} onChange={(requiredShipDate) => setCreateForm((value) => ({ ...value, requiredShipDate }))} />
+            </>
+          ) : action.kind === "create-return" ? (
+            <>
+              <TextField required label="采购退货单号" value={purchaseReturnForm.returnNo} onChange={(returnNo) => setPurchaseReturnForm((value) => ({ ...value, returnNo }))} />
+              <TextField required label="原采购入库单" value={purchaseReturnForm.sourcePurchaseOrderNo} onChange={(sourcePurchaseOrderNo) => setPurchaseReturnForm((value) => ({ ...value, sourcePurchaseOrderNo }))} />
+              <TextField required label="供应商" value={purchaseReturnForm.supplierName} onChange={(supplierName) => setPurchaseReturnForm((value) => ({ ...value, supplierName }))} />
+              <SelectField required label="仓库" value={purchaseReturnForm.warehouseId} options={warehouseOptions} onChange={(warehouseId) => setPurchaseReturnForm((value) => ({ ...value, warehouseId }))} />
+              <TextField required className="md:col-span-2" label="退货原因" value={purchaseReturnForm.reason} onChange={(reason) => setPurchaseReturnForm((value) => ({ ...value, reason }))} />
+              <TextField required label="商品编码" value={purchaseReturnForm.productCode} onChange={(productCode) => setPurchaseReturnForm((value) => ({ ...value, productCode }))} />
+              <TextField required label="数量" type="number" value={purchaseReturnForm.qty} onChange={(qty) => setPurchaseReturnForm((value) => ({ ...value, qty }))} />
+            </>
+          ) : action.kind === "ship" ? (
+            <>
+              <SelectField
+                required
+                label="配送方类型"
+                value={shipForm.carrierType}
+                options={[
+                  { value: "own_fleet", label: "自有配送" },
+                  { value: "third_party_express", label: "第三方快递" },
+                ]}
+                onChange={(carrierType) => setShipForm((value) => ({ ...value, carrierType }))}
+              />
+              <TextField required label="交接对象" value={shipForm.handoverTo} onChange={(handoverTo) => setShipForm((value) => ({ ...value, handoverTo }))} />
+              <TextField required label="包裹数量" type="number" value={shipForm.packageCount} onChange={(packageCount) => setShipForm((value) => ({ ...value, packageCount }))} />
             </>
           ) : (
             <>
@@ -271,16 +323,32 @@ export function M4OutboundActionDialog({ action, target, createForm, documentTyp
   );
 }
 
+function SelectField({ label, value, options, onChange, required = false }: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <label className="grid gap-1 text-sm">{label}
+      <select required={required} className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">请选择</option>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
 function actionMeta(kind: ActionKind) {
   const map: Record<ActionKind, { title: string; description: string; submitLabel: string }> = {
-    "create-order": { title: "新建出库单", description: "手工创建 PC Web 测试出库单。", submitLabel: "创建出库单" },
+    "create-order": { title: "新建出库单", description: "创建出库订单并提交业务校验。", submitLabel: "创建出库单" },
     validate: { title: "重新校验", description: "重新执行库存和批号校验。", submitLabel: "确认校验" },
     void: { title: "作废申请", description: "提交未进波次订单的作废申请。", submitLabel: "提交申请" },
     "create-wave": { title: "新建波次", description: "把已确认订单合并为一个波次。", submitLabel: "创建波次" },
     "release-wave": { title: "下发波次", description: "下发波次并进入库存锁定。", submitLabel: "确认下发" },
     "cancel-wave": { title: "取消波次", description: "仅未开始拣选的波次可取消。", submitLabel: "确认取消" },
     review: { title: "复核", description: "包装站复核完成后提交。", submitLabel: "提交复核" },
-    print: { title: "打印", description: "提交随货同行单或快递面单打印任务。", submitLabel: "提交打印" },
     ship: { title: "发货交接", description: "记录交接对象并确认发货。", submitLabel: "确认发货" },
     "create-return": { title: "新建采购退货单", description: "创建退供应商的出库申请。", submitLabel: "创建采购退货单" },
     "approve-return": { title: "采购退货审批", description: "审批退供应商出库申请，备注可选。", submitLabel: "审批通过" },

@@ -2,6 +2,26 @@ import { Input, StatusBadge } from "@wms/ui";
 
 import type { OutboundOrder, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
 
+export function OutboundPageErrors({
+  messages,
+}: {
+  messages: Array<string | null | undefined>;
+}) {
+  return (
+    <>
+      {messages.filter(Boolean).map((message) => (
+        <div
+          key={message}
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          role="alert"
+        >
+          {message}
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function TextField({
   label,
   value,
@@ -81,21 +101,13 @@ export function ValidationBadge({ order }: { order: OutboundOrder }) {
   );
 }
 
-/** 优先可读客户名；仅有 id 时 shortId + 门店名 */
-export function CustomerCell({ customerId, storeName = "门店A" }: { customerId: string; storeName?: string }) {
+/** 优先可读客户名；仅有 id 时 shortId。门店名无真实字段时不展示，不得虚构。 */
+export function CustomerCell({ customerId, storeName }: { customerId: string; storeName?: string }) {
   const name = customerDisplayName(customerId);
-  if (name) {
-    return (
-      <div className="text-sm">
-        <div className="font-medium whitespace-nowrap">{name}</div>
-        <div className="text-xs text-muted-foreground whitespace-nowrap">{storeName}</div>
-      </div>
-    );
-  }
   return (
     <div className="text-sm">
-      <div className="font-mono whitespace-nowrap">{shortId(customerId)}</div>
-      <div className="text-xs text-muted-foreground whitespace-nowrap">{storeName}</div>
+      <div className={`whitespace-nowrap ${name ? "font-medium" : "font-mono"}`}>{name ?? shortId(customerId)}</div>
+      {storeName && <div className="text-xs text-muted-foreground whitespace-nowrap">{storeName}</div>}
     </div>
   );
 }
@@ -132,20 +144,25 @@ export function ActionExtraFields({ kind }: { kind: string }) {
   return (
     <>
       {extraActionFields(kind).map(([label, value, placeholder]) => (
-        <StaticField key={label} label={label} defaultValue={value} placeholder={placeholder} />
+        <StaticField key={label} label={label} value={value} placeholder={placeholder} />
       ))}
     </>
   );
 }
 
+/**
+ * 动作弹窗的补充说明字段：只读展示，值从不提交。
+ * 有真实来源的才给 value（流程常量、行为说明）；采集尚未接入的字段一律空值 + 「待录入」，
+ * 不得预填虚构的工位码 / 车牌 / 供应商等业务数据。
+ */
 function extraActionFields(kind: string): Array<[string, string, string?]> {
-  if (kind === "release-wave" || kind === "create-wave") return [["路径策略", "S 型最短路径"], ["温区", "常温"], ["容量上限", "100 单 / 10000 件"]];
-  if (kind === "review") return [["工位码", "PK-STATION-01"], ["实际复核数量", "按扫码累计"], ["短拣标识", "否"], ["复核人", "当前用户"]];
+  if (kind === "release-wave" || kind === "create-wave") return [["路径策略", "", "待录入"], ["温区", "", "待录入"], ["容量上限", "", "待录入"]];
+  if (kind === "review") return [["工位码", "", "待录入"], ["实际复核数量", "按扫码累计"], ["短拣标识", "", "待录入"], ["复核人", "当前用户"]];
   if (kind === "ship" || kind === "ship-return") {
     return [
-      ["配送方类型", "第三方快递"],
-      ["包裹数量", "1"],
-      ["车牌号", "沪A-12345"],
+      ["配送方类型", "", "待录入"],
+      ["包裹数量", "", "待录入"],
+      ["车牌号", "", "待录入"],
       ["装车温度", "", "冷链时必填"],
       ["签字", "交接双方签字"],
     ];
@@ -153,22 +170,23 @@ function extraActionFields(kind: string): Array<[string, string, string?]> {
   if (kind === "approve-return" || kind === "reject-return" || kind === "pick-return" || kind === "review-return" || kind === "create-return") {
     return [
       ["单据类型", "采购退货出库"],
-      ["原采购入库单", "ASN-M2-PC-0001"],
-      ["供应商", "华东医药供应商"],
-      ["退货原因", "供应商召回"],
-      ["商品", "P-M4-001"],
-      ["数量", "3 件"],
+      ["原采购入库单", "", "待录入"],
+      ["供应商", "", "待录入"],
+      ["退货原因", "", "待录入"],
+      ["商品", "", "待录入"],
+      ["数量", "", "待录入"],
       ["审批来源", purchaseReturnApprovalSourceLabel("purchase_return_approval")],
     ];
   }
-  return [["校验结果", "指定批号库存充足"], ["审批来源", "企业微信"]];
+  return [["校验结果", "", "校验后回填"], ["审批来源", "", "待录入"]];
 }
 
-function StaticField({ label, defaultValue, placeholder }: { label: string; defaultValue: string; placeholder?: string }) {
+/** 只读展示：值从不被读取提交，禁止渲染成可编辑输入框误导用户。 */
+function StaticField({ label, value, placeholder }: { label: string; value: string; placeholder?: string }) {
   return (
     <label>
       <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
-      <Input defaultValue={defaultValue} placeholder={placeholder} />
+      <Input readOnly disabled value={value} placeholder={placeholder ?? "待录入"} />
     </label>
   );
 }
