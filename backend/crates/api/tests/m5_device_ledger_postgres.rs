@@ -24,7 +24,7 @@ fn audit(ctx: &AuthContext) -> AuditWriteRequest {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn create_cold_chain_device_is_validated_idempotent_and_audited(pool: PgPool) {
+async fn create_update_and_disable_cold_chain_device_are_idempotent_and_audited(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
     let repo = PgWave3Repository::new(pool.clone());
@@ -162,7 +162,19 @@ async fn create_cold_chain_device_is_validated_idempotent_and_audited(pool: PgPo
             audit(&ctx),
         )
         .await
-        .expect("disable device")
-        .value;
-    assert_eq!(disabled.status, "inactive");
+        .expect("disable device");
+    assert!(!disabled.replayed);
+    assert_eq!(disabled.value.status, "inactive");
+    let disable_replay = repo
+        .disable_cold_chain_device_with_audit(
+            &ctx,
+            "CC-LEDGER-001",
+            Utc::now(),
+            "m5-device-disable-2",
+            audit(&ctx),
+        )
+        .await
+        .expect("same disable should replay");
+    assert!(disable_replay.replayed);
+    assert_eq!(disable_replay.value.id, disabled.value.id);
 }
