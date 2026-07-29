@@ -21,6 +21,16 @@ mod export;
 pub use export::process_queued_exports_with_provider;
 use export::{count_rows, export_mode, generate_export};
 
+type AlertExportRow = (
+    String,
+    String,
+    i64,
+    Uuid,
+    Option<String>,
+    DateTime<Utc>,
+    Option<DateTime<Utc>>,
+);
+
 #[derive(Clone, Debug)]
 pub struct PgAlertDashboardService {
     pool: PgPool,
@@ -438,8 +448,7 @@ impl PgAlertDashboardService {
         owner_id: Uuid,
         id: Uuid,
     ) -> Result<AlertExportJob, AlertDashboardError> {
-        let row: (String, String, i64, Uuid, Option<String>, DateTime<Utc>, Option<DateTime<Utc>>) =
-            sqlx::query_as(
+        let row: AlertExportRow = sqlx::query_as(
                 "SELECT status, format, row_count, download_token, email_notification_status, created_at, completed_at FROM alert_report_exports WHERE owner_id = $1 AND id = $2",
             )
             .bind(owner_id)

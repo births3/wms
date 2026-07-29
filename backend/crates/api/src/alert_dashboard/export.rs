@@ -266,7 +266,7 @@ pub(super) async fn generate_export(
             "alert-report.xls".to_string(),
         )),
         "pdf" => Ok((
-            simple_pdf(&tabular),
+            crate::pdf_document::render_text_pdf(&tabular),
             "application/pdf".to_string(),
             "alert-report.pdf".to_string(),
         )),
@@ -300,53 +300,6 @@ fn export_text(query: &AlertInstanceListQuery, rows: &[ExportRow]) -> String {
     output
 }
 
-fn simple_pdf(text: &str) -> Vec<u8> {
-    let printable: String = text
-        .chars()
-        .map(|value| {
-            if value.is_ascii_graphic() || value == ' ' {
-                value
-            } else {
-                ' '
-            }
-        })
-        .take(4000)
-        .collect();
-    let escaped = printable
-        .replace('\\', "\\\\")
-        .replace('(', "\\(")
-        .replace(')', "\\)");
-    let stream = format!("BT /F1 8 Tf 36 800 Td ({escaped}) Tj ET");
-    let objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>".to_string(),
-        format!("<< /Length {} >>\nstream\n{}\nendstream", stream.len(), stream),
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
-    ];
-    let mut pdf = b"%PDF-1.4\n".to_vec();
-    let mut offsets = vec![0_usize];
-    for (index, object) in objects.iter().enumerate() {
-        offsets.push(pdf.len());
-        pdf.extend_from_slice(format!("{} 0 obj\n{}\nendobj\n", index + 1, object).as_bytes());
-    }
-    let xref = pdf.len();
-    pdf.extend_from_slice(
-        format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes(),
-    );
-    for offset in offsets.into_iter().skip(1) {
-        pdf.extend_from_slice(format!("{offset:010} 00000 n \n").as_bytes());
-    }
-    pdf.extend_from_slice(
-        format!(
-            "trailer << /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
-            objects.len() + 1
-        )
-        .as_bytes(),
-    );
-    pdf
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,7 +312,7 @@ mod tests {
 
     #[test]
     fn generated_pdf_has_pdf_header_and_eof() {
-        let pdf = simple_pdf("alert report");
+        let pdf = crate::pdf_document::render_text_pdf("alert report");
         assert!(pdf.starts_with(b"%PDF-1.4"));
         assert!(pdf.ends_with(b"%%EOF\n"));
     }

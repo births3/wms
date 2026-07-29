@@ -16,6 +16,10 @@ import {
   AlertDefinitionFormDialog, alertDefinitionFormFor, emptyAlertDefinitionForm,
   toAlertDefinitionDraft, validateAlertDefinitionForm, type AlertDefinitionForm,
 } from "./AlertDefinitionFormDialog";
+import { errorText } from "@/lib/error-text";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const alertDefinitionQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "编码 / 名称 / 事件类型" },
@@ -46,14 +50,18 @@ const columns: DataGridColumn<AlertDefinition>[] = [
  * 详情、编辑、启停、删除、导出和字段设置由公共组件承载；详情与确认使用瞬时弹窗，不设常驻侧栏。
  */
 export function AlertDefinitionPage() {
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(defaultQuery);
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery);
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const query = useAlertDefinitionsQuery(toFilters(appliedQuery));
   const submitChange = useSubmitAlertDefinitionChangeMutation();
   const escalationRules = useAlertEscalationRulesQuery();
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<AlertDefinition | null>(null);
+  const {
+    open: formOpen,
+    target: editing,
+    setOpen: setFormOpen,
+    setTarget: setEditing,
+  } = useDialogState<AlertDefinition>();
   const [form, setForm] = React.useState<AlertDefinitionForm>(emptyAlertDefinitionForm);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<AlertDefinition | null>(null);
@@ -73,13 +81,15 @@ export function AlertDefinitionPage() {
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
     <PageHeader title="H-AL 告警定义" subtitle="告警条件、级别、接收角色、升级和静默策略；所有变更经 M-QL 审批后生效" />
     {notice && <div role={notice.kind === "error" ? "alert" : "status"} className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"}>{notice.text}</div>}
-    <QueryPanel fields={alertDefinitionQueryFields} defaultVisibleFieldKeys={alertDefinitionCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => setAppliedQuery(normalizeQuery(draftQuery))} onReset={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} />
-    <Card><CardContent className="p-5"><DataGrid storageKey="hal.alert-definitions" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={query.isPending ? "加载告警定义..." : undefined} emptyTitle={query.isError ? "读取告警定义失败" : "暂无告警定义"} emptyDescription={query.isError ? errorText(query.error, "请检查鉴权和 API 服务") : "请新增首个货主告警定义"} tableClassName="min-w-[1595px]" exportFileBaseName="H-AL 告警定义" refreshAction={refreshAction} createAction={createAction} detailAction={detailAction} editAction={editAction} disableAction={disableAction} deleteAction={deleteAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(alertDefinitionQueryFields, appliedQuery)} onApplyQueryState={(value) => { const next = normalizeQuery(value); setDraftQuery(next); setAppliedQuery(next); }} onClearQueryState={() => { const next = defaultQuery(); setDraftQuery(next); setAppliedQuery(next); }} /></CardContent></Card>
+    <QueryPanel fields={alertDefinitionQueryFields} defaultVisibleFieldKeys={alertDefinitionCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />
+    <Card><CardContent className="p-5"><DataGrid storageKey="hal.alert-definitions" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={query.isPending ? "加载告警定义..." : undefined} emptyTitle={query.isError ? "读取告警定义失败" : "暂无告警定义"} emptyDescription={query.isError ? errorText(query.error, "请检查鉴权和 API 服务") : "请新增首个货主告警定义"} tableClassName="min-w-[1595px]" exportFileBaseName="H-AL 告警定义" refreshAction={refreshAction} createAction={createAction} detailAction={detailAction} editAction={editAction} disableAction={disableAction} deleteAction={deleteAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(alertDefinitionQueryFields, appliedQuery)} onApplyQueryState={applyGridQueryState} onClearQueryState={clearGridQueryState} /></CardContent></Card>
     <AlertDefinitionFormDialog open={formOpen} editing={editing} form={form} pending={busy} errorMessage={formError ?? submitChange.error?.message} escalationRules={escalationRules.data?.data ?? []} onOpenChange={setFormOpen} onFormChange={(next) => { setFormError(null); setForm(next); }} onSubmit={submitForm} />
     <AlertDefinitionDetailDialog row={detail} onOpenChange={(open) => !open && setDetail(null)} />
     <ConfirmDialog action={confirmAction} pending={busy} errorMessage={submitChange.error?.message} onOpenChange={(open) => !open && setConfirmAction(null)} onConfirm={() => void confirmChange()} />
   </section>;
 
+  function applyGridQueryState(value: unknown) { applyQuery(queryValueFromUnknown(value)); }
+  function clearGridQueryState() { resetQuery(); }
   function openForm(row: AlertDefinition | null) { setNotice(null); setFormError(null); submitChange.reset(); setEditing(row); setForm(row ? alertDefinitionFormFor(row) : emptyAlertDefinitionForm()); setFormOpen(true); }
   function openConfirm(operation: "set_enabled" | "delete", row: AlertDefinition) { setNotice(null); submitChange.reset(); setConfirmAction({ operation, row }); }
   async function submitForm(event: React.FormEvent<HTMLFormElement>) {
@@ -114,10 +124,8 @@ function AlertDefinitionDetailDialog({ row, onOpenChange }: { row: AlertDefiniti
 function Detail({ label, value }: { label: string; value: string }) { return <div><dt className="text-muted-foreground">{label}</dt><dd className="mt-1">{value}</dd></div>; }
 function cannotToggle(row?: AlertDefinition) { return !row || (row.enabled && (row.is_gsp_forced || !row.is_disable_allowed)); }
 function defaultQuery(): QueryPanelValue { return { keyword: "", enabled: "", severity: "" }; }
-function normalizeQuery(value: unknown): QueryPanelValue { const row = value && typeof value === "object" ? value as Record<string, unknown> : {}; return { keyword: text(row.keyword), enabled: text(row.enabled), severity: text(row.severity) }; }
-function toFilters(value: QueryPanelValue) { const enabled = text(value.enabled); return { keyword: text(value.keyword).trim() || undefined, severity: text(value.severity) || undefined, enabled: enabled ? enabled === "true" : undefined }; }
-function text(value: unknown) { return typeof value === "string" ? value : ""; }
-function errorText(error: unknown, fallback: string) { return error instanceof Error ? error.message : fallback; }
+function normalizeQuery(value: unknown): QueryPanelValue { const row = queryValueFromUnknown(value); return { keyword: queryString(row.keyword), enabled: queryString(row.enabled), severity: queryString(row.severity) }; }
+function toFilters(value: QueryPanelValue) { const enabled = queryString(value.enabled); return { keyword: queryString(value.keyword).trim() || undefined, severity: queryString(value.severity) || undefined, enabled: enabled ? enabled === "true" : undefined }; }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
 function severityLabel(value: string) { return ({ info: "提示", warning: "警告", critical: "严重" } as Record<string, string>)[value] ?? value; }
 function roleLabel(value: string) { return ({ warehouse_manager: "仓库经理", maintenance_operator: "养护员", system_admin: "系统管理员", owner_contact: "货主联系人" } as Record<string, string>)[value] ?? value; }
