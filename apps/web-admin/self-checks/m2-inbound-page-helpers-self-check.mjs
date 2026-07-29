@@ -102,6 +102,7 @@ try {
   const dashboardPageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDashboardPage.tsx", import.meta.url)), "utf8");
   const orderTableSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url)), "utf8");
   const printDialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPrintDialog.tsx", import.meta.url)), "utf8");
+  const businessPrintDialogSource = readFileSync(fileURLToPath(new URL("../src/pages/print-template/H9BusinessPrintDialog.tsx", import.meta.url)), "utf8");
   const dialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDialogs.tsx", import.meta.url)), "utf8");
   const inboundQueriesSource = readFileSync(fileURLToPath(new URL("../src/features/inbound/inbound-queries.ts", import.meta.url)), "utf8");
   const realE2eSource = readFileSync(fileURLToPath(new URL("../../../prototypes/e2e/web-admin-m2-real.spec.ts", import.meta.url)), "utf8");
@@ -136,9 +137,10 @@ try {
   assert.match(orderTableSource, /printAction: DataGridPrintAction/, "M2 打印必须接入 DataGrid 公共打印按钮");
   assert.match(orderTableSource, /onOpenPrint\(selectedOrder\.id\)/, "M2 打印按钮必须打开业务打印弹窗");
   assert.match(pageSource, /M2InboundPrintDialog/, "M2 页面必须挂载业务打印弹窗");
-  assert.match(printDialogSource, /usePreviewPrintTemplateMutation/, "M2 打印必须复用 H9 模板预览 API");
-  assert.match(printDialogSource, /useRecordPrintTemplateMutation/, "M2 打印必须写入 H9 打印记录");
-  assert.match(printDialogSource, /template_type_code: templateTypeCode\(mode\)/, "M2 打印必须按入库页面类型选择 H9 模板类型");
+  assert.match(printDialogSource, /H9BusinessPrintDialog/, "M2 打印必须复用 H9 业务打印入口");
+  assert.match(businessPrintDialogSource, /usePreviewPrintTemplateMutation/, "H9 业务打印入口必须复用模板预览 API");
+  assert.match(businessPrintDialogSource, /useRecordPrintTemplateMutation/, "H9 业务打印入口必须写入打印记录");
+  assert.match(printDialogSource, /templateTypeCode:\s*templateTypeCode\(mode\)/, "M2 打印必须按入库页面类型选择 H9 模板类型");
   assert.match(pageSource, /useReleaseReceivingOrderMutation/, "M2 页面必须接入真实 ASN 放行 API");
   assert.match(pageSource, /useMasterDataRowsQuery\("m1-locations", mode === "putaway"\)/, "上架页面必须读取 M1 库位主数据");
   assert.match(pageSource, /useMasterDataRowsQuery\("m1-products", mode === "receiving"\)/, "收货页面必须读取 M1 商品温区");

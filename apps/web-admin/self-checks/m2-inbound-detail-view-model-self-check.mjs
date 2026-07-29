@@ -45,15 +45,16 @@ const licenseRows = orderLicenseRows(order);
 
 assert.equal(productRows.length, 1);
 assert.equal(productRows[0].productCode, "P-M2-001");
-assert.equal(productRows[0].productName, "感冒灵颗粒");
-assert.equal(productRows[0].specification, "10g*9袋");
-assert.equal(productRows[0].manufacturer, "示例药业");
+// 商品档案/包装主数据尚未随入库明细返回：缺数据必须展示「-」，不得虚构品名、规格、厂家和包装换算
+assert.equal(productRows[0].productName, "-");
+assert.equal(productRows[0].specification, "-");
+assert.equal(productRows[0].manufacturer, "-");
 assert.equal(productRows[0].orderQty, "51");
-assert.equal(productRows[0].unit, "件");
-assert.equal(productRows[0].caseQty, "2");
-assert.equal(productRows[0].looseQty, "11");
-assert.equal(productRows[0].middlePackQty, "10 件/中包");
-assert.equal(productRows[0].casePackQty, "20 件/件");
+assert.equal(productRows[0].unit, "-");
+assert.equal(productRows[0].caseQty, "-");
+assert.equal(productRows[0].looseQty, "-");
+assert.equal(productRows[0].middlePackQty, "-");
+assert.equal(productRows[0].casePackQty, "-");
 assert.equal(batchRows.length, 2);
 assert.deepEqual(
   batchRows.map((item) => item.batchNo),
@@ -63,16 +64,27 @@ assert.deepEqual(
   batchRows.map((item) => item.batchQty),
   ["45", "6"],
 );
+// 批号资质字段尚未随入库明细返回：缺数据必须展示「-」，不得按商品编码虚构药监档案
 assert.deepEqual(licenseRows, [
-  ["批准文号", "国药准字Z0001"],
+  ["批准文号", "-"],
   ["进口注册证", "-"],
-  ["上市持有人", "示例药业"],
+  ["上市持有人", "-"],
 ]);
-assert.equal(batchRows[0].approvalNo, "国药准字Z0001");
+assert.equal(batchRows[0].approvalNo, "-");
 assert.equal(batchRows[0].importRegistrationCertificate, "-");
-assert.equal(batchRows[0].marketingAuthorizationHolder, "示例药业");
-assert.equal(batchRows[0].batchCasePackage, "2 件 + 5 零 / 20 件/件");
-const receivingLabels = processDetail("receiving", 51, 0).rows.map(([label]) => label);
+assert.equal(batchRows[0].marketingAuthorizationHolder, "-");
+assert.equal(batchRows[0].batchCasePackage, "-");
+const receivingDetail = processDetail("receiving", 51, 0);
+const receivingLabels = receivingDetail.rows.map(([label]) => label);
 assert.equal(receivingLabels.includes("第一收货员"), true);
 assert.equal(receivingLabels.includes("第二收货员"), true);
-assert.equal(processDetail("inspection", 51, 1).rows.some(([label]) => label === "验收复核"), true);
+// 收货/验收回执尚未返回：除预报数量外必须展示「待录入 / -」，不得虚构承运、联系人和收货员
+for (const [label, value] of receivingDetail.rows) {
+  assert.equal(value === "待录入" || value === "-" || value.includes("待录入"), true, `收货信息「${label}」不得虚构：${value}`);
+}
+assert.equal(receivingDetail.rows.some(([, value]) => value.includes("预报 51 件")), true);
+const inspectionDetail = processDetail("inspection", 51, 1);
+assert.equal(inspectionDetail.rows.some(([label]) => label === "验收复核"), true);
+for (const [label, value] of inspectionDetail.rows) {
+  assert.equal(value === "待录入" || value === "-", true, `验收信息「${label}」不得虚构：${value}`);
+}

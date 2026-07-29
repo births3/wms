@@ -80,20 +80,21 @@ export function inboundDetailStageIndex(status: string | null | undefined) {
 
 export function processDetail(stage: InboundDetailStage, expectedQty: number, currentStage: number) {
   const map = {
+    // ponytail: 列表/详情接口尚未返回收货、验收、上架回执，缺数据一律「待录入 / -」，不虚构现场记录。
     receiving: {
       title: "收货信息",
       state: processState(0, currentStage),
       rows: [
-        ["承运商 / 车牌", "华东冷链 / 沪A-12345"],
-        ["发运地点", "上海配送中心"],
-        ["启运 / 到货", "2026-06-27 08:00 / 2026-06-27 10:00"],
-        ["入库时间", "2026-06-27 10:15"],
-        ["运输 / 温控 / 温度", "冷藏车 / 冷藏车 / 20℃"],
-        ["联系人", "张三 / 13800000000 / 310101********0000"],
-        ["随货核对", "印章已核对 / 备案件已核对"],
-        ["数量闭合", `${expectedQty} / ${expectedQty} / 0 / 0 件`],
-        ["第一收货员", "收货员 0101"],
-        ["第二收货员", "收货员 0102"],
+        ["承运商 / 车牌", "待录入"],
+        ["发运地点", "待录入"],
+        ["启运 / 到货", "待录入"],
+        ["入库时间", "待录入"],
+        ["运输 / 温控 / 温度", "待录入"],
+        ["联系人", "待录入"],
+        ["随货核对", "待录入"],
+        ["数量闭合", `预报 ${expectedQty} 件 / 实收待录入`],
+        ["第一收货员", "待录入"],
+        ["第二收货员", "待录入"],
         ["异常备注", "-"],
       ],
     },
@@ -101,12 +102,12 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
       title: "验收信息",
       state: processState(1, currentStage),
       rows: [
-        ["通过 / 拒收", `${expectedQty} / 0 件`],
-        ["追溯码", "TC-M2-PC-0001"],
-        ["质量状态", "合格"],
-        ["四项核对", "外观 / 包装 / 说明书 / 标签均合格"],
-        ["验收复核", "验收节点命中双人扫码 / 已签字"],
-        ["验收 / 复核人", "验收员 0101 / 复核员 0102"],
+        ["通过 / 拒收", "待录入"],
+        ["追溯码", "待录入"],
+        ["质量状态", "待录入"],
+        ["四项核对", "待录入"],
+        ["验收复核", "待录入"],
+        ["验收 / 复核人", "待录入"],
         ["验收备注", "-"],
       ],
     },
@@ -114,8 +115,8 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
       title: "上架信息",
       state: processState(2, currentStage),
       rows: [
-        ["容器 LPN", "LPN-M2-PC-0001"],
-        ["推荐库位", "A-01-01 / A-01-02 / A-02-01"],
+        ["容器 LPN", "待录入"],
+        ["推荐库位", "-"],
         ["实际库位", "待录入"],
         ["校验结果", "待执行"],
         ["上架备注", "-"],
@@ -136,8 +137,8 @@ export function productInfoRows(order: Pick<ReceivingOrder, "lines">) {
     rows.set(item.product_code, (rows.get(item.product_code) ?? 0) + item.expected_qty);
   }
   return [...rows.entries()].map(([productCode, orderQty]) => ({
-    ...productMasterFields(productCode),
-    ...linePackageFields(orderQty),
+    ...productMasterFields(),
+    ...linePackageFields(),
     key: productCode,
     productCode: productCode || "-",
     orderQty: String(orderQty),
@@ -146,19 +147,19 @@ export function productInfoRows(order: Pick<ReceivingOrder, "lines">) {
 
 export function batchInfoRows(order: Pick<ReceivingOrder, "lines">) {
   return (order.lines ?? []).map((item) => ({
-    ...batchLicenseFields(item.product_code),
+    ...batchLicenseFields(),
     key: `${item.line_no}-${item.batch_no ?? ""}`,
     lineNo: `#${item.line_no}`,
     batchNo: item.batch_no || "-",
     batchQty: String(item.expected_qty),
-    batchCasePackage: batchPackageText(item.expected_qty),
+    batchCasePackage: "-",
     productionDate: item.production_date || "-",
     expiryDate: item.expiry_date || "-",
   }));
 }
 
 export function orderLicenseRows(order: Pick<ReceivingOrder, "lines">): Array<[string, string]> {
-  const rows = (order.lines ?? []).map((item) => batchLicenseFields(item.product_code));
+  const rows = (order.lines ?? []).map(() => batchLicenseFields());
   return [
     ["批准文号", uniqueText(rows.map((item) => item.approvalNo))],
     ["进口注册证", uniqueText(rows.map((item) => item.importRegistrationCertificate))],
@@ -172,40 +173,32 @@ function processState(index: number, current: number): ProcessState {
   return { label: "待处理", status: "pending" };
 }
 
-function linePackageFields(orderQty: number) {
-  // ponytail: ReceivingOrderLine 还没有产品包装主数据；后端补单位/中包/件包字段后替换这里。
-  const unit = "件";
-  const middlePackQty = 10;
-  const casePackQty = 20;
+function linePackageFields() {
+  // ponytail: ReceivingOrderLine 还没有产品包装主数据；缺数据展示「-」，后端补单位/中包/件包字段后替换这里。
   return {
-    unit,
-    caseQty: String(Math.floor(orderQty / casePackQty)),
-    looseQty: String(orderQty % casePackQty),
-    middlePackQty: `${middlePackQty} ${unit}/中包`,
-    casePackQty: `${casePackQty} ${unit}/件`,
+    unit: "-",
+    caseQty: "-",
+    looseQty: "-",
+    middlePackQty: "-",
+    casePackQty: "-",
   };
 }
 
-function batchPackageText(batchQty: number) {
-  const fields = linePackageFields(batchQty);
-  return `${fields.caseQty} 件 + ${fields.looseQty} 零 / ${fields.casePackQty}`;
-}
-
-function productMasterFields(productCode: string) {
-  // ponytail: ReceivingOrderLine 还没带商品档案字段；后端关联 M1 商品档案后替换这里。
+function productMasterFields() {
+  // ponytail: ReceivingOrderLine 还没带商品档案字段；缺数据展示「-」，后端关联 M1 商品档案后替换这里。
   return {
-    productName: productCode.includes("COLD") ? "冷链测试药品" : "感冒灵颗粒",
-    specification: productCode.includes("COLD") ? "2ml*10支" : "10g*9袋",
-    manufacturer: productCode.includes("COLD") ? "示例冷链药业" : "示例药业",
+    productName: "-",
+    specification: "-",
+    manufacturer: "-",
   };
 }
 
-function batchLicenseFields(productCode: string) {
-  // ponytail: ReceivingOrderLine 还没带批号资质字段；后端关联批号/药监档案后替换这里。
+function batchLicenseFields() {
+  // ponytail: ReceivingOrderLine 还没带批号资质字段；缺数据展示「-」，后端关联批号/药监档案后替换这里。
   return {
-    approvalNo: productCode.includes("COLD") ? "国药准字H20240001" : "国药准字Z0001",
+    approvalNo: "-",
     importRegistrationCertificate: "-",
-    marketingAuthorizationHolder: productCode.includes("COLD") ? "示例冷链药业" : "示例药业",
+    marketingAuthorizationHolder: "-",
   };
 }
 

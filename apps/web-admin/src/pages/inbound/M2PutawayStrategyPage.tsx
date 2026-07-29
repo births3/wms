@@ -29,6 +29,12 @@ import {
   useUpsertPutawayStrategyProfileMutation,
   type PutawayStrategyProfile,
 } from "@/features/inbound/putaway-strategy-queries";
+import { errorText } from "@/lib/error-text";
+import { formatDateTime } from "@/lib/format";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
+import { isUuid } from "@/lib/uuid";
 
 /** 上架策略规则目录（与 US-M2-010 验收标准一致）。 */
 export const PUTAWAY_RULE_CATALOG: Array<{ code: string; label: string }> = [
@@ -180,7 +186,7 @@ const columns: DataGridColumn<PutawayStrategyProfile>[] = [
     sortable: true,
     sortValue: (row) => row.created_at,
     copyValue: (row) => row.created_at,
-    render: (row) => formatDate(row.created_at),
+    render: (row) => formatDateTime(row.created_at),
     filter: { type: "dateRange" },
   },
   {
@@ -190,7 +196,7 @@ const columns: DataGridColumn<PutawayStrategyProfile>[] = [
     sortable: true,
     sortValue: (row) => row.updated_at,
     copyValue: (row) => row.updated_at,
-    render: (row) => formatDate(row.updated_at),
+    render: (row) => formatDateTime(row.updated_at),
     filter: { type: "dateRange" },
   },
 ];
@@ -199,11 +205,10 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
   const profilesQuery = usePutawayStrategyProfilesQuery();
   const saveMutation = useUpsertPutawayStrategyProfileMutation();
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [query, setQuery] = React.useState<QueryPanelValue>(defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(defaultQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [form, setForm] = React.useState<Form>(emptyForm());
-  const [editing, setEditing] = React.useState<PutawayStrategyProfile | null>(null);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const editDialog = useDialogState<PutawayStrategyProfile>();
   const [notice, setNotice] = React.useState<Notice>(null);
   const [dragCode, setDragCode] = React.useState<string | null>(null);
 
@@ -251,7 +256,7 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
         notify_on_no_location: form.notifyOnNoLocation,
         status: form.status,
       });
-      setDialogOpen(false);
+      editDialog.close();
       setSelected([]);
       setNotice({ kind: "success", text: `方案 ${saved.profile_code} 已保存` });
     } catch (errorValue) {
@@ -261,9 +266,9 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
 
   function openDialog(row: PutawayStrategyProfile | null) {
     setNotice(null);
-    setEditing(row);
     setForm(row ? formFromRow(row) : emptyForm());
-    setDialogOpen(true);
+    editDialog.setTarget(row);
+    editDialog.setOpen(true);
   }
 
   function moveRule(code: string, direction: -1 | 1) {
@@ -317,14 +322,10 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
       <QueryPanel
         fields={queryFields}
         defaultVisibleFieldKeys={defaultVisibleFieldKeys}
-        value={query}
-        onValueChange={setQuery}
-        onQuery={() => setAppliedQuery(query)}
-        onReset={() => {
-          const next = defaultQuery();
-          setQuery(next);
-          setAppliedQuery(next);
-        }}
+        value={draftQuery}
+        onValueChange={setDraftQuery}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       <Card>
         <CardContent className="p-5">
@@ -349,25 +350,17 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
             editAction={editAction}
             queryState={appliedQuery}
             querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)}
-            onApplyQueryState={(value) => {
-              const next = normalizeQuery(value);
-              setQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={() => {
-              const next = defaultQuery();
-              setQuery(next);
-              setAppliedQuery(next);
-            }}
+            onApplyQueryState={(value) => applyQuery(queryValueFromUnknown(value))}
+            onClearQueryState={resetQuery}
           />
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => !busy && setDialogOpen(open)}>
+      <Dialog open={editDialog.open} onOpenChange={(open) => !busy && editDialog.setOpen(open)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" data-testid="m2-putaway-strategy-dialog">
           <form className="grid gap-4" onSubmit={submit}>
             <DialogHeader>
-              <DialogTitle>{editing ? "修改上架策略方案" : "新增上架策略方案"}</DialogTitle>
+              <DialogTitle>{editDialog.target ? "修改上架策略方案" : "新增上架策略方案"}</DialogTitle>
               <DialogDescription>
                 规则可启用/停用，并支持拖拽或上下调整优先级。默认优先级：温区 &gt; 货主 &gt; 容积 &gt; 同品 &gt; ABC &gt; 品类 &gt; 效期 &gt; 空库位。
               </DialogDescription>
@@ -377,7 +370,7 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
                 <Input
                   required
                   value={form.profileCode}
-                  disabled={Boolean(editing)}
+                  disabled={Boolean(editDialog.target)}
                   onChange={(event) => setForm((current) => ({ ...current, profileCode: event.target.value }))}
                   placeholder="default"
                 />
@@ -576,9 +569,9 @@ function formFromRow(row: PutawayStrategyProfile): Form {
 }
 
 function filterRows(rows: PutawayStrategyProfile[], query: QueryPanelValue) {
-  const keyword = text(query.keyword).trim().toLowerCase();
-  const status = text(query.status);
-  const isDefault = text(query.isDefault);
+  const keyword = queryString(query.keyword).trim().toLowerCase();
+  const status = queryString(query.status);
+  const isDefault = queryString(query.isDefault);
   return rows.filter((row) => {
     if (
       keyword &&
@@ -606,16 +599,12 @@ function validate(form: Form) {
   return null;
 }
 
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
 function normalizeQuery(value: unknown): QueryPanelValue {
-  const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const record = queryValueFromUnknown(value);
   return {
-    keyword: text(record.keyword),
-    status: text(record.status),
-    isDefault: text(record.isDefault),
+    keyword: queryString(record.keyword),
+    status: queryString(record.status),
+    isDefault: queryString(record.isDefault),
   };
 }
 
@@ -628,17 +617,4 @@ function asRecord(value: unknown): Record<string, unknown> {
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
-}
-
-function text(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
-}
-
-function errorText(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
 }

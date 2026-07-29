@@ -1,6 +1,7 @@
 import type { QueryPanelRangeValue, QueryPanelValue, StatusKey } from "@wms/ui";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
+import { queryString, queryStringArray } from "@/lib/query-value";
 import type { InboundDetailStage } from "./m2-inbound-detail-view-model";
 import {
   inboundDocumentTypeLabel,
@@ -62,16 +63,17 @@ export function normalizeM2InboundQueryValue(
   };
 }
 
-export function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
-}
+export { queryValueFromUnknown } from "@/lib/query-value";
 
 export function workFieldText(order: ReceivingOrder, mode: M2InboundMode) {
   const line = order.lines?.[0];
   return {
-    receiving: [`供应商 ${shortId(order.supplier_id ?? "00000000")}`, "承运商 华东冷链 / 车牌沪A-12345"],
+    receiving: [
+      `供应商 ${order.supplier_id ? shortId(order.supplier_id) : "-"}`,
+      "承运商 / 车牌 待录入",
+    ],
     inspecting: [`批号 ${line?.batch_no ?? "-"}`, `效期 ${line?.expiry_date ?? "-"} / 质量待验`],
-    putaway: ["推荐 A-01-01 / 实际待录入", "LPN-M2-PC-0001 / 校验待执行"],
+    putaway: ["库位 待录入", "LPN 待录入 / 校验待执行"],
   }[mode];
 }
 
@@ -221,11 +223,6 @@ export function canInspect(status: string) {
   );
 }
 
-/** 第二签字：仅第一人已签、待第二人独立认证。 */
-export function canSecondSign(status: string) {
-  return status === "awaiting_second_sign";
-}
-
 /** 上架：仅双签完成进入上架中，或历史已验状态。 */
 export function canPutaway(status: string) {
   return status === "putaway" || status === "inspected";
@@ -277,7 +274,7 @@ export function productTemperatureAttribute(
   // ponytail: 老单据缺商品主数据时才按编码降级；ReceivingOrderLine 补温区后删除。
   if (!productCode) return "常温";
   if (/冻|FROZEN/i.test(productCode)) return "冷冻";
-  if (/冷|COLD|P-M2-002/i.test(productCode)) return "冷藏";
+  if (/冷|COLD/i.test(productCode)) return "冷藏";
   return "常温";
 }
 
@@ -334,12 +331,7 @@ export function ownerLabel(value: string | null | undefined, ownerContext?: Owne
   return shortId(value);
 }
 
-export function formatDateTime(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
-}
+export { formatDateTime } from "@/lib/format";
 
 function matchesStatusFilter(status: string | null | undefined, filter: StatusFilter | null | undefined) {
   if (!filter || filter.length === 0) return true;
@@ -352,14 +344,7 @@ function matchesStatusFilter(status: string | null | undefined, filter: StatusFi
   });
 }
 
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function queryStringArray(value: QueryPanelValue[string]) {
-  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
-}
-
+/** 与 @/lib/query-value 的 queryRange 相比多一个 fallback（创建时间默认近 90 天需要兜底）。 */
 function queryRange(value: QueryPanelValue[string], fallback?: QueryPanelRangeValue): QueryPanelRangeValue {
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback ?? { from: "", to: "" };
   return {

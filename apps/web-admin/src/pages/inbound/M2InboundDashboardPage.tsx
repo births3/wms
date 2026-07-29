@@ -25,6 +25,9 @@ import {
 import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
 import { localDayRange, statusKey, statusLabel, type OwnerContext } from "./m2-inbound-page-helpers";
 import type { InboundDetailStage } from "./m2-inbound-detail-view-model";
+import { queryString } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const dashboardQueryFields: QueryPanelField[] = [
   { key: "supplierId", label: "供应商 ID", type: "text", placeholder: "可选 UUID" },
@@ -56,18 +59,18 @@ interface M2InboundDashboardPageProps {
 }
 
 export function M2InboundDashboardPage({ currentOwner, onBack }: M2InboundDashboardPageProps) {
-  const initialQuery = React.useMemo(defaultQuery, []);
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(initialQuery);
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(initialQuery);
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery);
   const [refreshSeconds, setRefreshSeconds] = React.useState("30");
-  const [selectedStatus, setSelectedStatus] = React.useState<string | null>(null);
-  const [detailOrder, setDetailOrder] = React.useState<ReceivingOrder | null>(null);
+  const statusDialog = useDialogState<string>();
+  const detailDialog = useDialogState<ReceivingOrder>();
   const dashboardFilters = React.useMemo(() => toDashboardQuery(appliedQuery), [appliedQuery]);
   const dashboardQuery = useReceivingDashboardQuery(
     dashboardFilters,
     refreshSeconds === "0" ? false : Number(refreshSeconds) * 1000,
   );
   const ordersQuery = useReceivingOrdersQuery();
+  const selectedStatus = statusDialog.open ? statusDialog.target : null;
   const statusOrders = React.useMemo(
     () => ordersQuery.data?.filter((order) => order.status === selectedStatus && matchesDashboardFilters(order, dashboardFilters)) ?? [],
     [dashboardFilters, ordersQuery.data, selectedStatus],
@@ -98,12 +101,12 @@ export function M2InboundDashboardPage({ currentOwner, onBack }: M2InboundDashbo
   );
 
   function openStatusOrders(row: ReceivingDashboard["data"][number]) {
-    setSelectedStatus(row.status);
+    statusDialog.openWith(row.status);
   }
 
   function openOrderDetail(order: ReceivingOrder) {
-    setSelectedStatus(null);
-    setDetailOrder(order);
+    statusDialog.close();
+    detailDialog.openWith(order);
   }
 
   return (
@@ -133,12 +136,8 @@ export function M2InboundDashboardPage({ currentOwner, onBack }: M2InboundDashbo
         defaultVisibleFieldKeys={dashboardCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={setDraftQuery}
-        onQuery={() => setAppliedQuery(draftQuery)}
-        onReset={() => {
-          const next = defaultQuery();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       {dashboardQuery.error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -158,7 +157,7 @@ export function M2InboundDashboardPage({ currentOwner, onBack }: M2InboundDashbo
         tableClassName="min-w-[720px]"
       />
 
-      <Dialog open={selectedStatus !== null} onOpenChange={(open) => !open && setSelectedStatus(null)}>
+      <Dialog open={statusDialog.open} onOpenChange={statusDialog.setOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>状态单据</DialogTitle>
@@ -185,11 +184,11 @@ export function M2InboundDashboardPage({ currentOwner, onBack }: M2InboundDashbo
       </Dialog>
 
       <M2InboundDetailDialog
-        order={detailOrder}
+        order={detailDialog.target}
         currentOwner={currentOwner}
-        defaultStage={detailStageForStatus(detailOrder?.status)}
-        open={detailOrder !== null}
-        onOpenChange={(open) => !open && setDetailOrder(null)}
+        defaultStage={detailStageForStatus(detailDialog.target?.status)}
+        open={detailDialog.open}
+        onOpenChange={detailDialog.setOpen}
       />
     </section>
   );
@@ -205,8 +204,8 @@ function detailStageForStatus(status: string | null | undefined): InboundDetailS
 function toDashboardQuery(value: QueryPanelValue) {
   const arrivalRange = value.arrivalRange as QueryPanelRangeValue | undefined;
   return {
-    supplierId: typeof value.supplierId === "string" ? value.supplierId : "",
-    productCode: typeof value.productCode === "string" ? value.productCode : "",
+    supplierId: queryString(value.supplierId),
+    productCode: queryString(value.productCode),
     from: arrivalRange?.from ?? "",
     to: arrivalRange?.to ?? "",
   };
@@ -220,9 +219,11 @@ function matchesDashboardFilters(
   if (filters.productCode && !(order.lines ?? []).some((line) => line.product_code === filters.productCode)) {
     return false;
   }
-  const arrivalTime = order.expected_arrival_at ? Date.parse(order.expected_arrival_at) : null;
-  if (filters.from && (arrivalTime === null || arrivalTime < Date.parse(filters.from))) return false;
-  if (filters.to && (arrivalTime === null || arrivalTime > Date.parse(filters.to))) return false;
+  // 日期区间按日期字符串比较（同 m4 dateInRange）：Date.parse 会把 "YYYY-MM-DD" 当 UTC 零点，
+  // 导致 to 边界当天晚些到货的单据被错误排除。
+  const arrivalDate = order.expected_arrival_at?.slice(0, 10) ?? "";
+  if (filters.from && (!arrivalDate || arrivalDate < filters.from.slice(0, 10))) return false;
+  if (filters.to && (!arrivalDate || arrivalDate > filters.to.slice(0, 10))) return false;
   return true;
 }
 

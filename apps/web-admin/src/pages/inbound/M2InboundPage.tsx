@@ -60,6 +60,7 @@ import {
 } from "./m2-inbound-page-helpers";
 import { M2InboundOrderTable } from "./M2InboundOrderTable";
 import { M2InboundDashboardPage } from "./M2InboundDashboardPage";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export type { M2InboundMode } from "./m2-inbound-page-helpers";
 
@@ -106,6 +107,46 @@ const emptySignForm: SignFormState = {
   strategyNote: "",
   note: "",
 };
+const emptyReceiveForm: ReceiveFormState = {
+  actualQty: "",
+  shortageQty: "0",
+  rejectedQty: "0",
+  temperature: "",
+  temperatureControl: "常温",
+  vehicleNo: "",
+  origin: "",
+  departureTime: "",
+  arrivalTime: "",
+  storageTime: "",
+  transportMode: "",
+  carrier: "",
+  contactName: "",
+  contactPhone: "",
+  contactIdNo: "",
+  sealChecked: "已核对",
+  filingChecked: "已核对",
+  deliveryQty: "",
+  batchQty: "",
+  secondReceiverId: "",
+  note: "",
+};
+// 演示预填仅在 dev server 生效（e2e 走 vite dev 依赖这些值）；生产构建收货表单为空，
+// 避免虚构的车牌 / 承运商 / 联系人被原样写入 GSP 收货记录。
+const initialReceiveForm: ReceiveFormState = __WMS_WEB_ADMIN_DEV_PREFILL__
+  ? {
+      ...emptyReceiveForm,
+      vehicleNo: "沪A-12345",
+      origin: "上海配送中心",
+      departureTime: "2026-06-27T08:00",
+      arrivalTime: "2026-06-27T10:00",
+      storageTime: "2026-06-27T10:15",
+      carrier: "华东冷链承运商",
+      contactName: "张三",
+      contactPhone: "13800000000",
+      contactIdNo: "310101199001010000",
+      secondReceiverId: secondSignerExample,
+    }
+  : emptyReceiveForm;
 const m2InboundCoreQueryFieldKeys = ["keyword", "ownerKeyword", "statusFilter"];
 
 export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
@@ -158,12 +199,11 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     () => defaultM2InboundQueryValue(mode, currentOwner),
     [mode, currentOwner.ownerCode, currentOwner.ownerId],
   );
-  const [draftQuery, setDraftQuery] = React.useState<M2InboundQueryValue>(() =>
-    defaultM2InboundQueryValue(mode, currentOwner),
-  );
-  const [appliedQuery, setAppliedQuery] = React.useState<M2InboundQueryValue>(() =>
-    defaultM2InboundQueryValue(mode, currentOwner),
-  );
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<M2InboundQueryValue>(
+      () => defaultM2InboundQueryValue(mode, currentOwner),
+      (value) => normalizeM2InboundQueryValue(value, defaultQuery, mode),
+    );
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
   const [showDashboard, setShowDashboard] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
@@ -171,29 +211,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [putawayValidationError, setPutawayValidationError] = React.useState<string | null>(null);
   const [createForm, setCreateForm] = React.useState<CreateFormState>(emptyCreateForm);
-  const [receiveForm, setReceiveForm] = React.useState<ReceiveFormState>({
-    actualQty: "",
-    shortageQty: "0",
-    rejectedQty: "0",
-    temperature: "",
-    temperatureControl: "常温",
-    vehicleNo: "沪A-12345",
-    origin: "上海配送中心",
-    departureTime: "2026-06-27T08:00",
-    arrivalTime: "2026-06-27T10:00",
-    storageTime: "2026-06-27T10:15",
-    transportMode: "",
-    carrier: "华东冷链承运商",
-    contactName: "张三",
-    contactPhone: "13800000000",
-    contactIdNo: "310101199001010000",
-    sealChecked: "已核对",
-    filingChecked: "已核对",
-    deliveryQty: "",
-    batchQty: "",
-    secondReceiverId: secondSignerExample,
-    note: "",
-  });
+  const [receiveForm, setReceiveForm] = React.useState<ReceiveFormState>(initialReceiveForm);
   const [rejectForm, setRejectForm] = React.useState<RejectFormState>({
     reason: "",
   });
@@ -257,12 +275,10 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   }, [orders, selectedId, selectionClearedByUser]);
 
   React.useEffect(() => {
-    const next = defaultM2InboundQueryValue(mode, currentOwner);
-    setDraftQuery(next);
-    setAppliedQuery(next);
+    resetQuery();
     setLastEvent(null);
     setSelectionClearedByUser(false);
-  }, [mode, currentOwner.ownerCode, currentOwner.ownerId]);
+  }, [mode, currentOwner.ownerCode, currentOwner.ownerId, resetQuery]);
 
   const selectedFromList = ordersQuery.data?.find((order) => order.id === selectedId) ?? null;
   const detailQuery = useReceivingOrderQuery(selectedId);
@@ -358,7 +374,18 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       locationId: "",
       locationCode: "",
     }));
-  }, [order?.id, currentUser?.user_id, currentUser?.username, currentUser?.display_name, dualSignRequiredByStrategy]);
+    // dualSignRequiredByStrategy 故意不进依赖：策略异步返回时仅同步下方 signForm 的 dualRequired，
+    // 不得清空用户正在填写的收货/验收/上架表单。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, currentUser?.user_id, currentUser?.username, currentUser?.display_name]);
+
+  React.useEffect(() => {
+    setSignForm((value) =>
+      value.dualRequired === dualSignRequiredByStrategy
+        ? value
+        : { ...value, dualRequired: dualSignRequiredByStrategy },
+    );
+  }, [dualSignRequiredByStrategy]);
 
   React.useEffect(() => {
     setReceiveForm((value) =>
@@ -406,6 +433,20 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     setSelectionClearedByUser(clearedVisibleSelection);
     setSelectedRowKeys(keys);
     setSelectedId(keys.at(-1) ?? null);
+  }
+
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(normalizeM2InboundQueryValue(queryValueFromUnknown(queryState), defaultQuery, mode));
+    setSelectionClearedByUser(false);
+    setSelectedRowKeys([]);
+    setSelectedId(null);
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
+    setSelectionClearedByUser(false);
+    setSelectedRowKeys([]);
+    setSelectedId(null);
   }
 
   function openCreateDialog() {
@@ -628,18 +669,11 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           value={draftQuery}
           onValueChange={(next) => setDraftQuery(normalizeM2InboundQueryValue(next, defaultQuery, mode))}
           onQuery={() => {
-            setAppliedQuery(normalizeM2InboundQueryValue(draftQuery, defaultQuery, mode));
+            applyQuery(draftQuery);
             setSelectionClearedByUser(false);
             void refreshInbound("入库列表已查询");
           }}
-          onReset={() => {
-            const next = defaultM2InboundQueryValue(mode, currentOwner);
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectionClearedByUser(false);
-            setSelectedRowKeys([]);
-            setSelectedId(null);
-          }}
+          onReset={clearGridQueryState}
         />
 
         {errorMessage && (
@@ -666,22 +700,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           createAction={tableCreateAction}
           queryState={appliedQuery}
           querySummaryItems={m2QuerySummaryItems}
-          onApplyQueryState={(queryState) => {
-            const next = normalizeM2InboundQueryValue(queryValueFromUnknown(queryState), defaultQuery, mode);
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectionClearedByUser(false);
-            setSelectedRowKeys([]);
-            setSelectedId(null);
-          }}
-          onClearQueryState={() => {
-            const next = defaultM2InboundQueryValue(mode, currentOwner);
-            setDraftQuery(next);
-            setAppliedQuery(next);
-            setSelectionClearedByUser(false);
-            setSelectedRowKeys([]);
-            setSelectedId(null);
-          }}
+          onApplyQueryState={applyGridQueryState}
+          onClearQueryState={clearGridQueryState}
         />
 
         <M2InboundDialogs
@@ -725,7 +745,6 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           onOpenChange={setDetailOpen}
         />
         <M2InboundPrintDialog
-          currentOwner={currentOwner}
           mode={mode}
           onOpenChange={setPrintOpen}
           onPrinted={(receiptNo) => setLastEvent(`${receiptNo} 打印记录已写入`)}
@@ -750,31 +769,6 @@ function createSignFormForCurrentUser(
     firstSignerId: account,
     dualRequired: dualSignRequired,
   };
-}
-
-/**
- * 签字字段展示账号/工号；提交时若匹配当前登录用户则映射为 user_id（API 契约为 id）。
- * 未匹配时仅允许手填 UUID；账号解析需等待受控人员目录接口。
- */
-function resolveSignerIdForSubmit(
-  input: string,
-  user: { user_id: string; username?: string; display_name?: string } | null | undefined,
-  options?: { allowCurrentUser?: boolean },
-) {
-  if (!input) return input;
-  const allowCurrentUser = options?.allowCurrentUser !== false;
-  if (
-    allowCurrentUser &&
-    user &&
-    (input === user.user_id || input === user.username || input === user.display_name)
-  ) {
-    return user.user_id;
-  }
-  return input;
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function exampleText(value: string | number | null | undefined, fallback: string) {
