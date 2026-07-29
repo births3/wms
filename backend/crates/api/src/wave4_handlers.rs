@@ -15,11 +15,13 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     CompletePickTaskRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
-    DisposeTemperatureExcursionRequest, DriverTaskListResponse, ErrorResponse, OutboundOrder,
-    OutboundOrderListResponse, OutboundWave, OutboundWaveListResponse, PageMeta,
-    ReviewOutboundOrderRequest, ShipOutboundOrderRequest, StoreDashboardResponse,
-    TemperatureExcursionDispositionResponse, TemperatureExcursionEventListResponse,
-    TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
+    CreatePurchaseReturnRequest, DisposeTemperatureExcursionRequest, DriverTaskListResponse,
+    ErrorResponse, OutboundOrder, OutboundOrderListResponse, OutboundWave,
+    OutboundWaveListResponse, PageMeta, PurchaseReturnOrder, PurchaseReturnOrderListResponse,
+    RejectPurchaseReturnRequest, ReviewOutboundOrderRequest, ShipOutboundOrderRequest,
+    StoreDashboardResponse, TemperatureExcursionDispositionResponse,
+    TemperatureExcursionEventListResponse, TraceabilityOutboundReport,
+    TraceabilityOutboundReportRequest,
 };
 
 use crate::{
@@ -111,6 +113,14 @@ impl IntoResponse for Wave4HandlerError {
                 "M4_DUAL_PERSON_APPROVAL_REQUIRED",
                 "M-VR 策略要求先完成主管审批",
             ),
+            Wave4HandlerError::Repository(Wave4RepositoryError::MissingRejectReason) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "W4-422", "驳回原因必填")
+            }
+            Wave4HandlerError::Repository(Wave4RepositoryError::MissingRequiredField(_)) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "W4-422",
+                "必填字段不能为空",
+            ),
             Wave4HandlerError::Repository(Wave4RepositoryError::RouteBindingUnavailable) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "H9_ROUTE_BINDING_UNAVAILABLE",
@@ -168,6 +178,14 @@ pub fn wave4_router(state: Wave4AppState) -> Router {
             get(get_outbound_order_handler),
         )
         .route(
+            "/api/v1/outbound/orders/:id/revalidate",
+            post(revalidate_outbound_order_handler),
+        )
+        .route(
+            "/api/v1/outbound/orders/:id/void-request",
+            post(void_request_outbound_order_handler),
+        )
+        .route(
             "/api/v1/outbound/waves",
             get(list_outbound_waves_handler).post(create_outbound_wave_handler),
         )
@@ -180,6 +198,10 @@ pub fn wave4_router(state: Wave4AppState) -> Router {
             post(cancel_outbound_wave_handler),
         )
         .route(
+            "/api/v1/outbound/waves/:wave_id/release",
+            post(release_outbound_wave_handler),
+        )
+        .route(
             "/api/v1/outbound/pick-tasks/:id/complete",
             post(complete_pick_task_handler),
         )
@@ -190,6 +212,34 @@ pub fn wave4_router(state: Wave4AppState) -> Router {
         .route(
             "/api/v1/outbound/orders/:id/ship",
             post(ship_outbound_order_handler),
+        )
+        .route(
+            "/api/v1/outbound/purchase-returns",
+            get(list_purchase_returns_handler).post(create_purchase_return_handler),
+        )
+        .route(
+            "/api/v1/outbound/purchase-returns/:id",
+            get(get_purchase_return_handler),
+        )
+        .route(
+            "/api/v1/outbound/purchase-returns/:id/approve",
+            post(approve_purchase_return_handler),
+        )
+        .route(
+            "/api/v1/outbound/purchase-returns/:id/reject",
+            post(reject_purchase_return_handler),
+        )
+        .route(
+            "/api/v1/outbound/purchase-returns/:id/pick",
+            post(pick_purchase_return_handler),
+        )
+        .route(
+            "/api/v1/outbound/purchase-returns/:id/review",
+            post(review_purchase_return_handler),
+        )
+        .route(
+            "/api/v1/outbound/purchase-returns/:id/ship",
+            post(ship_purchase_return_handler),
         )
         .route(
             "/api/v1/cold-chain/excursions/pending-disposition",
@@ -357,6 +407,8 @@ async fn get_store_dashboard_handler(
 
 include!("wave4_handlers_orders.rs");
 include!("wave4_handlers_waves.rs");
+include!("wave4_handlers_actions.rs");
+include!("wave4_handlers_returns.rs");
 
 #[cfg(test)]
 #[path = "wave4_handlers_review_tests.rs"]

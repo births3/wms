@@ -9,7 +9,8 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     validate_review_submission, CompletePickTaskRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, InventoryBatch, OutboundOrder, OutboundOrderLine, OutboundWave,
+    CreateOutboundWaveRequest, CreatePurchaseReturnRequest, InventoryBatch, OutboundOrder,
+    OutboundOrderLine, OutboundWave, PurchaseReturnOrder, RejectPurchaseReturnRequest,
     ReviewOutboundOrderRequest, ReviewValidationError, ShipOutboundOrderRequest,
     TemperatureExcursionEvent, TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
     TraceabilityStatusChangeEvent,
@@ -22,8 +23,9 @@ use crate::{
     inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
     outbound::{
         all_lines_reviewed_for_ship, short_pick_qty, status_after_pick, status_after_review,
-        OUTBOUND_STATUS_CONFIRMED, OUTBOUND_STATUS_IN_WAVE, OUTBOUND_STATUS_REVIEWED,
-        OUTBOUND_STATUS_REVIEWED_SHORT, OUTBOUND_STATUS_SHIPPED,
+        OUTBOUND_STATUS_CONFIRMED, OUTBOUND_STATUS_IN_WAVE, OUTBOUND_STATUS_PENDING_VALIDATION,
+        OUTBOUND_STATUS_REVIEWED, OUTBOUND_STATUS_REVIEWED_SHORT, OUTBOUND_STATUS_SHIPPED,
+        OUTBOUND_STATUS_VALIDATION_EXCEPTION, OUTBOUND_STATUS_VOID_REQUESTED,
     },
     print_orchestration::{freeze_outbound_route_in_tx, PrintOrchestrationError},
     traceability_code::{
@@ -79,6 +81,8 @@ pub enum Wave4RepositoryError {
     MissingSecondReviewer,
     UnqualifiedSecondReviewer,
     DualPersonApprovalRequired,
+    MissingRejectReason,
+    MissingRequiredField(&'static str),
     Audit(String),
     Database(String),
     Serialize(String),
@@ -195,6 +199,8 @@ struct TraceabilityOutboundReportEventRow {
 include!("wave4_repository_part1.rs");
 include!("wave4_repository_part2.rs");
 include!("wave4_repository_waves.rs");
+include!("wave4_repository_actions.rs");
+include!("wave4_repository_returns.rs");
 
 async fn lock_outbound_order(
     tx: &mut Transaction<'_, Postgres>,

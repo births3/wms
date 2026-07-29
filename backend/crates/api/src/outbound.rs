@@ -2,7 +2,10 @@
 
 use wms_domain::OutboundOrderLine;
 
+pub const OUTBOUND_STATUS_PENDING_VALIDATION: &str = "pending_validation";
+pub const OUTBOUND_STATUS_VALIDATION_EXCEPTION: &str = "validation_exception";
 pub const OUTBOUND_STATUS_CONFIRMED: &str = "confirmed";
+pub const OUTBOUND_STATUS_VOID_REQUESTED: &str = "void_requested";
 pub const OUTBOUND_STATUS_IN_WAVE: &str = "in_wave";
 pub const OUTBOUND_STATUS_PICKED: &str = "picked";
 pub const OUTBOUND_STATUS_PICKED_SHORT: &str = "picked_short";

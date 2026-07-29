@@ -1,5 +1,5 @@
 impl PgWave4Repository {
-pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -279,62 +279,15 @@ pub fn new(pool: PgPool) -> Self {
             for line in &order_with_lines.lines {
                 allocate_inventory_for_outbound(&mut tx, ctx.owner_id, order.id, line, now).await?;
             }
-            let allocated_tasks = sqlx::query_as::<
-                _,
-                (Uuid, i32, Uuid, String, String, Uuid, String, Uuid, i64),
-            >(
-                r#"
-                SELECT allocation.batch_id,
-                       allocation.line_no,
-                       allocation.outbound_order_id,
-                       batch.product_code,
-                       batch.batch_no,
-                       batch.location_id,
-                       batch.location_code,
-                       location.warehouse_id,
-                       allocation.allocated_qty
-                  FROM inventory_allocations allocation
-                  JOIN inventory_batches batch
-                    ON batch.owner_id = allocation.owner_id
-                   AND batch.id = allocation.batch_id
-                  JOIN warehouse_locations location
-                    ON location.owner_id = batch.owner_id
-                   AND location.id = batch.location_id
-                 WHERE allocation.owner_id = $1
-                   AND allocation.outbound_order_id = $2
-                   AND allocation.status = 'locked'
-                 ORDER BY batch.location_code ASC, allocation.line_no ASC, allocation.batch_id ASC
-                "#,
-            )
-            .bind(ctx.owner_id)
-            .bind(order.id)
-            .fetch_all(&mut *tx)
-            .await
-            .map_err(map_db_error)?;
-            task_drafts.extend(allocated_tasks.into_iter().map(
-                |(
-                    batch_id,
-                    line_no,
-                    order_id,
-                    product_code,
-                    batch_no,
-                    location_id,
-                    location_code,
-                    warehouse_id,
-                    planned_qty,
-                )| PickTaskDraft {
-                    order_id,
-                    order_no: order.wms_order_no.clone(),
-                    warehouse_id,
-                    line_no,
-                    batch_id,
-                    product_code,
-                    batch_no,
-                    location_id,
-                    location_code,
-                    planned_qty,
-                },
-            ));
+            task_drafts.extend(
+                collect_locked_allocation_task_drafts(
+                    &mut tx,
+                    ctx.owner_id,
+                    order.id,
+                    &order.wms_order_no,
+                )
+                .await?,
+            );
             sqlx::query(
                 r#"
                 UPDATE outbound_orders
@@ -365,81 +318,7 @@ pub fn new(pool: PgPool) -> Self {
             .map_err(map_insert_error)?;
         }
 
-        task_drafts.sort_by(|left, right| {
-            left.location_code
-                .cmp(&right.location_code)
-                .then_with(|| left.order_id.cmp(&right.order_id))
-                .then_with(|| left.line_no.cmp(&right.line_no))
-                .then_with(|| left.batch_id.cmp(&right.batch_id))
-        });
-        for (index, task) in task_drafts.into_iter().enumerate() {
-            let route_sequence =
-                i32::try_from(index + 1).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
-            let pick_task_id = Uuid::new_v4();
-            sqlx::query(
-                r#"
-                INSERT INTO outbound_pick_tasks (
-                    id, owner_id, wave_id, outbound_order_id, line_no, batch_id,
-                    product_code, batch_no, location_id, location_code, planned_qty,
-                    status, route_sequence, created_at, updated_at
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending_assignment', $12, $13, $13)
-                "#,
-            )
-            .bind(pick_task_id)
-            .bind(ctx.owner_id)
-            .bind(wave_row.id)
-            .bind(task.order_id)
-            .bind(task.line_no)
-            .bind(task.batch_id)
-            .bind(&task.product_code)
-            .bind(&task.batch_no)
-            .bind(task.location_id)
-            .bind(&task.location_code)
-            .bind(task.planned_qty)
-            .bind(route_sequence)
-            .bind(now)
-            .execute(&mut *tx)
-            .await
-            .map_err(map_db_error)?;
-            crate::task_engine::create_task_in_tx(
-                &mut tx,
-                ctx,
-                &wms_domain::CreateWarehouseTaskRequest {
-                    task_type_code: wms_domain::TASK_TYPE_PICK.to_string(),
-                    source_module: "M4".to_string(),
-                    source_doc_type: "outbound_order".to_string(),
-                    source_doc_id: Some(task.order_id),
-                    source_doc_no: task.order_no,
-                    source_line_no: Some(task.line_no),
-                    source_task_key: format!(
-                        "M4:pick:{}:{}:{}:{}",
-                        wave_row.id, task.order_id, task.line_no, task.batch_id
-                    ),
-                    warehouse_id: task.warehouse_id,
-                    task_group_code: crate::task_engine::default_task_group_code(
-                        task.warehouse_id,
-                    ),
-                    product_id: None,
-                    product_code: task.product_code,
-                    batch_id: Some(task.batch_id),
-                    batch_no: Some(task.batch_no),
-                    planned_qty: task.planned_qty,
-                    source_location_id: Some(task.location_id),
-                    source_location_code: Some(task.location_code),
-                    target_location_id: None,
-                    target_location_code: None,
-                    priority: None,
-                    urgent_order: false,
-                    predecessor_task_id: None,
-                },
-                now,
-            )
-            .await
-            .map_err(|error| {
-                Wave4RepositoryError::Database(format!("M-TE 拣选任务创建失败: {error:?}"))
-            })?;
-        }
+        insert_wave_pick_tasks(&mut tx, ctx, wave_row.id, task_drafts, now).await?;
 
         let wave = map_outbound_wave(wave_row, req.order_ids);
         store_idempotency_success(
@@ -757,31 +636,32 @@ pub fn new(pool: PgPool) -> Self {
                     &mut tx,
                     ctx,
                     &wms_domain::CreateWarehouseTaskRequest {
-                    task_type_code: wms_domain::TASK_TYPE_LOADING.to_string(),
-                    source_module: "M4".to_string(),
-                    source_doc_type: "outbound_order".to_string(),
-                    source_doc_id: Some(order_id),
-                    source_doc_no: updated.wms_order_no.clone(),
-                    source_line_no: Some(i32::try_from(line.line_no).map_err(|_| {
-                        Wave4RepositoryError::InvalidQuantity
-                    })?),
-                    source_task_key: format!("M4:loading:{order_id}:{}", line.line_no),
-                    warehouse_id: task_warehouse_id,
-                    task_group_code: crate::task_engine::default_task_group_code(
-                        task_warehouse_id,
-                    ),
-                    product_id: None,
-                    product_code: line.product_code.clone(),
-                    batch_id: None,
-                    batch_no: Some(line.batch_no.clone()),
-                    planned_qty: line.reviewed_qty,
-                    source_location_id: None,
-                    source_location_code: None,
-                    target_location_id: None,
-                    target_location_code: None,
-                    priority: None,
-                    urgent_order: false,
-                    predecessor_task_id: None,
+                        task_type_code: wms_domain::TASK_TYPE_LOADING.to_string(),
+                        source_module: "M4".to_string(),
+                        source_doc_type: "outbound_order".to_string(),
+                        source_doc_id: Some(order_id),
+                        source_doc_no: updated.wms_order_no.clone(),
+                        source_line_no: Some(
+                            i32::try_from(line.line_no)
+                                .map_err(|_| Wave4RepositoryError::InvalidQuantity)?,
+                        ),
+                        source_task_key: format!("M4:loading:{order_id}:{}", line.line_no),
+                        warehouse_id: task_warehouse_id,
+                        task_group_code: crate::task_engine::default_task_group_code(
+                            task_warehouse_id,
+                        ),
+                        product_id: None,
+                        product_code: line.product_code.clone(),
+                        batch_id: None,
+                        batch_no: Some(line.batch_no.clone()),
+                        planned_qty: line.reviewed_qty,
+                        source_location_id: None,
+                        source_location_code: None,
+                        target_location_id: None,
+                        target_location_code: None,
+                        priority: None,
+                        urgent_order: false,
+                        predecessor_task_id: None,
                     },
                     now,
                 )

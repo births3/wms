@@ -174,6 +174,7 @@ fn state_machine_definitions() -> Vec<StateMachineDefinition> {
     vec![
         asn_definition(),
         outbound_order_definition(),
+        purchase_return_definition(),
         task_definition(),
     ]
 }
@@ -271,11 +272,12 @@ fn outbound_order_definition() -> StateMachineDefinition {
         machine_code: "outbound_order".to_string(),
         machine_name: "M4 出库订单".to_string(),
         business_module: "M4".to_string(),
-        version: "2026-07-10".to_string(),
+        version: "2026-07-26".to_string(),
         states: vec![
             state("pending_validation", "待校验", true, false),
             state("validation_exception", "校验异常", false, false),
             state("confirmed", "已确认", false, false),
+            state("void_requested", "作废申请中", false, false),
             state("in_wave", "已入波次", false, false),
             state("inventory_locked", "库存锁定", false, false),
             state("reviewed", "已复核", false, false),
@@ -305,6 +307,20 @@ fn outbound_order_definition() -> StateMachineDefinition {
             ),
             transition("confirmed", "in_wave", "wave_assigned", "进入波次"),
             transition("confirmed", "cancelled", "cancel_approved", "审批作废"),
+            transition(
+                "pending_validation",
+                "void_requested",
+                "void_requested",
+                "作废申请",
+            ),
+            transition(
+                "validation_exception",
+                "void_requested",
+                "void_requested",
+                "作废申请",
+            ),
+            transition("confirmed", "void_requested", "void_requested", "作废申请"),
+            transition("void_requested", "cancelled", "cancel_approved", "审批作废"),
             transition("in_wave", "inventory_locked", "start_picking", "开始拣选"),
             transition(
                 "in_wave",
@@ -320,6 +336,30 @@ fn outbound_order_definition() -> StateMachineDefinition {
             ),
             transition("reviewed", "shipped", "handover_confirmed", "发货交接"),
             transition("shipped", "signed", "customer_signed", "客户签收"),
+        ],
+    }
+}
+
+fn purchase_return_definition() -> StateMachineDefinition {
+    StateMachineDefinition {
+        machine_code: "purchase_return".to_string(),
+        machine_name: "M4 采购退货出库".to_string(),
+        business_module: "M4".to_string(),
+        version: "2026-07-26".to_string(),
+        states: vec![
+            state("pending_approval", "待审批", true, false),
+            state("approved", "已审批", false, false),
+            state("picking", "拣货中", false, false),
+            state("reviewed", "已复核", false, false),
+            state("shipped", "已出库", false, true),
+            state("cancelled", "已取消", false, true),
+        ],
+        transitions: vec![
+            transition("pending_approval", "approved", "approve_return", "审批通过"),
+            transition("pending_approval", "cancelled", "reject_return", "审批驳回"),
+            transition("approved", "picking", "start_picking", "开始拣货"),
+            transition("picking", "reviewed", "review_completed", "复核完成"),
+            transition("reviewed", "shipped", "handover_confirmed", "出库交接"),
         ],
     }
 }
@@ -422,6 +462,7 @@ mod tests {
 
         assert!(machine_codes.contains(&"asn"));
         assert!(machine_codes.contains(&"outbound_order"));
+        assert!(machine_codes.contains(&"purchase_return"));
         assert!(machine_codes.contains(&"warehouse_task"));
         for definition in definitions {
             let state_codes = definition
@@ -579,7 +620,7 @@ mod tests {
             .expect("authorized consumer should list state machines")
             .0;
 
-        for machine_code in ["asn", "outbound_order", "warehouse_task"] {
+        for machine_code in ["asn", "outbound_order", "purchase_return", "warehouse_task"] {
             assert!(response
                 .data
                 .iter()
