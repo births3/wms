@@ -91,3 +91,25 @@ pub(crate) fn get_quality_liaison() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn apply_quality_liaison_approval() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/quality-liaisons/{id}/archive-sync-callback",
+    tag = "quality-liaison",
+    params(
+        ("id" = Uuid, Path, description = "档案补录质量联系单 ID"),
+        ("Idempotency-Key" = String, Header, description = "H8 Worker 回执幂等键")
+    ),
+    request_body = CompleteArchiveRevisionRequest,
+    responses(
+        (status = 200, description = "M-QL 已落地且 M2 ASN 已恢复验收", body = QualityLiaisonOrder),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "缺少 H8 写权限", body = ErrorResponse),
+        (status = 404, description = "联系单不存在", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+        (status = 422, description = "ERP 出站、商品值或 ASN 关联校验失败", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn complete_archive_revision_sync() {}

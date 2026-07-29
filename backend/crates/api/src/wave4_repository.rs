@@ -1,4 +1,5 @@
 //! Wave 4 repository helpers for cross-module business closures.
+// @governance: skip-page-size shared row types and transaction helpers serve five include! slices.
 
 use std::collections::HashSet;
 
@@ -27,6 +28,7 @@ use crate::{
         OUTBOUND_STATUS_CONFIRMED, OUTBOUND_STATUS_IN_WAVE, OUTBOUND_STATUS_REVIEWED,
         OUTBOUND_STATUS_REVIEWED_SHORT, OUTBOUND_STATUS_SHIPPED,
     },
+    print_orchestration::{freeze_outbound_route_in_tx, PrintOrchestrationError},
     traceability_code::{
         TraceabilityCodeService, TraceabilityPlatformResponse, TraceabilityReplayDecision,
     },
@@ -60,6 +62,7 @@ pub enum Wave4RepositoryError {
     EmptySelection,
     InvalidDocumentType,
     InvalidDeliveryAddress,
+    RouteBindingUnavailable,
     BatchNotAffected(Uuid),
     InvalidStatus {
         expected: String,
@@ -129,6 +132,12 @@ struct OutboundOrderRow {
     document_type: String,
     wms_order_no: String,
     erp_order_no: Option<String>,
+    invoice_no: Option<String>,
+    transport_mode_code: Option<String>,
+    department_code: Option<String>,
+    sales_group_code: Option<String>,
+    order_group_no: Option<String>,
+    business_type_code: Option<String>,
     customer_id: Uuid,
     delivery_address_id: Uuid,
     delivery_address_snapshot: serde_json::Value,
@@ -205,9 +214,11 @@ async fn lock_outbound_order(
 ) -> Result<OutboundOrderRow, Wave4RepositoryError> {
     sqlx::query_as::<_, OutboundOrderRow>(
         r#"
-        SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
-               delivery_address_id, delivery_address_snapshot,
-               warehouse_id, required_ship_at, status, short_pick,
+        SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
+               invoice_no, transport_mode_code, department_code, sales_group_code,
+               order_group_no, business_type_code, customer_id,
+               delivery_address_id, delivery_address_snapshot, warehouse_id,
+               required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
          WHERE owner_id = $1 AND id = $2
@@ -259,9 +270,11 @@ async fn load_outbound_order(
 ) -> Result<OutboundOrder, Wave4RepositoryError> {
     let row = sqlx::query_as::<_, OutboundOrderRow>(
         r#"
-        SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
-               delivery_address_id, delivery_address_snapshot,
-               warehouse_id, required_ship_at, status, short_pick,
+        SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
+               invoice_no, transport_mode_code, department_code, sales_group_code,
+               order_group_no, business_type_code, customer_id,
+               delivery_address_id, delivery_address_snapshot, warehouse_id,
+               required_ship_at, status, short_pick,
                created_at, updated_at
           FROM outbound_orders
          WHERE owner_id = $1 AND id = $2
@@ -716,6 +729,12 @@ fn map_outbound_order(
         document_type: row.document_type,
         wms_order_no: row.wms_order_no,
         erp_order_no: row.erp_order_no,
+        invoice_no: row.invoice_no,
+        transport_mode_code: row.transport_mode_code,
+        department_code: row.department_code,
+        sales_group_code: row.sales_group_code,
+        order_group_no: row.order_group_no,
+        business_type_code: row.business_type_code,
         customer_id: row.customer_id,
         delivery_address_id: row.delivery_address_id,
         delivery_address_snapshot: row.delivery_address_snapshot,
@@ -815,6 +834,15 @@ fn map_db_error(error: sqlx::Error) -> Wave4RepositoryError {
         }
     }
     Wave4RepositoryError::Database(error.to_string())
+}
+
+fn map_route_freeze_error(error: PrintOrchestrationError) -> Wave4RepositoryError {
+    match error {
+        PrintOrchestrationError::RouteBindingNotFound
+        | PrintOrchestrationError::EffectivePeriodOverlap
+        | PrintOrchestrationError::InvalidRequest => Wave4RepositoryError::RouteBindingUnavailable,
+        other => Wave4RepositoryError::Database(format!("{other:?}")),
+    }
 }
 
 fn map_insert_error(error: sqlx::Error) -> Wave4RepositoryError {

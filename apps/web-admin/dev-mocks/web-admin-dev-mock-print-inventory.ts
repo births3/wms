@@ -22,6 +22,25 @@ import {
 
 const inventoryBatchOverrides = new Map<string, Partial<DevInventoryBatch>>();
 const inventoryRecallPreviousStatus = new Map<string, string>();
+interface DevFieldLibrary {
+  id: string;
+  library_code: string;
+  library_name: string;
+  business_module: string;
+  source_schema: string;
+  latest_version_id: string;
+  version_no: number;
+  latest_version_status: string;
+  latest_published_version_id: string | null;
+  latest_published_version_no: number | null;
+  field_count: number;
+  created_at: string;
+  created_by: string;
+  published_at: string | null;
+  published_by: string | null;
+}
+let devDraftFieldLibrary: DevFieldLibrary | null = null;
+const devFieldDefinitionOverrides = new Map<string, Record<string, unknown>>();
 
 export async function handlePrintInventoryDevMock(
   req: IncomingMessage,
@@ -181,12 +200,68 @@ export async function handlePrintInventoryDevMock(
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
     return true;
   }
+  if (req.method === "POST" && pathname === "/api/v1/print-templates/field-libraries/drafts") {
+    const body = await readJsonBody(req);
+    const now = new Date().toISOString();
+    const versionId = crypto.randomUUID();
+    devDraftFieldLibrary = {
+      id: crypto.randomUUID(),
+      library_code: asString(body.library_code, "h9_draft"),
+      library_name: asString(body.library_name, "H9 字段库草稿"),
+      business_module: asString(body.business_module, "H9"),
+      source_schema: asString(body.source_schema, "CreateReceivingOrderRequest"),
+      latest_version_id: versionId,
+      version_no: 1,
+      latest_version_status: "draft",
+      latest_published_version_id: null,
+      latest_published_version_no: null,
+      field_count: 2,
+      created_at: now,
+      created_by: devUserId,
+      published_at: null,
+      published_by: null,
+    };
+    sendJson(res, 200, fieldLibraryVersion(devDraftFieldLibrary));
+    return true;
+  }
   const fields = pathname.match(
     /^\/api\/v1\/print-templates\/field-libraries\/([^/]+)\/fields$/,
   );
   if (req.method === "GET" && fields) {
     const data = fieldDefinitions(decodeURIComponent(fields[1]));
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+  const fieldUpdate = pathname.match(
+    /^\/api\/v1\/print-templates\/field-libraries\/([^/]+)\/fields\/([^/]+)$/,
+  );
+  if (req.method === "PATCH" && fieldUpdate) {
+    const versionId = decodeURIComponent(fieldUpdate[1]);
+    const fieldId = decodeURIComponent(fieldUpdate[2]);
+    const current = fieldDefinitions(versionId).find((field) => field.id === fieldId);
+    if (!current) {
+      sendJson(res, 404, { code: "H9_FIELD_LIBRARY_VERSION_NOT_FOUND", message: "字段不存在" });
+      return true;
+    }
+    const updated = { ...current, ...(await readJsonBody(req)) };
+    devFieldDefinitionOverrides.set(fieldId, updated);
+    sendJson(res, 200, updated);
+    return true;
+  }
+  const publishLibrary = pathname.match(
+    /^\/api\/v1\/print-templates\/field-libraries\/([^/]+)\/publish$/,
+  );
+  if (req.method === "POST" && publishLibrary && devDraftFieldLibrary?.latest_version_id === decodeURIComponent(publishLibrary[1])) {
+    const now = new Date().toISOString();
+    devDraftFieldLibrary = {
+      ...devDraftFieldLibrary,
+      latest_version_status: "published",
+      latest_published_version_id: devDraftFieldLibrary.latest_version_id,
+      latest_published_version_no: devDraftFieldLibrary.version_no,
+      published_at: now,
+      published_by: devUserId,
+    };
+    sendJson(res, 200, fieldLibraryVersion(devDraftFieldLibrary));
     return true;
   }
   if (req.method === "GET" && pathname === "/api/v1/print-templates/templates") {
@@ -200,6 +275,37 @@ export async function handlePrintInventoryDevMock(
   if (req.method === "GET" && versions) {
     const data = templateVersions(decodeURIComponent(versions[1]));
     sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+    return true;
+  }
+  const publishTemplate = pathname.match(
+    /^\/api\/v1\/print-templates\/templates\/([^/]+)\/versions\/([^/]+)\/publish$/,
+  );
+  if (req.method === "POST" && publishTemplate) {
+    const published = publishTemplateVersion(
+      decodeURIComponent(publishTemplate[1]),
+      decodeURIComponent(publishTemplate[2]),
+    );
+    sendJson(
+      res,
+      published ? 200 : 404,
+      published ?? { code: "H9_TEMPLATE_VERSION_NOT_FOUND", message: "打印模板版本不存在" },
+    );
+    return true;
+  }
+  const templateEnabled = pathname.match(
+    /^\/api\/v1\/print-templates\/templates\/([^/]+)\/enabled$/,
+  );
+  if (req.method === "PATCH" && templateEnabled) {
+    const body = await readJsonBody(req);
+    const updated = setTemplateEnabled(
+      decodeURIComponent(templateEnabled[1]),
+      asBoolean(body.enabled, true),
+    );
+    sendJson(
+      res,
+      updated ? 200 : 404,
+      updated ?? { code: "H9_TEMPLATE_NOT_FOUND", message: "打印模板不存在" },
+    );
     return true;
   }
   if (req.method === "POST" && pathname === "/api/v1/print-templates/templates") {
@@ -262,29 +368,54 @@ function inventoryBatches(): DevInventoryBatch[] {
   return rows.map((row) => ({ ...row, ...inventoryBatchOverrides.get(row.id) }));
 }
 
-function fieldLibraries() {
+function seedFieldLibraries(): DevFieldLibrary[] {
   return (devSystemDictionaryItemsByCode.print_template_type ?? []).map((type, index) => {
     const libraryCode = String(type.params.field_library_code ?? type.item_code);
     return {
       id: `00000000-0000-0000-0000-0000000028${String(index + 1).padStart(2, "0")}`,
       library_code: libraryCode,
       library_name: `${type.item_name}字段库`,
+      business_module: String(type.params.business_module ?? "H9"),
       source_schema: sourceSchema(libraryCode),
       latest_version_id: `00000000-0000-0000-0000-0000000029${String(index + 1).padStart(2, "0")}`,
       version_no: 1,
+      latest_version_status: "published",
+      latest_published_version_id: `00000000-0000-0000-0000-0000000029${String(index + 1).padStart(2, "0")}`,
+      latest_published_version_no: 1,
       field_count: fieldCount(libraryCode),
       created_at: type.created_at,
+      created_by: devUserId,
       published_at: type.updated_at,
       published_by: devUserId,
     };
   });
 }
 
+function fieldLibraries() {
+  const rows = seedFieldLibraries();
+  if (devDraftFieldLibrary) {
+    const index = rows.findIndex((item) => item.library_code === devDraftFieldLibrary?.library_code);
+    if (index >= 0) rows[index] = devDraftFieldLibrary;
+    else rows.unshift(devDraftFieldLibrary);
+  }
+  return rows;
+}
+
 function fieldDefinitions(versionId: string) {
-  const library = fieldLibraries().find((item) => item.latest_version_id === versionId);
+  const library = fieldLibraries().find(
+    (item) => item.latest_version_id === versionId || item.latest_published_version_id === versionId,
+  );
   const libraryCode = library?.library_code ?? "m2_asn";
-  return fieldPaths(libraryCode).map((field, index) => ({
-    id: `00000000-0000-0000-0000-000000004${String(index + 1).padStart(3, "0")}`,
+  const paths = library === devDraftFieldLibrary
+    ? [
+        field("receipt_no", "receipt_no", "base", "base", "ASN-DEV-001"),
+        field("lines[].product_code", "product_code", "lines", "lines", "P-DEV-001"),
+      ]
+    : fieldPaths(libraryCode);
+  return paths.map((field, index) => {
+    const id = `00000000-0000-0000-0000-000000004${String(index + 1).padStart(3, "0")}`;
+    return {
+    id,
     library_version_id: versionId,
     field_path: field.fieldPath,
     field_type: "string",
@@ -292,9 +423,36 @@ function fieldDefinitions(versionId: string) {
     display_name: field.displayName,
     group_code: field.groupCode,
     group_name: field.groupName,
-    metadata: { printable: true, sensitive: false, sample_value: field.sampleValue },
+    description: "",
+    example_value: field.sampleValue,
+    printable: true,
+    sensitive: false,
+    masking_rule: null,
+    formatting_rule: null,
+    supports_barcode: false,
+    supports_qrcode: false,
+    is_table_detail: field.fieldPath.includes("[]"),
     sort_order: (index + 1) * 10,
-  }));
+    ...devFieldDefinitionOverrides.get(id),
+  };
+  });
+}
+
+function fieldLibraryVersion(library: DevFieldLibrary) {
+  return {
+    id: library.latest_version_id,
+    library_id: library.id,
+    library_code: library.library_code,
+    library_name: library.library_name,
+    business_module: library.business_module,
+    source_schema: library.source_schema,
+    version_no: library.version_no,
+    status: library.latest_version_status,
+    created_at: library.created_at,
+    created_by: library.created_by,
+    published_at: library.published_at,
+    published_by: library.published_by,
+  };
 }
 
 function templates() {
@@ -335,10 +493,13 @@ async function saveTemplate(req: IncomingMessage) {
   const now = new Date().toISOString();
   const code = asString(body.template_code, "h9_template");
   const typeCode = asString(body.template_type_code, "asn");
-  const existing = templates().find(
-    (item) => item.template_code === code && item.template_type_code === typeCode,
-  );
-  const previous = existing ? templateVersions(existing.id) : [];
+  const requestedTemplateId = asNullableString(body.template_id);
+  const existing = requestedTemplateId
+    ? templates().find((item) => item.id === requestedTemplateId)
+    : undefined;
+  const previous = existing
+    ? devPrintTemplateVersions.get(existing.id) ?? [existing]
+    : [];
   const template: DevPrintTemplate = {
     id: existing?.id ?? crypto.randomUUID(),
     template_code: code,
@@ -346,12 +507,12 @@ async function saveTemplate(req: IncomingMessage) {
     template_type_code: typeCode,
     owner_id: devOwnerId,
     scope: asString(body.scope, "global") === "owner" ? "owner" : "global",
-    enabled: asBoolean(body.enabled, true),
+    enabled: existing?.enabled ?? true,
     is_default: asBoolean(body.is_default, true),
     remark: asNullableString(body.remark),
     latest_version_id: crypto.randomUUID(),
     latest_version_no: (existing?.latest_version_no ?? 0) + 1,
-    latest_version_status: asBoolean(body.publish, true) ? "published" : "draft",
+    latest_version_status: "draft",
     field_library_version_id: asString(
       body.field_library_version_id,
       fieldLibraries()[0].latest_version_id,
@@ -359,16 +520,56 @@ async function saveTemplate(req: IncomingMessage) {
     designer_version: asString(body.designer_version, "hiprint@0.4.0"),
     created_at: existing?.created_at ?? now,
     updated_at: now,
-    published_at: asBoolean(body.publish, true) ? now : null,
+    published_at: null,
     hiprint_json: asRecord(body.hiprint_json),
     field_bindings: bindings(body.field_bindings),
     paper: asRecord(body.paper),
   };
+  storeTemplate(template);
+  devPrintTemplateVersions.set(template.id, [template, ...previous]);
+  return templateVersion(template);
+}
+
+function publishTemplateVersion(templateId: string, versionId: string) {
+  const current = templates().find((item) => item.id === templateId);
+  if (
+    !current
+    || current.latest_version_id !== versionId
+    || current.latest_version_status !== "draft"
+  ) return null;
+  const versions = [...(devPrintTemplateVersions.get(templateId) ?? [current])];
+  const index = versions.findIndex((version) => version.latest_version_id === versionId);
+  if (index < 0) return null;
+  const published = {
+    ...versions[index],
+    latest_version_status: "published",
+    published_at: new Date().toISOString(),
+  };
+  versions[index] = published;
+  devPrintTemplateVersions.set(templateId, versions);
+  if (current.latest_version_id === versionId) storeTemplate(published);
+  return templateVersion(published);
+}
+
+function setTemplateEnabled(templateId: string, enabled: boolean) {
+  const current = templates().find((item) => item.id === templateId);
+  if (!current) return null;
+  const updated = { ...current, enabled, updated_at: new Date().toISOString() };
+  storeTemplate(updated);
+  const versions = devPrintTemplateVersions.get(templateId);
+  if (versions) {
+    devPrintTemplateVersions.set(
+      templateId,
+      versions.map((version) => ({ ...version, enabled })),
+    );
+  }
+  return updated;
+}
+
+function storeTemplate(template: DevPrintTemplate) {
   const index = devCreatedPrintTemplates.findIndex((item) => item.id === template.id);
   if (index >= 0) devCreatedPrintTemplates[index] = template;
   else devCreatedPrintTemplates.unshift(template);
-  devPrintTemplateVersions.set(template.id, [template, ...previous]);
-  return templateVersion(template);
 }
 
 function templateVersions(templateId: string) {
@@ -428,6 +629,7 @@ function printRecord(body: Record<string, unknown>) {
 function templateVersion(template: DevPrintTemplate) {
   return {
     ...template,
+    id: template.latest_version_id,
     template_id: template.id,
     version_no: template.latest_version_no,
     status: template.latest_version_status,

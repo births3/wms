@@ -98,7 +98,7 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
     }
 
     sqlx::query(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, attrs, status) VALUES ($1, $2, 'M2-P-001', 'M2 test product', '1 unit', 'normal', '{\"unit_volume_cm3\": 10}', 'active')",
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 'M2-P-001', 'M2 test product', '1 unit', 'normal', 10, 'active')",
     )
     .bind(product_id)
     .bind(owner_id)

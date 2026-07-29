@@ -105,66 +105,31 @@ pub struct StoreDashboardResponse {
     pub generated_at: DateTime<Utc>,
 }
 
-/// M-PM 参数对照字典。
+/// M-PM 单值映射请求；外部自由文本不得直接进入业务模块。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct MappingDictionary {
-    pub id: Uuid,
-    pub owner_id: Uuid,
-    pub dictionary_code: String,
-    pub dictionary_name: String,
-    pub created_at: DateTime<Utc>,
+pub struct MapParameterRequest {
+    pub dict_code: String,
+    pub source_value: String,
+    pub source_system: Option<String>,
+    pub source_record_id: Option<String>,
 }
 
-/// M-PM 字段映射规则。
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct MappingRule {
-    pub id: Uuid,
-    pub owner_id: Uuid,
-    pub source_system: String,
-    pub external_field: String,
-    pub canonical_field: String,
-    pub transform: String,
-    pub created_at: DateTime<Utc>,
-}
-
-/// M-PM 待映射队列项。
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct MappingQueueItem {
-    pub id: Uuid,
-    pub owner_id: Uuid,
-    pub source_system: String,
-    #[schema(schema_with = free_form_json_schema)]
-    pub raw_payload: serde_json::Value,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterMappingStatus {
+    Matched,
+    Unmatched,
+    Ambiguous,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct ExecuteMappingRequest {
-    pub source_system: String,
-    #[schema(schema_with = free_form_json_schema)]
-    pub raw_payload: serde_json::Value,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct ExecuteMappingResponse {
-    pub execution_id: Uuid,
-    pub queue_item_id: Option<Uuid>,
-    #[schema(schema_with = free_form_json_schema)]
-    pub normalized_payload: serde_json::Value,
-    pub unresolved_fields: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
-pub struct MappingTraceResponse {
-    pub execution_id: Uuid,
-    pub source_system: String,
-    #[schema(schema_with = free_form_json_schema)]
-    pub raw_payload: serde_json::Value,
-    #[schema(schema_with = free_form_json_schema)]
-    pub normalized_payload: serde_json::Value,
-    pub applied_rule_ids: Vec<Uuid>,
-    pub unresolved_fields: Vec<String>,
+pub struct MapParameterResponse {
+    pub status: ParameterMappingStatus,
+    pub target_value: Option<String>,
+    pub rule_id: Option<Uuid>,
+    pub confidence: i32,
+    pub fallback_used: bool,
+    pub queued: bool,
 }
 
 /// M1-008 配置中心条目。

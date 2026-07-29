@@ -29,6 +29,43 @@ export interface M2InboundQueryValue extends QueryPanelValue {
   createdAt: QueryPanelRangeValue;
 }
 
+export function defaultM2InboundQueryValue(
+  mode: M2InboundMode,
+  currentOwner: OwnerContext,
+): M2InboundQueryValue {
+  return {
+    keyword: "",
+    ownerKeyword: currentOwner.ownerCode,
+    documentTypeFilter: [],
+    statusFilter: defaultStatusFilter(mode),
+    arrivalDate: { from: "", to: "" },
+    createdAt: defaultCreatedDateRange(),
+  };
+}
+
+export function normalizeM2InboundQueryValue(
+  value: QueryPanelValue,
+  fallback: M2InboundQueryValue,
+  mode: M2InboundMode,
+): M2InboundQueryValue {
+  const rawStatusFilter = queryStringArray(value.statusFilter);
+  const statusFilter = rawStatusFilter.filter((item): item is StatusFilter[number] =>
+    statusFilterOptions(mode).some((option) => option.value === item),
+  );
+  return {
+    keyword: queryString(value.keyword),
+    ownerKeyword: queryString(value.ownerKeyword) || fallback.ownerKeyword,
+    documentTypeFilter: queryStringArray(value.documentTypeFilter) as InboundDocumentTypeFilter,
+    statusFilter: rawStatusFilter.length > 0 && statusFilter.length === 0 ? fallback.statusFilter : statusFilter,
+    arrivalDate: queryRange(value.arrivalDate),
+    createdAt: queryRange(value.createdAt, fallback.createdAt),
+  };
+}
+
+export function queryValueFromUnknown(value: unknown): QueryPanelValue {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
+}
+
 export function workFieldText(order: ReceivingOrder, mode: M2InboundMode) {
   const line = order.lines?.[0];
   return {
@@ -224,8 +261,20 @@ export function totalExpectedQty(order: ReceivingOrder) {
   return (order.lines ?? []).reduce((sum, line) => sum + line.expected_qty, 0);
 }
 
-export function productTemperatureAttribute(productCode: string | null | undefined) {
-  // ponytail: ReceivingOrderLine 还没有商品温度属性；后端补字段后替换这里。
+export function productTemperatureAttribute(
+  storageCondition: string | null | undefined,
+  productCode?: string | null,
+) {
+  const condition = storageCondition?.trim().toLowerCase();
+  if (condition === "frozen" || condition?.includes("冻")) return "冷冻";
+  if (
+    condition === "cold"
+    || condition === "cool"
+    || condition === "refrigerated"
+    || condition?.includes("冷")
+  ) return "冷藏";
+  if (condition) return "常温";
+  // ponytail: 老单据缺商品主数据时才按编码降级；ReceivingOrderLine 补温区后删除。
   if (!productCode) return "常温";
   if (/冻|FROZEN/i.test(productCode)) return "冷冻";
   if (/冷|COLD|P-M2-002/i.test(productCode)) return "冷藏";
@@ -295,7 +344,28 @@ export function formatDateTime(value: string | null | undefined) {
 function matchesStatusFilter(status: string | null | undefined, filter: StatusFilter | null | undefined) {
   if (!filter || filter.length === 0) return true;
   if (!status) return false;
-  return filter.some((item) => (item === "receiving" ? canRelease(status) || canReceiveOrReject(status) : status === item));
+  return filter.some((item) => {
+    if (item === "receiving") return canRelease(status) || canReceiveOrReject(status);
+    if (item === "inspecting") return canInspect(status);
+    if (item === "putaway") return canPutaway(status);
+    return status === item;
+  });
+}
+
+function queryString(value: QueryPanelValue[string]) {
+  return typeof value === "string" ? value : "";
+}
+
+function queryStringArray(value: QueryPanelValue[string]) {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+function queryRange(value: QueryPanelValue[string], fallback?: QueryPanelRangeValue): QueryPanelRangeValue {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback ?? { from: "", to: "" };
+  return {
+    from: typeof value.from === "string" ? value.from : fallback?.from ?? "",
+    to: typeof value.to === "string" ? value.to : fallback?.to ?? "",
+  };
 }
 
 function matchesOwnerFilter(ownerId: string | null | undefined, normalizedOwner: string, ownerContext?: OwnerContext) {

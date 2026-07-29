@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from typing import Any
 
@@ -16,15 +17,11 @@ INBOUND_TABLES = {
 
 
 def sqlcmd_query(settings: Any, sql: str) -> str:
-    """执行 SQL 并返回 stdout 文本（-s| -W -h-1）。"""
+    """执行 SQL 并返回 stdout 文本；NVARCHAR(MAX) 不截断。"""
     cmd = [
-        "docker",
-        "exec",
-        "-i",
-        settings.mssql_container,
-        "/opt/mssql-tools18/bin/sqlcmd",
+        "sqlcmd",
         "-S",
-        "localhost",
+        f"tcp:{settings.mssql_host},{settings.mssql_port}",
         "-U",
         settings.mssql_user,
         "-P",
@@ -33,11 +30,10 @@ def sqlcmd_query(settings: Any, sql: str) -> str:
         "-b",
         "-d",
         settings.mssql_database,
-        "-s",
-        "|",
-        "-W",
-        "-h",
-        "-1",
+        "-y",
+        "0",
+        "-w",
+        "65535",
         "-Q",
         sql,
     ]
@@ -53,6 +49,63 @@ def sqlcmd_query(settings: Any, sql: str) -> str:
 
 def sql_escape(value: str) -> str:
     return value.replace("'", "''")
+
+
+def parse_json_rows(output: str) -> list[dict[str, str]]:
+    """解析 SQL Server `FOR JSON PATH` 输出，兼容 sqlcmd 的视觉换行。"""
+    start = output.find("[")
+    end = output.rfind("]")
+    if start < 0 or end < start:
+        if not output.strip():
+            return []
+        raise RuntimeError("sqlcmd JSON output missing")
+    compact = output[start : end + 1].replace("\r", "").replace("\n", "")
+    if not compact:
+        return []
+    try:
+        value = json.loads(compact)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("sqlcmd JSON output invalid") from exc
+    if not isinstance(value, list) or any(not isinstance(row, dict) for row in value):
+        raise RuntimeError("sqlcmd JSON rows required")
+    return [
+        {
+            str(key): "" if item is None else str(item)
+            for key, item in row.items()
+        }
+        for row in value
+    ]
+
+
+def list_acked_outbound(settings: Any) -> list[dict[str, str]]:
+    """读取 ERP 已确认、但尚未回写 H8 的出站接口行。"""
+    output = sqlcmd_query(
+        settings,
+        f"""
+SET NOCOUNT ON;
+SELECT TOP ({int(settings.batch_size)})
+  CONVERT(NVARCHAR(36), id) AS id,
+  idempotency_key AS idempotency_key,
+  ISNULL(erp_ack_ref,N'') AS erp_ack_ref
+  FROM dbo.if_out_message WITH (ROWLOCK, READPAST)
+ WHERE sync_status = N'acked'
+ ORDER BY updated_at ASC
+ FOR JSON PATH;
+""",
+    )
+    return parse_json_rows(output)
+
+
+def mark_outbound_receipt_recorded(settings: Any, row_id: str) -> None:
+    sqlcmd_query(
+        settings,
+        f"""
+SET NOCOUNT ON;
+UPDATE dbo.if_out_message
+   SET sync_status = N'success', updated_at = SYSUTCDATETIME()
+ WHERE id = '{sql_escape(row_id)}' AND sync_status = N'acked';
+""",
+    )
 
 
 def claim_rows(settings: Any, table: str) -> list[dict[str, str]]:
@@ -94,16 +147,23 @@ OUTPUT inserted.id INTO @claimed
             claim_cte.format(table=table)
             + """
 SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
-  CONVERT(NVARCHAR(36), supplier_id), product_code,
-  CONVERT(NVARCHAR(32), expected_qty),
-  CONVERT(NVARCHAR(33), expected_arrival_at, 126),
-  document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
-  CONVERT(NVARCHAR(33), created_at, 126)
-FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
+  CONVERT(NVARCHAR(36), id) AS id,
+  external_doc_no AS external_doc_no,
+  CONVERT(NVARCHAR(36), owner_id) AS owner_id,
+  CONVERT(NVARCHAR(36), warehouse_id) AS warehouse_id,
+  CONVERT(NVARCHAR(36), supplier_id) AS supplier_id,
+  product_code AS product_code,
+  CONVERT(NVARCHAR(32), expected_qty) AS expected_qty,
+  CONVERT(NVARCHAR(33), expected_arrival_at, 126) AS expected_arrival_at,
+  document_type AS document_type,
+  ISNULL(external_ref,N'') AS external_ref,
+  ISNULL(receipt_no,N'') AS receipt_no,
+  schema_version AS schema_version,
+  idempotency_key AS idempotency_key,
+  CONVERT(NVARCHAR(16), retry_count) AS retry_count,
+  CONVERT(NVARCHAR(33), created_at, 126) AS created_at
+FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed)
+FOR JSON PATH;
 """
         )
         cols = [
@@ -128,16 +188,24 @@ FROM dbo.if_in_asn WHERE id IN (SELECT id FROM @claimed);
             claim_cte.format(table=table)
             + """
 SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
-  CONVERT(NVARCHAR(36), customer_id), document_type,
-  ISNULL(erp_order_no,N''), ISNULL(wms_order_no,N''), product_code,
-  ISNULL(batch_no,N''), CONVERT(NVARCHAR(32), planned_qty),
-  ISNULL(CONVERT(NVARCHAR(33), required_ship_at, 126),N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
-  CONVERT(NVARCHAR(33), created_at, 126)
-FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
+  CONVERT(NVARCHAR(36), id) AS id,
+  external_doc_no AS external_doc_no,
+  CONVERT(NVARCHAR(36), owner_id) AS owner_id,
+  CONVERT(NVARCHAR(36), warehouse_id) AS warehouse_id,
+  CONVERT(NVARCHAR(36), customer_id) AS customer_id,
+  document_type AS document_type,
+  ISNULL(erp_order_no,N'') AS erp_order_no,
+  ISNULL(wms_order_no,N'') AS wms_order_no,
+  product_code AS product_code,
+  ISNULL(batch_no,N'') AS batch_no,
+  CONVERT(NVARCHAR(32), planned_qty) AS planned_qty,
+  ISNULL(CONVERT(NVARCHAR(33), required_ship_at, 126),N'') AS required_ship_at,
+  schema_version AS schema_version,
+  idempotency_key AS idempotency_key,
+  CONVERT(NVARCHAR(16), retry_count) AS retry_count,
+  CONVERT(NVARCHAR(33), created_at, 126) AS created_at
+FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed)
+FOR JSON PATH;
 """
         )
         cols = [
@@ -163,14 +231,31 @@ FROM dbo.if_in_outbound_order WHERE id IN (SELECT id FROM @claimed);
             claim_cte.format(table=table)
             + """
 SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), product_code, product_name,
-  ISNULL(approval_no,N''), ISNULL(spec,N''), ISNULL(dosage_form,N''),
-  ISNULL(manufacturer,N''), ISNULL(storage_condition,N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
-  CONVERT(NVARCHAR(33), created_at, 126)
-FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
+  CONVERT(NVARCHAR(36), id) AS id,
+  external_doc_no AS external_doc_no,
+  CONVERT(NVARCHAR(36), owner_id) AS owner_id,
+  product_code AS product_code,
+  product_name AS product_name,
+  ISNULL(approval_no,N'') AS approval_no,
+  ISNULL(spec,N'') AS spec,
+  ISNULL(dosage_form,N'') AS dosage_form,
+  ISNULL(manufacturer,N'') AS manufacturer,
+  special_drug_category AS special_drug_category,
+  storage_condition AS storage_condition,
+  ISNULL(udi_code,N'') AS udi_code,
+  ISNULL(electronic_regulatory_code,N'') AS electronic_regulatory_code,
+  ISNULL(CONVERT(NVARCHAR(64), length_mm),N'') AS length_mm,
+  ISNULL(CONVERT(NVARCHAR(64), width_mm),N'') AS width_mm,
+  ISNULL(CONVERT(NVARCHAR(64), height_mm),N'') AS height_mm,
+  ISNULL(CONVERT(NVARCHAR(64), volume_cm3),N'') AS volume_cm3,
+  ISNULL(CONVERT(NVARCHAR(64), weight_g),N'') AS weight_g,
+  packaging_json AS packaging_json,
+  schema_version AS schema_version,
+  idempotency_key AS idempotency_key,
+  CONVERT(NVARCHAR(16), retry_count) AS retry_count,
+  CONVERT(NVARCHAR(33), created_at, 126) AS created_at
+FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed)
+FOR JSON PATH;
 """
         )
         cols = [
@@ -183,7 +268,16 @@ FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
             "spec",
             "dosage_form",
             "manufacturer",
+            "special_drug_category",
             "storage_condition",
+            "udi_code",
+            "electronic_regulatory_code",
+            "length_mm",
+            "width_mm",
+            "height_mm",
+            "volume_cm3",
+            "weight_g",
+            "packaging_json",
             "schema_version",
             "idempotency_key",
             "retry_count",
@@ -194,19 +288,25 @@ FROM dbo.if_in_product_master WHERE id IN (SELECT id FROM @claimed);
             claim_cte.format(table=table)
             + """
 SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), CONVERT(NVARCHAR(36), warehouse_id),
-  CONVERT(NVARCHAR(36), customer_id),
-  CONVERT(NVARCHAR(36), ISNULL(supplier_id, customer_id)),
-  product_code,
-  CONVERT(NVARCHAR(32), expected_qty),
-  CONVERT(NVARCHAR(33), expected_arrival_at, 126),
-  document_type, ISNULL(external_ref,N''), ISNULL(receipt_no,N''),
-  ISNULL(batch_no,N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
-  CONVERT(NVARCHAR(33), created_at, 126)
-FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
+  CONVERT(NVARCHAR(36), id) AS id,
+  external_doc_no AS external_doc_no,
+  CONVERT(NVARCHAR(36), owner_id) AS owner_id,
+  CONVERT(NVARCHAR(36), warehouse_id) AS warehouse_id,
+  CONVERT(NVARCHAR(36), customer_id) AS customer_id,
+  CONVERT(NVARCHAR(36), ISNULL(supplier_id, customer_id)) AS supplier_id,
+  product_code AS product_code,
+  CONVERT(NVARCHAR(32), expected_qty) AS expected_qty,
+  CONVERT(NVARCHAR(33), expected_arrival_at, 126) AS expected_arrival_at,
+  document_type AS document_type,
+  ISNULL(external_ref,N'') AS external_ref,
+  ISNULL(receipt_no,N'') AS receipt_no,
+  ISNULL(batch_no,N'') AS batch_no,
+  schema_version AS schema_version,
+  idempotency_key AS idempotency_key,
+  CONVERT(NVARCHAR(16), retry_count) AS retry_count,
+  CONVERT(NVARCHAR(33), created_at, 126) AS created_at
+FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed)
+FOR JSON PATH;
 """
         )
         cols = [
@@ -233,16 +333,21 @@ FROM dbo.if_in_return_order WHERE id IN (SELECT id FROM @claimed);
             claim_cte.format(table=table)
             + """
 SELECT
-  CONVERT(NVARCHAR(36), id), external_doc_no,
-  CONVERT(NVARCHAR(36), owner_id), product_code,
-  ISNULL(CONVERT(NVARCHAR(36), product_id),N''),
-  field_name, new_value,
-  ISNULL(CONVERT(NVARCHAR(36), liaison_id),N''),
-  ISNULL(CONVERT(NVARCHAR(36), asn_id),N''),
-  schema_version,
-  idempotency_key, CONVERT(NVARCHAR(16), retry_count),
-  CONVERT(NVARCHAR(33), created_at, 126)
-FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
+  CONVERT(NVARCHAR(36), id) AS id,
+  external_doc_no AS external_doc_no,
+  CONVERT(NVARCHAR(36), owner_id) AS owner_id,
+  product_code AS product_code,
+  ISNULL(CONVERT(NVARCHAR(36), product_id),N'') AS product_id,
+  field_name AS field_name,
+  new_value AS new_value,
+  ISNULL(CONVERT(NVARCHAR(36), liaison_id),N'') AS liaison_id,
+  ISNULL(CONVERT(NVARCHAR(36), asn_id),N'') AS asn_id,
+  schema_version AS schema_version,
+  idempotency_key AS idempotency_key,
+  CONVERT(NVARCHAR(16), retry_count) AS retry_count,
+  CONVERT(NVARCHAR(33), created_at, 126) AS created_at
+FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed)
+FOR JSON PATH;
 """
         )
         cols = [
@@ -263,15 +368,11 @@ FROM dbo.if_in_product_change WHERE id IN (SELECT id FROM @claimed);
     else:
         raise ValueError(table)
 
-    rows: list[dict[str, str]] = []
-    for line in sqlcmd_query(settings, select_sql).splitlines():
-        line = line.strip()
-        if not line or line.startswith("(") or line.startswith("rows"):
-            continue
-        parts = [part.strip() for part in line.split("|")]
-        if len(parts) >= len(cols):
-            rows.append(dict(zip(cols, parts)))
-    return rows
+    rows = parse_json_rows(sqlcmd_query(settings, select_sql))
+    return [
+        {column: row.get(column, "") for column in cols}
+        for row in rows
+    ]
 
 
 def requeue_replay_row(settings: Any, table: str, idempotency_key: str) -> bool:

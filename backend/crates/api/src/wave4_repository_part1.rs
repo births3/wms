@@ -1,3 +1,4 @@
+// @governance: skip-page-size outbound create, wave, pick, and review transactions stay auditable together.
 impl PgWave4Repository {
 pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -15,9 +16,11 @@ pub fn new(pool: PgPool) -> Self {
         let limit = i64::from(limit.unwrap_or(50).clamp(1, 200));
         let rows = sqlx::query_as::<_, OutboundOrderRow>(
             r#"
-            SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
-                   delivery_address_id, delivery_address_snapshot,
-                   warehouse_id, required_ship_at, status, short_pick,
+            SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
+                   invoice_no, transport_mode_code, department_code, sales_group_code,
+                   order_group_no, business_type_code, customer_id,
+                   delivery_address_id, delivery_address_snapshot, warehouse_id,
+                   required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
              WHERE owner_id = $1
@@ -57,9 +60,11 @@ pub fn new(pool: PgPool) -> Self {
     ) -> Result<OutboundOrder, Wave4RepositoryError> {
         let row = sqlx::query_as::<_, OutboundOrderRow>(
             r#"
-            SELECT id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
-                   delivery_address_id, delivery_address_snapshot,
-                   warehouse_id, required_ship_at, status, short_pick,
+            SELECT id, owner_id, document_type, wms_order_no, erp_order_no,
+                   invoice_no, transport_mode_code, department_code, sales_group_code,
+                   order_group_no, business_type_code, customer_id,
+                   delivery_address_id, delivery_address_snapshot, warehouse_id,
+                   required_ship_at, status, short_pick,
                    created_at, updated_at
               FROM outbound_orders
              WHERE owner_id = $1 AND id = $2
@@ -146,11 +151,16 @@ pub fn new(pool: PgPool) -> Self {
         sqlx::query(
             r#"
             INSERT INTO outbound_orders (
-                id, owner_id, document_type, wms_order_no, erp_order_no, customer_id,
+                id, owner_id, document_type, wms_order_no, erp_order_no,
+                invoice_no, transport_mode_code, department_code, sales_group_code,
+                order_group_no, business_type_code, customer_id,
                 delivery_address_id, delivery_address_snapshot, warehouse_id,
                 required_ship_at, status, short_pick, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, FALSE, $12, $12)
+            VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                $12, $13, $14, $15, $16, $17, FALSE, $18, $18
+            )
             "#,
         )
         .bind(order_id)
@@ -158,6 +168,12 @@ pub fn new(pool: PgPool) -> Self {
         .bind(&req.document_type)
         .bind(&wms_order_no)
         .bind(&req.erp_order_no)
+        .bind(&req.invoice_no)
+        .bind(&req.transport_mode_code)
+        .bind(&req.department_code)
+        .bind(&req.sales_group_code)
+        .bind(&req.order_group_no)
+        .bind(&req.business_type_code)
         .bind(req.customer_id)
         .bind(req.delivery_address_id)
         .bind(delivery_address_snapshot)
@@ -168,6 +184,18 @@ pub fn new(pool: PgPool) -> Self {
         .execute(&mut *tx)
         .await
         .map_err(map_insert_error)?;
+
+        freeze_outbound_route_in_tx(
+            &mut tx,
+            ctx.owner_id,
+            order_id,
+            req.warehouse_id,
+            req.customer_id,
+            req.delivery_address_id,
+            now,
+        )
+        .await
+        .map_err(map_route_freeze_error)?;
 
         for line in &req.lines {
             sqlx::query(

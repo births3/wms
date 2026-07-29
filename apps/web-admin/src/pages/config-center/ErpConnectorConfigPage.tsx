@@ -67,13 +67,13 @@ export const h8ErpConnectorQueryFields: QueryPanelField[] = [
 export const h8ErpConnectorCoreQueryFieldKeys = ["keyword", "status"];
 
 const columns: DataGridColumn<H8ErpConnector>[] = [
-  textColumn("connector_code", "连接编码", 140),
-  textColumn("connector_name", "名称", 160),
-  textColumn("channel_mode", "通道", 180),
+  textColumn("connector_code", "连接编码", 170),
+  textColumn("connector_name", "名称", 180),
+  textColumn("channel_mode", "通道", 140),
   {
     key: "status",
     header: "状态",
-    width: 110,
+    width: 100,
     render: (row) => (
       <StatusBadge status={statusVariant(row.status)} label={row.status} size="sm" />
     ),
@@ -81,38 +81,43 @@ const columns: DataGridColumn<H8ErpConnector>[] = [
   {
     key: "config_version",
     header: "版本",
-    width: 80,
+    width: 70,
+    filter: false,
     render: (row) => row.config_version,
   },
   {
     key: "last_tested_succeeded",
     header: "最近测试",
-    width: 100,
+    width: 90,
+    filter: false,
     render: (row) =>
       row.last_tested_succeeded == null ? "—" : row.last_tested_succeeded ? "通过" : "失败",
   },
   {
     key: "created_at",
     header: "创建时间",
-    width: 180,
+    width: 160,
     render: (row) => formatDateTime(row.created_at),
   },
   {
     key: "updated_at",
     header: "更新时间",
     width: 180,
+    defaultHidden: true,
     render: (row) => formatDateTime(row.updated_at),
   },
   {
     key: "directions",
     header: "方向",
     width: 120,
+    defaultHidden: true,
     render: (row) => row.directions.join(","),
   },
   {
     key: "message_types",
     header: "消息类型",
     width: 180,
+    defaultHidden: true,
     render: (row) => row.message_types.join(","),
   },
 ];
@@ -682,7 +687,11 @@ function statusVariant(value: string): "completed" | "isolated" | "expired" {
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   }).format(new Date(value));
 }

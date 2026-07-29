@@ -34,6 +34,7 @@ use wms_api::{
     drug_inspection_stamp_handlers::{drug_inspection_stamp_router, DrugInspectionStampAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     feature_flags::FeatureFlagRegistry,
+    file_attachment::FileAttachmentService,
     file_attachment_handlers::{file_attachment_router, FileAttachmentAppState},
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
@@ -42,8 +43,12 @@ use wms_api::{
         inventory_status_config_router, InventoryStatusConfigAppState,
     },
     master_data_handlers::{master_data_router, MasterDataAppState},
+    print_device_handlers::{print_device_router, PrintDeviceAppState},
+    print_orchestration::CategoryPdfRenderer,
+    print_orchestration_handlers::{print_orchestration_router, PrintOrchestrationAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
+    reconciliation_handlers::{reconciliation_router, ReconciliationAppState},
     role_management::{role_management_router, RoleManagementState},
     system_dictionary_handlers::{system_dictionary_router, SystemDictionaryAppState},
     task_engine_handlers::{task_engine_router, TaskEngineAppState},
@@ -58,6 +63,10 @@ use wms_domain::HealthzResponse;
 mod wms_api_e2e_seed;
 #[path = "support/wms_api_e2e_seed_data.rs"]
 mod wms_api_e2e_seed_data;
+#[path = "support/wms_api_e2e_seed_h9.rs"]
+mod wms_api_e2e_seed_h9;
+#[path = "support/wms_api_e2e_seed_mrc.rs"]
+mod wms_api_e2e_seed_mrc;
 
 const BIND_ADDR_ENV: &str = "WMS_BIND_ADDR";
 const DATABASE_URL_ENV: &str = "DATABASE_URL";
@@ -102,9 +111,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .max_connections(8)
         .connect(&database_url()?)
         .await?;
-    if env::var(E2E_SEED_ENV).ok().as_deref() == Some("1") {
+    let seed_enabled = env::var(E2E_SEED_ENV).ok().as_deref() == Some("1");
+    let h_file = if seed_enabled {
+        FileAttachmentService::with_memory(pool.clone())
+    } else {
+        FileAttachmentService::from_env(pool.clone())
+            .unwrap_or_else(|_| FileAttachmentService::disabled(pool.clone()))
+    };
+    if seed_enabled {
         sqlx::migrate!("../../migrations").run(&pool).await?;
         wms_api_e2e_seed_data::seed_e2e_data(&pool).await?;
+        wms_api_e2e_seed_h9::seed_h9_file_attachments(&pool, &h_file).await?;
     }
 
     let h8_connector_state = H8ErpConnectorAppState::with_postgres(pool.clone());
@@ -127,6 +144,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )))
         .merge(quality_liaison_router(
             QualityLiaisonAppState::with_postgres(pool.clone()),
+        ))
+        .merge(reconciliation_router(
+            ReconciliationAppState::with_postgres(pool.clone()),
         ))
         .merge(alert_definition_router(
             AlertDefinitionAppState::with_postgres(pool.clone()),
@@ -197,6 +217,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             InventoryStatusConfigAppState::with_postgres(pool.clone()),
         ))
         .merge(print_template_router(PrintTemplateAppState::with_postgres(
+            pool.clone(),
+        )))
+        .merge(print_orchestration_router(
+            PrintOrchestrationAppState::with_pdf_dependencies(
+                pool.clone(),
+                h_file,
+                CategoryPdfRenderer::from_env(),
+            ),
+        ))
+        .merge(print_device_router(PrintDeviceAppState::with_postgres(
             pool.clone(),
         )))
         .merge(role_management_router(RoleManagementState::new(

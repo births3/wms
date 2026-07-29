@@ -5,7 +5,6 @@ import path from "node:path";
 const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m2-inbound");
 const supplierId = "00000000-0000-0000-0000-000000001101";
 const warehouseId = "00000000-0000-0000-0000-000000001301";
-const productId = "00000000-0000-0000-0000-000000001001";
 const adminUserId = "00000000-0000-0000-0000-000000000101";
 
 test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) => {
@@ -13,7 +12,6 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   const receiptNo = `ASN-M2-E2E-${Date.now()}`;
   await login(page);
   const signerIds = await ensureReceivingClerks(page);
-  await ensurePutawayProduct(page);
 
   await openMenu(page, "入库业务", "入库作业", /M2 收货管理/);
   await page.getByRole("button", { name: "新增", exact: true }).click();
@@ -43,23 +41,57 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await page.getByRole("button", { name: "打印", exact: true }).click();
   const asnPrintDialog = page.getByRole("dialog", { name: "M2 ASN E2E 模板" });
   await expect(asnPrintDialog).toBeVisible();
+  await expect(asnPrintDialog).toHaveCSS("opacity", "1");
   await expect(asnPrintDialog.getByText("ASN 号")).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "receiving-print-preview.png") });
-  const asnPrintRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith("/api/v1/print-templates/print") && request.method() === "POST",
-  );
   await asnPrintDialog.getByRole("button", { name: "打印", exact: true }).click();
-  const asnPrintRequest = await asnPrintRequestPromise;
-  const asnPrintBody = JSON.parse(asnPrintRequest.postData() ?? "{}") as Record<string, unknown>;
+  await expect(asnPrintDialog.getByText("确认打印结果")).toBeVisible();
+  await asnPrintDialog.screenshot({ path: path.join(artifactsDir, "browser-print-result-confirmation.png") });
+  const asnPrintResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/print-templates/print") && response.request().method() === "POST",
+  );
+  await asnPrintDialog.getByRole("button", { name: "已完成打印", exact: true }).click();
+  const asnPrintResponse = await asnPrintResponsePromise;
+  const asnPrintBody = JSON.parse(asnPrintResponse.request().postData() ?? "{}") as Record<string, unknown>;
   expect(asnPrintBody.business_module).toBe("M2");
   expect(asnPrintBody.business_document_type).toBe("asn");
-  expect(typeof asnPrintBody.business_document_id).toBe("string");
+  expect(asnPrintBody.business_document_id).toBe(receivingOrderId);
+  expect(asnPrintBody.status).toBe("printed");
+  expect((asnPrintBody.data as { asn?: { code?: string } }).asn?.code).toBe(receiptNo);
+  await expect(asnPrintResponse.json()).resolves.toMatchObject({ retry_count: 0, status: "printed" });
   await expect(page.getByRole("status").filter({ hasText: "打印记录已写入" })).toBeVisible();
+
+  for (const [resultLabel, expectedStatus, expectedRetry] of [
+    ["已取消", "cancelled", 1],
+    ["打印失败", "failed", 2],
+  ] as const) {
+    await page.getByRole("button", { name: "打印", exact: true }).click();
+    const retryDialog = page.getByRole("dialog", { name: "M2 ASN E2E 模板" });
+    await retryDialog.getByRole("button", { name: "打印", exact: true }).click();
+    await expect(retryDialog.getByText("确认打印结果")).toBeVisible();
+    const retryResponsePromise = page.waitForResponse(
+      (response) => response.url().endsWith("/api/v1/print-templates/print") && response.request().method() === "POST",
+    );
+    await retryDialog.getByRole("button", { name: resultLabel, exact: true }).click();
+    const retryResponse = await retryResponsePromise;
+    const retryBody = JSON.parse(retryResponse.request().postData() ?? "{}") as Record<string, unknown>;
+    expect(retryBody.business_document_id).toBe(receivingOrderId);
+    expect(retryBody.status).toBe(expectedStatus);
+    expect((retryBody.data as { asn?: { code?: string } }).asn?.code).toBe(receiptNo);
+    if (expectedStatus === "failed") expect(retryBody.failure_reason).toBe("用户确认浏览器打印失败");
+    await expect(retryResponse.json()).resolves.toMatchObject({
+      retry_count: expectedRetry,
+      status: expectedStatus,
+    });
+  }
 
   await page.getByRole("button", { name: "收货", exact: true }).click();
   await page.getByLabel("实际到货数量").fill("10");
   await page.getByLabel("缺货数量").fill("0");
   await page.getByLabel("拒收数量", { exact: true }).fill("0");
+  await expect(page.getByLabel("商品温度属性")).toHaveValue("冷藏");
+  await page.getByLabel("到货温度 (°C)").fill("5");
+  await page.getByLabel("冷链运输方式").fill("冷藏车");
   await page.getByRole("button", { name: "确认收货" }).click();
   await expect(page.getByText(`${receiptNo} 收货已提交`)).toBeVisible();
   const printDataResponse = await page.evaluate(async (id) => {
@@ -107,18 +139,23 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await page.getByRole("button", { name: "打印", exact: true }).click();
   const acceptancePrintDialog = page.getByRole("dialog", { name: "M2 验收记录 E2E 模板" });
   await expect(acceptancePrintDialog).toBeVisible();
+  await expect(acceptancePrintDialog).toHaveCSS("opacity", "1");
   await expect(acceptancePrintDialog.getByText("ASN 号")).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "inspection-print-preview.png") });
-  const acceptancePrintRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith("/api/v1/print-templates/print") && request.method() === "POST",
-  );
   await acceptancePrintDialog.getByRole("button", { name: "打印", exact: true }).click();
-  const acceptancePrintRequest = await acceptancePrintRequestPromise;
-  const acceptancePrintBody = JSON.parse(acceptancePrintRequest.postData() ?? "{}") as Record<string, unknown>;
+  await expect(acceptancePrintDialog.getByText("确认打印结果")).toBeVisible();
+  const acceptancePrintResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/print-templates/print") && response.request().method() === "POST",
+  );
+  await acceptancePrintDialog.getByRole("button", { name: "已完成打印", exact: true }).click();
+  const acceptancePrintResponse = await acceptancePrintResponsePromise;
+  const acceptancePrintBody = JSON.parse(acceptancePrintResponse.request().postData() ?? "{}") as Record<string, unknown>;
   expect(acceptancePrintBody.business_module).toBe("M2");
   expect(acceptancePrintBody.business_document_type).toBe("acceptance_record");
-  expect(typeof acceptancePrintBody.business_document_id).toBe("string");
+  expect(acceptancePrintBody.business_document_id).toBe(receivingOrderId);
+  expect(acceptancePrintBody.status).toBe("printed");
   expect((acceptancePrintBody.data as { receiving?: { actual_qty?: number } }).receiving?.actual_qty).toBe(10);
+  await expect(acceptancePrintResponse.json()).resolves.toMatchObject({ retry_count: 0, status: "printed" });
   await expect(page.getByRole("status").filter({ hasText: "打印记录已写入" })).toBeVisible();
 
   const overActualInspection = await page.evaluate(async (id) => {
@@ -371,22 +408,6 @@ async function ensureReceivingClerks(page: import("@playwright/test").Page) {
     });
     return { firstSignerId: firstSigner.user_id, secondSignerId: secondSigner.user_id };
   }, { adminUserId });
-}
-
-async function ensurePutawayProduct(page: import("@playwright/test").Page) {
-  await page.evaluate(async ({ productId }) => {
-    const session = JSON.parse(window.localStorage.getItem("wms.web-admin.auth-session") ?? "null") as { accessToken?: string } | null;
-    const response = await fetch(`/api/v1/master-data/products/${productId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: session?.accessToken ? `Bearer ${session.accessToken}` : "",
-        "Content-Type": "application/json",
-        "Idempotency-Key": `m2-e2e-product-volume-${Date.now()}`,
-      },
-      body: JSON.stringify({ attrs: { unit_volume_cm3: 1 } }),
-    });
-    if (!response.ok) throw new Error(`E2E 商品准备失败: ${response.status} ${await response.text()}`);
-  }, { productId });
 }
 
 async function openMenu(page: import("@playwright/test").Page, section: string, group: string, item: RegExp) {

@@ -8,13 +8,11 @@ import {
   type CustomerAddress,
   type CustomerProfile,
   type CreateLocationRequest,
-  type CreateProductRequest,
   type CreateSupplierRequest,
   type CreateWarehouseRequest,
   type CreateWarehouseZoneRequest,
   type DisableSystemDictionaryItemRequest,
   type MasterDataRow,
-  type Product,
   type SpecialDrugCategoryOption,
   type SystemDictionaryItem,
   type SystemDictionaryOption,
@@ -23,7 +21,6 @@ import {
   type UpdateCustomerAddressRequest,
   type UpsertCustomerProfileRequest,
   type UpdateLocationRequest,
-  type UpdateProductRequest,
   type UpdateSupplierRequest,
   type UpdateWarehouseRequest,
   type UpdateWarehouseZoneRequest,
@@ -62,23 +59,6 @@ export async function listProducts(): Promise<MasterDataRow[]> {
     throw new ApiError(result.error, "读取商品档案失败", result.response.status);
   }
   return result.data.data.map(productRow);
-}
-
-export async function updateProduct(input: {
-  id: string;
-  request: UpdateProductRequest;
-}): Promise<Product> {
-  const result = await api.PATCH("/api/v1/master-data/products/{id}", {
-    params: {
-      path: { id: input.id },
-      header: { "Idempotency-Key": idempotencyKey(`web-m1-product-update-${input.id}`) },
-    },
-    body: input.request,
-  });
-  if (!result.data) {
-    throw new ApiError(result.error, "保存商品档案失败", result.response.status);
-  }
-  return result.data;
 }
 
 export async function listSuppliers(): Promise<MasterDataRow[]> {
@@ -251,30 +231,6 @@ export async function batchCreateLocations(
   return result.data.data.map((location) =>
     locationRow(location, locationTypeLabels, warehouseRefs),
   );
-}
-
-export async function createProduct(request: CreateProductRequest): Promise<MasterDataRow> {
-  const result = await api.POST("/api/v1/master-data/products", {
-    params: { header: { "Idempotency-Key": idempotencyKey("web-m1-product-create") } },
-    body: request,
-  });
-  if (!result.data) {
-    throw new ApiError(result.error, "新建商品失败", result.response.status);
-  }
-  return productRow(result.data);
-}
-
-export async function batchCreateProducts(
-  requests: CreateProductRequest[],
-): Promise<MasterDataRow[]> {
-  const result = await api.POST("/api/v1/master-data/products/batch-sync", {
-    params: { header: { "Idempotency-Key": idempotencyKey("web-m1-product-batch") } },
-    body: requests,
-  });
-  if (!result.data) {
-    throw new ApiError(result.error, "批量导入商品失败", result.response.status);
-  }
-  return result.data.data.map(productRow);
 }
 
 export async function createSupplier(request: CreateSupplierRequest): Promise<MasterDataRow> {

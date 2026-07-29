@@ -5,7 +5,6 @@ import type {
   DevFeatureFlagConfig,
   DevLocation,
   DevOrder,
-  DevProduct,
   DevPrintTemplate,
   DevReceivingPrintData,
   DevSupplier,
@@ -18,7 +17,6 @@ const {
   devCreatedCustomers,
   devCreatedLocations,
   devCreatedOrders,
-  devCreatedProducts,
   devCreatedPrintTemplates,
   devCreatedSuppliers,
   devCreatedWarehouses,
@@ -26,7 +24,6 @@ const {
   devLocation,
   devLocationId,
   devOwnerId,
-  devProduct,
   devSeedOrderCount,
   devSeedOrderStatusOverrides,
   devSupplier,
@@ -124,6 +121,7 @@ export async function handleSystemDictionaryUpsert(
     params: asRecord(body.params),
     source: ownerId ? "owner" : "global",
     enabled: asBoolean(body.enabled, true),
+    sort_order: asNumber(body.sort_order, existingIndex >= 0 ? items[existingIndex].sort_order : 0),
     effective_from: asNullableString(body.effective_from),
     effective_to: asNullableString(body.effective_to),
     disabled_reason: existingIndex >= 0 ? items[existingIndex].disabled_reason : null,
@@ -164,39 +162,6 @@ export async function handleSystemDictionaryDisable(
     updated_at: new Date().toISOString(),
   };
   sendJson(res, 200, items[index]);
-}
-
-export async function handleProductUpdate(req: IncomingMessage, res: ServerResponse, id: string) {
-  const createdProductIndex = devCreatedProducts.findIndex((product) => product.id === id);
-  const seedProduct = model.devSeedProducts.find((product) => product.id === id);
-  const product = seedProduct ?? devCreatedProducts[createdProductIndex];
-  if (!product) {
-    sendError(res, 404, "DEV_MOCK_NOT_FOUND", "Product not found");
-    return;
-  }
-
-  const body = await readJsonBody(req);
-  const attrs = asRecord(body.attrs);
-  const storageCondition = asString(attrs.storage_condition, asString(product.attrs.storage_condition, "normal"));
-  const updatedProduct: DevProduct = {
-    ...product,
-    product_name: asString(body.product_name, product.product_name),
-    spec: asNullableString(body.spec) ?? product.spec,
-    dosage_form: asNullableString(body.dosage_form),
-    approval_no: asNullableString(body.approval_no),
-    manufacturer: asNullableString(body.manufacturer),
-    special_drug_category_code: asNullableString(body.special_drug_category_code),
-    attrs: { ...product.attrs, ...attrs, storage_condition: storageCondition },
-    status: asString(body.status, product.status),
-    updated_at: new Date().toISOString(),
-  };
-
-  if (seedProduct) {
-    Object.assign(seedProduct, updatedProduct);
-  } else {
-    devCreatedProducts[createdProductIndex] = updatedProduct;
-  }
-  sendJson(res, 200, updatedProduct);
 }
 
 export async function handleSupplierUpdate(req: IncomingMessage, res: ServerResponse, id: string) {

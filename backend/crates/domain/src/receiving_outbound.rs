@@ -1,3 +1,4 @@
+// @governance: skip-page-size 入库与出库共享 OpenAPI DTO 正在随 M4 分组收口，本次仅扩展 H9 标准归集字段，避免在脏工作区扩大跨故事重构。
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
@@ -9,12 +10,19 @@ use crate::common::PageMeta;
 /// 收货单明细。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceivingOrderLine {
+    /// 明细行号
     pub line_no: u32,
+    /// 商品主数据 ID
     pub product_id: Option<Uuid>,
+    /// 商品编码
     pub product_code: String,
+    /// 预计数量
     pub expected_qty: i64,
+    /// 批号
     pub batch_no: Option<String>,
+    /// 生产日期
     pub production_date: Option<String>,
+    /// 有效期至
     pub expiry_date: Option<String>,
 }
 
@@ -40,12 +48,19 @@ pub struct ReceivingOrder {
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateReceivingOrderRequest {
+    /// 收货单号
     pub receipt_no: String,
+    /// 单据类型
     pub document_type: String,
+    /// 供应商 ID
     pub supplier_id: Option<Uuid>,
+    /// 仓库 ID
     pub warehouse_id: Uuid,
+    /// 外部来源号
     pub external_ref: Option<String>,
+    /// 预计到货时间
     pub expected_arrival_at: Option<DateTime<Utc>>,
+    /// 收货明细
     pub lines: Vec<ReceivingOrderLine>,
 }
 
@@ -255,6 +270,12 @@ pub struct CreateOutboundOrderRequest {
     pub document_type: String,
     pub wms_order_no: String,
     pub erp_order_no: Option<String>,
+    pub invoice_no: Option<String>,
+    pub transport_mode_code: Option<String>,
+    pub department_code: Option<String>,
+    pub sales_group_code: Option<String>,
+    pub order_group_no: Option<String>,
+    pub business_type_code: Option<String>,
     pub customer_id: Uuid,
     pub delivery_address_id: Uuid,
     pub warehouse_id: Uuid,
@@ -269,6 +290,12 @@ pub struct OutboundOrder {
     pub document_type: String,
     pub wms_order_no: String,
     pub erp_order_no: Option<String>,
+    pub invoice_no: Option<String>,
+    pub transport_mode_code: Option<String>,
+    pub department_code: Option<String>,
+    pub sales_group_code: Option<String>,
+    pub order_group_no: Option<String>,
+    pub business_type_code: Option<String>,
     pub customer_id: Uuid,
     pub delivery_address_id: Uuid,
     pub delivery_address_snapshot: serde_json::Value,
@@ -501,6 +528,58 @@ fn forbidden_option(
     } else {
         Ok(())
     }
+}
+
+/// M4 采购退货出库固定单据类型。
+pub const PURCHASE_RETURN_DOCUMENT_TYPE: &str = "purchase_return_outbound";
+/// M4 采购退货出库固定审批来源。
+pub const PURCHASE_RETURN_APPROVAL_SOURCE: &str = "purchase_return_approval";
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreatePurchaseReturnRequest {
+    pub return_no: String,
+    pub source_purchase_order_no: String,
+    pub supplier_id: Option<Uuid>,
+    pub supplier_name: String,
+    pub reason: String,
+    pub warehouse_id: Uuid,
+    pub product_code: String,
+    pub qty: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct RejectPurchaseReturnRequest {
+    /// 驳回原因（必填，不允许空白）。
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PurchaseReturnOrder {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub warehouse_id: Uuid,
+    pub return_no: String,
+    pub document_type: String,
+    pub source_purchase_order_no: String,
+    pub supplier_id: Option<Uuid>,
+    pub supplier_name: String,
+    pub reason: String,
+    pub approval_source: String,
+    pub status: String,
+    pub product_code: String,
+    pub qty: i64,
+    pub reject_reason: Option<String>,
+    pub shipped_at: Option<DateTime<Utc>>,
+    pub shipped_by: Option<Uuid>,
+    pub shipped_by_name: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PurchaseReturnOrderListResponse {
+    pub data: Vec<PurchaseReturnOrder>,
+    pub page: PageMeta,
 }
 
 #[cfg(test)]

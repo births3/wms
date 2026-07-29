@@ -51,7 +51,12 @@ impl IntoResponse for H8ErpConnectorHandlerError {
             ),
             Self::Repo(H8ErpConnectorRepoError::Domain(err)) => domain_error(err),
             Self::Repo(H8ErpConnectorRepoError::Db(msg)) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "H8-500", msg)
+                tracing::error!(error = %msg, "H8 ERP connector database operation failed");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "H8-500",
+                    "database operation failed".into(),
+                )
             }
         };
         (

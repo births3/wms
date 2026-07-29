@@ -15,6 +15,9 @@ publish = false
 [workspace.dependencies]
 axum = "0.7"
 base64 = "0.22"
+aws-credential-types = "=1.2.14"
+aws-sdk-s3 = "=1.127.0"
+aws-types = "=1.3.14"
 bcrypt = "0.19.2"
 chrono = { version = "0.4", features = ["serde"] }
 deadpool-tiberius-rustls = { version = "0.1.12", default-features = false, features = ["rustls", "tds73", "chrono"] }
@@ -24,6 +27,7 @@ jsonwebtoken = "9"
 kamadak-exif = "0.6.1"
 printpdf = { version = "0.11.3", default-features = false, features = ["jpeg", "png"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+lopdf = "0.38"
 redis = { version = "0.27", features = ["aio", "tokio-comp"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

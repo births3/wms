@@ -10,9 +10,9 @@ use wms_domain::{
     CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest,
 };
 
-#[path = "support/wave4.rs"]
-mod wave4_test_support;
-use wave4_test_support::seed_customer_delivery_address;
+#[path = "support/h9.rs"]
+mod h9_support;
+use h9_support::seed_outbound_route_binding;
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -26,6 +26,46 @@ fn ctx(owner_id: Uuid) -> AuthContext {
 }
 
 async fn seed_inventory(pool: &PgPool, owner_id: Uuid, now: chrono::DateTime<Utc>) {
+    let warehouse_id = Uuid::new_v4();
+    let zone_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, '波次计划测试货主') ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(owner_id)
+    .bind(format!("WVP-{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("wave owner should be seeded");
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, '波次计划测试仓', 'normal', 'active')",
+    )
+    .bind(warehouse_id)
+    .bind(owner_id)
+    .bind(format!("WVP-WH-{}", &warehouse_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("wave warehouse should be seeded");
+    sqlx::query(
+        "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1, $2, $3, $4, '波次计划测试区', 'normal', 'qualified_green', 'active')",
+    )
+    .bind(zone_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(format!("WVP-ZONE-{}", &zone_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("wave zone should be seeded");
+    sqlx::query(
+        "INSERT INTO warehouse_locations (id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no, max_volume_cm3, used_volume_cm3, max_sku_count, location_type, status) VALUES ($1, $2, $3, $4, 'OUT-A-01', 1, 1, 1, 100000, 0, 100, 'storage', 'available')",
+    )
+    .bind(location_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(zone_id)
+    .execute(pool)
+    .await
+    .expect("wave location should be seeded");
     sqlx::query(
         r#"
         INSERT INTO inventory_batches (
@@ -41,7 +81,7 @@ async fn seed_inventory(pool: &PgPool, owner_id: Uuid, now: chrono::DateTime<Utc
     .bind(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"))
     .bind(NaiveDate::from_ymd_opt(2028, 1, 1).expect("valid date"))
     .bind(STATUS_QUALIFIED)
-    .bind(Uuid::new_v4())
+    .bind(location_id)
     .bind(now)
     .execute(pool)
     .await
@@ -58,7 +98,10 @@ async fn outbound_wave_release_persists_tasks_locks_audit_and_replays(pool: PgPo
         .single()
         .expect("valid time");
     seed_inventory(&pool, owner_id, now).await;
-    let (customer_id, delivery_address_id) = seed_customer_delivery_address(&pool, owner_id).await;
+    let customer_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, now).await;
     let order = repo
         .create_outbound_order(
             &ctx,
@@ -66,9 +109,15 @@ async fn outbound_wave_release_persists_tasks_locks_audit_and_replays(pool: PgPo
                 document_type: "sales_outbound".to_string(),
                 wms_order_no: "WMS-WAVE-001".to_string(),
                 erp_order_no: None,
+                invoice_no: None,
+                transport_mode_code: None,
+                department_code: None,
+                sales_group_code: None,
+                order_group_no: None,
+                business_type_code: None,
                 customer_id,
+                warehouse_id,
                 delivery_address_id,
-                warehouse_id: Uuid::new_v4(),
                 required_ship_at: None,
                 lines: vec![CreateOutboundOrderLineRequest {
                     line_no: 1,
@@ -142,14 +191,23 @@ async fn h8_outbound_order_create_replays_without_duplicate_lines(pool: PgPool) 
         .with_ymd_and_hms(2026, 7, 23, 9, 30, 0)
         .single()
         .expect("valid time");
-    let (customer_id, delivery_address_id) = seed_customer_delivery_address(&pool, owner_id).await;
+    let customer_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, now).await;
     let request = CreateOutboundOrderRequest {
         document_type: "sales_outbound".to_string(),
         wms_order_no: "WMS-H8-L11-001".to_string(),
         erp_order_no: Some("ERP-H8-L11-001".to_string()),
+        invoice_no: None,
+        transport_mode_code: None,
+        department_code: None,
+        sales_group_code: None,
+        order_group_no: None,
+        business_type_code: None,
         customer_id,
+        warehouse_id,
         delivery_address_id,
-        warehouse_id: Uuid::new_v4(),
         required_ship_at: None,
         lines: vec![CreateOutboundOrderLineRequest {
             line_no: 1,

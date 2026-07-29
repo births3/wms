@@ -145,13 +145,21 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
     }
 
     if (item.title === "M1 商品档案") {
-      const code = `P-M1-E2E-${Date.now()}`;
-      await page.getByRole("button", { name: "新增", exact: true }).click();
-      await page.getByLabel("商品编码").fill(code);
-      await page.getByLabel("商品名称").fill("E2E 受控储存商品");
-      await page.getByRole("textbox", { name: "规格", exact: true }).fill("1盒");
-      await page.getByRole("button", { name: "新建商品", exact: true }).click();
-      await expect(page.getByText(code).first()).toBeVisible();
+      await expect(page.getByText("ERP 权威商品投影")).toBeVisible();
+      await expect(page.getByText(/本页只读/)).toBeVisible();
+      await expect(page.getByRole("button", { name: "新增", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "导入", exact: true })).toHaveCount(0);
+      const row = page.locator("tr", { hasText: "P-M1-E2E-001" }).first();
+      await expect(row).toContainText("支 × 1");
+      await expect(row).toContainText("盒 × 10");
+      await expect(row).toContainText("06901234567891");
+      await expect(row).toContainText("长 120 mm");
+      await expect(row).toContainText("重量 180 g");
+      fs.mkdirSync(productEvidenceDir, { recursive: true });
+      await page.screenshot({
+        path: path.join(productEvidenceDir, "product-read-only-contract-current.png"),
+        fullPage: false,
+      });
     }
   }
 
@@ -255,10 +263,11 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
 
   const importedDockCode = `D-E2E-IMPORT-${Date.now()}`;
   await page.locator('input[type="file"]').setInputFiles({
-    name: "docks-e2e.xls",
-    mimeType: "application/vnd.ms-excel",
+    name: "docks-e2e.csv",
+    mimeType: "text/csv",
     buffer: Buffer.from(
-      `<table><tr><th>月台编号</th><th>作业类型</th><th>温区</th><th>位置说明</th></tr><tr><td>${importedDockCode}</td><td>发货</td><td>常温</td><td>E2E 批量导入月台</td></tr></table>`,
+      `月台编号,作业类型,温区,位置说明\n${importedDockCode},发货,常温,E2E 批量导入月台`,
+      "utf8",
     ),
   });
   await expect(page.getByText("已导入 1 个月台", { exact: true })).toBeVisible();
@@ -346,51 +355,6 @@ test("M1 供应商资质 PC 真实维护", async ({ page }) => {
   await expect(supplierDialog).toBeHidden();
   await expect(page.getByText("E2E 供应商联系人").first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "supplier-qualification-updated.png"), fullPage: false });
-});
-
-test("M1 商品批量导入调用原子批量接口", async ({ page }) => {
-  fs.mkdirSync(productEvidenceDir, { recursive: true });
-  await page.goto("/");
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await page.getByLabel("货主编码").fill("PY_OWNER");
-  await page.getByLabel("登录账号").fill("admin");
-  await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
-  await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
-
-  await page.getByRole("button", { name: "基础档案" }).click();
-  const masterDataGroup = page.getByRole("navigation").getByRole("button", { name: "主数据", exact: true });
-  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") await masterDataGroup.click();
-  await page.getByRole("navigation").getByRole("button", { name: /M1 商品档案/ }).click();
-  await expect(page.getByRole("heading", { name: "M1 商品档案" })).toBeVisible();
-
-  const marker = Date.now();
-  const firstCode = `P-E2E-BATCH-${marker}-1`;
-  const secondCode = `P-E2E-BATCH-${marker}-2`;
-  await page.getByRole("button", { name: "导入", exact: true }).click();
-  await page.getByRole("textbox", { name: "商品批量导入内容" }).fill([
-    "product_code,product_name,spec,approval_no,dosage_form,manufacturer,storage_condition,special_drug_category_code",
-    `${firstCode},E2E 批量商品一,10ml*1支,国药准字E2E1,注射剂,E2E药业,normal,none`,
-    `${secondCode},E2E 批量商品二,20片,国药准字E2E2,片剂,E2E药业,normal,none`,
-  ].join("\n"));
-  await expect(page.getByText("已解析 2 条，预览前 8 条", { exact: true })).toBeVisible();
-  const batchResponse = page.waitForResponse(
-    (response) => response.url().endsWith("/api/v1/master-data/products/batch-sync")
-      && response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "确认导入", exact: true }).click();
-  const response = await batchResponse;
-  expect(response.status(), await response.text()).toBe(200);
-  expect(response.request().postDataJSON()).toHaveLength(2);
-  await expect(page.getByRole("dialog")).toBeHidden();
-  await expect(page.getByText("已批量导入 2 个商品", { exact: true })).toBeVisible();
-  await expect(page.getByText(firstCode, { exact: true })).toBeVisible();
-  await expect(page.getByText(secondCode, { exact: true })).toBeVisible();
-  await page.screenshot({
-    path: path.join(productEvidenceDir, "product-batch-import-current.png"),
-    fullPage: false,
-  });
 });
 
 test("M1 供应商批量导入调用原子批量接口", async ({ page }) => {

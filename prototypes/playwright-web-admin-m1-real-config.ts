@@ -5,6 +5,10 @@ import path from "node:path";
 
 const baseURL = process.env.WMS_WEB_ADMIN_E2E_BASE_URL ?? "http://127.0.0.1:19081";
 const apiURL = process.env.WMS_WEB_ADMIN_E2E_API_URL ?? "http://127.0.0.1:19080";
+const renderWorkerURL =
+  process.env.WMS_H9_RENDER_WORKER_URL ?? "http://127.0.0.1:19082/render";
+const renderWorkerToken =
+  process.env.WMS_H9_RENDER_TOKEN ?? `h9-render-e2e-${crypto.randomUUID()}`;
 const databaseURL = process.env.DATABASE_URL ?? process.env.WMS_DB_URL;
 const jwtSigningKey = process.env.WMS_JWT_SECRET ?? `web-admin-m1-real-e2e-${crypto.randomUUID()}`;
 const executablePath =
@@ -22,7 +26,7 @@ function bindAddr(url: string) {
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /web-admin-m1-real\.spec\.ts/,
+  testMatch: /web-admin-(?:m1|h9-template-type|h9-field-library|h9-template-version|h9-delivery-note-aggregation|h9-print-device)-real\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
@@ -42,6 +46,21 @@ export default defineConfig({
   },
   webServer: [
     {
+      command: `pnpm --dir ${path.join("..", "apps", "h9-render-worker")} start`,
+      url: new URL("/healthz", renderWorkerURL).toString(),
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: {
+        ...process.env,
+        WMS_H9_RENDER_HOST: new URL(renderWorkerURL).hostname,
+        WMS_H9_RENDER_PORT: new URL(renderWorkerURL).port || "19082",
+        WMS_H9_RENDER_TOKEN: renderWorkerToken,
+        ...(executablePath
+          ? { WMS_H9_RENDER_CHROMIUM_EXECUTABLE: executablePath }
+          : {}),
+      },
+    },
+    {
       command: "cargo run --manifest-path ../backend/Cargo.toml -p wms-api --example wms_api_e2e",
       url: `${apiURL}/api/v1/healthz`,
       reuseExistingServer: false,
@@ -51,6 +70,8 @@ export default defineConfig({
         DATABASE_URL: databaseURL,
         WMS_BIND_ADDR: bindAddr(apiURL),
         WMS_E2E_SEED: "1",
+        WMS_H9_RENDER_TOKEN: renderWorkerToken,
+        WMS_H9_RENDER_WORKER_URL: renderWorkerURL,
         WMS_JWT_SECRET: jwtSigningKey,
       },
     },
@@ -62,6 +83,7 @@ export default defineConfig({
       env: {
         ...process.env,
         WMS_WEB_ADMIN_E2E_API_URL: apiURL,
+        WMS_WEB_ADMIN_DEV_MOCK: "0",
       },
     },
   ],

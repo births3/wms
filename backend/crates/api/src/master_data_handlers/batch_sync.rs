@@ -7,8 +7,8 @@ use wms_domain::{
 use crate::auth::AuthContext;
 
 use super::{
-    idempotency_key_from_headers, page, MasterDataAppState, MasterDataHandlerError,
-    MASTER_DATA_WRITE_PERMISSION,
+    idempotency_key_from_headers, page, require_internal_product_write, MasterDataAppState,
+    MasterDataHandlerError, MASTER_DATA_WRITE_PERMISSION,
 };
 
 impl MasterDataAppState {
@@ -100,7 +100,7 @@ pub(super) async fn batch_create_products_handler(
     headers: HeaderMap,
     Json(requests): Json<Vec<CreateProductRequest>>,
 ) -> Result<Json<ProductListResponse>, MasterDataHandlerError> {
-    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    require_internal_product_write(&ctx)?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     let data = state
         .batch_create_products(&ctx, requests, chrono::Utc::now(), &idempotency_key)

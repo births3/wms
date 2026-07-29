@@ -16,15 +16,19 @@ use wms_domain::{
     H8ErpConnectorTestResult, PageMeta, UpdateH8ErpConnectorRequest,
 };
 
-use crate::auth::{AuthContext, AuthError};
+use crate::{
+    auth::{AuthContext, AuthError},
+    warehouse_scope::load_user_warehouse_scopes,
+};
 
-use super::audit::{audit_snapshot, write_audit};
+use super::audit::{audit_request, audit_snapshot};
 use super::error::{H8ErpConnectorHandlerError, H8ErpConnectorRepoError};
 use super::idempotency::{
-    ensure_inbound_api_key_scopes, idempotency_key, load_idempotent_response, request_hash,
-    store_idempotent_response,
+    cache_idempotent_response, ensure_inbound_api_key_scopes, idempotency_key,
+    load_idempotent_response, request_hash, H8IdempotencyWrite,
 };
 use super::probe::run_connection_probe;
+use super::repository::H8ConnectorStatusTransition;
 use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE};
 
 pub fn h8_erp_connector_router(state: H8ErpConnectorAppState) -> Router {
@@ -98,13 +102,37 @@ async fn resolve_connector_route(
     Query(q): Query<RouteResolveQuery>,
 ) -> Result<Json<RouteResolveResponse>, H8ErpConnectorHandlerError> {
     ctx.require_permission(H8_CONFIG_READ)?;
-    let warehouse_id = match (q.warehouse_id, ctx.warehouse_scope) {
+    let mut warehouse_id = match (q.warehouse_id, ctx.warehouse_scope) {
         (Some(requested), Some(scope)) if requested != scope => {
             return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
         }
         (None, Some(scope)) => Some(scope),
         (requested, _) => requested,
     };
+    if ctx.warehouse_scope.is_none() {
+        let scopes = match state.audit_pool.as_ref() {
+            Some(pool) => load_user_warehouse_scopes(pool, &ctx)
+                .await
+                .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))?,
+            None if ctx.has_permission(H8_CONFIG_WRITE) => Vec::new(),
+            None => return Err(AuthError::PermissionDenied("warehouse scope".into()).into()),
+        };
+        if scopes.is_empty() {
+            if !ctx.has_permission(H8_CONFIG_WRITE) {
+                return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
+            }
+        } else if warehouse_id.is_some_and(|id| !scopes.contains(&id)) {
+            return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
+        } else if warehouse_id.is_none() {
+            if scopes.len() == 1 {
+                warehouse_id = scopes.first().copied();
+            } else if q.direction.trim() != "inbound"
+                || !matches!(q.message_type.trim(), "product_master" | "product_change")
+            {
+                return Err(AuthError::PermissionDenied("warehouse scope required".into()).into());
+            }
+        }
+    }
     let actives = state.repository.list_active(ctx.owner_id).await?;
     let connector = resolve_active_connector(
         &actives,
@@ -199,19 +227,22 @@ async fn create_connector(
         updated_at: now,
     };
     ensure_inbound_api_key_scopes(&state, ctx.owner_id, &connector).await?;
-    let saved = state.repository.insert(&connector).await?;
-    write_audit(&state, &ctx, "h8_connector_create", &saved, None).await;
-    store_idempotent_response(
-        &state,
+    let audit = audit_request(&ctx, "h8_connector_create", &connector, None);
+    let idempotency = H8IdempotencyWrite::new(
         ctx.owner_id,
         &idem,
         &hash,
         "POST",
         "/api/v1/config/erp-connectors",
         StatusCode::CREATED,
-        &saved,
-    )
-    .await?;
+        connector.id,
+        &connector,
+    )?;
+    let saved = state
+        .repository
+        .commit_create(&connector, &audit, &idempotency)
+        .await?;
+    cache_idempotent_response(&state, &idempotency);
     Ok((StatusCode::CREATED, Json(saved)))
 }
 
@@ -239,22 +270,23 @@ async fn update_connector(
     let before = audit_snapshot(&current);
     let next = apply_update(&current, &req, Utc::now()).map_err(H8ErpConnectorRepoError::Domain)?;
     ensure_inbound_api_key_scopes(&state, ctx.owner_id, &next).await?;
-    let saved = state
-        .repository
-        .save(&next, observed, observed_probe)
-        .await?;
-    write_audit(&state, &ctx, "h8_connector_update", &saved, Some(before)).await;
-    store_idempotent_response(
-        &state,
+    let path = format!("/api/v1/config/erp-connectors/{id}");
+    let audit = audit_request(&ctx, "h8_connector_update", &next, Some(before));
+    let idempotency = H8IdempotencyWrite::new(
         ctx.owner_id,
         &idem,
         &hash,
         "PATCH",
-        &format!("/api/v1/config/erp-connectors/{id}"),
+        &path,
         StatusCode::OK,
-        &saved,
-    )
-    .await?;
+        next.id,
+        &next,
+    )?;
+    let saved = state
+        .repository
+        .commit_update(&next, observed, observed_probe, &audit, &idempotency)
+        .await?;
+    cache_idempotent_response(&state, &idempotency);
     Ok(Json(saved))
 }
 
@@ -302,29 +334,37 @@ async fn test_connector(
     connector.last_tested_succeeded = Some(ok);
     connector.last_tested_error_summary = err.clone();
     connector.updated_at = now;
-    let saved = state
-        .repository
-        .save(&connector, observed, observed_probe)
-        .await?;
-    write_audit(&state, &ctx, "h8_connector_test", &saved, Some(before)).await;
     let result = H8ErpConnectorTestResult {
         succeeded: ok,
         error_summary: err,
         tested_version: connector.config_version,
         tested_at: now,
     };
-    store_idempotent_response(
-        &state,
+    let path = format!("/api/v1/config/erp-connectors/{id}/test");
+    let audit = audit_request(&ctx, "h8_connector_test", &connector, Some(before));
+    let idempotency = H8IdempotencyWrite::new(
         ctx.owner_id,
         &idem,
         &hash,
         "POST",
-        &format!("/api/v1/config/erp-connectors/{id}/test"),
+        &path,
         StatusCode::OK,
+        connector.id,
         &result,
-    )
-    .await?;
-    Ok(Json(result))
+    )?;
+    let saved_result = state
+        .repository
+        .commit_test(
+            &connector,
+            observed,
+            observed_probe,
+            &result,
+            &audit,
+            &idempotency,
+        )
+        .await?;
+    cache_idempotent_response(&state, &idempotency);
+    Ok(Json(saved_result))
 }
 
 async fn activate_connector(
@@ -357,31 +397,32 @@ async fn activate_connector(
     }
     connector.status = "active".into();
     connector.updated_at = now;
-    let saved = state
-        .repository
-        .save(&connector, observed, observed_probe)
-        .await?;
-    // AC12：原连接重新启用后，paused 在途从原阶段续传（恢复 running）
-    let resumed = state
-        .repository
-        .resume_inflight(ctx.owner_id, connector.id)
-        .await
-        .unwrap_or(0);
-    write_audit(&state, &ctx, "h8_connector_activate", &saved, Some(before)).await;
-    if resumed > 0 {
-        write_audit(&state, &ctx, "h8_connector_inflight_resume", &saved, None).await;
-    }
-    store_idempotent_response(
-        &state,
+    let activate_audit = audit_request(&ctx, "h8_connector_activate", &connector, Some(before));
+    let resume_audit = audit_request(&ctx, "h8_connector_inflight_resume", &connector, None);
+    let path = format!("/api/v1/config/erp-connectors/{id}/activate");
+    let idempotency = H8IdempotencyWrite::new(
         ctx.owner_id,
         &idem,
         &hash,
         "POST",
-        &format!("/api/v1/config/erp-connectors/{id}/activate"),
+        &path,
         StatusCode::OK,
-        &saved,
-    )
-    .await?;
+        connector.id,
+        &connector,
+    )?;
+    let (saved, _resumed) = state
+        .repository
+        .commit_status_transition(
+            &connector,
+            observed,
+            observed_probe,
+            H8ConnectorStatusTransition::Activate,
+            &activate_audit,
+            Some(&resume_audit),
+            &idempotency,
+        )
+        .await?;
+    cache_idempotent_response(&state, &idempotency);
     Ok(Json(saved))
 }
 
@@ -411,28 +452,33 @@ async fn disable_connector(
         ));
     }
     let before = audit_snapshot(&connector);
-    state
-        .repository
-        .pause_inflight(ctx.owner_id, connector.id)
-        .await?;
     connector.status = "disabled".into();
     connector.updated_at = Utc::now();
-    let saved = state
-        .repository
-        .save(&connector, observed, observed_probe)
-        .await?;
-    write_audit(&state, &ctx, "h8_connector_disable", &saved, Some(before)).await;
-    store_idempotent_response(
-        &state,
+    let disable_audit = audit_request(&ctx, "h8_connector_disable", &connector, Some(before));
+    let path = format!("/api/v1/config/erp-connectors/{id}/disable");
+    let idempotency = H8IdempotencyWrite::new(
         ctx.owner_id,
         &idem,
         &hash,
         "POST",
-        &format!("/api/v1/config/erp-connectors/{id}/disable"),
+        &path,
         StatusCode::OK,
-        &saved,
-    )
-    .await?;
+        connector.id,
+        &connector,
+    )?;
+    let (saved, _paused) = state
+        .repository
+        .commit_status_transition(
+            &connector,
+            observed,
+            observed_probe,
+            H8ConnectorStatusTransition::Disable,
+            &disable_audit,
+            None,
+            &idempotency,
+        )
+        .await?;
+    cache_idempotent_response(&state, &idempotency);
     Ok(Json(saved))
 }
 
@@ -443,8 +489,27 @@ async fn delete_connector(
     headers: HeaderMap,
 ) -> Result<StatusCode, H8ErpConnectorHandlerError> {
     ctx.require_permission(H8_CONFIG_WRITE)?;
-    let _idem = idempotency_key(&headers)?;
-    let connector = state.repository.get(ctx.owner_id, id).await?;
+    let idem = idempotency_key(&headers)?;
+    let hash = request_hash(&("delete", id))?;
+    if load_idempotent_response(&state, ctx.owner_id, &idem, &hash)
+        .await?
+        .is_some()
+    {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    let connector = match state.repository.get(ctx.owner_id, id).await {
+        Ok(connector) => connector,
+        Err(H8ErpConnectorRepoError::Domain(H8ErpConnectorError::NotFound)) => {
+            if load_idempotent_response(&state, ctx.owner_id, &idem, &hash)
+                .await?
+                .is_some()
+            {
+                return Ok(StatusCode::NO_CONTENT);
+            }
+            return Err(H8ErpConnectorRepoError::Domain(H8ErpConnectorError::NotFound).into());
+        }
+        Err(error) => return Err(error.into()),
+    };
     let refs = state
         .repository
         .has_inflight_refs(ctx.owner_id, connector.id)
@@ -455,14 +520,22 @@ async fn delete_connector(
         ));
     }
     let before = audit_snapshot(&connector);
-    state.repository.delete(ctx.owner_id, id).await?;
-    write_audit(
-        &state,
-        &ctx,
-        "h8_connector_delete",
-        &connector,
-        Some(before),
-    )
-    .await;
+    let path = format!("/api/v1/config/erp-connectors/{id}");
+    let audit = audit_request(&ctx, "h8_connector_delete", &connector, Some(before));
+    let idempotency = H8IdempotencyWrite::new(
+        ctx.owner_id,
+        &idem,
+        &hash,
+        "DELETE",
+        &path,
+        StatusCode::NO_CONTENT,
+        connector.id,
+        &serde_json::Value::Null,
+    )?;
+    state
+        .repository
+        .commit_delete(ctx.owner_id, id, &audit, &idempotency)
+        .await?;
+    cache_idempotent_response(&state, &idempotency);
     Ok(StatusCode::NO_CONTENT)
 }

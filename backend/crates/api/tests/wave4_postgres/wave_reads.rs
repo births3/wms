@@ -136,26 +136,14 @@ async fn outbound_wave_can_cancel_before_picking_and_release_inventory(pool: PgP
         .value;
 
     let cancelled = repo
-        .cancel_outbound_wave(
-            &ctx,
-            wave.id,
-            now,
-            "outbound-wave-cancel-002",
-            None,
-        )
+        .cancel_outbound_wave(&ctx, wave.id, now, "outbound-wave-cancel-002", None)
         .await
         .expect("wave should be cancellable before picking")
         .value;
     assert_eq!(cancelled.status, "cancelled");
 
     let replayed = repo
-        .cancel_outbound_wave(
-            &ctx,
-            wave.id,
-            now,
-            "outbound-wave-cancel-002",
-            None,
-        )
+        .cancel_outbound_wave(&ctx, wave.id, now, "outbound-wave-cancel-002", None)
         .await
         .expect("cancellation should replay")
         .value;

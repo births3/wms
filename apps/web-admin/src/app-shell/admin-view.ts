@@ -19,6 +19,7 @@ export type AdminView =
   | "m3-counts"
   | "m3-maintenance"
   | "m3-relocations"
+  | "mrc-reconciliation"
   | "mte-task-types"
   | "mte-task-groups"
   | "mte-task-dispatch"
@@ -44,5 +45,7 @@ export type AdminView =
   | "h8-erp-connectors"
   | "h8-erp-messages"
   | "h8-erp-interface-tables"
+  | "h9-delivery-note-aggregation"
+  | "h9-print-devices"
   | "h9-print-templates"
   | "mcg-numbering";

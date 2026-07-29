@@ -38,6 +38,14 @@ async fn seed_inventory(pool: &PgPool, owner_id: Uuid, qty: i64) -> (Uuid, Uuid,
     let now = Utc::now();
 
     sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'M3 盘点测试货主') ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(owner_id)
+    .bind(format!("M3-COUNT-{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed count owner");
+    sqlx::query(
         "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, 'M3-COUNT-WH', 'M3 盘点仓', 'main', 'active')",
     )
     .bind(warehouse_id)
@@ -190,6 +198,20 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
     .expect("count adjustment movement");
     assert_eq!(movement, (-2, "inventory_count".to_string()));
 
+    let snapshot: (String, serde_json::Value, String) = sqlx::query_as(
+        "SELECT snapshot_no, payload, status FROM inventory_snapshot_erp_feedback_outbox WHERE owner_id = $1",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("approved count should publish inventory snapshot");
+    assert_eq!(snapshot.0, format!("{}:{warehouse_id}", created.value.id));
+    assert_eq!(snapshot.1["warehouse_id"], warehouse_id.to_string());
+    assert_eq!(snapshot.1["count_id"], created.value.id.to_string());
+    assert_eq!(snapshot.1["lines"][0]["qty_on_hand"], 8);
+    assert_eq!(snapshot.1["lines"][0]["qty_available"], 6);
+    assert_eq!(snapshot.2, "pending");
+
     let replay = repository
         .approve_inventory_count_with_audit(
             &manager,
@@ -214,6 +236,110 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
     .await
     .expect("count adjustment count");
     assert_eq!(movement_count, 1);
+    let (outbox_count, audit_count, idempotency_count): (i64, i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+          (SELECT COUNT(*) FROM inventory_snapshot_erp_feedback_outbox
+            WHERE owner_id = $1),
+          (SELECT COUNT(*) FROM audit_event
+            WHERE owner_id = $1 AND action = 'approve_inventory_count'
+              AND resource_id = $2),
+          (SELECT COUNT(*) FROM idempotency_request
+            WHERE owner_id = $1 AND idempotency_key = $3)
+        "#,
+    )
+    .bind(owner_id)
+    .bind(created.value.id.to_string())
+    .bind("m3-count-approve-1")
+    .fetch_one(&pool)
+    .await
+    .expect("inventory snapshot replay evidence should query");
+    assert_eq!((outbox_count, audit_count, idempotency_count), (1, 1, 1));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn inventory_snapshot_failure_rolls_back_count_approval(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let (warehouse_id, zone_id, _location_id, batch_id) = seed_inventory(&pool, owner_id, 10).await;
+    let repository = PgWave3Repository::new(pool.clone());
+    let keeper = ctx(owner_id, &["m3.inventory_count.write"]);
+    let manager = ctx(owner_id, &["m3.inventory_count.approve"]);
+    let created = repository
+        .create_inventory_count_with_audit(
+            &keeper,
+            CreateInventoryCountRequest {
+                count_type: "cycle".to_string(),
+                warehouse_id: Some(warehouse_id),
+                zone_id: Some(zone_id),
+                product_code: None,
+            },
+            Utc::now(),
+            "m3-count-rollback-create",
+            None,
+        )
+        .await
+        .expect("rollback count should create");
+    repository
+        .submit_inventory_count_line_with_audit(
+            &keeper,
+            created.value.id,
+            created.value.lines[0].id,
+            SubmitInventoryCountLineRequest { physical_qty: 6 },
+            Utc::now(),
+            "m3-count-rollback-submit",
+            None,
+        )
+        .await
+        .expect("rollback count line should submit");
+    sqlx::query(
+        "ALTER TABLE inventory_snapshot_erp_feedback_outbox ADD CONSTRAINT reject_inventory_snapshot_test CHECK (FALSE)",
+    )
+    .execute(&pool)
+    .await
+    .expect("snapshot failure constraint should install");
+
+    let error = repository
+        .approve_inventory_count_with_audit(
+            &manager,
+            created.value.id,
+            ApproveInventoryCountRequest {
+                approval_source: "盘点-高级".to_string(),
+                approval_id: "M3-COUNT-ROLLBACK-APPROVAL".to_string(),
+            },
+            Utc::now(),
+            "m3-count-rollback-approve",
+            None,
+        )
+        .await
+        .expect_err("outbox failure must reject count approval");
+    assert!(matches!(error, Wave3RepositoryError::Database(_)));
+    let state: (String, i64, i64, i64, i64, i64) = sqlx::query_as(
+        r#"
+        SELECT count_sheet.status, batch.qty_on_hand,
+          (SELECT COUNT(*) FROM inventory_movements movement
+            WHERE movement.owner_id = $1 AND movement.source_document_id = $2),
+          (SELECT COUNT(*) FROM inventory_snapshot_erp_feedback_outbox outbox
+            WHERE outbox.owner_id = $1),
+          (SELECT COUNT(*) FROM audit_event audit
+            WHERE audit.owner_id = $1 AND audit.action = 'approve_inventory_count'
+              AND audit.resource_id = $2::text),
+          (SELECT COUNT(*) FROM idempotency_request request
+            WHERE request.owner_id = $1
+              AND request.idempotency_key = $4)
+          FROM inventory_counts count_sheet
+          JOIN inventory_batches batch ON batch.owner_id = count_sheet.owner_id
+           AND batch.id = $3
+         WHERE count_sheet.owner_id = $1 AND count_sheet.id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(created.value.id)
+    .bind(batch_id)
+    .bind("m3-count-rollback-approve")
+    .fetch_one(&pool)
+    .await
+    .expect("rolled back count state should query");
+    assert_eq!(state, ("pending_approval".to_string(), 10, 0, 0, 0, 0));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

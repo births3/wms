@@ -9,6 +9,8 @@ type PrintFieldDefinition = components["schemas"]["PrintFieldDefinition"];
 type PrintTemplateSummary = components["schemas"]["PrintTemplateSummary"];
 type SystemDictionaryItem = components["schemas"]["SystemDictionaryItem"];
 
+export type GeneratePrintFieldLibraryDraftRequest = components["schemas"]["GeneratePrintFieldLibraryDraftRequest"];
+export type UpdatePrintFieldDefinitionRequest = components["schemas"]["UpdatePrintFieldDefinitionRequest"];
 export type PrintTemplateBinding = components["schemas"]["PrintTemplateBinding"];
 export type PrintTemplateVersion = components["schemas"]["PrintTemplateVersion"];
 export type ResolvePrintTemplateRequest = components["schemas"]["ResolvePrintTemplateRequest"];
@@ -17,19 +19,24 @@ export type PrintTemplatePreviewRequest = components["schemas"]["PrintTemplatePr
 export type PrintTemplatePreviewResponse = components["schemas"]["PrintTemplatePreviewResponse"];
 export type PrintTemplatePrintRequest = components["schemas"]["PrintTemplatePrintRequest"];
 export type SavePrintTemplateRequest = components["schemas"]["SavePrintTemplateRequest"];
+export type SetPrintTemplateEnabledRequest = components["schemas"]["SetPrintTemplateEnabledRequest"];
 
 export interface PrintFieldLibraryRow {
   id: string;
   libraryCode: string;
   libraryName: string;
+  businessModule: string;
   sourceSchema: string;
   latestVersionId: string;
   versionNo: number;
+  publishedVersionId: string | null;
+  publishedVersionNo: number | null;
   fieldCount: number;
   createdAt: string;
-  publishedAt: string;
-  publishedBy: string;
-  status: "published";
+  createdBy: string;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  status: "draft" | "published";
   statusLabel: string;
   searchText: string;
 }
@@ -43,7 +50,15 @@ export interface PrintFieldDefinitionRow {
   displayName: string;
   groupCode: string;
   groupName: string;
-  metadata: unknown;
+  description: string;
+  exampleValue: unknown;
+  printable: boolean;
+  sensitive: boolean;
+  maskingRule: string | null;
+  formattingRule: string | null;
+  supportsBarcode: boolean;
+  supportsQrcode: boolean;
+  isTableDetail: boolean;
   sortOrder: number;
 }
 
@@ -122,6 +137,59 @@ export function useSavePrintTemplateMutation() {
   });
 }
 
+export function usePublishPrintTemplateMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: publishPrintTemplate,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: printTemplateQueryKey });
+    },
+  });
+}
+
+export function useSetPrintTemplateEnabledMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setPrintTemplateEnabled,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: printTemplateQueryKey });
+    },
+  });
+}
+
+export function useGeneratePrintFieldLibraryDraftMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: generatePrintFieldLibraryDraft,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: printTemplateQueryKey });
+    },
+  });
+}
+
+export function useUpdatePrintFieldDefinitionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updatePrintFieldDefinition,
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: [...printTemplateQueryKey, "field-definitions", variables.libraryVersionId],
+      });
+      void queryClient.invalidateQueries({ queryKey: [...printTemplateQueryKey, "field-libraries"] });
+    },
+  });
+}
+
+export function usePublishPrintFieldLibraryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: publishPrintFieldLibrary,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: printTemplateQueryKey });
+    },
+  });
+}
+
 export function useResolvePrintTemplateMutation() {
   return useMutation<ResolvePrintTemplateResponse, ApiError, ResolvePrintTemplateRequest>({
     mutationFn: resolvePrintTemplate,
@@ -193,6 +261,103 @@ async function savePrintTemplate(request: SavePrintTemplateRequest) {
   return result.data;
 }
 
+async function publishPrintTemplate({
+  templateId,
+  versionId,
+}: {
+  templateId: string;
+  versionId: string;
+}) {
+  const result = await api.POST(
+    "/api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish",
+    {
+      params: {
+        path: { template_id: templateId, version_id: versionId },
+        header: { "Idempotency-Key": idempotencyKey("web-h9-template-publish") },
+      },
+    },
+  );
+  if (!result.data) {
+    throw new ApiError(result.error, "发布打印模板失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function setPrintTemplateEnabled({
+  templateId,
+  body,
+}: {
+  templateId: string;
+  body: SetPrintTemplateEnabledRequest;
+}) {
+  const result = await api.PATCH(
+    "/api/v1/print-templates/templates/{template_id}/enabled",
+    {
+      body,
+      params: {
+        path: { template_id: templateId },
+        header: { "Idempotency-Key": idempotencyKey("web-h9-template-enabled") },
+      },
+    },
+  );
+  if (!result.data) {
+    throw new ApiError(result.error, "停启打印模板失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function generatePrintFieldLibraryDraft(request: GeneratePrintFieldLibraryDraftRequest) {
+  const result = await api.POST("/api/v1/print-templates/field-libraries/drafts", {
+    body: request,
+    params: { header: { "Idempotency-Key": idempotencyKey("web-h9-field-library-draft") } },
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "生成字段库草稿失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function updatePrintFieldDefinition({
+  libraryVersionId,
+  fieldId,
+  body,
+}: {
+  libraryVersionId: string;
+  fieldId: string;
+  body: UpdatePrintFieldDefinitionRequest;
+}) {
+  const result = await api.PATCH(
+    "/api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}",
+    {
+      body,
+      params: {
+        path: { version_id: libraryVersionId, field_id: fieldId },
+        header: { "Idempotency-Key": idempotencyKey("web-h9-field-definition") },
+      },
+    },
+  );
+  if (!result.data) {
+    throw new ApiError(result.error, "保存字段元数据失败", result.response.status);
+  }
+  return result.data;
+}
+
+async function publishPrintFieldLibrary(libraryVersionId: string) {
+  const result = await api.POST(
+    "/api/v1/print-templates/field-libraries/{version_id}/publish",
+    {
+      params: {
+        path: { version_id: libraryVersionId },
+        header: { "Idempotency-Key": idempotencyKey("web-h9-field-library-publish") },
+      },
+    },
+  );
+  if (!result.data) {
+    throw new ApiError(result.error, "发布字段库失败", result.response.status);
+  }
+  return result.data;
+}
+
 async function resolvePrintTemplate(request: ResolvePrintTemplateRequest) {
   const result = await api.POST("/api/v1/print-templates/resolve", { body: request });
   if (!result.data) {
@@ -235,21 +400,27 @@ function printFieldLibraryRow(row: PrintFieldLibrarySummary): PrintFieldLibraryR
     id: row.id,
     libraryCode: row.library_code,
     libraryName: row.library_name,
+    businessModule: row.business_module,
     sourceSchema: row.source_schema,
     latestVersionId: row.latest_version_id,
     versionNo: row.version_no,
+    publishedVersionId: row.latest_published_version_id ?? null,
+    publishedVersionNo: row.latest_published_version_no ?? null,
     fieldCount: row.field_count,
     createdAt: row.created_at,
-    publishedAt: row.published_at,
-    publishedBy: row.published_by,
-    status: "published",
-    statusLabel: "已发布",
+    createdBy: row.created_by,
+    publishedAt: row.published_at ?? null,
+    publishedBy: row.published_by ?? null,
+    status: row.latest_version_status === "published" ? "published" : "draft",
+    statusLabel: row.latest_version_status === "published" ? "已发布" : "草稿",
     searchText: [
       row.library_code,
       row.library_name,
       row.source_schema,
       row.latest_version_id,
-      row.published_by,
+      row.business_module,
+      row.latest_version_status,
+      row.published_by ?? "",
     ]
       .join(" ")
       .toLowerCase(),
@@ -266,7 +437,15 @@ function printFieldDefinitionRow(row: PrintFieldDefinition): PrintFieldDefinitio
     displayName: row.display_name,
     groupCode: row.group_code,
     groupName: row.group_name,
-    metadata: row.metadata,
+    description: row.description,
+    exampleValue: row.example_value,
+    printable: row.printable,
+    sensitive: row.sensitive,
+    maskingRule: row.masking_rule ?? null,
+    formattingRule: row.formatting_rule ?? null,
+    supportsBarcode: row.supports_barcode,
+    supportsQrcode: row.supports_qrcode,
+    isTableDetail: row.is_table_detail,
     sortOrder: row.sort_order,
   };
 }

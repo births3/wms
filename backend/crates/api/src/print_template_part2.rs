@@ -1,42 +1,3 @@
-fn validate_publish_request(
-    req: &PublishPrintFieldLibraryRequest,
-) -> Result<(), PrintTemplateError> {
-    if req.library_code.trim().is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "library_code is required".to_string(),
-        ));
-    }
-    if req.library_name.trim().is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "library_name is required".to_string(),
-        ));
-    }
-    if req.source_schema.trim().is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "source_schema is required".to_string(),
-        ));
-    }
-    if req.fields.is_empty() {
-        return Err(PrintTemplateError::InvalidRequest(
-            "fields are required".to_string(),
-        ));
-    }
-    let mut paths = BTreeSet::new();
-    for field in &req.fields {
-        if field.field_path.trim().is_empty() {
-            return Err(PrintTemplateError::InvalidRequest(
-                "field_path is required".to_string(),
-            ));
-        }
-        if !paths.insert(field.field_path.as_str()) {
-            return Err(PrintTemplateError::InvalidRequest(format!(
-                "duplicate field_path: {}",
-                field.field_path
-            )));
-        }
-    }
-    Ok(())
-}
 fn validate_template_request(req: &SavePrintTemplateRequest) -> Result<(), PrintTemplateError> {
     if req.template_code.trim().is_empty() {
         return Err(PrintTemplateError::InvalidRequest(
@@ -63,6 +24,7 @@ fn validate_template_request(req: &SavePrintTemplateRequest) -> Result<(), Print
             .hiprint_json
             .get("panels")
             .is_some_and(serde_json::Value::is_array)
+        || contains_executable_hiprint_option(&req.hiprint_json)
     {
         return Err(PrintTemplateError::TemplateJsonInvalid);
     }
@@ -83,6 +45,29 @@ fn validate_template_request(req: &SavePrintTemplateRequest) -> Result<(), Print
     Ok(())
 }
 
+fn contains_executable_hiprint_option(value: &Value) -> bool {
+    const EXECUTABLE_OPTIONS: [&str; 9] = [
+        "formatter",
+        "styler",
+        "rowsColumnsMerge",
+        "rowStyler",
+        "footerFormatter",
+        "gridColumnsFooterFormatter",
+        "styler2",
+        "renderFormatter",
+        "formatter2",
+    ];
+
+    match value {
+        Value::Object(fields) => fields.iter().any(|(key, value)| {
+            (EXECUTABLE_OPTIONS.contains(&key.as_str()) && !value.is_null())
+                || contains_executable_hiprint_option(value)
+        }),
+        Value::Array(items) => items.iter().any(contains_executable_hiprint_option),
+        _ => false,
+    }
+}
+
 fn validate_print_request(req: &PrintTemplatePrintRequest) -> Result<(), PrintTemplateError> {
     if req.template_type_code.trim().is_empty()
         || req.business_module.trim().is_empty()
@@ -98,25 +83,41 @@ fn validate_print_request(req: &PrintTemplatePrintRequest) -> Result<(), PrintTe
             "print status must be printed, cancelled or failed".to_string(),
         ));
     }
+    if req.status == "failed"
+        && req
+            .failure_reason
+            .as_deref()
+            .map(str::trim)
+            .filter(|reason| !reason.is_empty())
+            .is_none()
+    {
+        return Err(PrintTemplateError::InvalidRequest(
+            "failed print requires failure_reason".to_string(),
+        ));
+    }
     Ok(())
 }
 
 async fn validate_field_library_and_bindings(
     pool: &PgPool,
     req: &SavePrintTemplateRequest,
-) -> Result<(), PrintTemplateError> {
-    let status: Option<(String,)> = sqlx::query_as(
+) -> Result<String, PrintTemplateError> {
+    let version: Option<(String, String)> = sqlx::query_as(
         r#"
-        SELECT status
-          FROM print_field_library_versions
-         WHERE id = $1
+        SELECT versions.status, libraries.library_code
+          FROM print_field_library_versions versions
+          JOIN print_field_libraries libraries ON libraries.id = versions.library_id
+         WHERE versions.id = $1
         "#,
     )
     .bind(req.field_library_version_id)
     .fetch_optional(pool)
     .await
     .map_err(map_db_error)?;
-    if status.as_ref().map(|row| row.0.as_str()) != Some("published") {
+    let Some((status, library_code)) = version else {
+        return Err(PrintTemplateError::FieldLibraryNotPublished);
+    };
+    if status != "published" {
         return Err(PrintTemplateError::FieldLibraryNotPublished);
     }
 
@@ -141,6 +142,88 @@ async fn validate_field_library_and_bindings(
     if !missing.is_empty() {
         return Err(PrintTemplateError::TemplateFieldMismatch(missing));
     }
+    Ok(library_code)
+}
+
+async fn effective_template_type_field_library_code_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    template_type_code: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<String>, PrintTemplateError> {
+    sqlx::query_scalar(EFFECTIVE_TEMPLATE_TYPE_FIELD_LIBRARY_SQL)
+        .bind(owner_id)
+        .bind(SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE)
+        .bind(template_type_code)
+        .bind(now)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(map_db_error)
+}
+
+const EFFECTIVE_TEMPLATE_TYPE_FIELD_LIBRARY_SQL: &str = r#"
+        WITH scoped_items AS (
+            SELECT item.enabled,
+                   item.params,
+                   ROW_NUMBER() OVER (
+                       ORDER BY
+                           CASE WHEN item.owner_id = $1 THEN 1 ELSE 0 END DESC,
+                           item.updated_at DESC
+                   ) AS scope_rank
+              FROM system_dictionary_items item
+              JOIN system_dictionary_categories category
+                ON category.dict_code = item.dict_code
+               AND category.enabled = TRUE
+             WHERE item.dict_code = $2
+               AND item.item_code = $3
+               AND (item.owner_id IS NULL OR item.owner_id = $1)
+               AND (item.effective_from IS NULL OR item.effective_from <= $4)
+               AND (item.effective_to IS NULL OR item.effective_to > $4)
+        )
+        SELECT params ->> 'field_library_code'
+          FROM scoped_items
+         WHERE scope_rank = 1
+           AND enabled = TRUE
+        "#;
+
+async fn validate_resolved_template(
+    pool: &PgPool,
+    ctx: &AuthContext,
+    version: &PrintTemplateVersion,
+) -> Result<(), PrintTemplateError> {
+    let library: Option<(String, String)> = sqlx::query_as(
+        r#"
+        SELECT versions.status, libraries.library_code
+          FROM print_field_library_versions versions
+          JOIN print_field_libraries libraries ON libraries.id = versions.library_id
+         WHERE versions.id = $1
+        "#,
+    )
+    .bind(version.field_library_version_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(map_db_error)?;
+    let Some((status, library_code)) = library else {
+        return Err(PrintTemplateError::FieldLibraryNotPublished);
+    };
+    if status != "published" {
+        return Err(PrintTemplateError::FieldLibraryNotPublished);
+    }
+    let expected_library_code: String =
+        sqlx::query_scalar(EFFECTIVE_TEMPLATE_TYPE_FIELD_LIBRARY_SQL)
+        .bind(ctx.owner_id)
+        .bind(SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE)
+        .bind(&version.template_type_code)
+        .bind(Utc::now())
+        .fetch_optional(pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(PrintTemplateError::TemplateDisabled)?;
+    if expected_library_code != library_code {
+        return Err(PrintTemplateError::TemplateFieldMismatch(vec![format!(
+            "field_library_code:{library_code}"
+        )]));
+    }
     Ok(())
 }
 
@@ -150,7 +233,7 @@ fn validate_required_fields(
 ) -> Result<(), PrintTemplateError> {
     let missing: Vec<String> = bindings
         .iter()
-        .filter(|binding| binding.required && value_at_path(data, &binding.field_path).is_none())
+        .filter(|binding| binding.required && !required_path_present(data, &binding.field_path))
         .map(|binding| binding.field_path.clone())
         .collect();
     if missing.is_empty() {
@@ -160,78 +243,83 @@ fn validate_required_fields(
     }
 }
 
-fn value_at_path<'a>(data: &'a Value, path: &str) -> Option<&'a Value> {
-    let mut current = data;
-    for part in path.split('.') {
-        if part.is_empty() {
-            return None;
-        }
-        current = current.get(part)?;
+fn required_path_present(data: &Value, path: &str) -> bool {
+    let parts: Vec<&str> = path.split('.').collect();
+    !parts.is_empty()
+        && parts.iter().all(|part| !part.is_empty())
+        && required_parts_present(data, &parts)
+}
+
+fn required_parts_present(data: &Value, parts: &[&str]) -> bool {
+    let Some((part, remaining)) = parts.split_first() else {
+        return !data.is_null();
+    };
+    if let Some(key) = part.strip_suffix("[]") {
+        return data
+            .get(key)
+            .and_then(Value::as_array)
+            .is_some_and(|items| {
+                !items.is_empty()
+                    && items
+                        .iter()
+                        .all(|item| required_parts_present(item, remaining))
+            });
     }
-    if current.is_null() {
-        None
-    } else {
-        Some(current)
+    data.get(*part)
+        .is_some_and(|value| required_parts_present(value, remaining))
+}
+
+fn mask_sensitive_fields(data: &mut Value, fields: &[PrintFieldDefinition]) {
+    for field in fields.iter().filter(|field| field.sensitive) {
+        let parts: Vec<&str> = field.field_path.split('.').collect();
+        mask_parts(data, &parts, field.masking_rule.as_deref());
     }
 }
 
-async fn upsert_library_for_update(
-    tx: &mut Transaction<'_, Postgres>,
-    req: &PublishPrintFieldLibraryRequest,
-    now: DateTime<Utc>,
-) -> Result<Uuid, PrintTemplateError> {
-    let existing: Option<(Uuid,)> = sqlx::query_as(
-        r#"
-        SELECT id
-          FROM print_field_libraries
-         WHERE library_code = $1
-         FOR UPDATE
-        "#,
-    )
-    .bind(&req.library_code)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-
-    if let Some((id,)) = existing {
-        sqlx::query(
-            r#"
-            UPDATE print_field_libraries
-               SET library_name = $1,
-                   source_schema = $2,
-                   updated_at = $3,
-                   version = version + 1
-             WHERE id = $4
-            "#,
-        )
-        .bind(&req.library_name)
-        .bind(&req.source_schema)
-        .bind(now)
-        .bind(id)
-        .execute(&mut **tx)
-        .await
-        .map_err(map_db_error)?;
-        return Ok(id);
+fn mask_parts(data: &mut Value, parts: &[&str], rule: Option<&str>) {
+    let Some((part, remaining)) = parts.split_first() else {
+        mask_value(data, rule);
+        return;
+    };
+    if let Some(key) = part.strip_suffix("[]") {
+        if let Some(items) = data.get_mut(key).and_then(Value::as_array_mut) {
+            for item in items {
+                mask_parts(item, remaining, rule);
+            }
+        }
+        return;
     }
+    if let Some(value) = data.get_mut(*part) {
+        mask_parts(value, remaining, rule);
+    }
+}
 
-    let id = Uuid::new_v4();
-    sqlx::query(
-        r#"
-        INSERT INTO print_field_libraries (
-            id, library_code, library_name, source_schema, created_at, updated_at
+fn mask_value(value: &mut Value, rule: Option<&str>) {
+    if value.is_null() {
+        return;
+    }
+    let Some(text) = value.as_str() else {
+        *value = Value::String("******".to_string());
+        return;
+    };
+    let Some(keep) = rule
+        .and_then(|rule| rule.strip_prefix("keep_last_"))
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|keep| *keep > 0)
+    else {
+        *value = Value::String("******".to_string());
+        return;
+    };
+    let characters: Vec<char> = text.chars().collect();
+    *value = Value::String(if characters.len() <= keep {
+        "*".repeat(characters.len().max(1))
+    } else {
+        format!(
+            "{}{}",
+            "*".repeat(characters.len() - keep),
+            characters[characters.len() - keep..].iter().collect::<String>()
         )
-        VALUES ($1, $2, $3, $4, $5, $5)
-        "#,
-    )
-    .bind(id)
-    .bind(&req.library_code)
-    .bind(&req.library_name)
-    .bind(&req.source_schema)
-    .bind(now)
-    .execute(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-    Ok(id)
+    });
 }
 
 async fn next_version_no(
@@ -256,51 +344,52 @@ async fn upsert_template_for_update(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &AuthContext,
     req: &SavePrintTemplateRequest,
+    template_owner_id: Uuid,
     now: DateTime<Utc>,
-) -> Result<Uuid, PrintTemplateError> {
-    let existing: Option<(Uuid,)> = sqlx::query_as(
-        r#"
-        SELECT id
-          FROM print_templates
-         WHERE owner_id = $1 AND template_code = $2
-         FOR UPDATE
-        "#,
-    )
-    .bind(ctx.owner_id)
-    .bind(&req.template_code)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-
-    if let Some((id,)) = existing {
-        sqlx::query(
+) -> Result<(Uuid, bool), PrintTemplateError> {
+    if let Some(template_id) = req.template_id {
+        let existing: Option<(String, bool)> = sqlx::query_as(
             r#"
-            UPDATE print_templates
-               SET template_name = $1,
-                   template_type_code = $2,
-                   scope = $3,
-                   enabled = $4,
-                   is_default = $5,
-                   remark = $6,
-                   updated_at = $7,
-                   updated_by = $8,
-                   version = version + 1
-             WHERE id = $9
+            SELECT template_code, enabled
+              FROM print_templates
+             WHERE owner_id = $1
+               AND id = $2
+             FOR UPDATE
             "#,
         )
-        .bind(&req.template_name)
-        .bind(&req.template_type_code)
-        .bind(req.scope.as_str())
-        .bind(req.enabled)
-        .bind(req.is_default)
-        .bind(&req.remark)
-        .bind(now)
-        .bind(ctx.user_id)
-        .bind(id)
-        .execute(&mut **tx)
+        .bind(template_owner_id)
+        .bind(template_id)
+        .fetch_optional(&mut **tx)
         .await
         .map_err(map_db_error)?;
-        return Ok(id);
+        let Some((template_code, enabled)) = existing else {
+            return Err(PrintTemplateError::TemplateNotFound);
+        };
+        if template_code != req.template_code {
+            return Err(PrintTemplateError::InvalidRequest(
+                "template_code cannot be changed".to_string(),
+            ));
+        }
+        return Ok((template_id, enabled));
+    }
+
+    let duplicate: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+              FROM print_templates
+             WHERE owner_id = $1
+               AND template_code = $2
+        )
+        "#,
+    )
+    .bind(template_owner_id)
+    .bind(&req.template_code)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    if duplicate {
+        return Err(PrintTemplateError::TemplateDuplicate);
     }
 
     let id = Uuid::new_v4();
@@ -315,12 +404,12 @@ async fn upsert_template_for_update(
         "#,
     )
     .bind(id)
-    .bind(ctx.owner_id)
+    .bind(template_owner_id)
     .bind(&req.template_code)
     .bind(&req.template_name)
     .bind(&req.template_type_code)
     .bind(req.scope.as_str())
-    .bind(req.enabled)
+    .bind(true)
     .bind(req.is_default)
     .bind(&req.remark)
     .bind(now)
@@ -328,7 +417,7 @@ async fn upsert_template_for_update(
     .execute(&mut **tx)
     .await
     .map_err(map_db_error)?;
-    Ok(id)
+    Ok((id, true))
 }
 
 async fn next_template_version_no(
@@ -365,13 +454,13 @@ async fn resolve_template_version(
                 versions.id,
                 templates.id AS template_id,
                 templates.template_code,
-                templates.template_name,
-                templates.template_type_code,
+                versions.template_name,
+                versions.template_type_code,
                 templates.owner_id,
-                templates.scope,
+                versions.scope,
                 templates.enabled,
-                templates.is_default,
-                templates.remark,
+                versions.is_default,
+                versions.remark,
                 versions.field_library_version_id,
                 versions.version_no,
                 versions.status,
@@ -391,14 +480,20 @@ async fn resolve_template_version(
                  ORDER BY version_no DESC
                  LIMIT 1
               ) versions ON TRUE
-             WHERE templates.owner_id = $1
-               AND templates.template_code = $2
-               AND templates.template_type_code = $3
+         WHERE templates.template_code = $2
+           AND templates.template_type_code = $3
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $4)
+           )
+         ORDER BY CASE templates.scope WHEN 'owner' THEN 0 ELSE 1 END
+         LIMIT 1
             "#,
         )
         .bind(ctx.owner_id)
         .bind(code)
         .bind(template_type_code)
+        .bind(Uuid::nil())
         .fetch_optional(pool)
         .await
         .map_err(map_db_error)?
@@ -407,6 +502,7 @@ async fn resolve_template_version(
         if !version.enabled {
             return Err(PrintTemplateError::TemplateDisabled);
         }
+        validate_resolved_template(pool, ctx, &version).await?;
         return Ok(version);
     }
 
@@ -416,13 +512,13 @@ async fn resolve_template_version(
             versions.id,
             templates.id AS template_id,
             templates.template_code,
-            templates.template_name,
-            templates.template_type_code,
+            versions.template_name,
+            versions.template_type_code,
             templates.owner_id,
-            templates.scope,
+            versions.scope,
             templates.enabled,
-            templates.is_default,
-            templates.remark,
+            versions.is_default,
+            versions.remark,
             versions.field_library_version_id,
             versions.version_no,
             versions.status,
@@ -442,21 +538,132 @@ async fn resolve_template_version(
              ORDER BY version_no DESC
              LIMIT 1
           ) versions ON TRUE
-         WHERE templates.owner_id = $1
-           AND templates.template_type_code = $2
+         WHERE templates.template_type_code = $2
            AND templates.enabled = TRUE
+           AND templates.is_default = TRUE
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $3)
+           )
          ORDER BY
            CASE templates.scope WHEN 'owner' THEN 0 ELSE 1 END,
-           templates.is_default DESC,
            templates.updated_at DESC
          LIMIT 1
         "#,
     )
     .bind(ctx.owner_id)
     .bind(template_type_code)
+    .bind(Uuid::nil())
     .fetch_optional(pool)
     .await
     .map_err(map_db_error)?
     .ok_or(PrintTemplateError::TemplateNotFound)?;
+    let version = PrintTemplateVersion::try_from(row)?;
+    validate_resolved_template(pool, ctx, &version).await?;
+    Ok(version)
+}
+
+async fn template_version_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    template_id: Uuid,
+    version_id: Uuid,
+) -> Result<PrintTemplateVersion, PrintTemplateError> {
+    let row = sqlx::query_as::<_, PrintTemplateVersionRow>(
+        r#"
+        SELECT
+            versions.id,
+            templates.id AS template_id,
+            templates.template_code,
+            versions.template_name,
+            versions.template_type_code,
+            templates.owner_id,
+            versions.scope,
+            templates.enabled,
+            versions.is_default,
+            versions.remark,
+            versions.field_library_version_id,
+            versions.version_no,
+            versions.status,
+            versions.hiprint_json,
+            versions.field_bindings,
+            versions.paper,
+            versions.designer_version,
+            versions.created_at,
+            versions.created_by,
+            versions.published_at,
+            versions.published_by
+          FROM print_template_versions versions
+          JOIN print_templates templates ON templates.id = versions.template_id
+         WHERE templates.id = $2
+           AND versions.id = $3
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $4)
+           )
+         FOR UPDATE OF templates, versions
+        "#,
+    )
+    .bind(owner_id)
+    .bind(template_id)
+    .bind(version_id)
+    .bind(Uuid::nil())
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(map_db_error)?
+    .ok_or(PrintTemplateError::TemplateVersionNotFound)?;
     PrintTemplateVersion::try_from(row)
+}
+
+async fn template_summary_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    template_id: Uuid,
+) -> Result<PrintTemplateSummary, PrintTemplateError> {
+    let row = sqlx::query_as::<_, PrintTemplateSummaryRow>(
+        r#"
+        SELECT
+            templates.id,
+            templates.template_code,
+            latest_versions.template_name,
+            latest_versions.template_type_code,
+            templates.owner_id,
+            latest_versions.scope,
+            templates.enabled,
+            latest_versions.is_default,
+            latest_versions.remark,
+            latest_versions.id AS latest_version_id,
+            latest_versions.version_no AS latest_version_no,
+            latest_versions.status AS latest_version_status,
+            latest_versions.field_library_version_id,
+            latest_versions.designer_version,
+            templates.created_at,
+            templates.updated_at,
+            latest_versions.published_at
+          FROM print_templates templates
+          JOIN LATERAL (
+            SELECT
+                id, template_name, template_type_code, scope, is_default, remark,
+                version_no, status, field_library_version_id, designer_version, published_at
+              FROM print_template_versions
+             WHERE template_id = templates.id
+             ORDER BY version_no DESC
+             LIMIT 1
+          ) latest_versions ON TRUE
+         WHERE templates.id = $2
+           AND (
+                (templates.scope = 'owner' AND templates.owner_id = $1)
+                OR (templates.scope = 'global' AND templates.owner_id = $3)
+           )
+         FOR UPDATE OF templates
+        "#,
+    )
+    .bind(owner_id)
+    .bind(template_id)
+    .bind(Uuid::nil())
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(map_db_error)?
+    .ok_or(PrintTemplateError::TemplateNotFound)?;
+    PrintTemplateSummary::try_from(row)
 }

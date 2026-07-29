@@ -101,11 +101,36 @@ export interface DevProduct {
   owner_id: string;
   product_code: string;
   product_name: string;
-  spec: string | null;
+  spec: string;
   dosage_form: string | null;
   approval_no: string | null;
   manufacturer: string | null;
   special_drug_category_code: string | null;
+  udi_code: string | null;
+  electronic_regulatory_code: string | null;
+  length_mm: number | null;
+  width_mm: number | null;
+  height_mm: number | null;
+  volume_cm3: number | null;
+  weight_g: number | null;
+  packaging_levels: Array<{
+    id: string;
+    unit_code: string;
+    unit_name: string;
+    ratio_to_base: number;
+    is_base: boolean;
+    is_default: boolean;
+    sort_order: number;
+  }>;
+  mapping_traces: Array<{
+    id: string;
+    field_name: string;
+    source_system: string;
+    source_value: string;
+    target_value: string;
+    rule_id: string | null;
+    created_at: string;
+  }>;
   attrs: Record<string, unknown>;
   status: string;
   created_at: string;
@@ -193,6 +218,7 @@ export interface DevSystemDictionaryItem {
   params: Record<string, unknown>;
   source: string;
   enabled: boolean;
+  sort_order: number;
   effective_from: string | null;
   effective_to: string | null;
   disabled_reason: string | null;
@@ -247,6 +273,7 @@ function devSystemDictionaryItem(
   itemCode: string,
   itemName: string,
   params: Record<string, unknown>,
+  sortOrder = 0,
 ): DevSystemDictionaryItem {
   return {
     id,
@@ -257,6 +284,7 @@ function devSystemDictionaryItem(
     params,
     source: "global",
     enabled: true,
+    sort_order: sortOrder,
     effective_from: null,
     effective_to: null,
     disabled_reason: null,
@@ -267,7 +295,6 @@ function devSystemDictionaryItem(
 
 export const devCreatedOrders: DevOrder[] = [];
 export const devReceivingPrintData = new Map<string, DevReceivingPrintData>();
-export const devCreatedProducts: DevProduct[] = [];
 export const devCreatedSuppliers: DevSupplier[] = [];
 export const devCreatedCustomers: DevCustomer[] = [];
 export const devCreatedWarehouses: DevWarehouse[] = [];
@@ -329,16 +356,46 @@ export let devProduct: DevProduct = {
   approval_no: "国药准字H20260001",
   manufacturer: "鹏鹞示例药业",
   special_drug_category_code: "none",
+  udi_code: "06901234567891",
+  electronic_regulatory_code: "81000000000000000001",
+  length_mm: 120,
+  width_mm: 100,
+  height_mm: 30,
+  volume_cm3: 360,
+  weight_g: 180,
+  packaging_levels: [
+    {
+      id: "00000000-0000-0000-0000-000000001011",
+      unit_code: "piece",
+      unit_name: "支",
+      ratio_to_base: 1,
+      is_base: true,
+      is_default: false,
+      sort_order: 1,
+    },
+    {
+      id: "00000000-0000-0000-0000-000000001012",
+      unit_code: "box",
+      unit_name: "盒",
+      ratio_to_base: 10,
+      is_base: false,
+      is_default: true,
+      sort_order: 2,
+    },
+    {
+      id: "00000000-0000-0000-0000-000000001013",
+      unit_code: "case",
+      unit_name: "箱",
+      ratio_to_base: 200,
+      is_base: false,
+      is_default: false,
+      sort_order: 3,
+    },
+  ],
+  mapping_traces: [],
   attrs: {
-    large_package: "20 件/大包",
-    middle_package: "10 件/中包",
     source: "api_import",
     storage_condition: "cold",
-    unit_height_mm: "30",
-    unit_length_mm: "120",
-    unit_volume_cm3: "360",
-    unit_weight_g: "180",
-    unit_width_mm: "100",
   } as Record<string, unknown>,
   status: "active",
   created_at: "2026-06-29T00:00:00.000Z",
@@ -357,16 +414,46 @@ export const devSeedProducts: DevProduct[] = [
     approval_no: "国药准字Z20260002",
     manufacturer: "鹏鹞示例药业",
     special_drug_category_code: "none",
+    udi_code: "06901234567892",
+    electronic_regulatory_code: "81000000000000000002",
+    length_mm: 150,
+    width_mm: 120,
+    height_mm: 55,
+    volume_cm3: 990,
+    weight_g: 240,
+    packaging_levels: [
+      {
+        id: "00000000-0000-0000-0000-000000001021",
+        unit_code: "bag",
+        unit_name: "袋",
+        ratio_to_base: 1,
+        is_base: true,
+        is_default: false,
+        sort_order: 1,
+      },
+      {
+        id: "00000000-0000-0000-0000-000000001022",
+        unit_code: "box",
+        unit_name: "盒",
+        ratio_to_base: 9,
+        is_base: false,
+        is_default: true,
+        sort_order: 2,
+      },
+      {
+        id: "00000000-0000-0000-0000-000000001023",
+        unit_code: "case",
+        unit_name: "箱",
+        ratio_to_base: 216,
+        is_base: false,
+        is_default: false,
+        sort_order: 3,
+      },
+    ],
+    mapping_traces: [],
     attrs: {
-      large_package: "24 盒/大包",
-      middle_package: "12 盒/中包",
       source: "batch_import",
       storage_condition: "normal",
-      unit_height_mm: "55",
-      unit_length_mm: "150",
-      unit_volume_cm3: "990",
-      unit_weight_g: "240",
-      unit_width_mm: "120",
     },
     status: "active",
     created_at: "2026-06-29T00:00:00.000Z",
@@ -382,16 +469,46 @@ export const devSeedProducts: DevProduct[] = [
     approval_no: "国药准字H20260003",
     manufacturer: "鹏鹞示例药业",
     special_drug_category_code: "none",
+    udi_code: "06901234567893",
+    electronic_regulatory_code: "81000000000000000003",
+    length_mm: 60,
+    width_mm: 60,
+    height_mm: 90,
+    volume_cm3: 324,
+    weight_g: 120,
+    packaging_levels: [
+      {
+        id: "00000000-0000-0000-0000-000000001031",
+        unit_code: "tablet",
+        unit_name: "片",
+        ratio_to_base: 1,
+        is_base: true,
+        is_default: false,
+        sort_order: 1,
+      },
+      {
+        id: "00000000-0000-0000-0000-000000001032",
+        unit_code: "bottle",
+        unit_name: "瓶",
+        ratio_to_base: 100,
+        is_base: false,
+        is_default: true,
+        sort_order: 2,
+      },
+      {
+        id: "00000000-0000-0000-0000-000000001033",
+        unit_code: "case",
+        unit_name: "箱",
+        ratio_to_base: 3000,
+        is_base: false,
+        is_default: false,
+        sort_order: 3,
+      },
+    ],
+    mapping_traces: [],
     attrs: {
-      large_package: "30 瓶/大包",
-      middle_package: "10 瓶/中包",
       source: "manual",
       storage_condition: "normal",
-      unit_height_mm: "90",
-      unit_length_mm: "60",
-      unit_volume_cm3: "324",
-      unit_weight_g: "120",
-      unit_width_mm: "60",
     },
     status: "active",
     created_at: "2026-06-29T00:00:00.000Z",
@@ -500,13 +617,20 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
     }),
   ],
   print_template_type: [
-    devSystemDictionaryItem("00000000-0000-0000-0000-000000001801", "print_template_type", "asn", "ASN 单", {
-      business_direction: "inbound",
-      business_module: "M2",
-      default_scope: "global",
-      field_library_code: "m2_asn",
-      paper_type: "a4",
-    }),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001801",
+      "print_template_type",
+      "asn",
+      "ASN 单",
+      {
+        business_direction: "inbound",
+        business_module: "M2",
+        default_scope: "global",
+        field_library_code: "m2_asn",
+        paper_type: "a4",
+      },
+      10,
+    ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001802",
       "print_template_type",
@@ -519,6 +643,7 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m2_acceptance_record",
         paper_type: "a4",
       },
+      20,
     ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001803",
@@ -532,6 +657,7 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m4_delivery_note",
         paper_type: "a4",
       },
+      30,
     ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001804",
@@ -545,14 +671,22 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m1_location_label",
         paper_type: "label",
       },
+      40,
     ),
-    devSystemDictionaryItem("00000000-0000-0000-0000-000000001805", "print_template_type", "lpn_label", "LPN 标签", {
-      business_direction: "label",
-      business_module: "M3",
-      default_scope: "global",
-      field_library_code: "m3_lpn_label",
-      paper_type: "label",
-    }),
+    devSystemDictionaryItem(
+      "00000000-0000-0000-0000-000000001805",
+      "print_template_type",
+      "lpn_label",
+      "LPN 标签",
+      {
+        business_direction: "label",
+        business_module: "M3",
+        default_scope: "global",
+        field_library_code: "m3_lpn_label",
+        paper_type: "label",
+      },
+      50,
+    ),
     devSystemDictionaryItem(
       "00000000-0000-0000-0000-000000001806",
       "print_template_type",
@@ -565,6 +699,7 @@ export const devSystemDictionaryItemsByCode: Record<string, DevSystemDictionaryI
         field_library_code: "m1_product_label",
         paper_type: "label",
       },
+      60,
     ),
   ],
   special_drug_category: [

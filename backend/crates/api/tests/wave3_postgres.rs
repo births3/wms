@@ -84,7 +84,7 @@ async fn seed_active_supplier_and_warehouse(pool: &PgPool, owner_id: Uuid) -> (U
     .await
     .expect("seed warehouse");
     sqlx::query(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, attrs, status) VALUES ($1, $2, 'P-001', 'Active Product', '1 unit', 'normal', '{\"unit_volume_cm3\": 1}', 'active')",
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 'P-001', 'Active Product', '1 unit', 'normal', 1, 'active')",
     )
     .bind(Uuid::new_v4())
     .bind(owner_id)

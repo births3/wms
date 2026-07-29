@@ -4,7 +4,7 @@ use serde_json::Value;
 #[derive(FromRow)]
 struct PutawayProductPolicyRow {
     storage_condition: String,
-    attrs: Value,
+    volume_cm3: Option<f64>,
 }
 
 #[derive(FromRow)]
@@ -420,7 +420,7 @@ impl PgWave3Repository {
         }
 
         let product = sqlx::query_as::<_, PutawayProductPolicyRow>(
-            "SELECT storage_condition, attrs FROM products WHERE owner_id = $1 AND product_code = $2 AND status = 'active'",
+            "SELECT storage_condition, volume_cm3 FROM products WHERE owner_id = $1 AND product_code = $2 AND status = 'active'",
         )
         .bind(ctx.owner_id)
         .bind(&query.product_code)
@@ -428,7 +428,7 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?
         .ok_or(Wave3RepositoryError::NotFound)?;
-        let unit_volume_cm3 = product_unit_volume_cm3(&product.attrs)?;
+        let unit_volume_cm3 = product_unit_volume_cm3(product.volume_cm3)?;
         let required_volume_cm3 = unit_volume_cm3
             .checked_mul(query.qty)
             .ok_or(Wave3RepositoryError::InvalidQuantity)?;
@@ -558,13 +558,15 @@ impl PgWave3Repository {
     }
 }
 
-pub(super) fn product_unit_volume_cm3(attrs: &Value) -> Result<i64, Wave3RepositoryError> {
-    let value = attrs
-        .get("unit_volume_cm3")
-        .and_then(|value| value.as_i64().or_else(|| value.as_str()?.parse().ok()))
-        .filter(|value| *value > 0)
+pub(super) fn product_unit_volume_cm3(
+    volume_cm3: Option<f64>,
+) -> Result<i64, Wave3RepositoryError> {
+    let value = volume_cm3
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .map(f64::ceil)
+        .filter(|value| *value < i64::MAX as f64)
         .ok_or(Wave3RepositoryError::InvalidProductVolume)?;
-    Ok(value)
+    Ok(value as i64)
 }
 
 /// 按策略 `rule_priority` 比较库位；未配置时按 enabled_rules 回退。

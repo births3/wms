@@ -15,11 +15,17 @@ test("H1 API Key 管理使用真实 API 完成创建、轮换、吊销和截图�
   const createDialog = page.getByRole("dialog", { name: "创建 API Key" });
   await createDialog.getByLabel("调用方名称").fill(caller);
   await createDialog.getByLabel("用途").fill("E2E API Key 生命周期");
+  await createDialog
+    .getByLabel("API Key 作用域")
+    .selectOption(["outbound:push", "return:push"]);
   await createDialog.getByRole("button", { name: "确认创建" }).click();
   await expect(page.getByText(/创建成功。明文 secret 只展示一次/)).toBeVisible();
   await expect(page.getByText(caller)).toBeVisible();
+  const createdRow = page.locator("tbody tr").filter({ hasText: caller });
+  await expect(createdRow).toContainText("outbound:push");
+  await expect(createdRow).toContainText("return:push");
 
-  await page.locator("tbody tr").filter({ hasText: caller }).getByRole("checkbox", { name: "选择此行" }).check();
+  await createdRow.getByRole("checkbox", { name: "选择此行" }).check();
   await page.getByRole("button", { name: "轮换", exact: true }).click();
   const rotateDialog = page.getByRole("dialog", { name: "轮换 API Key" });
   await rotateDialog.getByLabel("旧 Key 宽限期（天）").fill("2");

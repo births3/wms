@@ -12,7 +12,7 @@ BEGIN
         product_code      NVARCHAR(64)     NOT NULL,
         product_id        UNIQUEIDENTIFIER NULL, -- 可选，优先于 code 解析
         field_name        NVARCHAR(64)     NOT NULL,
-        new_value         NVARCHAR(512)    NOT NULL,
+        new_value         NVARCHAR(MAX)    NOT NULL,
         liaison_id        UNIQUEIDENTIFIER NULL,
         asn_id            UNIQUEIDENTIFIER NULL,
         schema_version    NVARCHAR(16)     NOT NULL CONSTRAINT DF_if_in_pc_sv DEFAULT N'1',

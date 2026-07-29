@@ -5,7 +5,11 @@
 //! 2. `WMS_VAULT_ADDR` + `WMS_VAULT_TOKEN` 的 Vault KV v2 HTTP（`vault://path` → `/v1/secret/data/{path}`）
 //! 3. 若配置了 `WMS_SECRETS_REQUIRE_RESOLVE=1`（或任一本地方案已启用）则失败；否则仅校验 alias 形态
 
-use std::time::Duration;
+use std::{
+    io::Write,
+    process::{Command, Stdio},
+    time::Duration,
+};
 
 /// 解析 secret alias，成功返回明文值（调用方不得记录/回显）。
 pub fn resolve_secret_alias(alias: &str) -> Result<String, String> {
@@ -30,26 +34,21 @@ pub fn resolve_secret_alias(alias: &str) -> Result<String, String> {
     Ok(String::new())
 }
 
-/// 连接测试专用：要求 secret 可解析；配置了后端时值必须非空。
-pub fn resolve_secret_alias_for_probe(alias: Option<&str>) -> Result<(), String> {
+/// 连接测试专用：要求 secret 真正解析为非空值。
+pub fn resolve_secret_alias_for_probe(alias: Option<&str>) -> Result<String, String> {
     let alias = alias
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .ok_or_else(|| "secret alias missing".to_string())?;
     let value = resolve_secret_alias(alias)?;
-    if secrets_backend_configured() && value.is_empty() {
-        return Err(format!("secret alias resolved empty: {alias}"));
-    }
-    if !secrets_backend_configured() && secrets_require_resolve() {
+    if value.is_empty() {
         return Err(format!("secret alias not resolvable: {alias}"));
     }
-    // 未配置后端时 shape 通过即可
-    let _ = value;
-    Ok(())
+    Ok(value)
 }
 
 fn validate_alias_shape(alias: &str) -> Result<(), String> {
-    if alias.len() < 3 || alias.contains(' ') || alias.contains('\n') {
+    if alias.len() < 3 || alias.contains(' ') || alias.contains(['\r', '\n']) {
         return Err("invalid secret alias shape".into());
     }
     if alias.starts_with("sk-") || alias.len() > 256 {
@@ -201,18 +200,22 @@ fn vault_http_get_impl(url: &str, token: &str) -> Result<String, String> {
 }
 
 fn vault_http_get_via_curl(url: &str, token: &str) -> Result<String, String> {
-    let output = std::process::Command::new("curl")
-        .args([
-            "-sS",
-            "-f",
-            "-H",
-            &format!("X-Vault-Token: {token}"),
-            "--max-time",
-            "5",
-            url,
-        ])
-        .output()
+    if token.contains(['\r', '\n']) {
+        return Err("invalid Vault token".into());
+    }
+    let mut child = vault_curl_command(url)
+        .spawn()
         .map_err(|e| format!("vault curl: {e}"))?;
+    let stdin = child
+        .stdin
+        .as_mut()
+        .ok_or_else(|| "vault curl stdin unavailable".to_string())?;
+    stdin
+        .write_all(format!("X-Vault-Token: {token}\n").as_bytes())
+        .map_err(|e| format!("vault curl auth write: {e}"))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("vault curl wait: {e}"))?;
     if !output.status.success() {
         return Err(format!(
             "vault curl failed: {}",
@@ -220,6 +223,27 @@ fn vault_http_get_via_curl(url: &str, token: &str) -> Result<String, String> {
         ));
     }
     String::from_utf8(output.stdout).map_err(|_| "vault body not utf8".to_string())
+}
+
+fn vault_curl_command(url: &str) -> Command {
+    let mut command = Command::new("curl");
+    command.args([
+        "--disable",
+        "-sS",
+        "-f",
+        "-H",
+        "@-",
+        "--max-redirs",
+        "0",
+        "--max-time",
+        "5",
+        url,
+    ]);
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    command
 }
 
 #[cfg(test)]
@@ -234,6 +258,7 @@ mod tests {
         let _g = ENV_LOCK.lock().expect("env lock");
         assert!(validate_alias_shape("ab").is_err());
         assert!(validate_alias_shape("sk-plaintext").is_err());
+        assert!(validate_alias_shape("vault://h8/worker\rX-Injected: value").is_err());
     }
 
     #[test]
@@ -261,6 +286,25 @@ mod tests {
         std::env::remove_var("WMS_VAULT_ADDR");
         std::env::remove_var("WMS_VAULT_TOKEN");
         std::env::remove_var("WMS_SECRETS_REQUIRE_RESOLVE");
-        assert!(resolve_secret_alias_for_probe(Some("vault://wms/e2e/x")).is_ok());
+        assert!(resolve_secret_alias_for_probe(Some("vault://wms/e2e/x")).is_err());
+    }
+
+    #[test]
+    fn vault_curl_argv_does_not_contain_token() {
+        let token = "vault-token-must-stay-off-argv";
+        let command = vault_curl_command("https://vault.example.test/v1/secret/data/x");
+        let argv = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert!(!argv.contains(token), "Vault token leaked into curl argv");
+        assert_eq!(
+            command.get_args().next().and_then(|arg| arg.to_str()),
+            Some("--disable"),
+            "curl config must be disabled before any other option"
+        );
+        assert!(argv.contains("--max-redirs 0"));
     }
 }

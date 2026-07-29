@@ -52,6 +52,8 @@ class ExchangeLifecycle:
     schema_version: str = "1"
     payload: dict[str, Any] | None = None
     message_id: str | None = None
+    warehouse_id: str | None = None
+    wms_resource_id: str | None = None
     stages_emitted: list[tuple[str, str]] = field(default_factory=list)
     http_json: HttpJsonFn | None = None
 
@@ -75,6 +77,10 @@ class ExchangeLifecycle:
         }
         if self.message_id:
             body["message_id"] = self.message_id
+        if self.warehouse_id:
+            body["warehouse_id"] = self.warehouse_id
+        if self.wms_resource_id:
+            body["wms_resource_id"] = self.wms_resource_id
         if self.connector_id:
             body["connector_id"] = self.connector_id
             body["connector_code"] = self.connector_code
@@ -131,6 +137,7 @@ def run_inbound_pipeline(
         connector_code=(route_binding.connector_code if route_binding else None),
         config_version=(route_binding.config_version if route_binding else None),
         schema_version=str(row.get("schema_version") or "1"),
+        warehouse_id=(row.get("warehouse_id") or "").strip() or None,
         payload=row,
         http_json=http_json,
     )
@@ -142,6 +149,7 @@ def run_inbound_pipeline(
             return None, life
         life.stage("business_api", "started")
         wms_id = handler(settings, command)
+        life.wms_resource_id = wms_id
         life.stage("business_api", "ok")
         # 入站成功：WMS 已接受即视为回执阶段完成（ERP 业务回执另走 acked）
         life.stage("receipt", "ok")
@@ -193,7 +201,7 @@ def run_outbound_pipeline(
     message_type: str,
     external_ref: str,
     idempotency_key: str,
-    send_fn: Callable[[], None],
+    send_fn: Callable[[ExchangeLifecycle], None],
     *,
     http_json: HttpJsonFn | None = None,
     connector_id: str | None = None,
@@ -202,7 +210,7 @@ def run_outbound_pipeline(
     payload: dict[str, Any] | None = None,
     dry_run: bool = False,
 ) -> ExchangeLifecycle:
-    """真实出站路径：receive→convert→send→receipt|final_failure。"""
+    """真实出站发送路径：receive→convert→send；业务回执到达后另发 receipt。"""
     life = ExchangeLifecycle(
         settings=settings,
         message_type=message_type,
@@ -222,9 +230,8 @@ def run_outbound_pipeline(
         return life
     try:
         life.stage("send", "started")
-        send_fn()
+        send_fn(life)
         life.stage("send", "ok")
-        life.stage("receipt", "ok")
         return life
     except Exception as exc:  # noqa: BLE001
         life.stage("final_failure", "error")

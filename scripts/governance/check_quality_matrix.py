@@ -65,6 +65,8 @@ NAVIGATION_CHECK_SOURCES = {
     / "apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs",
     "node apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
+    "node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs",
     "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
     "node apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs": REPO_ROOT
@@ -113,6 +115,7 @@ ALLOWED_MODULES = {
     "TE",
     "AL",
     "DI",
+    "RC",
 }
 STORY_TYPE_LAYERS = {
     "read_only": {"L1", "L2", "L3", "L8"},

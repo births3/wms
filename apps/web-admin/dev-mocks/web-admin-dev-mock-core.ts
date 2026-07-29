@@ -14,6 +14,7 @@ import { handleDocumentNumberingDevMock } from "./document-numbering-dev-mock";
 import { handleOutboundDevMock } from "./outbound-dev-mock";
 import { handleDockDevMock } from "./dock-dev-mock";
 import { handleDrugInspectionDocumentDevMock } from "./drug-inspection-document-dev-mock";
+import { handleReconciliationDevMock } from "./reconciliation-dev-mock";
 
 import {
   asNullableString,
@@ -25,7 +26,6 @@ import {
   handleFeatureFlagRequest,
   handleInboundAction,
   handleLocationUpdate,
-  handleProductUpdate,
   handleSystemDictionaryDisable,
   handleSystemDictionaryUpsert,
   devOrderExpectedQty,
@@ -42,7 +42,6 @@ import * as model from "./web-admin-dev-mock-model";
 import type {
   DevCustomer,
   DevLocation,
-  DevProduct,
   DevSupplier,
   DevWarehouse,
 } from "./web-admin-dev-mock-model";
@@ -99,7 +98,6 @@ const {
   devAuthSessions,
   devCreatedLocations,
   devCreatedOrders,
-  devCreatedProducts,
   devCreatedSuppliers,
   devCreatedWarehouses,
   devLocation,
@@ -184,6 +182,10 @@ async function tryHandleDevMockRoute(
   }
   if (pathname.startsWith("/api/v1/dock-appointments")) {
     await handleDockDevMock(req, res, pathname);
+    return true;
+  }
+  if (pathname.startsWith("/api/v1/reconciliation")) {
+    await handleReconciliationDevMock(req, res, pathname);
     return true;
   }
   if (pathname.startsWith("/api/v1/wechat-notify")) {
@@ -300,17 +302,16 @@ async function tryHandleDevMockRoute(
     }
   }
 
-  if (pathname === "/api/v1/master-data/products" && req.method === "POST") {
-    const body = await readJsonBody(req);
-    const next = devCreateProduct(body);
-    devCreatedProducts.unshift(next);
-    sendJson(res, 200, next);
-    return true;
-  }
-
-  const productUpdate = matchUpdate(pathname, "/api/v1/master-data/products/");
-  if (productUpdate && req.method === "PATCH") {
-    await handleProductUpdate(req, res, productUpdate);
+  if (
+    pathname.startsWith("/api/v1/master-data/products") &&
+    req.method !== "GET"
+  ) {
+    sendError(
+      res,
+      403,
+      "AUTH-005",
+      "商品主数据只能由 ERP 通过 H8 商品主数据防腐层同步",
+    );
     return true;
   }
 
@@ -552,7 +553,7 @@ async function tryHandleDevMockRoute(
 function devMasterDataResponse(pathname: string): Record<string, unknown> | null {
   let data: unknown[] | undefined;
   if (pathname === "/api/v1/master-data/products") {
-    data = [...devCreatedProducts, ...devSeedProducts];
+    data = [...devSeedProducts];
     return {
       data,
       page: { count: data.length, next_cursor: null },
@@ -594,10 +595,6 @@ function devSupplierFromCreateRequest(body: Record<string, unknown>): DevSupplie
   };
 }
 
-function devCreateProduct(body: Record<string, unknown>): DevProduct {
-  return devProductFromCreateRequest(body);
-}
-
 function devCustomerFromCreateRequest(body: Record<string, unknown>): DevCustomer {
   const now = new Date().toISOString();
   return {
@@ -607,30 +604,6 @@ function devCustomerFromCreateRequest(body: Record<string, unknown>): DevCustome
     customer_name: asString(body.customer_name, "新建客户"),
     license_no: asNullableString(body.license_no),
     source: asString(body.source, "api_import"),
-    status: "active",
-    created_at: now,
-    updated_at: now,
-  };
-}
-
-function devProductFromCreateRequest(body: Record<string, unknown>): DevProduct {
-  const now = new Date().toISOString();
-  const attrs = asRecord(body.attrs);
-  return {
-    id: `00000000-0000-0000-0000-${String(1900 + devCreatedProducts.length + 1).padStart(12, "0")}`,
-    owner_id: devOwnerId,
-    product_code: asString(body.product_code, "P-M1-NEW"),
-    product_name: asString(body.product_name, "新建商品"),
-    spec: asNullableString(body.spec),
-    dosage_form: asNullableString(body.dosage_form),
-    approval_no: asNullableString(body.approval_no),
-    manufacturer: asNullableString(body.manufacturer),
-    special_drug_category_code: asNullableString(body.special_drug_category_code),
-    attrs: {
-      ...attrs,
-      storage_condition: asString(attrs.storage_condition, "normal"),
-      source: asString(attrs.source, "api_import"),
-    },
     status: "active",
     created_at: now,
     updated_at: now,

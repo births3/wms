@@ -3,6 +3,7 @@ export interface SystemDictionaryTwoPaneItem {
   name: string;
   source: string;
   enabled: boolean;
+  sortOrder: number;
   params?: Record<string, unknown>;
 }
 
@@ -21,10 +22,26 @@ export interface SystemDictionaryGroupSummary {
 
 export interface SystemDictionaryParamSummary {
   key: string;
+  label: string;
   value: string;
 }
 
-const PARAM_KEY_ORDER = ["direction", "workflow_template", "batch_policy"];
+const PARAM_LABELS: Record<string, string> = {
+  field_library_code: "字段库编码",
+  business_module: "业务模块",
+  business_direction: "业务方向",
+  paper_type: "纸张类型",
+  default_scope: "默认作用域",
+  direction: "业务方向",
+  workflow_template: "流程模板",
+  batch_policy: "批号策略",
+};
+const PARAM_VALUE_LABELS: Record<string, Record<string, string>> = {
+  business_direction: { inbound: "入库", outbound: "出库", label: "标签" },
+  paper_type: { a4: "A4", a5: "A5", label: "标签纸" },
+  default_scope: { global: "全局", owner: "货主" },
+};
+const PARAM_KEY_ORDER = Object.keys(PARAM_LABELS);
 
 export function summarizeSystemDictionaryGroup(
   group: SystemDictionaryTwoPaneGroup
@@ -54,7 +71,14 @@ export function summarizeSystemDictionaryParams(
   const otherEntries = Object.entries(params).filter(([key]) => !knownKeys.has(key));
 
   return [...orderedEntries, ...otherEntries]
-    .map(([key, value]) => ({ key, value: text(value) }))
+    .map(([key, value]) => {
+      const rawValue = text(value);
+      return {
+        key,
+        label: PARAM_LABELS[key] ?? key,
+        value: PARAM_VALUE_LABELS[key]?.[rawValue] ?? rawValue,
+      };
+    })
     .filter((entry) => entry.value !== "-");
 }
 

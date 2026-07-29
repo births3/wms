@@ -21,6 +21,7 @@ try {
     localDayRange,
     nextM2InboundSelectedId,
     ownerLabel,
+    productTemperatureAttribute,
     statusKey,
     statusLabel,
     statusColumnFilterOptions,
@@ -53,11 +54,28 @@ try {
   assert.equal(nextM2InboundSelectedId("b", ["a", "b"], true), "b");
   assert.equal(nextM2InboundSelectedId("missing", ["a"], false), "a");
   assert.deepEqual(statusFilterOptions("inspecting").map((item) => item.value), ["inspecting"]);
+  assert.deepEqual(
+    filterOrders(
+      [orderFixture({ id: "second-sign", status: "awaiting_second_sign" })],
+      "",
+      [],
+      ["inspecting"],
+      "",
+      "",
+      "",
+      "",
+    ).map((item) => item.id),
+    ["second-sign"],
+  );
   assert.deepEqual(statusColumnFilterOptions("inspecting").map((item) => item.value), ["inspecting"]);
   assert.deepEqual(statusFilterOptions("putaway").map((item) => item.value), ["putaway", "completed"]);
   assert.ok(statusColumnFilterOptions("putaway").some((item) => item.value === "putaway"));
   assert.equal(statusLabel(null), "-");
   assert.equal(statusKey(null), "pending");
+  assert.equal(productTemperatureAttribute("cold", "P-001"), "冷藏");
+  assert.equal(productTemperatureAttribute("frozen", "P-001"), "冷冻");
+  assert.equal(productTemperatureAttribute("normal", "P-COLD"), "常温");
+  assert.equal(productTemperatureAttribute(null, "P-COLD"), "冷藏");
   const localRange = localDayRange(new Date(2026, 6, 12, 12, 0, 0));
   assert.ok(localRange.from < localRange.to, "看板本地日期范围必须有明确起止边界");
 
@@ -123,6 +141,9 @@ try {
   assert.match(printDialogSource, /template_type_code: templateTypeCode\(mode\)/, "M2 打印必须按入库页面类型选择 H9 模板类型");
   assert.match(pageSource, /useReleaseReceivingOrderMutation/, "M2 页面必须接入真实 ASN 放行 API");
   assert.match(pageSource, /useMasterDataRowsQuery\("m1-locations", mode === "putaway"\)/, "上架页面必须读取 M1 库位主数据");
+  assert.match(pageSource, /useMasterDataRowsQuery\("m1-products", mode === "receiving"\)/, "收货页面必须读取 M1 商品温区");
+  assert.match(pageSource, /productFields\?\.storageCondition/, "收货温控必须使用 M1 商品真实储存条件");
+  assert.match(pageSource, /value\.temperatureControl === currentTemperatureControl[\s\S]*temperatureControl: currentTemperatureControl/, "商品温区异步返回时只能更新温控字段，不能清空已填写的收货表单");
   assert.match(pageSource, /row\.code === locationCode[\s\S]*row\.locationFields\?\.warehouseId === order\.warehouse_id/, "上架提交必须按仓库和库位编码解析真实库位 ID");
   assert.match(pageSource, /const qty = toInteger\(putawayForm\.qty\)[\s\S]*上架数量必须大于 0/, "上架数量非法时必须阻止真实提交并显示原因");
   assert.match(inboundQueriesSource, /putaway-recommendations[\s\S]*api\.GET\("\/api\/v1\/inbound\/receiving-orders\/{id}\/putaway-recommendations"/, "推荐库位必须调用真实 API");
@@ -152,6 +173,9 @@ try {
   assert.match(pageSource, /secondSignerExample = "00000000-0000-0000-0000-000000000102"/, "第二签字人示例应符合 UUID 契约");
   assert.doesNotMatch(pageSource, /firstSignerId: `例如 \$\{firstSignerId\}`|secondSignerId: `例如 \$\{secondSignerId\}`/, "签字人 placeholder 不得以 UUID 样例为主");
   assert.match(dialogSource, /label="第二签字人 ID"/, "第二签字人 label 应明确要求用户 ID");
+  assert.doesNotMatch(dialogSource, /label="第二签字人 ID" required=/, "第一人提交时不得用第二签字人的浏览器必填校验阻断独立签字");
+  assert.match(dialogSource, /\{!secondSignature && \(/, "第二人独立签字时不得重复要求第一阶段验收字段");
+  assert.match(pageSource, /secondSignature=\{order\?\.status === "awaiting_second_sign"\}/, "第二人签字表单必须由真实单据状态驱动");
   assert.match(pageSource, /first_signer_id: currentUserId/, "第一签字人必须绑定当前登录用户");
   assert.match(pageSource, /second_signer_id: null/, "第一人签字不得同次提交第二签字人");
   assert.match(pageSource, /awaiting_second_sign/, "PC 验收必须处理待第二人签字状态");
@@ -211,5 +235,6 @@ function orderFixture(overrides) {
         expiry_date: null,
       },
     ],
+    ...overrides,
   };
 }

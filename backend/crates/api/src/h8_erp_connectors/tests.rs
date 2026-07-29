@@ -4,7 +4,7 @@ use axum::{
     body::{to_bytes, Body},
     http::{Request, StatusCode},
 };
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use tower::ServiceExt;
@@ -17,7 +17,9 @@ use wms_domain::{
 
 use super::error::{H8ErpConnectorHandlerError, H8ErpConnectorRepoError};
 use super::handlers::h8_erp_connector_router;
-use super::idempotency::{load_idempotent_response, store_idempotent_response};
+use super::idempotency::{
+    ensure_inbound_api_key_scopes, load_idempotent_response, store_idempotent_response,
+};
 use super::repository::{H8ErpConnectorRepository, PgH8ErpConnectorRepository};
 use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE};
 use crate::auth::AuthContext;
@@ -476,6 +478,101 @@ async fn postgres_captures_each_runtime_version_and_rejects_unversioned_change(p
     .execute(&pool)
     .await;
     assert!(unversioned_change.is_err());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn postgres_inbound_connector_requires_current_same_owner_api_key(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let responsible_user_id = Uuid::new_v4();
+    for (owner, code) in [(owner_id, "H8-KEY-A"), (other_owner_id, "H8-KEY-B")] {
+        sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$2)")
+            .bind(owner)
+            .bind(format!("{code}-{owner}"))
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    sqlx::query(
+        "INSERT INTO auth_users (id, username, display_name, password_hash) VALUES ($1,$2,$2,'test-hash')",
+    )
+    .bind(responsible_user_id)
+    .bind(format!("h8-key-user-{responsible_user_id}"))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let valid_key_id = Uuid::new_v4();
+    let cross_owner_key_id = Uuid::new_v4();
+    let expired_key_id = Uuid::new_v4();
+    let grace_expired_key_id = Uuid::new_v4();
+    for (key_id, key_owner_id, expires_at, grace_expires_at) in [
+        (
+            valid_key_id,
+            owner_id,
+            Utc::now() + Duration::days(30),
+            None,
+        ),
+        (
+            cross_owner_key_id,
+            other_owner_id,
+            Utc::now() + Duration::days(30),
+            None,
+        ),
+        (
+            expired_key_id,
+            owner_id,
+            Utc::now() - Duration::minutes(1),
+            None,
+        ),
+        (
+            grace_expired_key_id,
+            owner_id,
+            Utc::now() + Duration::days(30),
+            Some(Utc::now() - Duration::minutes(1)),
+        ),
+    ] {
+        sqlx::query(
+            r#"INSERT INTO auth_api_keys (
+                   id, owner_id, caller_name, purpose, scopes, responsible_user_id,
+                   key_hash, status, expires_at, grace_expires_at
+               ) VALUES ($1,$2,'H8 ERP','connector test',ARRAY['inbound:push'],$3,$4,'active',$5,$6)"#,
+        )
+        .bind(key_id)
+        .bind(key_owner_id)
+        .bind(responsible_user_id)
+        .bind(format!("test-hash-{key_id}"))
+        .bind(expires_at)
+        .bind(grace_expires_at)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    let state = H8ErpConnectorAppState::with_postgres(pool);
+    let mut connector = versioned_connector(owner_id);
+    connector.api_key_id = Some(valid_key_id);
+    ensure_inbound_api_key_scopes(&state, owner_id, &connector)
+        .await
+        .expect("current same-owner key should be accepted");
+
+    for invalid_key_id in [
+        Uuid::new_v4(),
+        cross_owner_key_id,
+        expired_key_id,
+        grace_expired_key_id,
+    ] {
+        connector.api_key_id = Some(invalid_key_id);
+        let error = ensure_inbound_api_key_scopes(&state, owner_id, &connector)
+            .await
+            .expect_err("missing, cross-owner, or expired key must fail closed");
+        assert!(matches!(
+            error,
+            H8ErpConnectorHandlerError::Repo(H8ErpConnectorRepoError::Domain(
+                H8ErpConnectorError::InsufficientApiKeyScope
+            ))
+        ));
+    }
 }
 
 #[test]

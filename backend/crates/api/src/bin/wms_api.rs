@@ -41,13 +41,17 @@ use wms_api::{
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
     h8_erp_messages::{h8_erp_message_router, H8ErpMessageAppState},
+    h8_inbound::{h8_inbound_router, H8InboundAppState},
     inventory_status_config_handlers::{
         inventory_status_config_router, InventoryStatusConfigAppState,
     },
     master_data_handlers::{master_data_router, MasterDataAppState},
     parameter_mapping::{parameter_mapping_router, ParameterMappingAppState},
+    print_device_handlers::{print_device_router, PrintDeviceAppState},
+    print_orchestration_handlers::{print_orchestration_router, PrintOrchestrationAppState},
     print_template_handlers::{print_template_router, PrintTemplateAppState},
     quality_liaison_handlers::{quality_liaison_router, QualityLiaisonAppState},
+    reconciliation_handlers::{reconciliation_router, ReconciliationAppState},
     reports_handlers::mount_reports,
     resilience::{resilience_middleware, resilience_status, ResilienceState},
     role_management::{role_management_router, RoleManagementState},
@@ -138,6 +142,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     wms_api::api_key_expiry::spawn(pool.clone());
     wms_api::alert_engine_job::spawn(pool.clone());
     wms_api::inventory_expiry_job::spawn(pool.clone());
+    wms_api::print_orchestration_job::spawn(pool.clone());
     wms_api::h8_erp_messages::spawn_maintenance_job(pool.clone()).await?;
     wms_api::task_release_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
@@ -313,6 +318,9 @@ fn app(
         .merge(h8_erp_message_router(H8ErpMessageAppState::with_postgres(
             shared_pool.clone(),
         )))
+        .merge(h8_inbound_router(H8InboundAppState::with_postgres(
+            shared_pool.clone(),
+        )))
         .merge(drug_inspection_router(
             DrugInspectionAppState::with_postgres(shared_pool.clone()),
         ))
@@ -355,6 +363,9 @@ fn app(
         .merge(quality_liaison_router(
             QualityLiaisonAppState::with_postgres(shared_pool.clone()),
         ))
+        .merge(reconciliation_router(
+            ReconciliationAppState::with_postgres(shared_pool.clone()),
+        ))
         .merge(alert_definition_router(
             AlertDefinitionAppState::with_postgres(shared_pool.clone()),
         ))
@@ -369,6 +380,12 @@ fn app(
         )))
         .merge(document_numbering_router(document_numbering_state))
         .merge(print_template_router(print_template_state))
+        .merge(print_orchestration_router(
+            PrintOrchestrationAppState::with_postgres(shared_pool.clone()),
+        ))
+        .merge(print_device_router(PrintDeviceAppState::with_postgres(
+            shared_pool.clone(),
+        )))
         .merge(wechat_notify_router(wechat_notify_state))
         .merge(express_router(express_state))
         .merge(wave3_router(wave3_state))

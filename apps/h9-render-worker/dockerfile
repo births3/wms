@@ -1,0 +1,23 @@
+FROM node:22-bookworm-slim
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y chromium fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable \
+    && corepack prepare pnpm@11.5.2 --activate
+
+WORKDIR /app
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/h9-render-worker/package.json apps/h9-render-worker/package.json
+RUN pnpm install --filter @wms/h9-render-worker --frozen-lockfile --prod
+
+COPY apps/h9-render-worker apps/h9-render-worker
+
+ENV HOME=/tmp
+ENV WMS_H9_RENDER_CHROMIUM_EXECUTABLE=/usr/bin/chromium
+WORKDIR /app/apps/h9-render-worker
+RUN node -e 'import("./src/server.mjs")'
+USER node
+
+CMD ["node", "src/server.mjs"]

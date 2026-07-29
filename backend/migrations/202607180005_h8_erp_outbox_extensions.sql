@@ -39,8 +39,9 @@ CREATE TABLE IF NOT EXISTS reconciliation_erp_feedback_outbox (
         CHECK (event_type = 'reconciliation_diff'),
     payload         JSONB NOT NULL,
     status          TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'failed', 'succeeded')),
-    attempt_count   INT NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+        CHECK (status IN ('pending', 'failed', 'succeeded', 'dead')),
+    attempt_count   INT NOT NULL DEFAULT 0 CHECK (attempt_count BETWEEN 0 AND 5),
+    max_attempts    INT NOT NULL DEFAULT 5 CHECK (max_attempts = 5),
     next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_error      TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -19,7 +19,10 @@ use wms_domain::{
 
 #[path = "support/wave4.rs"]
 mod support;
-use support::{seed_customer_delivery_address, seed_inventory_batch};
+use support::seed_inventory_batch;
+#[path = "support/h9.rs"]
+mod h9_support;
+use h9_support::seed_outbound_route_binding;
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -150,17 +153,25 @@ async fn create_read_order(
     erp_order_no: &str,
     now: chrono::DateTime<Utc>,
 ) -> OutboundOrder {
-    let (customer_id, delivery_address_id) =
-        seed_customer_delivery_address(pool, ctx.owner_id).await;
+    let customer_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(pool, ctx.owner_id, warehouse_id, customer_id, now).await;
     repo.create_outbound_order(
         ctx,
         CreateOutboundOrderRequest {
             document_type: "sales_outbound".to_string(),
             wms_order_no: wms_order_no.to_string(),
             erp_order_no: Some(erp_order_no.to_string()),
+            invoice_no: None,
+            transport_mode_code: None,
+            department_code: None,
+            sales_group_code: None,
+            order_group_no: None,
+            business_type_code: None,
             customer_id,
+            warehouse_id,
             delivery_address_id,
-            warehouse_id: Uuid::new_v4(),
             required_ship_at: Some(now),
             lines: vec![CreateOutboundOrderLineRequest {
                 line_no: 1,

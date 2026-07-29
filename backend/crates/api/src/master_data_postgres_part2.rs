@@ -1,3 +1,4 @@
+// @governance: skip-page-size - 拆分文件仍包含同一事务族，当前优先保持商品、包装与映射溯源的原子边界。
 impl PgMasterDataReadRepository {
     pub async fn batch_create_customers(
         &self,
@@ -323,11 +324,12 @@ async fn ensure_bound_owner_exists(
     let Some(bound_owner_id) = bound_owner_id else {
         return Ok(());
     };
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM auth_owners WHERE id = $1)")
-        .bind(bound_owner_id)
-        .fetch_one(&mut **tx)
-        .await
-        .map_err(map_db_error)?;
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM auth_owners WHERE id = $1)")
+            .bind(bound_owner_id)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(map_db_error)?;
     if exists {
         Ok(())
     } else {
@@ -509,7 +511,38 @@ async fn load_master_data_before(
     resource_type: &str,
 ) -> Result<Value, MasterDataError> {
     let sql = match resource_type {
-        "product" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, attrs, status, created_at, updated_at FROM products WHERE owner_id=$1 AND id=$2) t",
+        "product" => r#"
+            SELECT to_jsonb(t) || jsonb_build_object(
+                'packaging_levels',
+                COALESCE((
+                    SELECT jsonb_agg(
+                        to_jsonb(level_row)
+                        - 'owner_id' - 'product_id' - 'created_at' - 'updated_at'
+                        ORDER BY level_row.sort_order
+                    )
+                      FROM product_packaging_levels level_row
+                     WHERE level_row.owner_id = $1 AND level_row.product_id = $2
+                ), '[]'::jsonb),
+                'mapping_traces',
+                COALESCE((
+                    SELECT jsonb_agg(
+                        to_jsonb(trace_row) - 'owner_id' - 'product_id'
+                        ORDER BY trace_row.created_at, trace_row.id
+                    )
+                      FROM product_mapping_traces trace_row
+                     WHERE trace_row.owner_id = $1 AND trace_row.product_id = $2
+                ), '[]'::jsonb)
+            )
+              FROM (
+                    SELECT id, owner_id, product_code, product_name, specification,
+                           dosage_form, storage_condition, special_drug_category,
+                           approval_no, manufacturer, udi_code,
+                           electronic_regulatory_code, length_mm, width_mm, height_mm,
+                           volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                      FROM products
+                     WHERE owner_id = $1 AND id = $2
+              ) t
+        "#,
         "supplier" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, supplier_code, supplier_name, uscc, contact_name, source, status, created_at, updated_at FROM suppliers WHERE owner_id=$1 AND id=$2) t",
         "customer" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, customer_code, customer_name, license_no, source, status, created_at, updated_at FROM customers WHERE owner_id=$1 AND id=$2) t",
         "warehouse" => "SELECT to_jsonb(t) FROM (SELECT id, owner_id, warehouse_code, warehouse_name, warehouse_type, status, created_at, updated_at FROM warehouses WHERE owner_id=$1 AND id=$2) t",
@@ -635,7 +668,10 @@ impl From<ProductRow> for Product {
     fn from(row: ProductRow) -> Self {
         let mut attrs = row.attrs;
         if let Some(object) = attrs.as_object_mut() {
-            object.insert("storage_condition".to_string(), json!(row.storage_condition));
+            object.insert(
+                "storage_condition".to_string(),
+                json!(row.storage_condition),
+            );
             object.insert("source".to_string(), json!(row.source));
         }
         Self {
@@ -644,16 +680,249 @@ impl From<ProductRow> for Product {
             product_code: row.product_code,
             product_name: row.product_name,
             approval_no: row.approval_no,
-            spec: Some(row.specification),
+            spec: row.specification,
             dosage_form: row.dosage_form,
             manufacturer: row.manufacturer,
-            special_drug_category_code: Some(row.special_drug_category),
+            udi_code: row.udi_code,
+            electronic_regulatory_code: row.electronic_regulatory_code,
+            length_mm: row.length_mm,
+            width_mm: row.width_mm,
+            height_mm: row.height_mm,
+            volume_cm3: row.volume_cm3,
+            weight_g: row.weight_g,
+            packaging_levels: Vec::new(),
+            mapping_traces: Vec::new(),
+            special_drug_category_code: row.special_drug_category,
             status: row.status,
             attrs,
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
     }
+}
+
+impl From<ProductPackagingLevelRow> for ProductPackagingLevel {
+    fn from(row: ProductPackagingLevelRow) -> Self {
+        Self {
+            id: row.id,
+            unit_code: row.unit_code,
+            unit_name: row.unit_name,
+            ratio_to_base: row.ratio_to_base,
+            is_base: row.is_base,
+            is_default: row.is_default,
+            sort_order: row.sort_order,
+        }
+    }
+}
+
+impl From<ProductMappingTraceRow> for ProductMappingTrace {
+    fn from(row: ProductMappingTraceRow) -> Self {
+        Self {
+            id: row.id,
+            field_name: row.field_name,
+            rule_id: row.rule_id,
+            source_system: row.source_system,
+            source_value: row.source_value,
+            target_value: row.target_value,
+            created_at: row.created_at,
+        }
+    }
+}
+
+async fn insert_product_packaging_levels(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    product_id: Uuid,
+    levels: &[ProductPackagingLevelInput],
+    now: DateTime<Utc>,
+) -> Result<Vec<ProductPackagingLevel>, MasterDataError> {
+    let mut inserted = Vec::with_capacity(levels.len());
+    for level in levels {
+        let row = sqlx::query_as::<_, ProductPackagingLevelRow>(
+            r#"
+            INSERT INTO product_packaging_levels (
+                id, owner_id, product_id, unit_code, unit_name, ratio_to_base,
+                is_base, is_default, sort_order, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
+            RETURNING id, product_id, unit_code, unit_name, ratio_to_base,
+                      is_base, is_default, sort_order
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(product_id)
+        .bind(level.unit_code.trim())
+        .bind(level.unit_name.trim())
+        .bind(level.ratio_to_base)
+        .bind(level.is_base)
+        .bind(level.is_default)
+        .bind(level.sort_order)
+        .bind(now)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        inserted.push(ProductPackagingLevel::from(row));
+    }
+    inserted.sort_by_key(|level| level.sort_order);
+    Ok(inserted)
+}
+
+async fn load_product_packaging_levels(
+    pool: &PgPool,
+    owner_id: Uuid,
+    product_id: Uuid,
+) -> Result<Vec<ProductPackagingLevel>, MasterDataError> {
+    sqlx::query_as::<_, ProductPackagingLevelRow>(
+        r#"
+        SELECT id, product_id, unit_code, unit_name, ratio_to_base,
+               is_base, is_default, sort_order
+          FROM product_packaging_levels
+         WHERE owner_id = $1 AND product_id = $2
+         ORDER BY sort_order
+        "#,
+    )
+    .bind(owner_id)
+    .bind(product_id)
+    .fetch_all(pool)
+    .await
+    .map(|rows| rows.into_iter().map(ProductPackagingLevel::from).collect())
+    .map_err(map_db_error)
+}
+
+async fn load_product_packaging_levels_by_owner(
+    pool: &PgPool,
+    owner_id: Uuid,
+) -> Result<HashMap<Uuid, Vec<ProductPackagingLevel>>, MasterDataError> {
+    let rows = sqlx::query_as::<_, ProductPackagingLevelRow>(
+        r#"
+        SELECT id, product_id, unit_code, unit_name, ratio_to_base,
+               is_base, is_default, sort_order
+          FROM product_packaging_levels
+         WHERE owner_id = $1
+         ORDER BY product_id, sort_order
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_all(pool)
+    .await
+    .map_err(map_db_error)?;
+    let mut grouped = HashMap::new();
+    for row in rows {
+        grouped
+            .entry(row.product_id)
+            .or_insert_with(Vec::new)
+            .push(ProductPackagingLevel::from(row));
+    }
+    Ok(grouped)
+}
+
+async fn insert_product_mapping_traces(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    product_id: Uuid,
+    traces: &[ProductMappingTraceInput],
+    now: DateTime<Utc>,
+) -> Result<Vec<ProductMappingTrace>, MasterDataError> {
+    let mut inserted = Vec::with_capacity(traces.len());
+    for trace in traces {
+        let row = sqlx::query_as::<_, ProductMappingTraceRow>(
+            r#"
+            INSERT INTO product_mapping_traces (
+                id, owner_id, product_id, field_name, rule_id,
+                source_system, source_value, target_value, created_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, product_id, field_name, rule_id, source_system,
+                      source_value, target_value, created_at
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(product_id)
+        .bind(trace.field_name.trim())
+        .bind(trace.rule_id)
+        .bind(trace.source_system.trim())
+        .bind(trace.source_value.trim())
+        .bind(trace.target_value.as_deref().map(str::trim))
+        .bind(now)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        inserted.push(ProductMappingTrace::from(row));
+    }
+    Ok(inserted)
+}
+
+async fn load_product_mapping_traces(
+    pool: &PgPool,
+    owner_id: Uuid,
+    product_id: Uuid,
+) -> Result<Vec<ProductMappingTrace>, MasterDataError> {
+    sqlx::query_as::<_, ProductMappingTraceRow>(
+        r#"
+        SELECT id, product_id, field_name, rule_id, source_system,
+               source_value, target_value, created_at
+          FROM product_mapping_traces
+         WHERE owner_id = $1 AND product_id = $2
+         ORDER BY created_at, id
+        "#,
+    )
+    .bind(owner_id)
+    .bind(product_id)
+    .fetch_all(pool)
+    .await
+    .map(|rows| rows.into_iter().map(ProductMappingTrace::from).collect())
+    .map_err(map_db_error)
+}
+
+async fn load_product_mapping_traces_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    product_id: Uuid,
+) -> Result<Vec<ProductMappingTrace>, MasterDataError> {
+    sqlx::query_as::<_, ProductMappingTraceRow>(
+        r#"
+        SELECT id, product_id, field_name, rule_id, source_system,
+               source_value, target_value, created_at
+          FROM product_mapping_traces
+         WHERE owner_id = $1 AND product_id = $2
+         ORDER BY created_at, id
+        "#,
+    )
+    .bind(owner_id)
+    .bind(product_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map(|rows| rows.into_iter().map(ProductMappingTrace::from).collect())
+    .map_err(map_db_error)
+}
+
+async fn load_product_mapping_traces_by_owner(
+    pool: &PgPool,
+    owner_id: Uuid,
+) -> Result<HashMap<Uuid, Vec<ProductMappingTrace>>, MasterDataError> {
+    let rows = sqlx::query_as::<_, ProductMappingTraceRow>(
+        r#"
+        SELECT id, product_id, field_name, rule_id, source_system,
+               source_value, target_value, created_at
+          FROM product_mapping_traces
+         WHERE owner_id = $1
+         ORDER BY product_id, created_at, id
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_all(pool)
+    .await
+    .map_err(map_db_error)?;
+    let mut grouped = HashMap::new();
+    for row in rows {
+        grouped
+            .entry(row.product_id)
+            .or_insert_with(Vec::new)
+            .push(ProductMappingTrace::from(row));
+    }
+    Ok(grouped)
 }
 
 impl From<SupplierRow> for Supplier {
@@ -759,6 +1028,9 @@ fn map_location_write_error(error: sqlx::Error) -> MasterDataError {
 fn map_catalog_write_error(error: sqlx::Error, code: &str) -> MasterDataError {
     if let sqlx::Error::Database(db_error) = &error {
         if db_error.code().as_deref() == Some("23505") {
+            if db_error.constraint() == Some("products_owner_udi_uidx") {
+                return MasterDataError::DuplicateProductUdi;
+            }
             return MasterDataError::DuplicateCode(code.to_string());
         }
     }

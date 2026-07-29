@@ -1,5 +1,4 @@
-import { Button, type DataGridColumn } from "@wms/ui";
-import { Pencil } from "lucide-react";
+import type { DataGridColumn } from "@wms/ui";
 
 import type {
   MasterDataRow,
@@ -8,13 +7,12 @@ import type {
 
 export function masterDataGridClassName(viewId: MasterDataViewId) {
   if (viewId === "m1-locations") return "min-w-[1910px]";
-  if (viewId === "m1-products") return "min-w-[2380px]";
+  if (viewId === "m1-products") return "min-w-[2800px]";
   return "min-w-[1650px]";
 }
 
 export function productColumns(
   baseColumns: DataGridColumn<MasterDataRow>[],
-  onEdit: (row: MasterDataRow) => void,
 ): DataGridColumn<MasterDataRow>[] {
   return [
     ...baseColumns,
@@ -27,9 +25,21 @@ export function productColumns(
       copyValue: productPackagingText,
       filter: { type: "text" },
       render: (row) => (
+        <span className="text-sm">{productValue(row, "packagingText")}</span>
+      ),
+    },
+    {
+      key: "regulatoryCodes",
+      header: "监管标识",
+      width: 260,
+      minWidth: 220,
+      filterValue: regulatoryCodesText,
+      copyValue: regulatoryCodesText,
+      filter: { type: "text" },
+      render: (row) => (
         <TwoLine
-          top={`中包装 ${productValue(row, "middlePackage")}`}
-          bottom={`大包装 ${productValue(row, "largePackage")}`}
+          top={`UDI ${productValue(row, "udiCode")}`}
+          bottom={`电子监管码 ${productValue(row, "electronicRegulatoryCode")}`}
         />
       ),
     },
@@ -43,8 +53,8 @@ export function productColumns(
       filter: { type: "text" },
       render: (row) => (
         <TwoLine
-          top={`长 ${productValue(row, "unitLengthMm")} mm / 宽 ${productValue(row, "unitWidthMm")} mm`}
-          bottom={`高 ${productValue(row, "unitHeightMm")} mm`}
+          top={`长 ${productValue(row, "lengthMm")} mm / 宽 ${productValue(row, "widthMm")} mm`}
+          bottom={`高 ${productValue(row, "heightMm")} mm`}
         />
       ),
     },
@@ -58,36 +68,20 @@ export function productColumns(
       filter: { type: "text" },
       render: (row) => (
         <TwoLine
-          top={`重量 ${productValue(row, "unitWeightG")} g`}
-          bottom={`体积 ${productValue(row, "unitVolumeCm3")} cm³`}
+          top={`重量 ${productValue(row, "weightG")} g`}
+          bottom={`体积 ${productValue(row, "volumeCm3")} cm³`}
         />
       ),
     },
     {
-      key: "actions",
-      header: "操作",
-      width: 150,
-      minWidth: 140,
-      align: "right",
-      sortable: false,
-      filter: false,
-      copyable: false,
-      hideable: false,
-      render: (row) => (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={`编辑商品 ${row.code}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onEdit(row);
-          }}
-        >
-          <Pencil className="size-4" aria-hidden />
-          编辑
-        </Button>
-      ),
+      key: "mappingTrace",
+      header: "映射溯源",
+      width: 220,
+      minWidth: 190,
+      filterValue: mappingTraceText,
+      copyValue: mappingTraceText,
+      filter: { type: "text" },
+      render: (row) => <span className="text-sm">{mappingTraceText(row)}</span>,
     },
   ];
 }
@@ -95,27 +89,39 @@ export function productColumns(
 function productValue(
   row: MasterDataRow,
   key:
-    | "middlePackage"
-    | "largePackage"
-    | "unitLengthMm"
-    | "unitWidthMm"
-    | "unitHeightMm"
-    | "unitWeightG"
-    | "unitVolumeCm3",
+    | "electronicRegulatoryCode"
+    | "heightMm"
+    | "lengthMm"
+    | "packagingText"
+    | "udiCode"
+    | "volumeCm3"
+    | "weightG"
+    | "widthMm",
 ) {
   return row.productFields?.[key]?.trim() || "-";
 }
 
 function productPackagingText(row: MasterDataRow) {
-  return `中包装 ${productValue(row, "middlePackage")} / 大包装 ${productValue(row, "largePackage")}`;
+  return productValue(row, "packagingText");
 }
 
 function unitSizeText(row: MasterDataRow) {
-  return `长 ${productValue(row, "unitLengthMm")} mm / 宽 ${productValue(row, "unitWidthMm")} mm / 高 ${productValue(row, "unitHeightMm")} mm`;
+  return `长 ${productValue(row, "lengthMm")} mm / 宽 ${productValue(row, "widthMm")} mm / 高 ${productValue(row, "heightMm")} mm`;
 }
 
 function unitWeightVolumeText(row: MasterDataRow) {
-  return `重量 ${productValue(row, "unitWeightG")} g / 体积 ${productValue(row, "unitVolumeCm3")} cm³`;
+  return `重量 ${productValue(row, "weightG")} g / 体积 ${productValue(row, "volumeCm3")} cm³`;
+}
+
+function regulatoryCodesText(row: MasterDataRow) {
+  return `UDI ${productValue(row, "udiCode")} / 电子监管码 ${productValue(row, "electronicRegulatoryCode")}`;
+}
+
+function mappingTraceText(row: MasterDataRow) {
+  const traces = row.productFields?.mappingTraces ?? [];
+  if (traces.length === 0) return "无外部映射";
+  const latest = traces[traces.length - 1];
+  return `${latest?.source_system ?? "-"} · ${traces.length} 条`;
 }
 
 function TwoLine({ top, bottom }: { top: string; bottom: string }) {

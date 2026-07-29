@@ -291,6 +291,45 @@ def test_scope_gap_rejects_dev_mock_screenshot_even_when_story_has_another_real_
     assert [gap.kind for gap in result.gaps] == ["menu_page_missing_e2e_screenshot_evidence"]
 
 
+def test_scope_gap_blocks_when_any_declared_screenshot_is_missing_from_evidence_refs():
+    from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
+
+    page = "h8-erp-messages"
+    spec = "prototypes/e2e/web-admin-h8-messages-real.spec.ts"
+    first = "artifacts/screenshot-portal/real-web/h8-erp-messages/message-list-real.png"
+    missing = "artifacts/screenshot-portal/real-web/h8-erp-messages/readonly-real.png"
+    navigation = AdminNavigation(
+        menu_sections={page: "H8 ERP 消息"},
+        default_menu_tree={page},
+        routed_views={page},
+    )
+    result = scan_scope_gaps(
+        story_docs={"docs/domain/user-stories-h8.md": "## US-H8-003：ERP 消息日志"},
+        matrix_stories=[
+            {
+                "id": "US-H8-003",
+                "module": "H8",
+                "types": ["frontend_interaction"],
+                "frontend_pages": [page],
+                "e2e_checks": ["pnpm --dir apps/web-admin run test:e2e:h8-real"],
+                "e2e_screenshots": [
+                    {"page": page, "spec": spec, "screenshot": first},
+                    {"page": page, "spec": spec, "screenshot": missing},
+                ],
+                "evidence_refs": [spec, first],
+            }
+        ],
+        admin_pages=navigation.menu_sections,
+        admin_navigation=navigation,
+        screenshot_legacy_pages=set(),
+    )
+
+    assert [gap.kind for gap in result.gaps] == [
+        "declared_e2e_screenshot_missing_evidence_ref"
+    ]
+    assert missing in result.gaps[0].message
+
+
 def test_scope_gap_does_not_retroactively_block_legacy_menu_page_screenshot_debt():
     from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
 

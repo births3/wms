@@ -4,16 +4,21 @@ impl PgMasterDataReadRepository {
         ctx: &AuthContext,
         id: Uuid,
     ) -> Result<Product, MasterDataError> {
-        sqlx::query_as::<_, ProductRow>(
-            "SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, attrs, status, created_at, updated_at FROM products WHERE owner_id = $1 AND id = $2",
+        let row = sqlx::query_as::<_, ProductRow>(
+            "SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm, volume_cm3, weight_g, source, attrs, status, created_at, updated_at FROM products WHERE owner_id = $1 AND id = $2",
         )
         .bind(ctx.owner_id)
         .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(map_db_error)?
-        .map(Product::from)
-        .ok_or(MasterDataError::NotFound)
+        .ok_or(MasterDataError::NotFound)?;
+        let mut product = Product::from(row);
+        product.packaging_levels =
+            load_product_packaging_levels(&self.pool, ctx.owner_id, product.id).await?;
+        product.mapping_traces =
+            load_product_mapping_traces(&self.pool, ctx.owner_id, product.id).await?;
+        Ok(product)
     }
 
     pub async fn update_product(
@@ -24,14 +29,35 @@ impl PgMasterDataReadRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<Product, MasterDataError> {
+        self.update_product_with_mapping_traces(ctx, id, req, Vec::new(), now, idempotency_key)
+            .await
+    }
+
+    pub async fn update_product_with_mapping_traces(
+        &self,
+        ctx: &AuthContext,
+        id: Uuid,
+        req: UpdateProductRequest,
+        mapping_traces: Vec<ProductMappingTraceInput>,
+        now: DateTime<Utc>,
+        idempotency_key: &str,
+    ) -> Result<Product, MasterDataError> {
+        validate_update_product_fields(&req)?;
+        validate_product_mapping_traces(&mapping_traces)?;
         if let Some(attrs) = req.attrs.as_ref() {
             if attrs.get("storage_condition").is_some() {
                 validate_product_storage_condition(attrs)?;
             }
         }
+        if let Some(levels) = req.packaging_levels.as_ref() {
+            validate_product_packaging_levels(levels)?;
+        }
+        let physical = normalize_product_physical_patch(&req)?;
+        let packaging_levels = req.packaging_levels.clone();
         let request_hash = request_hash(&json!({
             "path": format!("/api/v1/master-data/products/{id}"),
             "request": &req,
+            "mapping_traces": &mapping_traces,
         }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
@@ -47,6 +73,16 @@ impl PgMasterDataReadRepository {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
         }
+        let (current_category, current_status): (String, String) = sqlx::query_as(
+            "SELECT special_drug_category, status FROM products WHERE owner_id = $1 AND id = $2 FOR UPDATE",
+        )
+        .bind(ctx.owner_id)
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(MasterDataError::NotFound)?;
+        validate_product_update_transition(Some(&current_category), &current_status, &req)?;
         let before = load_master_data_before(&mut tx, ctx.owner_id, id, "product").await?;
         let storage_condition = req
             .attrs
@@ -67,18 +103,95 @@ impl PgMasterDataReadRepository {
             .await
             .map_err(|_| MasterDataError::InvalidSpecialDrugCategory)?;
         }
+        let approval_no_present = req.approval_no.is_some();
+        let approval_no = req.approval_no.clone().flatten();
+        let dosage_form_present = req.dosage_form.is_some();
+        let dosage_form = req.dosage_form.clone().flatten();
+        let manufacturer_present = req.manufacturer.is_some();
+        let manufacturer = req.manufacturer.clone().flatten();
+        let udi_code_present = req.udi_code.is_some();
+        let udi_code = req
+            .udi_code
+            .clone()
+            .flatten()
+            .map(|value| value.trim().to_string());
+        let electronic_regulatory_code_present = req.electronic_regulatory_code.is_some();
+        let electronic_regulatory_code = req.electronic_regulatory_code.clone().flatten();
         let row = sqlx::query_as::<_, ProductRow>(
-            r#"UPDATE products SET product_name = COALESCE($3, product_name), approval_no = COALESCE($4, approval_no), specification = COALESCE($5, specification), dosage_form = COALESCE($6, dosage_form), manufacturer = COALESCE($7, manufacturer), special_drug_category = COALESCE($8, special_drug_category), status = COALESCE($9, status), storage_condition = COALESCE($10, storage_condition), source = COALESCE($11, source), attrs = CASE WHEN $12 IS NULL THEN attrs ELSE attrs || $12 END, updated_at = $13, version = version + 1 WHERE owner_id = $1 AND id = $2 RETURNING id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, source, attrs, status, created_at, updated_at"#,
+            r#"UPDATE products SET
+                product_name = COALESCE($3, product_name),
+                approval_no = CASE WHEN $4 THEN $5 ELSE approval_no END,
+                specification = COALESCE($6, specification),
+                dosage_form = CASE WHEN $7 THEN $8 ELSE dosage_form END,
+                manufacturer = CASE WHEN $9 THEN $10 ELSE manufacturer END,
+                special_drug_category = COALESCE($11, special_drug_category),
+                status = COALESCE($12, status),
+                storage_condition = COALESCE($13, storage_condition),
+                source = COALESCE($14, source),
+                attrs = CASE WHEN $15 IS NULL THEN attrs ELSE attrs || $15 END,
+                udi_code = CASE WHEN $16 THEN $17 ELSE udi_code END,
+                electronic_regulatory_code = CASE WHEN $18 THEN $19 ELSE electronic_regulatory_code END,
+                length_mm = CASE WHEN $20 THEN $21 ELSE length_mm END,
+                width_mm = CASE WHEN $22 THEN $23 ELSE width_mm END,
+                height_mm = CASE WHEN $24 THEN $25 ELSE height_mm END,
+                volume_cm3 = CASE WHEN $26 THEN $27 ELSE volume_cm3 END,
+                weight_g = CASE WHEN $28 THEN $29 ELSE weight_g END,
+                updated_at = $30,
+                version = version + 1
+              WHERE owner_id = $1 AND id = $2
+              RETURNING id, owner_id, product_code, product_name, specification,
+                        dosage_form, storage_condition, special_drug_category, approval_no,
+                        manufacturer, udi_code, electronic_regulatory_code, length_mm,
+                        width_mm, height_mm, volume_cm3, weight_g, source, attrs, status,
+                        created_at, updated_at"#,
         )
-        .bind(ctx.owner_id).bind(id).bind(req.product_name).bind(req.approval_no)
-        .bind(req.spec).bind(req.dosage_form).bind(req.manufacturer)
-        .bind(req.special_drug_category_code).bind(req.status).bind(storage_condition).bind(source)
-        .bind(req.attrs).bind(now)
-        .fetch_optional(&mut *tx).await.map_err(map_db_error)?
+        .bind(ctx.owner_id).bind(id).bind(req.product_name)
+        .bind(approval_no_present).bind(approval_no).bind(req.spec)
+        .bind(dosage_form_present).bind(dosage_form)
+        .bind(manufacturer_present).bind(manufacturer)
+        .bind(req.special_drug_category_code).bind(req.status)
+        .bind(storage_condition).bind(source).bind(req.attrs)
+        .bind(udi_code_present).bind(udi_code)
+        .bind(electronic_regulatory_code_present).bind(electronic_regulatory_code)
+        .bind(physical.length_mm.is_some()).bind(physical.length_mm.flatten())
+        .bind(physical.width_mm.is_some()).bind(physical.width_mm.flatten())
+        .bind(physical.height_mm.is_some()).bind(physical.height_mm.flatten())
+        .bind(physical.volume_cm3.is_some()).bind(physical.volume_cm3.flatten())
+        .bind(physical.weight_g.is_some()).bind(physical.weight_g.flatten())
+        .bind(now)
+        .fetch_optional(&mut *tx).await.map_err(|error| map_catalog_write_error(error, "product"))?
         .ok_or(MasterDataError::NotFound)?;
-        let value = Product::from(row);
-        append_master_data_update_audit(&mut tx, ctx, "update_product", "product", id, before, &value, now)
-            .await?;
+        let mut value = Product::from(row);
+        if let Some(levels) = packaging_levels {
+            sqlx::query(
+                "DELETE FROM product_packaging_levels WHERE owner_id = $1 AND product_id = $2",
+            )
+            .bind(ctx.owner_id)
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            value.packaging_levels =
+                insert_product_packaging_levels(&mut tx, ctx.owner_id, id, &levels, now).await?;
+        } else {
+            value.packaging_levels =
+                load_product_packaging_levels(&self.pool, ctx.owner_id, id).await?;
+        }
+        if !mapping_traces.is_empty() {
+            insert_product_mapping_traces(&mut tx, ctx.owner_id, id, &mapping_traces, now).await?;
+        }
+        value.mapping_traces = load_product_mapping_traces_in_tx(&mut tx, ctx.owner_id, id).await?;
+        append_master_data_update_audit(
+            &mut tx,
+            ctx,
+            "update_product",
+            "product",
+            id,
+            before,
+            &value,
+            now,
+        )
+        .await?;
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,
@@ -130,8 +243,17 @@ impl PgMasterDataReadRepository {
         ).bind(ctx.owner_id).bind(id).bind(req.supplier_name).bind(req.license_no).bind(req.contact_name).bind(req.status).bind(now)
         .fetch_optional(&mut *tx).await.map_err(map_db_error)?.ok_or(MasterDataError::NotFound)?;
         let value = Supplier::from(row);
-        append_master_data_update_audit(&mut tx, ctx, "update_supplier", "supplier", id, before, &value, now)
-            .await?;
+        append_master_data_update_audit(
+            &mut tx,
+            ctx,
+            "update_supplier",
+            "supplier",
+            id,
+            before,
+            &value,
+            now,
+        )
+        .await?;
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,
@@ -181,8 +303,17 @@ impl PgMasterDataReadRepository {
         ).bind(ctx.owner_id).bind(id).bind(req.customer_name).bind(req.license_no).bind(req.status).bind(now)
         .fetch_optional(&mut *tx).await.map_err(map_db_error)?.ok_or(MasterDataError::NotFound)?;
         let value = Customer::from(row);
-        append_master_data_update_audit(&mut tx, ctx, "update_customer", "customer", id, before, &value, now)
-            .await?;
+        append_master_data_update_audit(
+            &mut tx,
+            ctx,
+            "update_customer",
+            "customer",
+            id,
+            before,
+            &value,
+            now,
+        )
+        .await?;
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,
@@ -340,14 +471,9 @@ impl PgMasterDataReadRepository {
         }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) = replay_idempotency::<Location>(
-            &mut tx,
-            ctx.owner_id,
-            idempotency_key,
-            &hash,
-            now,
-        )
-        .await?
+        if let Some(value) =
+            replay_idempotency::<Location>(&mut tx, ctx.owner_id, idempotency_key, &hash, now)
+                .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
@@ -410,14 +536,9 @@ impl PgMasterDataReadRepository {
         }))?;
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) = replay_idempotency::<Location>(
-            &mut tx,
-            ctx.owner_id,
-            idempotency_key,
-            &hash,
-            now,
-        )
-        .await?
+        if let Some(value) =
+            replay_idempotency::<Location>(&mut tx, ctx.owner_id, idempotency_key, &hash, now)
+                .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
@@ -483,8 +604,17 @@ impl PgMasterDataReadRepository {
         ).bind(ctx.owner_id).bind(id).bind(req.zone_id).bind(req.location_code).bind(req.row_no).bind(req.column_no).bind(req.layer_no).bind(req.max_volume_cm3).bind(req.used_volume_cm3).bind(req.max_sku_count).bind(req.location_type).bind(req.bound_owner_id).bind(req.status).bind(now)
         .fetch_optional(&mut *tx).await.map_err(map_db_error)?.ok_or(MasterDataError::NotFound)?;
         let value = Location::from(row);
-        append_master_data_update_audit(&mut tx, ctx, "update_location", "location", id, before, &value, now)
-            .await?;
+        append_master_data_update_audit(
+            &mut tx,
+            ctx,
+            "update_location",
+            "location",
+            id,
+            before,
+            &value,
+            now,
+        )
+        .await?;
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,
@@ -525,14 +655,8 @@ impl PgMasterDataReadRepository {
             "request": &req,
         }))?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) = replay_idempotency(
-            &mut tx,
-            ctx.owner_id,
-            idempotency_key,
-            &hash,
-            now,
-        )
-        .await?
+        if let Some(value) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
@@ -610,20 +734,13 @@ impl PgMasterDataReadRepository {
             "request": &req,
         }))?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) = replay_idempotency(
-            &mut tx,
-            ctx.owner_id,
-            idempotency_key,
-            &hash,
-            now,
-        )
-        .await?
+        if let Some(value) =
+            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
         }
-        let before =
-            load_master_data_before(&mut tx, ctx.owner_id, id, "warehouse_zone").await?;
+        let before = load_master_data_before(&mut tx, ctx.owner_id, id, "warehouse_zone").await?;
         if let Some(value) = req.temperature_zone.as_deref() {
             ensure_enabled_dictionary_item(
                 &mut tx,

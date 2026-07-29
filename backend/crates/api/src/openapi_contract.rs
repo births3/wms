@@ -137,10 +137,6 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
         reason: "M1 基础档案 CRUD 旧契约未接入 L11 幂等，本轮不扩大调用侧 header 面。",
     },
     IdempotencyExemptionGroup {
-        operations: &[("/api/v1/parameter-mapping/execute", PathItemType::Post)],
-        reason: "参数对照执行使用业务追踪 ID，L11 幂等运行时证据后续切片补齐。",
-    },
-    IdempotencyExemptionGroup {
         operations: &[
             ("/api/v1/reports/gsp/inbound-ledger", PathItemType::Post),
             ("/api/v1/reports/gsp/inventory-ledger", PathItemType::Post),
@@ -344,6 +340,12 @@ impl Modify for ContractSecurityAddon {
         for path in [
             "/api/v1/cold-chain/readings",
             "/api/v1/cold-chain/excursions",
+            "/api/v1/integration/erp-messages/inbound/asn",
+            "/api/v1/integration/erp-messages/inbound/outbound_order",
+            "/api/v1/integration/erp-messages/inbound/product_change",
+            "/api/v1/integration/erp-messages/inbound/product_master",
+            "/api/v1/integration/erp-messages/inbound/return_order",
+            "/api/v1/integration/erp-messages/{id}/receipt",
         ] {
             if let Some(operation) = operation_mut(openapi, path, PathItemType::Post) {
                 operation.security = Some(vec![SecurityRequirement::new(

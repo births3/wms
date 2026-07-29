@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -19,11 +19,29 @@ pub struct Product {
     /// 批准文号。
     pub approval_no: Option<String>,
     /// 规格。
-    pub spec: Option<String>,
+    pub spec: String,
     /// 剂型。
     pub dosage_form: Option<String>,
     /// 生产企业。
     pub manufacturer: Option<String>,
+    /// UDI 唯一码。
+    pub udi_code: Option<String>,
+    /// 电子监管码关联。
+    pub electronic_regulatory_code: Option<String>,
+    /// 单品长度（毫米）。
+    pub length_mm: Option<f64>,
+    /// 单品宽度（毫米）。
+    pub width_mm: Option<f64>,
+    /// 单品高度（毫米）。
+    pub height_mm: Option<f64>,
+    /// 单品体积（立方厘米）。
+    pub volume_cm3: Option<f64>,
+    /// 单品重量（克）。
+    pub weight_g: Option<f64>,
+    /// 包装层级，转换比统一相对基础单位。
+    pub packaging_levels: Vec<ProductPackagingLevel>,
+    /// 经 M-PM 规整化字段的追加式溯源记录。
+    pub mapping_traces: Vec<ProductMappingTrace>,
     /// 特殊药品分类编码。
     pub special_drug_category_code: Option<String>,
     /// 启停状态。
@@ -43,10 +61,18 @@ pub struct CreateProductRequest {
     pub product_code: String,
     pub product_name: String,
     pub approval_no: Option<String>,
-    pub spec: Option<String>,
+    pub spec: String,
     pub dosage_form: Option<String>,
     pub manufacturer: Option<String>,
     pub special_drug_category_code: Option<String>,
+    pub udi_code: Option<String>,
+    pub electronic_regulatory_code: Option<String>,
+    pub length_mm: Option<f64>,
+    pub width_mm: Option<f64>,
+    pub height_mm: Option<f64>,
+    pub volume_cm3: Option<f64>,
+    pub weight_g: Option<f64>,
+    pub packaging_levels: Vec<ProductPackagingLevelInput>,
     #[schema(schema_with = free_form_json_schema)]
     pub attrs: serde_json::Value,
 }
@@ -55,14 +81,126 @@ pub struct CreateProductRequest {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateProductRequest {
     pub product_name: Option<String>,
-    pub approval_no: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub approval_no: Option<Option<String>>,
     pub spec: Option<String>,
-    pub dosage_form: Option<String>,
-    pub manufacturer: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub dosage_form: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub manufacturer: Option<Option<String>>,
     pub special_drug_category_code: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub udi_code: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub electronic_regulatory_code: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub length_mm: Option<Option<f64>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub width_mm: Option<Option<f64>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub height_mm: Option<Option<f64>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub volume_cm3: Option<Option<f64>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub weight_g: Option<Option<f64>>,
+    pub packaging_levels: Option<Vec<ProductPackagingLevelInput>>,
     pub status: Option<String>,
     #[schema(schema_with = free_form_json_schema)]
     pub attrs: Option<serde_json::Value>,
+}
+
+fn deserialize_present_nullable<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+/// 商品包装层级写入项。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ProductPackagingLevelInput {
+    pub unit_code: String,
+    pub unit_name: String,
+    /// 相对基础单位的换算数量。
+    pub ratio_to_base: i64,
+    pub is_base: bool,
+    pub is_default: bool,
+    pub sort_order: i32,
+}
+
+/// 商品包装层级。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ProductPackagingLevel {
+    pub id: Uuid,
+    pub unit_code: String,
+    pub unit_name: String,
+    pub ratio_to_base: i64,
+    pub is_base: bool,
+    pub is_default: bool,
+    pub sort_order: i32,
+}
+
+/// M-PM 规整化结果写入项，仅供受控防腐层调用。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ProductMappingTraceInput {
+    pub field_name: String,
+    pub rule_id: Option<Uuid>,
+    pub source_system: String,
+    pub source_value: String,
+    pub target_value: Option<String>,
+}
+
+/// 商品字段映射溯源。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ProductMappingTrace {
+    pub id: Uuid,
+    pub field_name: String,
+    pub rule_id: Option<Uuid>,
+    pub source_system: String,
+    pub source_value: String,
+    pub target_value: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -505,6 +643,7 @@ pub struct SystemDictionaryItem {
     pub item_name: String,
     pub enabled: bool,
     pub owner_id: Option<Uuid>,
+    pub sort_order: i32,
     #[schema(schema_with = free_form_json_schema)]
     pub params: serde_json::Value,
     pub effective_from: Option<DateTime<Utc>>,
@@ -543,6 +682,7 @@ pub struct UpsertSystemDictionaryItemRequest {
     pub owner_id: Option<Uuid>,
     pub item_name: String,
     pub enabled: bool,
+    pub sort_order: i32,
     #[schema(schema_with = free_form_json_schema)]
     pub params: serde_json::Value,
     pub effective_from: Option<DateTime<Utc>>,

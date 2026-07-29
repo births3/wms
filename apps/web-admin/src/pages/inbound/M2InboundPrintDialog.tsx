@@ -89,7 +89,7 @@ export function M2InboundPrintDialog({
     };
   }, [currentOwner.ownerCode, currentOwner.ownerId, mode, open, order?.id, printDataQuery.data, printDataQuery.error, printDataQuery.isError, printDataQuery.isPending]);
 
-  async function recordPrint() {
+  async function recordPrint(status: "printed" | "cancelled" | "failed", failureReason: string | null) {
     if (!preview || !order) return;
     await printMutation.mutateAsync({
       template_code: preview.template_code,
@@ -98,11 +98,10 @@ export function M2InboundPrintDialog({
       business_document_type: preview.template_type_code,
       business_document_id: order.id,
       data: preview.data,
-      status: "printed",
-      failure_reason: null,
+      status,
+      failure_reason: failureReason,
     });
     onPrinted(order.receipt_no);
-    onOpenChange(false);
   }
 
   return (

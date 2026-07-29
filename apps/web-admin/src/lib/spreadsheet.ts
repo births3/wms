@@ -1,9 +1,8 @@
 export async function readSpreadsheetRows(file: File): Promise<string[][]> {
   const extension = file.name.toLowerCase().split(".").pop();
   if (extension === "csv") return parseCsv(await file.text());
-  if (extension === "xls") return parseHtmlSpreadsheet(await file.text());
   if (extension === "xlsx") return parseXlsx(await file.arrayBuffer());
-  throw new Error("仅支持 .xlsx、.xls 或 .csv 文件");
+  throw new Error("仅支持 .xlsx 或 .csv 文件");
 }
 
 export function parseCsv(text: string): string[][] {
@@ -37,13 +36,6 @@ export function parseCsv(text: string): string[][] {
     if (row.some(Boolean)) rows.push(row);
   }
   return rows;
-}
-
-function parseHtmlSpreadsheet(text: string): string[][] {
-  const document = new DOMParser().parseFromString(text, "text/html");
-  const table = document.querySelector("table");
-  if (!table) throw new Error("XLS 文件中没有可读取的表格");
-  return Array.from(table.rows).map((row) => Array.from(row.cells).map((cell) => cell.textContent?.trim() ?? ""));
 }
 
 async function parseXlsx(buffer: ArrayBuffer): Promise<string[][]> {

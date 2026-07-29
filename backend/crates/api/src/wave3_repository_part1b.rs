@@ -59,17 +59,16 @@ pub async fn putaway_receiving_order_and_inventory(
             });
         }
 
-        let (product_storage_condition, product_attrs): (String, serde_json::Value) =
-            sqlx::query_as(
-                "SELECT storage_condition, attrs FROM products WHERE owner_id = $1 AND product_code = $2 AND status = 'active'",
-            )
+        let (product_storage_condition, product_volume_cm3): (String, Option<f64>) = sqlx::query_as(
+            "SELECT storage_condition, volume_cm3 FROM products WHERE owner_id = $1 AND product_code = $2 AND status = 'active'",
+        )
             .bind(ctx.owner_id)
             .bind(&req.product_code)
             .fetch_optional(&mut *tx)
             .await
             .map_err(map_db_error)?
             .ok_or(Wave3RepositoryError::NotFound)?;
-        let unit_volume_cm3 = putaway::product_unit_volume_cm3(&product_attrs)?;
+        let unit_volume_cm3 = putaway::product_unit_volume_cm3(product_volume_cm3)?;
         let required_volume_cm3 = unit_volume_cm3
             .checked_mul(req.qty)
             .ok_or(Wave3RepositoryError::InvalidQuantity)?;

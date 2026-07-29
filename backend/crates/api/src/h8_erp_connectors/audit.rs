@@ -4,22 +4,16 @@ use chrono::Utc;
 use wms_domain::H8ErpConnector;
 
 use crate::{
-    audit::{append_event, AuditDiff, AuditWriteRequest},
+    audit::{AuditDiff, AuditWriteRequest},
     auth::AuthContext,
 };
 
-use super::state::H8ErpConnectorAppState;
-
-pub(crate) async fn write_audit(
-    state: &H8ErpConnectorAppState,
+pub(crate) fn audit_request(
     ctx: &AuthContext,
     action: &str,
     connector: &H8ErpConnector,
     before: Option<serde_json::Value>,
-) {
-    let Some(pool) = &state.audit_pool else {
-        return;
-    };
+) -> AuditWriteRequest {
     let after = audit_snapshot(connector);
     let mut req = AuditWriteRequest::from_auth_context(
         ctx,
@@ -33,7 +27,7 @@ pub(crate) async fn write_audit(
         )),
     );
     req.occurred_at = Utc::now();
-    let _ = append_event(pool, &req).await;
+    req
 }
 
 pub(crate) fn audit_snapshot(c: &H8ErpConnector) -> serde_json::Value {

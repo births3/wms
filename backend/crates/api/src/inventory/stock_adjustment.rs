@@ -19,8 +19,8 @@ pub(crate) async fn add_for_stock_surplus_in_tx(
         WITH target AS (
             SELECT location.id,
                    CASE
-                       WHEN COALESCE(product.attrs->>'unit_volume_cm3', '') ~ '^[1-9][0-9]*$'
-                       THEN (product.attrs->>'unit_volume_cm3')::NUMERIC * $4
+                       WHEN product.volume_cm3 IS NOT NULL
+                       THEN CEIL(product.volume_cm3)::NUMERIC * $4
                    END AS required_volume
               FROM inventory_batches batch
               JOIN products product

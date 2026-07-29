@@ -7,7 +7,6 @@ import {
   type CreateCustomerRequest,
   type CreateCustomerAddressRequest,
   type CreateLocationRequest,
-  type CreateProductRequest,
   type CreateSupplierRequest,
   type CreateWarehouseRequest,
   type CreateWarehouseZoneRequest,
@@ -23,7 +22,6 @@ import {
   type UpdateCustomerAddressRequest,
   type UpsertCustomerProfileRequest,
   type UpdateLocationRequest,
-  type UpdateProductRequest,
   type UpdateSupplierRequest,
   type UpdateWarehouseRequest,
   type UpdateWarehouseZoneRequest,
@@ -35,7 +33,6 @@ import {
   createCustomer,
   createCustomerAddress,
   createLocation,
-  createProduct,
   createSupplier,
   createWarehouse,
   createWarehouseZone,
@@ -57,7 +54,6 @@ import {
   updateCustomerAddress,
   upsertCustomerProfile,
   updateLocation,
-  updateProduct,
   updateSupplier,
   updateWarehouse,
   updateWarehouseZone,
@@ -178,16 +174,6 @@ export function useDisableSystemDictionaryItemMutation() {
   });
 }
 
-export function useUpdateProductMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: updateProduct,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [...masterDataQueryKey, "m1-products"] });
-    },
-  });
-}
-
 export function listMasterDataRows(viewId: MasterDataViewId): Promise<MasterDataRow[]> {
   switch (viewId) {
     case "m1-products":
@@ -221,7 +207,6 @@ export {
   createCustomer,
   createCustomerAddress,
   createLocation,
-  createProduct,
   createSupplier,
   createWarehouse,
   createWarehouseZone,
@@ -241,7 +226,6 @@ export {
   updateCustomerAddress,
   upsertCustomerProfile,
   updateLocation,
-  updateProduct,
   updateSupplier,
   updateWarehouse,
   updateWarehouseZone,
@@ -255,7 +239,6 @@ export type {
   CreateCustomerAddressRequest,
   CustomerProfile,
   CreateLocationRequest,
-  CreateProductRequest,
   CreateSupplierRequest,
   CreateWarehouseRequest,
   CreateWarehouseZoneRequest,
@@ -263,7 +246,6 @@ export type {
   UpdateCustomerAddressRequest,
   UpsertCustomerProfileRequest,
   UpdateLocationRequest,
-  UpdateProductRequest,
   UpdateSupplierRequest,
   UpdateWarehouseRequest,
   UpdateWarehouseZoneRequest,

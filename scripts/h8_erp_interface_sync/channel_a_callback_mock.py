@@ -4,6 +4,7 @@
 接收 H8 worker HTTP 出站投递，写入 JSONL 便于验收。
 
 用法：
+  export ERP_VENDOR_BEARER_TOKEN='replace-with-local-test-token'
   python3 scripts/h8_erp_interface_sync/channel_a_callback_mock.py --port 18091
   export ERP_CALLBACK_BASE=http://127.0.0.1:18091
 """
@@ -11,7 +12,9 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +22,19 @@ from pathlib import Path
 
 RECEIVED: list[dict] = []
 _LOG_PATH = Path("/tmp/h8-channel-a-callback.jsonl")
+_BEARER_TOKEN = os.environ.get("ERP_VENDOR_BEARER_TOKEN", "").strip()
+
+
+def bearer_authorized(header: str | None, expected_token: str) -> bool:
+    """只接受配置值完全匹配的 Bearer，不允许匿名或其他认证方案。"""
+    if not expected_token:
+        return False
+    scheme, separator, token = (header or "").partition(" ")
+    return (
+        bool(separator)
+        and scheme.casefold() == "bearer"
+        and hmac.compare_digest(token.strip(), expected_token)
+    )
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -44,7 +60,18 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _require_bearer(self) -> bool:
+        if bearer_authorized(self.headers.get("Authorization"), _BEARER_TOKEN):
+            return True
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", "Bearer")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
     def do_GET(self) -> None:  # noqa: N802
+        if not self._require_bearer():
+            return
         if self.path in ("/health", "/healthz", "/"):
             self._ok({"status": "ok", "received": len(RECEIVED)})
             return
@@ -54,6 +81,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._require_bearer():
+            return
         data = self._read_json()
         event = {
             "path": self.path,
@@ -78,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=18091)
     parser.add_argument("--log", default=str(_LOG_PATH))
     args = parser.parse_args(argv)
+    if not _BEARER_TOKEN:
+        parser.error("ERP_VENDOR_BEARER_TOKEN is required")
     _LOG_PATH = Path(args.log)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(

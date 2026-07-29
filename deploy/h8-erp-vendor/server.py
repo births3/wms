@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import threading
@@ -27,6 +28,7 @@ FAIL_COUNT = int(os.environ.get("ERP_FAIL_COUNT", "0"))
 VENDOR_CODE = os.environ.get("ERP_VENDOR_CODE", "container-erp-vendor-a")
 # 可选：设置后 /_admin/* 需带 Header X-ERP-Admin-Token
 ADMIN_TOKEN = os.environ.get("ERP_VENDOR_ADMIN_TOKEN", "").strip()
+BEARER_TOKEN = os.environ.get("ERP_VENDOR_BEARER_TOKEN", "").strip()
 
 _lock = threading.Lock()
 _fail_remaining = FAIL_COUNT
@@ -53,6 +55,18 @@ def _load_existing() -> None:
                 _receipts.append(obj)
 
 
+def bearer_authorized(header: str | None, expected_token: str) -> bool:
+    """只接受配置值完全匹配的 Bearer，不允许匿名或其他认证方案。"""
+    if not expected_token:
+        return False
+    scheme, separator, token = (header or "").partition(" ")
+    return (
+        bool(separator)
+        and scheme.casefold() == "bearer"
+        and hmac.compare_digest(token.strip(), expected_token)
+    )
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: object) -> None:
         print(f"[erp-vendor] {fmt % args}", flush=True)
@@ -75,7 +89,18 @@ class Handler(BaseHTTPRequestHandler):
             data = {"raw": raw.decode("utf-8", errors="replace")}
         return data if isinstance(data, dict) else {"value": data}
 
+    def _require_bearer(self) -> bool:
+        if bearer_authorized(self.headers.get("Authorization"), BEARER_TOKEN):
+            return True
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", "Bearer")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
     def do_GET(self) -> None:  # noqa: N802
+        if not self._require_bearer():
+            return
         path = urlparse(self.path).path
         if path in ("/", "/health", "/healthz"):
             with _lock:
@@ -114,6 +139,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         global _fail_remaining
+        if not self._require_bearer():
+            return
         path = urlparse(self.path).path
         body = self._read_json()
         # 运维探针：不经业务 fail 计数（生产镜像务必配置 ERP_VENDOR_ADMIN_TOKEN）
@@ -171,6 +198,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    if not BEARER_TOKEN:
+        raise SystemExit("ERP_VENDOR_BEARER_TOKEN is required")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     _load_existing()
     server = ThreadingHTTPServer((HOST, PORT), Handler)

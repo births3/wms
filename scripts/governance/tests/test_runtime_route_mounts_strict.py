@@ -12,7 +12,7 @@ def test_strict_route_specs_cover_reports_and_parameter_mapping():
 
     assert paths == {
         "/api/v1/reports/query",
-        "/api/v1/parameter-mapping/execute",
+        "/api/v1/parameter-mapping/map",
     }
 
 
@@ -22,7 +22,7 @@ def test_current_strict_scan_tracks_remaining_unimplemented_route_families():
 
     assert any("DELETE /api/v1/inbound/receiving-orders/{id}" in message for message in messages)
     assert any("POST /api/v1/reports/query" in message for message in messages)
-    assert not any("POST /api/v1/parameter-mapping/execute" in message for message in messages)
+    assert not any("POST /api/v1/parameter-mapping/map" in message for message in messages)
 
 
 def test_runtime_operation_parser_tracks_method_and_normalizes_path_parameter():

@@ -18,7 +18,7 @@ interface H9TemplatePreviewDialogProps {
   open: boolean;
   preview: PrintTemplatePreviewResponse | null;
   onOpenChange: (open: boolean) => void;
-  onPrint: () => Promise<void>;
+  onPrint?: (status: PrintResult, failureReason: string | null) => Promise<void>;
 }
 
 export function H9TemplatePreviewDialog({
@@ -34,8 +34,10 @@ export function H9TemplatePreviewDialog({
   const [error, setError] = React.useState<string | null>(null);
   const [printing, setPrinting] = React.useState(false);
   const [ready, setReady] = React.useState(false);
+  const [awaitingResult, setAwaitingResult] = React.useState(false);
 
   React.useEffect(() => {
+    setAwaitingResult(false);
     if (open && preview) setPaperDirection(readPaperDirection(preview.hiprint_json));
   }, [open, preview]);
 
@@ -77,12 +79,26 @@ export function H9TemplatePreviewDialog({
     };
   }, [containerId, open, paperDirection, preview]);
 
-  async function print() {
-    if (!preview) return;
-    setPrinting(true);
+  function print() {
+    if (!preview || printing) return;
+    setError(null);
     try {
       templateRef.current?.print(preview.data);
-      await onPrint();
+      setAwaitingResult(true);
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : "浏览器打印失败";
+      setError(reason);
+      void recordResult("failed", reason);
+    }
+  }
+
+  async function recordResult(status: PrintResult, failureReason: string | null) {
+    if (!onPrint || printing) return;
+    setPrinting(true);
+    try {
+      await onPrint(status, failureReason);
+      setAwaitingResult(false);
+      onOpenChange(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "打印记录写入失败");
     } finally {
@@ -90,9 +106,17 @@ export function H9TemplatePreviewDialog({
     }
   }
 
+  function requestOpenChange(nextOpen: boolean) {
+    if (!nextOpen && awaitingResult) {
+      void recordResult("cancelled", null);
+      return;
+    }
+    onOpenChange(nextOpen);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-[72rem] overflow-auto">
+    <Dialog open={open} onOpenChange={requestOpenChange}>
+      <DialogContent className="flex h-[92vh] max-w-[72rem] flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>{preview?.template_name ?? "打印预览"}</DialogTitle>
           <DialogDescription>
@@ -110,16 +134,40 @@ export function H9TemplatePreviewDialog({
             <option value="landscape">横向</option>
           </select>
         </label>
-        {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
-        <div id={containerId} className="min-h-[32rem] overflow-auto rounded-md border bg-muted/30 p-4" />
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            关闭
-          </Button>
-          <Button type="button" disabled={!preview || !ready || printing} onClick={() => void print()}>
-            <Printer className="size-4" aria-hidden />
-            打印
-          </Button>
+        {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{error}</div>}
+        {awaitingResult && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm" role="status">
+            <p className="font-medium">确认打印结果</p>
+            <p className="text-muted-foreground">浏览器打印窗口已打开，请按实际结果登记。</p>
+          </div>
+        )}
+        <div id={containerId} className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30 p-4" />
+        <DialogFooter className="shrink-0">
+          {awaitingResult ? (
+            <>
+              <Button type="button" variant="outline" disabled={printing} onClick={() => void recordResult("cancelled", null)}>
+                已取消
+              </Button>
+              <Button type="button" variant="destructive" disabled={printing} onClick={() => void recordResult("failed", "用户确认浏览器打印失败")}>
+                打印失败
+              </Button>
+              <Button type="button" disabled={printing} onClick={() => void recordResult("printed", null)}>
+                已完成打印
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="outline" onClick={() => requestOpenChange(false)}>
+                关闭
+              </Button>
+              {onPrint && (
+                <Button type="button" disabled={!preview || !ready || printing} onClick={print}>
+                  <Printer className="size-4" aria-hidden />
+                  打印
+                </Button>
+              )}
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -132,6 +180,7 @@ type HiprintTemplate = {
 };
 
 type PaperDirection = "portrait" | "landscape";
+type PrintResult = "printed" | "cancelled" | "failed";
 
 function applyPreviewPaperDirection(value: unknown, direction: PaperDirection) {
   const record = cloneRecord(value);

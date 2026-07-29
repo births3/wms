@@ -43,6 +43,11 @@ pub async fn ship_outbound_order(
             .map_err(Wave4RepositoryError::ShipmentValidation)?;
         let driver_name =
             outbound_driver_name(&mut tx, ctx.owner_id, &req).await?;
+        let handover_to = driver_name
+            .as_deref()
+            .or(req.courier_name.as_deref())
+            .unwrap_or_default()
+            .to_string();
         ensure_handover_signature_attachment(
             &mut tx,
             ctx.owner_id,
@@ -66,6 +71,9 @@ pub async fn ship_outbound_order(
                 deduct_inventory_for_outbound(&mut tx, ctx.owner_id, order_id, line, now).await?;
             }
         }
+        let shipment_id = Uuid::new_v4();
+        let package_count =
+            i32::try_from(req.package_count).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
         sqlx::query(
             r#"
             UPDATE outbound_order_lines
@@ -93,7 +101,7 @@ pub async fn ship_outbound_order(
             )
             "#,
         )
-        .bind(Uuid::new_v4())
+        .bind(shipment_id)
         .bind(ctx.owner_id)
         .bind(order_id)
         .bind(&req.delivery_provider_type)
@@ -107,7 +115,7 @@ pub async fn ship_outbound_order(
         .bind(cold_chain)
         .bind(req.loading_temperature_celsius)
         .bind(cold_chain_packages)
-        .bind(i32::try_from(req.package_count).map_err(|_| Wave4RepositoryError::InvalidQuantity)?)
+        .bind(package_count)
         .bind(ctx.user_id)
         .bind(now)
         .execute(&mut *tx)
@@ -137,6 +145,34 @@ pub async fn ship_outbound_order(
             now,
         )
         .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO shipment_confirm_erp_feedback_outbox (
+                id, owner_id, shipment_id, outbound_order_id, payload
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ctx.owner_id)
+        .bind(shipment_id)
+        .bind(order_id)
+        .bind(serde_json::json!({
+            "warehouse_id": shipped.warehouse_id,
+            "shipment_id": shipment_id,
+            "outbound_order_id": shipped.id,
+            "wms_order_no": shipped.wms_order_no,
+            "erp_order_no": shipped.erp_order_no,
+            "carrier_type": req.delivery_provider_type,
+            "handover_to": handover_to,
+            "package_count": package_count,
+            "shipped_at": now,
+            "lines": shipped.lines,
+        }))
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
 
         store_idempotency_success(
             &mut tx,

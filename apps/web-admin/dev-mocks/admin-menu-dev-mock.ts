@@ -242,6 +242,7 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
         ["m3-counts", "M3 库存盘点", "ClipboardList"],
         ["m3-maintenance", "M3 在库养护", "ClipboardList"],
         ["m3-relocations", "M3 库内移库", "Layers"],
+        ["mrc-reconciliation", "M-RC 库存对账", "ClipboardList"],
         ["mte-task-dispatch", "M-TE 任务调度", "ClipboardList"],
         ["mte-task-groups", "M-TE 任务组资格", "Users"],
         ["mte-task-types", "M-TE 任务类型配置", "ClipboardList"],
@@ -278,7 +279,11 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
         ["h8-erp-messages", "H8 ERP 消息", "Inbox"],
         ["h8-erp-interface-tables", "H8 接口表探查", "Database"],
       ]),
-      group(parent, "h9-print", "H9 打印能力", "Printer", 90, [["h9-print-templates", "H9 打印模板", "Printer"]]),
+      group(parent, "h9-print", "H9 打印能力", "Printer", 90, [
+        ["h9-delivery-note-aggregation", "作业·随货同行单归集", "Printer"],
+        ["h9-print-devices", "设备·Print Agent 管理", "Printer"],
+        ["h9-print-templates", "H9 打印模板", "Printer"],
+      ]),
       group(parent, "mcg-numbering", "M-CG 编码能力", "KeyRound", 100, [["mcg-numbering", "M-CG 单据号规则", "KeyRound"]]),
     ]),
   ];
@@ -355,6 +360,7 @@ function devViewPermissionKey(viewId: string) {
     "m3-counts": "m3.read",
     "m3-maintenance": "m3.read",
     "m3-relocations": "m3.read",
+    "mrc-reconciliation": "rc.reconciliation.read",
     "mte-task-dispatch": "mte.task.read_all",
     "mte-task-groups": "mte.task_group.write",
     "mte-task-types": "mte.task_type.read",
@@ -380,6 +386,8 @@ function devViewPermissionKey(viewId: string) {
     "h8-erp-connectors": "h8.erp_connector.read",
     "h8-erp-messages": "h8.erp_connector.read",
     "h8-erp-interface-tables": "h8.erp_interface_table.read",
+    "h9-delivery-note-aggregation": "h9.print_orchestration.read",
+    "h9-print-devices": "h9.print_device.read",
     "h9-print-templates": "h9.print_template.read",
     "mcg-numbering": "mcg.document_numbering.read",
   };

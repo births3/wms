@@ -19,16 +19,13 @@ import { Plus, Upload } from "lucide-react";
 
 import {
   batchCreateCustomers,
-  batchCreateProducts,
   batchCreateSuppliers,
   batchCreateLocations,
   createCustomer,
-  createProduct,
   createSupplier,
   useMasterDataRowsQuery,
   useSystemDictionaryItemOptionsQuery,
   type CreateCustomerRequest,
-  type CreateProductRequest,
   type CreateSupplierRequest,
   type MasterDataRow,
   type MasterDataViewId,
@@ -53,9 +50,6 @@ import {
   MasterDataSourceActions,
   type MasterDataSourceActionsHandle,
 } from "./MasterDataSourceActions";
-import { ProductCreateDialog } from "./ProductCreateDialog";
-import { ProductBatchImportDialog } from "./ProductBatchImportDialog";
-import { ProductEditDialog } from "./ProductEditDialog";
 import { productColumns } from "./ProductEditTable";
 import {
   baseMasterDataColumns,
@@ -66,7 +60,6 @@ import {
   productTableClassName,
 } from "./m1-product-page-model";
 import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
-import { useProductEditDialog } from "./use-product-edit-dialog";
 import type { CurrentUser } from "@/features/auth/auth-queries";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
 export const masterDataViewMeta: Record<
@@ -81,7 +74,7 @@ export const masterDataViewMeta: Record<
 > = {
   "m1-products": {
     title: "M1 商品档案",
-    subtitle: "商品编码、规格、批准文号与储存条件",
+    subtitle: "ERP 权威商品投影；本页只读，变更由 H8 商品消息同步",
     emptyTitle: "暂无商品档案",
     emptyDescription: "当前筛选条件下没有商品，请调整关键字或清空筛选。",
     storageKey: "m1-products-datagrid",
@@ -142,7 +135,7 @@ interface M1MasterDataPageProps {
 
 export function M1MasterDataPage({ viewId, currentUser }: M1MasterDataPageProps) {
   if (viewId === "m1-system-dictionary") {
-    return <M1SystemDictionaryPage meta={masterDataViewMeta[viewId]} />;
+    return <M1SystemDictionaryPage currentUser={currentUser} meta={masterDataViewMeta[viewId]} />;
   }
 
   return <M1MasterDataGridPage currentUser={currentUser} viewId={viewId} />;
@@ -170,12 +163,6 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const [crudTarget, setCrudTarget] = React.useState<MasterDataCrudTarget | null>(null);
   const supplierActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
   const customerActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
-  const productEdit = useProductEditDialog({
-    refetchRows: rowsQuery.refetch,
-    onSaved: (productCode) => setLastEvent(`${productCode} 已保存`),
-  });
-  const [productCreateOpen, setProductCreateOpen] = React.useState(false);
-  const [productBatchImportOpen, setProductBatchImportOpen] = React.useState(false);
   const [locationBatchOpen, setLocationBatchOpen] = React.useState(false);
   const [locationBatchRange, setLocationBatchRange] =
     React.useState<LocationBatchRange>(initialLocationBatchRange);
@@ -235,7 +222,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const baseGridColumns = masterDataColumns(viewId, baseMasterDataColumns, locationMasterDataColumns);
   const gridColumns =
     viewId === "m1-products"
-      ? productColumns(baseGridColumns, productEdit.openDialog)
+      ? productColumns(baseGridColumns)
       : isMasterDataCrudView(viewId)
         ? masterDataCrudColumns(baseGridColumns, viewId, openCrudEdit, disableCrudRow, disablingId)
         : baseGridColumns;
@@ -261,18 +248,6 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
     await rowsQuery.refetch();
     setRowActionError(null);
     setLastEvent(`${meta.title} 已刷新`);
-  }
-
-  async function submitProductCreate(request: CreateProductRequest) {
-    const created = await createProduct(request);
-    await rowsQuery.refetch();
-    setLastEvent(`${created.code} 已新建`);
-  }
-
-  async function importProductsFromDialog(requests: CreateProductRequest[]) {
-    const createdRows = await batchCreateProducts(requests);
-    await rowsQuery.refetch();
-    setLastEvent(`已批量导入 ${createdRows.length} 个商品`);
   }
 
   async function createSupplierFromDialog(request: CreateSupplierRequest) {
@@ -384,13 +359,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
     },
   };
   const gridCreateAction: DataGridCreateAction | undefined = canWrite
-    ? viewId === "m1-products"
-      ? {
-          label: "新增",
-          description: "新建商品",
-          onClick: () => setProductCreateOpen(true),
-        }
-      : viewId === "m1-warehouses"
+    ? viewId === "m1-warehouses"
         ? {
             label: "新增",
             description: "新建仓库",
@@ -411,7 +380,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
           : undefined
     : undefined;
   const gridEditAction: DataGridEditAction | undefined = canWrite &&
-    (viewId === "m1-products" || isMasterDataCrudView(viewId))
+    isMasterDataCrudView(viewId)
       ? {
           label: "修改",
           description: "修改选中档案",
@@ -419,10 +388,6 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
           onClick: ({ selectedRowKeys: keys }) => {
             const row = selectedRowFrom(keys);
             if (!row) return;
-            if (viewId === "m1-products") {
-              productEdit.openDialog(row);
-              return;
-            }
             openCrudEdit(row);
           },
         }
@@ -442,17 +407,6 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
       }
     : undefined;
   const gridToolbarActions: DataGridToolbarAction[] = canWrite ? [
-    ...(viewId === "m1-products"
-      ? [
-          {
-            key: "product-import",
-            label: "导入",
-            description: "批量导入商品",
-            icon: <Upload className="size-4" aria-hidden />,
-            onClick: () => setProductBatchImportOpen(true),
-          },
-        ]
-      : []),
     ...(viewId === "m1-business-partners"
       ? [
           {
@@ -593,33 +547,8 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
           setAppliedQuery(defaults);
           setSelectedRowKeys([]);
         }}
-        selectable
+        selectable={viewId !== "m1-products"}
       />
-
-      <ProductEditDialog
-        form={productEdit.form}
-        pending={productEdit.pending}
-        error={productEdit.error}
-        onFormChange={productEdit.updateForm}
-        onOpenChange={productEdit.closeDialog}
-        onSubmit={productEdit.submit}
-      />
-
-      {viewId === "m1-products" && (
-        <ProductCreateDialog
-          open={productCreateOpen}
-          onOpenChange={setProductCreateOpen}
-          onCreate={submitProductCreate}
-        />
-      )}
-
-      {viewId === "m1-products" && (
-        <ProductBatchImportDialog
-          open={productBatchImportOpen}
-          onOpenChange={setProductBatchImportOpen}
-          onImport={importProductsFromDialog}
-        />
-      )}
 
       {viewId === "m1-locations" && (
         <LocationBatchDialog

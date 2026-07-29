@@ -55,8 +55,15 @@ pub fn api_key_scopes_cover_messages(
 pub const H8_INFLIGHT_RUNNING: &str = "running";
 pub const H8_INFLIGHT_PAUSED: &str = "paused";
 
-/// AC7：接口表通道最小对象清单（探测时校验声明，不写业务单据）。
-pub const H8_INTERFACE_TABLE_REQUIRED_OBJECTS: [&str; 2] = ["if_out_message", "if_in_message"];
+/// AC7：接口表通道对象清单（探测时校验实际表、必需列与最小权限，不写业务单据）。
+pub const H8_INTERFACE_TABLE_REQUIRED_OBJECTS: [&str; 6] = [
+    "if_in_asn",
+    "if_in_outbound_order",
+    "if_in_return_order",
+    "if_in_product_master",
+    "if_in_product_change",
+    "if_out_message",
+];
 
 /// AC5/7：启用或测试时相对已 active 连接的路由重叠检查。
 pub fn reject_route_overlap_with_actives(
@@ -317,8 +324,7 @@ impl CreateH8ErpConnectorRequest {
     pub fn validate(&self) -> Result<(), H8ErpConnectorError> {
         validate_text(&self.connector_code, "connector_code", 64)?;
         validate_text(&self.connector_name, "connector_name", 128)?;
-        validate_directions(&self.directions)?;
-        validate_message_types(&self.message_types)?;
+        validate_direction_message_selection(&self.directions, &self.message_types)?;
         validate_channel_mode(&self.channel_mode)?;
         validate_channel_fields(
             &self.channel_mode,
@@ -372,6 +378,26 @@ pub fn validate_message_types(types: &[String]) -> Result<(), H8ErpConnectorErro
     Ok(())
 }
 
+pub fn validate_direction_message_selection(
+    directions: &[String],
+    message_types: &[String],
+) -> Result<(), H8ErpConnectorError> {
+    validate_directions(directions)?;
+    validate_message_types(message_types)?;
+    if message_types.iter().any(|message_type| {
+        !directions.iter().any(|direction| {
+            crate::h8_erp_message::validate_message_direction(direction, message_type).is_ok()
+        })
+    }) || directions.iter().any(|direction| {
+        !message_types.iter().any(|message_type| {
+            crate::h8_erp_message::validate_message_direction(direction, message_type).is_ok()
+        })
+    }) {
+        return Err(H8ErpConnectorError::InvalidMessageType);
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn validate_channel_fields(
     channel_mode: &str,
@@ -397,7 +423,7 @@ pub fn validate_channel_fields(
                 "api_base_url",
             ))?;
         validate_api_url(url)?;
-        if directions.iter().any(|d| d == "inbound") && api_key_id.is_none() {
+        if api_key_id.is_none() {
             return Err(H8ErpConnectorError::ConditionalFieldRequired("api_key_id"));
         }
         if directions.iter().any(|d| d == "outbound") {
@@ -529,6 +555,7 @@ pub fn apply_update(
         next.interface_probe_db_username.as_deref(),
         next.interface_probe_db_password_alias.as_deref(),
     )?;
+    validate_direction_message_selection(&next.directions, &next.message_types)?;
 
     validate_channel_fields(
         &next.channel_mode,
@@ -729,6 +756,29 @@ mod tests {
     }
 
     #[test]
+    fn create_rest_outbound_requires_receipt_api_key_binding() {
+        let mut req = base_create();
+        req.directions = vec!["outbound".into()];
+        req.message_types = vec!["putaway_complete".into()];
+        req.api_key_id = None;
+        req.bearer_secret_alias = Some("vault://h8/outbound".into());
+
+        assert_eq!(
+            req.validate(),
+            Err(H8ErpConnectorError::ConditionalFieldRequired("api_key_id"))
+        );
+
+        req.channel_mode = "interface_table".into();
+        req.api_base_url = None;
+        req.interface_db_host = Some("mssql".into());
+        req.interface_db_port = Some(1433);
+        req.interface_db_name = Some("wms_erp_if".into());
+        req.interface_db_username = Some("erp_if".into());
+        req.interface_db_password_alias = Some("vault://h8/db-pass".into());
+        assert_eq!(req.validate(), Ok(()));
+    }
+
+    #[test]
     fn create_interface_table_requires_db_fields() {
         let mut req = base_create();
         req.channel_mode = "interface_table".into();
@@ -744,6 +794,52 @@ mod tests {
         req.interface_db_username = Some("erp_if".into());
         req.interface_db_password_alias = Some("vault://h8/db-pass".into());
         assert_eq!(req.validate(), Ok(()));
+    }
+
+    #[test]
+    fn create_rejects_message_not_matching_any_selected_direction() {
+        let mut req = base_create();
+        req.message_types = vec!["shipment_confirm".into()];
+
+        assert_eq!(req.validate(), Err(H8ErpConnectorError::InvalidMessageType));
+    }
+
+    #[test]
+    fn create_requires_each_selected_direction_to_have_a_message() {
+        let mut req = base_create();
+        req.directions = vec!["inbound".into(), "outbound".into()];
+        req.bearer_secret_alias = Some("vault://h8/outbound".into());
+
+        assert_eq!(req.validate(), Err(H8ErpConnectorError::InvalidMessageType));
+    }
+
+    #[test]
+    fn update_rejects_direction_message_mismatch_after_merge() {
+        let connector = sample_connector(Uuid::new_v4(), vec![], "testing");
+        let req = UpdateH8ErpConnectorRequest {
+            expected_config_version: connector.config_version,
+            expected_probe_config_version: None,
+            connector_name: None,
+            warehouse_ids: None,
+            directions: None,
+            message_types: Some(vec!["shipment_confirm".into()]),
+            channel_mode: None,
+            api_base_url: None,
+            interface_db_host: None,
+            interface_db_port: None,
+            interface_db_name: None,
+            interface_db_username: None,
+            api_key_id: None,
+            bearer_secret_alias: None,
+            interface_db_password_alias: None,
+            interface_probe_db_username: None,
+            interface_probe_db_password_alias: None,
+        };
+
+        assert_eq!(
+            apply_update(&connector, &req, Utc::now()),
+            Err(H8ErpConnectorError::InvalidMessageType)
+        );
     }
 
     #[test]
@@ -1005,7 +1101,12 @@ mod tests {
 
     #[test]
     fn interface_table_required_objects_declared() {
+        assert_eq!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.len(), 6);
+        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_asn"));
+        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_outbound_order"));
+        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_return_order"));
+        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_product_master"));
+        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_product_change"));
         assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_out_message"));
-        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_message"));
     }
 }

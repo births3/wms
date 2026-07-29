@@ -124,6 +124,13 @@ impl IntoResponse for SystemDictionaryHandlerError {
                 "幂等键已被不同请求使用",
             ),
             SystemDictionaryHandlerError::SystemDictionary(
+                SystemDictionaryError::PrintTemplateFieldLibraryRequired,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "H9_FIELD_LIBRARY_REQUIRED",
+                "启用打印模板类型必须绑定字段库编码",
+            ),
+            SystemDictionaryHandlerError::SystemDictionary(
                 SystemDictionaryError::InvalidScope
                 | SystemDictionaryError::InvalidEffectiveWindow
                 | SystemDictionaryError::ParamInvalid { .. },
@@ -346,6 +353,7 @@ mod tests {
             owner_id,
             item_name: "采购入库".to_string(),
             enabled: true,
+            sort_order: 10,
             params: json!({
                 "direction": "inbound",
                 "workflow_template": "purchase_inbound",

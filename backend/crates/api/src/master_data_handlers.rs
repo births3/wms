@@ -384,6 +384,16 @@ impl From<AuthError> for MasterDataHandlerError {
     }
 }
 
+pub(super) fn require_internal_product_write(
+    ctx: &AuthContext,
+) -> Result<(), MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_WRITE_PERMISSION)?;
+    Err(AuthError::PermissionDenied(
+        "商品主数据只能由 ERP 通过 H8 商品主数据防腐层同步".to_string(),
+    )
+    .into())
+}
+
 include!("master_data_handlers/customer_addresses.rs");
 include!("master_data_handlers/customer_profile.rs");
 include!("master_data_handlers_part2.rs");

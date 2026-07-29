@@ -28,6 +28,66 @@ services:
       timeout: 5s
       retries: 10
 
+  minio-staging:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${WMS_HFILE_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${WMS_HFILE_SECRET_KEY}
+    volumes:
+      - minio_staging_data:/data
+    ports:
+      - "${WMS_STAGING_MINIO_API_PORT:-19000}:9000"
+      - "${WMS_STAGING_MINIO_CONSOLE_PORT:-19001}:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init-staging:
+    image: minio/mc:RELEASE.2025-07-16T15-35-03Z
+    depends_on:
+      minio-staging:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set local http://minio-staging:9000 "$${WMS_HFILE_ACCESS_KEY}" "$${WMS_HFILE_SECRET_KEY}" &&
+        mc mb --ignore-existing local/wms-attachments &&
+        mc anonymous set none local/wms-attachments
+    environment:
+      WMS_HFILE_ACCESS_KEY: ${WMS_HFILE_ACCESS_KEY}
+      WMS_HFILE_SECRET_KEY: ${WMS_HFILE_SECRET_KEY}
+    restart: "no"
+
+  h9-render-worker-staging:
+    build:
+      context: ..
+      dockerfile: apps/h9-render-worker/dockerfile
+    image: wms-h9-render-worker-staging:${WMS_VERSION:-latest}
+    pull_policy: build
+    environment:
+      WMS_H9_RENDER_HOST: 0.0.0.0
+      WMS_H9_RENDER_PORT: 18090
+      WMS_H9_RENDER_TOKEN: ${WMS_H9_RENDER_TOKEN}
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:18090/healthz').then(r=>{if(!r.ok)process.exit(1)})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   wms-db-migrate-staging:
     build:
       context: ..
@@ -53,12 +113,24 @@ services:
         condition: service_completed_successfully
       redis-staging:
         condition: service_healthy
+      minio-init-staging:
+        condition: service_completed_successfully
+      h9-render-worker-staging:
+        condition: service_healthy
     environment:
       - WMS_BIND_ADDR=0.0.0.0:8080
       - WMS_DB_URL=postgres://wms_staging:${WMS_STAGING_DB_PASSWORD}@postgres-staging:5432/wms_staging
       - WMS_REDIS_URL=redis://redis-staging:6379/0
       - WMS_FEATURE_FLAGS_FILE=/app/deploy/feature_flags.toml
       - WMS_JWT_SECRET=${WMS_JWT_SECRET}
+      - WMS_HFILE_ENDPOINT=http://minio-staging:9000
+      - WMS_HFILE_ACCESS_KEY=${WMS_HFILE_ACCESS_KEY}
+      - WMS_HFILE_SECRET_KEY=${WMS_HFILE_SECRET_KEY}
+      - WMS_HFILE_REGION=${WMS_HFILE_REGION:-us-east-1}
+      - WMS_HFILE_BUCKET=wms-attachments
+      - WMS_HFILE_SSE_MODE=none
+      - WMS_H9_RENDER_WORKER_URL=http://h9-render-worker-staging:18090/render
+      - WMS_H9_RENDER_TOKEN=${WMS_H9_RENDER_TOKEN}
     ports:
       - "${WMS_STAGING_API_PORT:-18080}:8080"
     healthcheck:
@@ -70,6 +142,7 @@ services:
 volumes:
   postgres_staging_data:
   redis_staging_data:
+  minio_staging_data:
 
 secrets:
   wms_staging_db_password:

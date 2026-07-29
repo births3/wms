@@ -67,6 +67,24 @@ pub(crate) fn resend_h4_notification_record() {}
 pub(crate) fn list_print_field_libraries() {}
 
 #[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/field-libraries/drafts",
+    tag = "print-template",
+    params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+    request_body = GeneratePrintFieldLibraryDraftRequest,
+    responses(
+        (status = 200, description = "从当前 OpenAPI schema 生成字段库草稿", body = PrintFieldLibraryVersion),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+        (status = 422, description = "schema 不存在或请求非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn generate_print_field_library_draft() {}
+
+#[utoipa::path(
     get,
     path = "/api/v1/print-templates/field-libraries/{version_id}/fields",
     tag = "print-template",
@@ -79,6 +97,50 @@ pub(crate) fn list_print_field_libraries() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn list_print_field_definitions() {}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}",
+    tag = "print-template",
+    params(
+        ("version_id" = uuid::Uuid, Path, description = "字段库版本 ID"),
+        ("field_id" = uuid::Uuid, Path, description = "字段定义 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    request_body = UpdatePrintFieldDefinitionRequest,
+    responses(
+        (status = 200, description = "更新草稿字段元数据", body = PrintFieldDefinition),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "字段库版本或字段不存在", body = ErrorResponse),
+        (status = 409, description = "已发布版本不可修改或幂等冲突", body = ErrorResponse),
+        (status = 422, description = "字段元数据非法", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn update_print_field_definition() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/field-libraries/{version_id}/publish",
+    tag = "print-template",
+    params(
+        ("version_id" = uuid::Uuid, Path, description = "字段库版本 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    responses(
+        (status = 200, description = "发布字段库草稿", body = PrintFieldLibraryVersion),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "字段库版本不存在", body = ErrorResponse),
+        (status = 409, description = "已发布版本不可重复改写或幂等冲突", body = ErrorResponse),
+        (status = 422, description = "字段路径已不在当前 OpenAPI schema", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn publish_print_field_library() {}
 
 #[utoipa::path(
     get,
@@ -124,6 +186,48 @@ pub(crate) fn list_print_template_versions() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn save_print_template() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish",
+    tag = "print-template",
+    params(
+        ("template_id" = uuid::Uuid, Path, description = "打印模板 ID"),
+        ("version_id" = uuid::Uuid, Path, description = "草稿版本 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    responses(
+        (status = 200, description = "发布打印模板草稿版本", body = PrintTemplateVersion),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "模板或版本不存在", body = ErrorResponse),
+        (status = 409, description = "版本不是最新草稿、已发布、模板类型停用或幂等冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn publish_print_template() {}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/print-templates/templates/{template_id}/enabled",
+    tag = "print-template",
+    params(
+        ("template_id" = uuid::Uuid, Path, description = "打印模板 ID"),
+        ("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")
+    ),
+    request_body = SetPrintTemplateEnabledRequest,
+    responses(
+        (status = 200, description = "停用或启用打印模板主数据", body = PrintTemplateSummary),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 404, description = "模板不存在", body = ErrorResponse),
+        (status = 409, description = "幂等冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn set_print_template_enabled() {}
 
 #[utoipa::path(
     post,
@@ -483,13 +587,9 @@ pub(crate) fn list_driver_today_tasks() {}
 #[allow(dead_code)]
 pub(crate) fn get_store_dashboard() {}
 
-#[utoipa::path(post, path = "/api/v1/parameter-mapping/execute", tag = "parameter-mapping", request_body = ExecuteMappingRequest, responses((status = 200, description = "执行参数对照", body = ExecuteMappingResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(post, path = "/api/v1/parameter-mapping/map", tag = "parameter-mapping", params(("Idempotency-Key" = String, Header, description = "跨重试保持不变的幂等键")), request_body = MapParameterRequest, responses((status = 200, description = "执行参数对照", body = MapParameterResponse), (status = 400, description = "缺少幂等键", body = ErrorResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 404, description = "字典不存在", body = ErrorResponse), (status = 409, description = "幂等键冲突", body = ErrorResponse), (status = 422, description = "请求无效", body = ErrorResponse)))]
 #[allow(dead_code)]
-pub(crate) fn execute_mapping() {}
-
-#[utoipa::path(get, path = "/api/v1/parameter-mapping/traces/{execution_id}", tag = "parameter-mapping", params(("execution_id" = uuid::Uuid, Path, description = "执行 ID")), responses((status = 200, description = "参数对照反向追溯", body = MappingTraceResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
-#[allow(dead_code)]
-pub(crate) fn trace_mapping() {}
+pub(crate) fn map_parameter() {}
 
 #[utoipa::path(post, path = "/api/v1/config-center/feature-flags/migrate", tag = "config-center", responses((status = 200, description = "迁移文件版 Feature Flag", body = FeatureFlagMigrationResult), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]

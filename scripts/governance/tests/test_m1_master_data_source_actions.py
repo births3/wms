@@ -35,6 +35,20 @@ def test_m1_split_source_tokens_are_bound_to_owning_files():
     assert not split_specs
 
 
+def test_m1_governance_requires_erp_authoritative_product_write_guard():
+    import check_m1_master_data_source_actions as check
+
+    handler_tokens = {
+        spec.token
+        for spec in check.TOKEN_SPECS
+        if spec.path == check.HANDLERS_RS
+    }
+
+    assert "state.create_product" not in handler_tokens
+    assert "pub(super) fn require_internal_product_write" in handler_tokens
+    assert "商品主数据只能由 ERP 通过 H8 商品主数据防腐层同步" in handler_tokens
+
+
 def test_m1_governance_recursively_reports_missing_split_source_token(tmp_path, monkeypatch):
     import check_m1_master_data_source_actions as check
 

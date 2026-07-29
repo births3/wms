@@ -85,6 +85,7 @@ const viewIdOptions = [
   "m4-waves",
   "m4-review",
   "m4-returns",
+  "mrc-reconciliation",
   "h1-menu-management",
   "h1-role-permission",
   "h1-session-management",
@@ -102,6 +103,8 @@ const viewIdOptions = [
   "h8-erp-messages",
   "h8-erp-interface-tables",
   "h9-print-templates",
+  "h9-delivery-note-aggregation",
+  "h9-print-devices",
   "mcg-numbering",
 ];
 

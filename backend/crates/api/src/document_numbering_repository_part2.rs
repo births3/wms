@@ -48,6 +48,18 @@ async fn ensure_document_type_valid(
     document_type: &str,
     effective_at: DateTime<Utc>,
 ) -> Result<(), DocumentNumberingError> {
+    let (dict_code, item_code) = match document_type.split_once(':') {
+        Some((dict_code, item_code))
+            if !dict_code.trim().is_empty() && !item_code.trim().is_empty() =>
+        {
+            (dict_code, item_code)
+        }
+        Some(_) => return Err(DocumentNumberingError::DocumentTypeInvalid),
+        None => ("document_type", document_type),
+    };
+    if !matches!(dict_code, "document_type" | "print_document_category") {
+        return Err(DocumentNumberingError::DocumentTypeInvalid);
+    }
     let params: Option<Value> = sqlx::query_scalar(
         r#"
         WITH scoped_items AS (
@@ -56,21 +68,22 @@ async fn ensure_document_type_valid(
                 enabled,
                 ROW_NUMBER() OVER (
                     PARTITION BY item_code
-                    ORDER BY CASE WHEN owner_id = $2 THEN 1 ELSE 0 END DESC, updated_at DESC
+                    ORDER BY CASE WHEN owner_id = $3 THEN 1 ELSE 0 END DESC, updated_at DESC
                 ) AS scope_rank
               FROM system_dictionary_items
-             WHERE dict_code = 'document_type'
-               AND item_code = $1
-               AND (owner_id IS NULL OR owner_id = $2)
-               AND (effective_from IS NULL OR effective_from <= $3)
-               AND (effective_to IS NULL OR effective_to > $3)
+             WHERE dict_code = $1
+               AND item_code = $2
+               AND (owner_id IS NULL OR owner_id = $3)
+               AND (effective_from IS NULL OR effective_from <= $4)
+               AND (effective_to IS NULL OR effective_to > $4)
         )
         SELECT params
           FROM scoped_items
          WHERE scope_rank = 1 AND enabled = TRUE
         "#,
     )
-    .bind(document_type)
+    .bind(dict_code)
+    .bind(item_code)
     .bind(owner_id)
     .bind(effective_at)
     .fetch_optional(&mut **tx)
@@ -80,7 +93,12 @@ async fn ensure_document_type_valid(
     let Some(params) = params else {
         return Err(DocumentNumberingError::DocumentTypeInvalid);
     };
-    for key in ["direction", "workflow_template", "batch_policy"] {
+    let required_keys: &[&str] = if dict_code == "document_type" {
+        &["direction", "workflow_template", "batch_policy"]
+    } else {
+        &["source_mode"]
+    };
+    for key in required_keys {
         if !params.get(key).is_some_and(Value::is_string) {
             return Err(DocumentNumberingError::DocumentTypeInvalid);
         }
@@ -440,7 +458,10 @@ fn render_number(
         .replace("{OWNER}", owner_code)
         .replace("{DOCUMENT_TYPE}", &rule.document_type)
         .replace("{YYYY}", &format!("{:04}", occurred_at.year()))
-        .replace("{YY}", &format!("{:02}", occurred_at.year().rem_euclid(100)))
+        .replace(
+            "{YY}",
+            &format!("{:02}", occurred_at.year().rem_euclid(100)),
+        )
         .replace("{MM}", &format!("{:02}", occurred_at.month()))
         .replace("{DD}", &format!("{:02}", occurred_at.day()))
         .replace("{SEQ}", &seq))

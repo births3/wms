@@ -218,35 +218,100 @@ pub fn should_auto_retry(error_kind: &str) -> bool {
 /// 脱敏错误摘要：去掉 token / password 片段。
 pub fn sanitize_error_summary(raw: &str) -> String {
     let mut out = raw.to_string();
-    for needle in [
-        "bearer ",
-        "password=",
-        "password:",
-        "token=",
-        "token:",
-        "api_key=",
-        "api_key:",
-    ] {
-        let mut offset = 0;
-        loop {
-            let Some(found) = out[offset..].to_ascii_lowercase().find(needle) else {
-                break;
-            };
-            let value_start = offset + found + needle.len();
-            let value_end = out[value_start..]
-                .char_indices()
-                .find(|(_, ch)| ch.is_whitespace() || matches!(ch, ',' | ';' | '}' | ']'))
-                .map(|(index, _)| value_start + index)
-                .unwrap_or(out.len());
-            out.replace_range(value_start..value_end, "***");
-            offset = value_start + 3;
-        }
+    for key in ["password", "token", "api_key", "bearer"] {
+        redact_named_secret(&mut out, key);
     }
-    if out.len() > 256 {
-        out.truncate(256);
+    redact_bearer_scheme(&mut out);
+    if out.chars().count() > 256 {
+        out = out.chars().take(255).collect();
         out.push('…');
     }
     out
+}
+
+fn redact_named_secret(out: &mut String, key: &str) {
+    let mut offset = 0;
+    while offset < out.len() {
+        let Some(found) = out[offset..].to_ascii_lowercase().find(key) else {
+            break;
+        };
+        let key_end = offset + found + key.len();
+        let bytes = out.as_bytes();
+        let mut separator = key_end;
+        while separator < bytes.len()
+            && (bytes[separator].is_ascii_whitespace() || matches!(bytes[separator], b'"' | b'\''))
+        {
+            separator += 1;
+        }
+        if separator >= bytes.len() || !matches!(bytes[separator], b':' | b'=') {
+            offset = key_end;
+            continue;
+        }
+        let mut value_start = separator + 1;
+        while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
+            value_start += 1;
+        }
+        let quote = if value_start < bytes.len() && matches!(bytes[value_start], b'"' | b'\'') {
+            let quote = bytes[value_start] as char;
+            value_start += 1;
+            Some(quote)
+        } else {
+            None
+        };
+        if value_start >= out.len() {
+            break;
+        }
+        let value_end = out[value_start..]
+            .char_indices()
+            .find(|(_, ch)| {
+                quote.map_or_else(
+                    || ch.is_whitespace() || matches!(ch, ',' | ';' | '}' | ']' | '"' | '\''),
+                    |quote| *ch == quote,
+                )
+            })
+            .map(|(index, _)| value_start + index)
+            .unwrap_or(out.len());
+        out.replace_range(value_start..value_end, "***");
+        offset = value_start + 3;
+    }
+}
+
+fn redact_bearer_scheme(out: &mut String) {
+    let mut offset = 0;
+    while offset < out.len() {
+        let Some(found) = out[offset..].to_ascii_lowercase().find("bearer") else {
+            break;
+        };
+        let bearer_end = offset + found + "bearer".len();
+        let bytes = out.as_bytes();
+        if bearer_end >= bytes.len() || !bytes[bearer_end].is_ascii_whitespace() {
+            offset = bearer_end;
+            continue;
+        }
+        let mut value_start = bearer_end;
+        while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
+            value_start += 1;
+        }
+        let quote = if value_start < bytes.len() && matches!(bytes[value_start], b'"' | b'\'') {
+            let quote = bytes[value_start] as char;
+            value_start += 1;
+            Some(quote)
+        } else {
+            None
+        };
+        let value_end = out[value_start..]
+            .char_indices()
+            .find(|(_, ch)| {
+                quote.map_or_else(
+                    || ch.is_whitespace() || matches!(ch, ',' | ';' | '}' | ']' | '"' | '\''),
+                    |quote| *ch == quote,
+                )
+            })
+            .map(|(index, _)| value_start + index)
+            .unwrap_or(out.len());
+        out.replace_range(value_start..value_end, "***");
+        offset = value_start + 3;
+    }
 }
 
 /// 入站处理成功前不得返回成功回执（AC3）：仅 succeeded 可 ack。
@@ -299,6 +364,23 @@ pub const H8_EXCHANGE_AUDIT_STAGES: [&str; 6] = [
 
 pub fn is_exchange_audit_stage(stage: &str) -> bool {
     H8_EXCHANGE_AUDIT_STAGES.contains(&stage)
+}
+
+/// 交换生命周期结果必须符合阶段语义；所有结果统一脱敏并限制为 256 字符。
+pub fn normalize_exchange_lifecycle_result(stage: &str, result: &str) -> Option<String> {
+    let result = sanitize_error_summary(result.trim());
+    if result.is_empty() {
+        return None;
+    }
+    let valid = match stage {
+        "receive" => matches!(result.as_str(), "ok" | "received"),
+        "convert" => result == "ok",
+        "business_api" | "send" => matches!(result.as_str(), "started" | "ok"),
+        "receipt" => matches!(result.as_str(), "ok" | "rejected"),
+        "final_failure" => true,
+        _ => false,
+    };
+    valid.then_some(result)
 }
 
 /// US-H8-003 AC6：进入 dead 时必须产生的审计 action 名。
@@ -443,6 +525,18 @@ mod tests {
     }
 
     #[test]
+    fn sanitize_masks_colon_spacing_and_json_secret_values() {
+        let sanitized = sanitize_error_summary(
+            r#"token: secret-a password : "secret-b" {"api_key":"secret-c","bearer": "secret-d"} Authorization: Bearer secret-e"#,
+        );
+        for secret in ["secret-a", "secret-b", "secret-c", "secret-d", "secret-e"] {
+            assert!(!sanitized.contains(secret), "leaked {secret}: {sanitized}");
+        }
+        assert!(sanitized.matches("***").count() >= 5);
+        assert!(sanitized.chars().count() <= 256);
+    }
+
+    #[test]
     fn success_ack_only_after_succeeded() {
         assert!(!may_return_success_ack("processing"));
         assert!(may_return_success_ack("succeeded"));
@@ -465,6 +559,30 @@ mod tests {
         assert!(is_exchange_audit_stage("final_failure"));
         assert!(!is_exchange_audit_stage("free_text"));
         assert_eq!(H8_MESSAGE_DEAD_AUDIT_ACTION, "h8_message_dead");
+    }
+
+    #[test]
+    fn exchange_lifecycle_results_are_controlled_sanitized_and_limited() {
+        assert_eq!(
+            normalize_exchange_lifecycle_result("receive", " received "),
+            Some("received".into())
+        );
+        assert_eq!(
+            normalize_exchange_lifecycle_result("send", "started"),
+            Some("started".into())
+        );
+        assert!(normalize_exchange_lifecycle_result("send", "retry").is_none());
+        assert!(normalize_exchange_lifecycle_result("free_text", "ok").is_none());
+
+        let normalized = normalize_exchange_lifecycle_result(
+            "final_failure",
+            &format!("Bearer super-secret {}", "错".repeat(300)),
+        )
+        .expect("final failure summary");
+        assert!(!normalized.contains("super-secret"));
+        assert!(normalized.contains("***"));
+        assert_eq!(normalized.chars().count(), 256);
+        assert!(normalized.ends_with('…'));
     }
 
     #[test]

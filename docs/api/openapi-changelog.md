@@ -2,6 +2,13 @@
 
 > 本文件记录 H3 OpenAPI 契约可见变更。Spec 文件仍以 Git diff 和提交记录为最终追踪来源。
 
+## 2026-07-25
+
+- M-RC 定时对账用 service-only `POST /api/v1/reconciliation/claims` 替代无认领的到期窗口读取，
+  新增 claim 续租与失败上报 API。
+- M-RC 定时 `POST /api/v1/reconciliation/runs` 增加 claim id/token，成功对账与 claim 完成同事务；
+  首版前直接同步当前契约，不保留旧 `GET /api/v1/reconciliation/due-owners`。
+
 ## 2026-07-15
 
 - 增加 H-AL 告警定义列表、详情和变更申请 API；新增、编辑、启停、删除统一经 M-QL 审批后原子生效。

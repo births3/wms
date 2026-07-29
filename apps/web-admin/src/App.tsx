@@ -127,6 +127,7 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m3-counts", title: "M3 库存盘点", subtitle: "盘点单 / 差异审批", icon: ClipboardList },
       { id: "m3-maintenance", title: "M3 在库养护", subtitle: "计划 / 任务执行", icon: ClipboardList },
       { id: "m3-relocations", title: "M3 库内移库", subtitle: "库位转移", icon: Layers },
+      { id: "mrc-reconciliation", title: "M-RC 库存对账", subtitle: "ERP 差异 / 隔离 / 处置", icon: ClipboardList },
       { id: "mte-task-types", title: "M-TE 任务类型配置", subtitle: "任务 / 调度参数", icon: ClipboardList },
       { id: "mte-task-groups", title: "M-TE 任务组资格", subtitle: "仓库 / 类型 / 人员", icon: Users },
       { id: "mte-task-dispatch", title: "M-TE 任务调度", subtitle: "分派 / 下发 / 处置", icon: ClipboardList },
@@ -158,6 +159,8 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "h8-erp-connectors", title: "H8 ERP 连接", subtitle: "集成中心 / 通道 / 凭证引用", icon: KeyRound },
       { id: "h8-erp-messages", title: "H8 ERP 消息", subtitle: "集成中心 / 日志 / 死信重放", icon: Inbox },
       { id: "h8-erp-interface-tables", title: "H8 接口表探查", subtitle: "集成中心 / 只读 / 接口行", icon: Database },
+      { id: "h9-delivery-note-aggregation", title: "作业·随货同行单归集", subtitle: "线路冻结 / 截单计划 / 归集结果", icon: Printer },
+      { id: "h9-print-devices", title: "设备·Print Agent 管理", subtitle: "站点 / 打印机 / 纸盒 / 租约", icon: Printer },
       { id: "h9-print-templates", title: "H9 打印模板", subtitle: "字段库 / 模板类型", icon: Printer },
       { id: "mcg-numbering", title: "M-CG 单据号规则", subtitle: "单据类型 / 编码规则", icon: KeyRound },
     ],
@@ -191,7 +194,7 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
     label: "出库业务",
     groups: [{ label: "出库作业", items: [menuItem("m4-orders"), menuItem("m4-waves"), menuItem("m4-review"), menuItem("m4-returns")] }],
   },
-  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches"), menuItem("m3-location-history"), menuItem("m3-status-config"), menuItem("m3-counts"), menuItem("m3-maintenance"), menuItem("m3-relocations"), menuItem("mte-task-dispatch"), menuItem("mte-task-groups"), menuItem("mte-task-types")] }] },
+  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches"), menuItem("m3-location-history"), menuItem("m3-status-config"), menuItem("m3-counts"), menuItem("m3-maintenance"), menuItem("m3-relocations"), menuItem("mrc-reconciliation"), menuItem("mte-task-dispatch"), menuItem("mte-task-groups"), menuItem("mte-task-types")] }] },
   { label: "增值业务", groups: [{ label: "增值作业", items: [menuItem("m9-billing-rules"), menuItem("m10-route-plans")] }] },
   {
     label: "基础能力",
@@ -203,7 +206,7 @@ const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
       { label: "H-AL 告警能力", items: [menuItem("hal-alert-dashboard"), menuItem("hal-alert-definitions"), menuItem("hal-alert-escalations")] },
       { label: "H5 快递能力", items: [menuItem("h5-express")] },
       { label: "H8 集成中心", items: [menuItem("h8-erp-connectors"), menuItem("h8-erp-messages"), menuItem("h8-erp-interface-tables")] },
-      { label: "H9 打印能力", items: [menuItem("h9-print-templates")] },
+      { label: "H9 打印能力", items: [menuItem("h9-delivery-note-aggregation"), menuItem("h9-print-devices"), menuItem("h9-print-templates")] },
       { label: "M-CG 编码能力", items: [menuItem("mcg-numbering")] },
     ],
   },
@@ -277,10 +280,31 @@ function defaultWorkspaceState(): AdminWorkspaceState {
 
 function openWorkspaceTab(state: AdminWorkspaceState, nextView: AdminView): AdminWorkspaceState {
   const exists = state.openTabs.some((tab) => tab.view === nextView);
+  if (exists && state.view === nextView) return state;
   return {
     view: nextView,
     openTabs: exists ? state.openTabs : [...state.openTabs, workspaceTabForView(nextView)],
   };
+}
+
+/** 从 location.hash（形如 #/m4-orders）解析视图，非法值返回 null。 */
+function viewFromLocationHash(): AdminView | null {
+  if (typeof window === "undefined") return null;
+  const candidate = window.location.hash.replace(/^#\/?/, "");
+  return isAdminView(candidate) ? candidate : null;
+}
+
+function writeLocationHash(view: AdminView) {
+  if (typeof window === "undefined") return;
+  const next = `#/${view}`;
+  if (window.location.hash !== next) window.location.hash = next;
+}
+
+/** 刷新 / 深链进入时：先恢复 localStorage 页签，再让 URL hash 指定的视图生效。 */
+function initialWorkspaceState(): AdminWorkspaceState {
+  const stored = readWorkspaceTabs();
+  const hashView = viewFromLocationHash();
+  return hashView ? openWorkspaceTab(stored, hashView) : stored;
 }
 
 function closeWorkspaceTab(state: AdminWorkspaceState, targetView: AdminView): AdminWorkspaceState {
@@ -322,7 +346,7 @@ function isAdminView(value: unknown): value is AdminView {
 
 export function App() {
   const logout = useLogout();
-  const [workspaceState, setWorkspaceState] = React.useState<AdminWorkspaceState>(readWorkspaceTabs);
+  const [workspaceState, setWorkspaceState] = React.useState<AdminWorkspaceState>(initialWorkspaceState);
   const [sessionVersion, setSessionVersion] = React.useState(0);
   const hasSession = React.useMemo(() => hasActiveAuthSession(), [sessionVersion]);
   const currentUserQuery = useCurrentUserQuery(hasSession);
@@ -336,6 +360,19 @@ export function App() {
   const navigateTo = React.useCallback((nextView: AdminView) => {
     setWorkspaceState((state) => openWorkspaceTab(state, nextView));
   }, []);
+
+  React.useLayoutEffect(() => {
+    writeLocationHash(view);
+  }, [view]);
+
+  React.useEffect(() => {
+    const onHashChange = () => {
+      const next = viewFromLocationHash();
+      if (next) navigateTo(next);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [navigateTo]);
 
   const closeTab = React.useCallback((targetView: AdminView) => {
     setWorkspaceState((state) => closeWorkspaceTab(state, targetView));
@@ -386,18 +423,29 @@ export function App() {
     >
       {openTabs.map((tab) => (
         <div key={tab.view} hidden={tab.view !== view}>
-          {renderAdminView(tab.view, currentUserQuery.data, navigateTo) ?? (
-            <Dashboard
-              currentUser={currentUserQuery.data}
-              onOpenM2Inbound={() => navigateTo("m2-receiving")}
-              onOpenM4Outbound={() => navigateTo("m4-orders")}
-              onOpenM3Batches={() => navigateTo("m3-batches")}
-              onOpenH2Audit={() => navigateTo("h2-audit-trail")}
-            />
-          )}
+          <React.Suspense fallback={<PageLoading />}>
+            {renderAdminView(tab.view, currentUserQuery.data, navigateTo) ?? (
+              <Dashboard
+                currentUser={currentUserQuery.data}
+                onOpenM2Inbound={() => navigateTo("m2-receiving")}
+                onOpenM4Outbound={() => navigateTo("m4-orders")}
+                onOpenM3Batches={() => navigateTo("m3-batches")}
+                onOpenH2Audit={() => navigateTo("h2-audit-trail")}
+              />
+            )}
+          </React.Suspense>
         </div>
       ))}
     </AppShell>
+  );
+}
+
+function PageLoading() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+      <RefreshCw className="mr-2 size-4 animate-spin" aria-hidden />
+      页面加载中
+    </div>
   );
 }
 

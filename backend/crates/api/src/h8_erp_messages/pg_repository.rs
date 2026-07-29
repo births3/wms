@@ -12,6 +12,7 @@ use super::error::H8ErpMessageRepoError;
 use super::pg_lifecycle::transition_lifecycle_status;
 use super::pg_rows::{AttemptRow, MessageRow, StatsRow};
 use super::repository::{H8ErpMessageCursor, H8ErpMessageRepository};
+use crate::audit::AuditWriteRequest;
 
 pub struct PgH8ErpMessageRepository {
     pool: PgPool,
@@ -446,6 +447,7 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         error_summary: &str,
         actor: &str,
         now: DateTime<Utc>,
+        audit_requests: &[AuditWriteRequest],
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
         let mut tx = self
             .pool
@@ -500,6 +502,16 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .execute(&mut *tx)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        crate::reconciliation::advance_from_h8_receipt_in_tx(
+            &mut tx,
+            owner_id,
+            &row.idempotency_key,
+            "dead",
+            now,
+            audit_requests.first(),
+        )
+        .await
+        .map_err(|error| H8ErpMessageRepoError::Db(format!("M-RC 状态推进失败: {error:?}")))?;
         sqlx::query(
             r#"
             INSERT INTO h8_erp_message_attempts (
@@ -519,6 +531,11 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         .execute(&mut *tx)
         .await
         .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
+        for audit_request in audit_requests {
+            crate::audit::append_event_in_tx(&mut tx, audit_request)
+                .await
+                .map_err(|error| H8ErpMessageRepoError::Db(format!("{error:?}")))?;
+        }
         tx.commit()
             .await
             .map_err(|e| H8ErpMessageRepoError::Db(e.to_string()))?;
@@ -531,11 +548,23 @@ impl H8ErpMessageRepository for PgH8ErpMessageRepository {
         id: Uuid,
         target: &str,
         error_summary: Option<&str>,
+        wms_resource_id: Option<&str>,
         actor: &str,
         now: DateTime<Utc>,
+        audit_requests: &[AuditWriteRequest],
     ) -> Result<H8ErpMessage, H8ErpMessageRepoError> {
-        transition_lifecycle_status(&self.pool, owner_id, id, target, error_summary, actor, now)
-            .await
+        transition_lifecycle_status(
+            &self.pool,
+            owner_id,
+            id,
+            target,
+            error_summary,
+            wms_resource_id,
+            actor,
+            now,
+            audit_requests,
+        )
+        .await
     }
 
     async fn mark_archived(

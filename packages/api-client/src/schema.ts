@@ -2308,6 +2308,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integration/erp-messages/inbound/asn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_asn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/outbound_order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/product_change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_product_change"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/product_master": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_product_master"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/inbound/return_order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_h8_return_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integration/erp-messages/lifecycle": {
         parameters: {
             query?: never;
@@ -2478,6 +2558,22 @@ export interface paths {
         get: operations["decrypt_h8_erp_message_payload"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integration/erp-messages/{id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["record_h8_erp_business_receipt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3316,6 +3412,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/outbound/orders/{id}/revalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["revalidate_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/outbound/orders/{id}/review": {
         parameters: {
             query?: never;
@@ -3348,6 +3460,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/outbound/orders/{id}/void-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["void_request_outbound_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/outbound/pick-tasks/{id}/complete": {
         parameters: {
             query?: never;
@@ -3358,6 +3486,118 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["complete_outbound_pick_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/purchase-returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_purchase_returns"];
+        put?: never;
+        post: operations["create_purchase_return"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/purchase-returns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_purchase_return"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/purchase-returns/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve_purchase_return"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/purchase-returns/{id}/pick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["pick_purchase_return"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/purchase-returns/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reject_purchase_return"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/purchase-returns/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["review_purchase_return"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/purchase-returns/{id}/ship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ship_purchase_return"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3406,6 +3646,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["cancel_outbound_wave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outbound/waves/{wave_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["release_outbound_wave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3476,7 +3732,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/parameter-mapping/execute": {
+    "/api/v1/parameter-mapping/map": {
         parameters: {
             query?: never;
             header?: never;
@@ -3485,23 +3741,503 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["execute_mapping"];
+        post: operations["map_parameter"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/parameter-mapping/traces/{execution_id}": {
+    "/api/v1/print-devices/leases": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["trace_mapping"];
+        get: operations["list_device_leases"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-devices/leases/{lease_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["release_device_lease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-devices/printers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_printers"];
+        put?: never;
+        post: operations["create_printer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-devices/printers/{printer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_printer"];
+        trace?: never;
+    };
+    "/api/v1/print-devices/printers/{printer_id}/test-print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["test_print_printer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-devices/printers/{printer_id}/trays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_printer_trays"];
+        put?: never;
+        post: operations["create_printer_tray"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-devices/printers/{printer_id}/trays/{tray_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_printer_tray"];
+        trace?: never;
+    };
+    "/api/v1/print-devices/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_sites"];
+        put?: never;
+        post: operations["create_print_site"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-devices/sites/{site_id}/owner-mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_site_owner_mappings"];
+        put?: never;
+        post: operations["create_print_site_owner_mapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-devices/sites/{site_id}/owner-mappings/{mapping_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disable_print_site_owner_mapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/aggregation-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_aggregation_fields"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/aggregation-rules/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_aggregation_rules"];
+        put?: never;
+        post: operations["create_aggregation_rule_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disable_aggregation_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_aggregation_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["test_aggregation_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/cutoff-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_cutoff_plans"];
+        put?: never;
+        post: operations["create_cutoff_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_cutoff_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/delivery-note-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_delivery_note_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/delivery-note-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_delivery_note_groups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/delivery-note-groups/manual-cutoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["manual_delivery_note_cutoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/print-document-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_document_categories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/print-suites/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_suites"];
+        put?: never;
+        post: operations["create_print_suite_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/print-suites/versions/{version_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["disable_print_suite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/print-suites/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_print_suite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/print-suites/versions/{version_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["test_print_suite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/route-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_route_bindings"];
+        put?: never;
+        post: operations["publish_route_binding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_print_suite_instances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_category_pdfs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["download_category_pdfs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["emergency_print_category_pdfs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["prepare_category_pdfs"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3524,6 +4260,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-templates/field-libraries/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["generate_print_field_library_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/print-templates/field-libraries/{version_id}/fields": {
         parameters: {
             query?: never;
@@ -3534,6 +4286,38 @@ export interface paths {
         get: operations["list_print_field_definitions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_print_field_definition"];
+        trace?: never;
+    };
+    "/api/v1/print-templates/field-libraries/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_print_field_library"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3604,6 +4388,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/print-templates/templates/{template_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["set_print_template_enabled"];
+        trace?: never;
+    };
     "/api/v1/print-templates/templates/{template_id}/versions": {
         parameters: {
             query?: never;
@@ -3614,6 +4414,22 @@ export interface paths {
         get: operations["list_print_template_versions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["publish_print_template"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3678,6 +4494,150 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["apply_quality_liaison_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quality-liaisons/{id}/archive-sync-callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["complete_archive_revision_sync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["claim_reconciliation_window"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/claims/{id}/failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["fail_reconciliation_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/claims/{id}/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["renew_reconciliation_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_reconciliation_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/items/isolation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["set_reconciliation_isolation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/items/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resolve_reconciliation_item"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_reconciliation_rule"];
+        put: operations["upsert_reconciliation_rule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["run_reconciliation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4539,6 +5499,79 @@ export interface components {
             /** Format: int64 */
             version_no: number;
         };
+        /** @description H9 一条有序归集维度。 */
+        AggregationDimension: {
+            field_code: components["schemas"]["AggregationFieldCode"];
+            method: components["schemas"]["AggregationMethod"];
+            /** Format: int32 */
+            order: number;
+        };
+        /** @description H9 归集字段目录。 */
+        AggregationFieldCatalogResponse: {
+            data: components["schemas"]["AggregationFieldDefinition"][];
+        };
+        /**
+         * @description H9 可用于等值归组的受控出库订单字段。
+         * @enum {string}
+         */
+        AggregationFieldCode: "document_type" | "erp_order_no" | "invoice_no" | "transport_mode_code" | "department_code" | "sales_group_code" | "order_group_no" | "business_type_code";
+        /** @description H9 归集字段目录项。 */
+        AggregationFieldDefinition: {
+            display_name: string;
+            field_code: components["schemas"]["AggregationFieldCode"];
+            method: components["schemas"]["AggregationMethod"];
+            value_type: string;
+        };
+        /** @description 样本测试中一项可解释的分组键。 */
+        AggregationGroupKeyItem: {
+            display_name: string;
+            field_code: string;
+            value: string;
+        };
+        /**
+         * @description H9 归组方法；首个正式版本前只允许受控等值归组。
+         * @enum {string}
+         */
+        AggregationMethod: "equals";
+        /** @description 样本测试的一组预计归集结果。 */
+        AggregationRuleTestGroup: {
+            /** Format: uuid */
+            delivery_address_id: string;
+            group_key: components["schemas"]["AggregationGroupKeyItem"][];
+            order_ids: string[];
+            order_nos: string[];
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description H9 归集规则样本测试结果。 */
+        AggregationRuleTestResult: {
+            groups: components["schemas"]["AggregationRuleTestGroup"][];
+            rule: components["schemas"]["AggregationRuleVersion"];
+        };
+        /** @description H9 归集规则不可变版本。 */
+        AggregationRuleVersion: {
+            /** Format: date-time */
+            created_at: string;
+            dimensions: components["schemas"]["AggregationDimension"][];
+            /** Format: date-time */
+            disabled_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            published_at?: string | null;
+            status: string;
+            /** Format: date-time */
+            tested_at?: string | null;
+            /** Format: int32 */
+            version_no: number;
+        };
+        /** @description H9 归集规则版本列表。 */
+        AggregationRuleVersionListResponse: {
+            data: components["schemas"]["AggregationRuleVersion"][];
+        };
         AlertActionRequest: {
             description: string;
         };
@@ -5109,6 +6142,51 @@ export interface components {
             approval_id?: string | null;
             reason: string;
         };
+        /** @description H9 分类 PDF 产物；稳定事实只保存 H-FILE ID、版本与哈希，不保存临时访问 URL。 */
+        CategoryPdfOutput: {
+            /** Format: uuid */
+            attachment_id?: string | null;
+            /** Format: int32 */
+            attempt_count: number;
+            /** Format: date-time */
+            cache_expires_at?: string | null;
+            category_code: string;
+            content_hash?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            failure_reason?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            instance_id: string;
+            /** Format: uuid */
+            instance_item_id: string;
+            /** Format: date-time */
+            processed_at?: string | null;
+            processing_status: string;
+            retention_policy: string;
+            /** Format: int32 */
+            sort_order: number;
+            source_data_version?: string | null;
+            source_file_bindings: components["schemas"]["PrintSuiteFileBinding"][];
+            source_mode: components["schemas"]["PrintSuiteSourceMode"];
+            /** Format: uuid */
+            template_version_id?: string | null;
+        };
+        /** @description H9 分类 PDF 产物列表。 */
+        CategoryPdfOutputListResponse: {
+            data: components["schemas"]["CategoryPdfOutput"][];
+            preparation_status?: string | null;
+            retry_idempotency_key?: string | null;
+        };
+        /** @description 一次分类 PDF 准备结果；同一实例只能复用最初的幂等键重试。 */
+        CategoryPdfPreparation: {
+            idempotency_key: string;
+            /** Format: uuid */
+            instance_id: string;
+            outputs: components["schemas"]["CategoryPdfOutput"][];
+            status: string;
+        };
         ChangeDrugInspectionPlatformStatusRequest: {
             status: string;
         };
@@ -5128,6 +6206,11 @@ export interface components {
             lease_seconds?: number | null;
             worker_id: string;
         };
+        ClaimReconciliationRequest: {
+            /** Format: int64 */
+            lease_seconds: number;
+            worker_id: string;
+        };
         ColdChainDevice: {
             /** Format: date-time */
             calibration_due_at?: string | null;
@@ -5141,6 +6224,15 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             status: string;
+        };
+        CompleteArchiveRevisionRequest: {
+            /** Format: uuid */
+            asn_id: string;
+            field_name: string;
+            new_value: string;
+            product_code: string;
+            /** Format: uuid */
+            product_id: string;
         };
         CompletePickTaskRequest: {
             exception_code?: string | null;
@@ -5218,6 +6310,11 @@ export interface components {
             title: string;
             view_id?: string | null;
         };
+        /** @description 创建下一版 H9 归集规则草稿。 */
+        CreateAggregationRuleDraftRequest: {
+            dimensions: components["schemas"]["AggregationDimension"][];
+            name: string;
+        };
         CreateAlertExportRequest: {
             filters: components["schemas"]["AlertInstanceListQuery"];
             format: string;
@@ -5287,6 +6384,24 @@ export interface components {
             customer_name: string;
             license_no?: string | null;
             source?: string | null;
+        };
+        /** @description 创建 H9 截单计划草稿。 */
+        CreateCutoffPlanRequest: {
+            /** Format: uuid */
+            customer_id?: string | null;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            exceptions: components["schemas"]["CutoffDateException"][];
+            name: string;
+            route_code?: string | null;
+            scope: components["schemas"]["CutoffPlanScope"];
+            /** Format: int32 */
+            utc_offset_minutes: number;
+            /** Format: uuid */
+            warehouse_id: string;
+            weekly_schedule: components["schemas"]["WeeklyCutoffSlot"][];
         };
         CreateDockAppointmentRequest: {
             appointment_no: string;
@@ -5465,15 +6580,21 @@ export interface components {
             product_code: string;
         };
         CreateOutboundOrderRequest: {
+            business_type_code?: string | null;
             /** Format: uuid */
             customer_id: string;
             /** Format: uuid */
             delivery_address_id: string;
+            department_code?: string | null;
             document_type: string;
             erp_order_no?: string | null;
+            invoice_no?: string | null;
             lines: components["schemas"]["CreateOutboundOrderLineRequest"][];
+            order_group_no?: string | null;
             /** Format: date-time */
             required_ship_at?: string | null;
+            sales_group_code?: string | null;
+            transport_mode_code?: string | null;
             /** Format: uuid */
             warehouse_id: string;
             wms_order_no: string;
@@ -5502,6 +6623,43 @@ export interface components {
             station_name: string;
             temperature_zone: string;
         };
+        /** @description 创建 H9 物理打印站点。 */
+        CreatePrintSiteRequest: {
+            site_code: string;
+            site_name: string;
+        };
+        /** @description 创建 H9 打印组套草稿版本。 */
+        CreatePrintSuiteDraftRequest: {
+            /** Format: uuid */
+            customer_id?: string | null;
+            /** Format: uuid */
+            delivery_address_id?: string | null;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            items: components["schemas"]["PrintSuiteItemInput"][];
+            name: string;
+            route_code?: string | null;
+            scope: components["schemas"]["PrintSuiteScope"];
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description 创建 H9 打印机。 */
+        CreatePrinterRequest: {
+            connection_type: string;
+            printer_model?: string | null;
+            printer_name: string;
+            release_mode_override?: string | null;
+            /** Format: uuid */
+            site_id: string;
+        };
+        /** @description 创建 H9 纸盒。 */
+        CreatePrinterTrayRequest: {
+            paper_size: string;
+            paper_type: string;
+            tray_code: string;
+        };
         /** @description 创建商品请求。 */
         CreateProductRequest: {
             approval_no?: string | null;
@@ -5510,11 +6668,37 @@ export interface components {
                 [key: string]: unknown;
             };
             dosage_form?: string | null;
+            electronic_regulatory_code?: string | null;
+            /** Format: double */
+            height_mm?: number | null;
+            /** Format: double */
+            length_mm?: number | null;
             manufacturer?: string | null;
+            packaging_levels: components["schemas"]["ProductPackagingLevelInput"][];
             product_code: string;
             product_name: string;
-            spec?: string | null;
+            spec: string;
             special_drug_category_code?: string | null;
+            udi_code?: string | null;
+            /** Format: double */
+            volume_cm3?: number | null;
+            /** Format: double */
+            weight_g?: number | null;
+            /** Format: double */
+            width_mm?: number | null;
+        };
+        CreatePurchaseReturnRequest: {
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            reason: string;
+            return_no: string;
+            source_purchase_order_no: string;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            supplier_name: string;
+            /** Format: uuid */
+            warehouse_id: string;
         };
         CreateQualityLiaisonRequest: {
             /** @description 自由结构 JSON 对象。 */
@@ -5529,15 +6713,28 @@ export interface components {
             type_code: string;
         };
         CreateReceivingOrderRequest: {
+            /** @description 单据类型 */
             document_type: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description 预计到货时间
+             */
             expected_arrival_at?: string | null;
+            /** @description 外部来源号 */
             external_ref?: string | null;
+            /** @description 收货明细 */
             lines: components["schemas"]["ReceivingOrderLine"][];
+            /** @description 收货单号 */
             receipt_no: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 供应商 ID
+             */
             supplier_id?: string | null;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 仓库 ID
+             */
             warehouse_id: string;
         };
         CreateRetailReplenishmentSuggestionRequest: {
@@ -5562,6 +6759,13 @@ export interface components {
             parent_role_id?: string | null;
             role_code: string;
             role_name: string;
+        };
+        /** @description 新增 H9 站点货主仓映射。 */
+        CreateSiteOwnerMappingRequest: {
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            warehouse_id: string;
         };
         CreateSpecialDrugCategoryRequest: {
             category_code: string;
@@ -5766,9 +6970,168 @@ export interface components {
             certificate_type: string;
             expires_at?: string | null;
         };
+        /** @description 截单计划的例外日期；空时间表示当天不截单。 */
+        CutoffDateException: {
+            cutoff_time?: string | null;
+            /** Format: date */
+            date: string;
+        };
+        /** @description H9 截单计划。 */
+        CutoffPlan: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            customer_id?: string | null;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            exceptions: components["schemas"]["CutoffDateException"][];
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            owner_id: string;
+            route_code?: string | null;
+            scope: components["schemas"]["CutoffPlanScope"];
+            status: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int32 */
+            utc_offset_minutes: number;
+            /** Format: uuid */
+            warehouse_id: string;
+            weekly_schedule: components["schemas"]["WeeklyCutoffSlot"][];
+        };
+        /** @description H9 截单计划列表。 */
+        CutoffPlanListResponse: {
+            data: components["schemas"]["CutoffPlan"][];
+        };
+        /**
+         * @description 截单计划匹配层级；枚举顺序不代表运行优先级。
+         * @enum {string}
+         */
+        CutoffPlanScope: "customer" | "route" | "owner_warehouse";
         DeleteRoleResponse: {
             /** Format: uuid */
             id: string;
+        };
+        /** @description H9 待截单出库订单。 */
+        DeliveryNoteCandidate: {
+            /** Format: date-time */
+            created_at: string;
+            customer_code: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            delivery_address: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            erp_order_no?: string | null;
+            /** Format: uuid */
+            outbound_order_id: string;
+            route_code: string;
+            warehouse_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            warehouse_name: string;
+            wms_order_no: string;
+        };
+        /** @description H9 待截单订单列表。 */
+        DeliveryNoteCandidateListResponse: {
+            data: components["schemas"]["DeliveryNoteCandidate"][];
+        };
+        /** @description H9 已冻结的随货同行单归集结果。 */
+        DeliveryNoteGroup: {
+            aggregation_group_key: unknown;
+            /** Format: uuid */
+            aggregation_rule_version_id?: string | null;
+            /** Format: int32 */
+            aggregation_rule_version_no?: number | null;
+            /** Format: uuid */
+            customer_id: string;
+            /** Format: date-time */
+            cutoff_at: string;
+            cutoff_mode: string;
+            /** Format: uuid */
+            cutoff_plan_id?: string | null;
+            cutoff_reason?: string | null;
+            /** Format: uuid */
+            delivery_address_id: string;
+            delivery_note_no: string;
+            /** Format: uuid */
+            id: string;
+            order_ids: string[];
+            /** Format: uuid */
+            owner_id: string;
+            route_code: string;
+            /** Format: date-time */
+            scheduled_cutoff_at?: string | null;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description H9 随货同行单归集结果列表项。 */
+        DeliveryNoteGroupListItem: {
+            customer_code: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            /** Format: date-time */
+            cutoff_at: string;
+            cutoff_mode: string;
+            /** Format: uuid */
+            cutoff_plan_id?: string | null;
+            cutoff_reason?: string | null;
+            delivery_address: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            delivery_note_no: string;
+            /** Format: uuid */
+            id: string;
+            order_ids: string[];
+            order_nos: string[];
+            route_code: string;
+            /** Format: date-time */
+            scheduled_cutoff_at?: string | null;
+            warehouse_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            warehouse_name: string;
+        };
+        /** @description H9 随货同行单归集结果列表。 */
+        DeliveryNoteGroupListResponse: {
+            data: components["schemas"]["DeliveryNoteGroupListItem"][];
+        };
+        /**
+         * @description H9 设备租约；`release_mode` 是租约创建时的策略快照；
+         *     `busy_state` 真实来源在 US-H9-010/012，printing/result_unknown/reconciling 禁止释放。
+         */
+        DeviceLease: {
+            /** Format: date-time */
+            acquired_at?: string | null;
+            /** Format: date-time */
+            assigned_at: string;
+            busy_state: string;
+            connection_type: string;
+            /** Format: uuid */
+            holder_agent_id?: string | null;
+            /** Format: uuid */
+            id: string;
+            lease_token: string;
+            /** Format: uuid */
+            printer_id: string;
+            printer_name: string;
+            release_mode: string;
+            release_reason?: string | null;
+            /** Format: date-time */
+            released_at?: string | null;
+            /** Format: uuid */
+            site_id: string;
+            status: string;
+        };
+        /** @description H9 设备租约列表。 */
+        DeviceLeaseListResponse: {
+            data: components["schemas"]["DeviceLease"][];
         };
         DisableSystemDictionaryItemRequest: {
             disabled_reason?: string | null;
@@ -6098,6 +7461,12 @@ export interface components {
         };
         /** @enum {string} */
         DualPersonPolicyScope: "global" | "owner" | "warehouse";
+        ErpInventorySnapshotItem: {
+            batch_no: string;
+            product_code: string;
+            /** Format: int64 */
+            qty_on_hand: number;
+        };
         /** @description 统一错误响应。 */
         ErrorResponse: {
             /** @description 业务错误码。 */
@@ -6131,24 +7500,6 @@ export interface components {
         };
         EventDeliveryNackRequest: {
             error: string;
-        };
-        ExecuteMappingRequest: {
-            /** @description 自由结构 JSON 对象。 */
-            raw_payload: {
-                [key: string]: unknown;
-            };
-            source_system: string;
-        };
-        ExecuteMappingResponse: {
-            /** Format: uuid */
-            execution_id: string;
-            /** @description 自由结构 JSON 对象。 */
-            normalized_payload: {
-                [key: string]: unknown;
-            };
-            /** Format: uuid */
-            queue_item_id?: string | null;
-            unresolved_fields: string[];
         };
         ExecuteStockLossOrderRequest: {
             /** Format: uuid */
@@ -6260,6 +7611,12 @@ export interface components {
             /** Format: int64 */
             weight_grams: number;
         };
+        FailReconciliationClaimRequest: {
+            /** Format: uuid */
+            claim_token: string;
+            error_code: components["schemas"]["ReconciliationClaimFailureCode"];
+            stage: components["schemas"]["ReconciliationClaimFailureStage"];
+        };
         FeatureFlagArchiveRequest: {
             archive_ref: string;
         };
@@ -6349,6 +7706,12 @@ export interface components {
             contract_id: string;
             period_end: string;
             period_start: string;
+        };
+        GeneratePrintFieldLibraryDraftRequest: {
+            business_module: string;
+            library_code: string;
+            library_name: string;
+            source_schema: string;
         };
         GspAlertLifecycleRecord: {
             alert: components["schemas"]["AlertInstance"];
@@ -6501,12 +7864,36 @@ export interface components {
             message: string;
             status: string;
         };
+        H8AsnInboundRequest: {
+            correlation_id: string;
+            document_type: string;
+            /** Format: date-time */
+            expected_arrival_at: string;
+            /** Format: int64 */
+            expected_qty: number;
+            external_ref: string;
+            /** Format: date-time */
+            occurred_at: string;
+            product_code: string;
+            receipt_no: string;
+            schema_version: string;
+            /** Format: uuid */
+            supplier_id: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
         H8DecryptedPayload: {
             /** Format: date-time */
             expires_at: string;
             /** Format: uuid */
             message_id: string;
             payload: string;
+        };
+        H8ErpBusinessReceiptRequest: {
+            correlation_id: string;
+            error_summary?: string | null;
+            result: string;
+            schema_version: string;
         };
         H8ErpConnector: {
             api_base_url?: string | null;
@@ -6758,6 +8145,35 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        H8InboundResponse: {
+            /** Format: uuid */
+            message_id: string;
+            replayed: boolean;
+            status: string;
+            wms_resource_id: string;
+        };
+        H8OutboundOrderInboundRequest: {
+            batch_no: string;
+            correlation_id: string;
+            /** Format: uuid */
+            customer_id: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            document_type: string;
+            erp_order_no?: string | null;
+            external_ref: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: int64 */
+            planned_qty: number;
+            product_code: string;
+            /** Format: date-time */
+            required_ship_at?: string | null;
+            schema_version: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            wms_order_no?: string | null;
+        };
         H8PayloadRetentionPolicy: {
             /** Format: uuid */
             connector_id: string;
@@ -6766,6 +8182,90 @@ export interface components {
             retention_days: number;
             /** Format: date-time */
             updated_at: string;
+        };
+        H8PhysicalDimensionsInput: {
+            /** Format: double */
+            height_mm: number;
+            /** Format: double */
+            length_mm: number;
+            /** Format: double */
+            width_mm: number;
+        };
+        H8ProductChangeInboundRequest: {
+            /** Format: uuid */
+            asn_id?: string | null;
+            correlation_id: string;
+            external_ref: string;
+            field_name: string;
+            /** Format: uuid */
+            liaison_id?: string | null;
+            new_value?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            physical_dimensions?: components["schemas"]["H8PhysicalDimensionsInput"] | null;
+            product_code: string;
+            /** Format: uuid */
+            product_id?: string | null;
+            schema_version: string;
+        };
+        H8ProductMasterInboundRequest: {
+            approval_no?: string | null;
+            correlation_id: string;
+            dosage_form?: string | null;
+            electronic_regulatory_code?: string | null;
+            external_ref: string;
+            /** Format: double */
+            height_mm?: number | null;
+            /** Format: double */
+            length_mm?: number | null;
+            manufacturer?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            packaging_levels: components["schemas"]["H8ProductPackagingLevelInput"][];
+            product_code: string;
+            product_name: string;
+            schema_version: string;
+            spec: string;
+            special_drug_category: string;
+            storage_condition: string;
+            udi_code?: string | null;
+            /** Format: double */
+            volume_cm3?: number | null;
+            /** Format: double */
+            weight_g?: number | null;
+            /** Format: double */
+            width_mm?: number | null;
+        };
+        H8ProductPackagingLevelInput: {
+            is_base: boolean;
+            is_default: boolean;
+            /** Format: int64 */
+            ratio_to_base: number;
+            /** Format: int32 */
+            sort_order: number;
+            /** @description ERP 包装单位源值，进入 M1 前必须经 M-PM `unit_pack` 规整。 */
+            unit: string;
+        };
+        H8ReturnOrderInboundRequest: {
+            batch_no: string;
+            correlation_id: string;
+            /** Format: uuid */
+            customer_id: string;
+            document_type: string;
+            /** Format: date-time */
+            expected_arrival_at: string;
+            /** Format: int64 */
+            expected_qty: number;
+            external_ref: string;
+            /** Format: date-time */
+            occurred_at: string;
+            product_code: string;
+            receipt_no?: string | null;
+            schema_version: string;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            /** Format: uuid */
+            warehouse_id: string;
         };
         H8WorkerClaimControl: {
             /** Format: uuid */
@@ -7361,59 +8861,31 @@ export interface components {
             data: components["schemas"]["MaintenanceTask"][];
             page: components["schemas"]["PageMeta"];
         };
-        /** @description M-PM 参数对照字典。 */
-        MappingDictionary: {
-            /** Format: date-time */
-            created_at: string;
-            dictionary_code: string;
-            dictionary_name: string;
+        /** @description H9 授权人工截单命令。 */
+        ManualDeliveryNoteCutoffRequest: {
             /** Format: uuid */
-            id: string;
+            delivery_address_id: string;
+            order_ids: string[];
+            reason: string;
             /** Format: uuid */
-            owner_id: string;
+            warehouse_id: string;
         };
-        /** @description M-PM 待映射队列项。 */
-        MappingQueueItem: {
-            /** Format: date-time */
-            created_at: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            owner_id: string;
-            /** @description 自由结构 JSON 对象。 */
-            raw_payload: {
-                [key: string]: unknown;
-            };
-            source_system: string;
-            status: string;
+        /** @description M-PM 单值映射请求；外部自由文本不得直接进入业务模块。 */
+        MapParameterRequest: {
+            dict_code: string;
+            source_record_id?: string | null;
+            source_system?: string | null;
+            source_value: string;
         };
-        /** @description M-PM 字段映射规则。 */
-        MappingRule: {
-            canonical_field: string;
-            /** Format: date-time */
-            created_at: string;
-            external_field: string;
+        MapParameterResponse: {
+            /** Format: int32 */
+            confidence: number;
+            fallback_used: boolean;
+            queued: boolean;
             /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            owner_id: string;
-            source_system: string;
-            transform: string;
-        };
-        MappingTraceResponse: {
-            applied_rule_ids: string[];
-            /** Format: uuid */
-            execution_id: string;
-            /** @description 自由结构 JSON 对象。 */
-            normalized_payload: {
-                [key: string]: unknown;
-            };
-            /** @description 自由结构 JSON 对象。 */
-            raw_payload: {
-                [key: string]: unknown;
-            };
-            source_system: string;
-            unresolved_fields: string[];
+            rule_id?: string | null;
+            status: components["schemas"]["ParameterMappingStatus"];
+            target_value?: string | null;
         };
         MarkInventoryRecallRequest: {
             approval_id: string;
@@ -7428,6 +8900,7 @@ export interface components {
             insulated_container_no: string;
         };
         OutboundOrder: {
+            business_type_code?: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: uuid */
@@ -7435,18 +8908,23 @@ export interface components {
             /** Format: uuid */
             delivery_address_id: string;
             delivery_address_snapshot: unknown;
+            department_code?: string | null;
             document_type: string;
             erp_order_no?: string | null;
             /** Format: uuid */
             id: string;
+            invoice_no?: string | null;
             lines: components["schemas"]["OutboundOrderLine"][];
+            order_group_no?: string | null;
             /** Format: uuid */
             owner_id: string;
             /** Format: date-time */
             required_ship_at?: string | null;
+            sales_group_code?: string | null;
             shipment?: components["schemas"]["OutboundShipment"] | null;
             short_pick: boolean;
             status: string;
+            transport_mode_code?: string | null;
             /** Format: date-time */
             updated_at: string;
             /** Format: uuid */
@@ -7572,6 +9050,8 @@ export interface components {
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
         };
+        /** @enum {string} */
+        ParameterMappingStatus: "matched" | "unmatched" | "ambiguous";
         /** @description 修改当前用户密码。 */
         PasswordChangeRequest: {
             current_password: string;
@@ -7592,20 +9072,38 @@ export interface components {
             reference_date?: string | null;
             table_name: string;
         };
+        /** @description M1 系统字典 print_document_category 的一条受控分类。 */
+        PrintDocumentCategory: {
+            item_code: string;
+            item_name: string;
+            source_mode: components["schemas"]["PrintSuiteSourceMode"];
+        };
+        /** @description M1 系统字典 print_document_category 列表。 */
+        PrintDocumentCategoryListResponse: {
+            data: components["schemas"]["PrintDocumentCategory"][];
+        };
         PrintFieldDefinition: {
+            description: string;
             display_name: string;
+            example_value?: unknown;
             field_path: string;
             field_type: string;
+            formatting_rule?: string | null;
             group_code: string;
             group_name: string;
             /** Format: uuid */
             id: string;
+            is_table_detail: boolean;
             /** Format: uuid */
             library_version_id: string;
-            metadata: unknown;
+            masking_rule?: string | null;
+            printable: boolean;
+            sensitive: boolean;
             /** Format: int32 */
             sort_order: number;
             source_schema: string;
+            supports_barcode: boolean;
+            supports_qrcode: boolean;
         };
         PrintFieldDefinitionListResponse: {
             data: components["schemas"]["PrintFieldDefinition"][];
@@ -7616,21 +9114,50 @@ export interface components {
             page: components["schemas"]["PageMeta"];
         };
         PrintFieldLibrarySummary: {
+            business_module: string;
             /** Format: date-time */
             created_at: string;
+            /** Format: uuid */
+            created_by: string;
             /** Format: int64 */
             field_count: number;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
+            latest_published_version_id?: string | null;
+            /** Format: int32 */
+            latest_published_version_no?: number | null;
+            /** Format: uuid */
             latest_version_id: string;
+            latest_version_status: string;
             library_code: string;
             library_name: string;
             /** Format: date-time */
-            published_at: string;
+            published_at?: string | null;
             /** Format: uuid */
-            published_by: string;
+            published_by?: string | null;
             source_schema: string;
+            /** Format: int32 */
+            version_no: number;
+        };
+        PrintFieldLibraryVersion: {
+            business_module: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: uuid */
+            id: string;
+            library_code: string;
+            /** Format: uuid */
+            library_id: string;
+            library_name: string;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** Format: uuid */
+            published_by?: string | null;
+            source_schema: string;
+            status: string;
             /** Format: int32 */
             version_no: number;
         };
@@ -7654,6 +9181,214 @@ export interface components {
             status: string;
             /** Format: uuid */
             template_version_id: string;
+        };
+        /** @description H9 物理打印站点：打印机、纸盒、设备租约与 Print Agent（US-H9-012）的资源边界。 */
+        PrintSite: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            site_code: string;
+            site_name: string;
+            status: string;
+        };
+        /** @description H9 物理打印站点列表。 */
+        PrintSiteListResponse: {
+            data: components["schemas"]["PrintSite"][];
+        };
+        /** @description H9 站点 ↔ 货主+仓库显式映射；停用为软删。 */
+        PrintSiteOwnerMapping: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            disabled_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: uuid */
+            site_id: string;
+            status: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description H9 站点货主仓映射列表。 */
+        PrintSiteOwnerMappingListResponse: {
+            data: components["schemas"]["PrintSiteOwnerMapping"][];
+        };
+        /**
+         * @description H9 打印项失败策略；必需项永远不能跳过（ADR-0041）。
+         * @enum {string}
+         */
+        PrintSuiteFailurePolicy: "pause_suite" | "skip_and_continue";
+        /** @description H9 权威文件绑定（AC6/AC8：文件 ID + 版本 + 内容哈希，不落临时 URL）。 */
+        PrintSuiteFileBinding: {
+            content_hash: string;
+            /** Format: uuid */
+            file_id: string;
+            file_ref: string;
+            /** Format: int32 */
+            file_version: number;
+        };
+        /** @description H9 组套实例：冻结组套版本、规则版本、源单据和策略快照。 */
+        PrintSuiteInstance: {
+            /** Format: uuid */
+            aggregation_rule_version_id?: string | null;
+            /** Format: int32 */
+            aggregation_rule_version_no?: number | null;
+            /** Format: date-time */
+            created_at: string;
+            delivery_note_no: string;
+            /** Format: uuid */
+            group_id: string;
+            hold_scope?: string | null;
+            /** Format: uuid */
+            id: string;
+            items: components["schemas"]["PrintSuiteInstanceItem"][];
+            /** Format: uuid */
+            owner_id: string;
+            source_documents: unknown;
+            status: string;
+            suite_snapshot: unknown;
+            /** Format: uuid */
+            suite_version_id: string;
+            /** Format: int32 */
+            suite_version_no: number;
+        };
+        /** @description H9 组套实例中的一条冻结打印项。 */
+        PrintSuiteInstanceItem: {
+            category_code: string;
+            /** Format: int32 */
+            copies: number;
+            external_file_ref?: string | null;
+            failure_policy: components["schemas"]["PrintSuiteFailurePolicy"];
+            file_bindings: components["schemas"]["PrintSuiteFileBinding"][];
+            /** Format: uuid */
+            id: string;
+            missing: string[];
+            output_slot: string;
+            ready: boolean;
+            ready_policy: components["schemas"]["PrintSuiteReadyPolicy"];
+            required: boolean;
+            /** Format: int32 */
+            sort_order: number;
+            source_mode: components["schemas"]["PrintSuiteSourceMode"];
+            /** Format: uuid */
+            template_version_id?: string | null;
+        };
+        /** @description H9 组套实例列表。 */
+        PrintSuiteInstanceListResponse: {
+            data: components["schemas"]["PrintSuiteInstance"][];
+        };
+        /** @description H9 打印组套版本中的一条打印项。 */
+        PrintSuiteItem: {
+            category_code: string;
+            category_name: string;
+            /** Format: int32 */
+            copies: number;
+            external_file_ref?: string | null;
+            failure_policy: components["schemas"]["PrintSuiteFailurePolicy"];
+            /** Format: uuid */
+            id: string;
+            output_slot: string;
+            ready_policy: components["schemas"]["PrintSuiteReadyPolicy"];
+            required: boolean;
+            /** Format: int32 */
+            sort_order: number;
+            source_mode: components["schemas"]["PrintSuiteSourceMode"];
+            /** Format: uuid */
+            template_version_id?: string | null;
+        };
+        /** @description 创建 H9 打印组套草稿的一条有序打印项。 */
+        PrintSuiteItemInput: {
+            category_code: string;
+            /** Format: int32 */
+            copies: number;
+            external_file_ref?: string | null;
+            failure_policy: components["schemas"]["PrintSuiteFailurePolicy"];
+            output_slot: string;
+            ready_policy: components["schemas"]["PrintSuiteReadyPolicy"];
+            required: boolean;
+            /** Format: int32 */
+            sort_order: number;
+            source_mode: components["schemas"]["PrintSuiteSourceMode"];
+            /** Format: uuid */
+            template_version_id?: string | null;
+        };
+        /** @description 一条打印项对一个样本归集组的就绪判定（AC5）。 */
+        PrintSuiteItemReadiness: {
+            category_code: string;
+            category_name: string;
+            file_bindings: components["schemas"]["PrintSuiteFileBinding"][];
+            missing: string[];
+            ready: boolean;
+            required: boolean;
+            source_mode: components["schemas"]["PrintSuiteSourceMode"];
+        };
+        /**
+         * @description H9 必需单据未就绪时的受控就绪策略（AC7）。
+         * @enum {string}
+         */
+        PrintSuiteReadyPolicy: "wait_hold_instance" | "pause_agent_queue";
+        /**
+         * @description H9 打印组套匹配层级；解析优先级固定为送货地址、客户、线路、货主+仓库默认。
+         * @enum {string}
+         */
+        PrintSuiteScope: "delivery_address" | "customer" | "route" | "warehouse_default";
+        /**
+         * @description H9 打印项来源模式（ADR-0041）。
+         * @enum {string}
+         */
+        PrintSuiteSourceMode: "rendered" | "external_file";
+        /** @description H9 打印组套样本测试结果。 */
+        PrintSuiteTestResult: {
+            samples: components["schemas"]["PrintSuiteTestSample"][];
+            suite: components["schemas"]["PrintSuiteVersion"];
+        };
+        /** @description 一个样本归集组的组套解析与就绪预检结果。 */
+        PrintSuiteTestSample: {
+            delivery_note_no: string;
+            /** Format: uuid */
+            group_id: string;
+            item_readiness: components["schemas"]["PrintSuiteItemReadiness"][];
+            matches_this_version: boolean;
+            resolved_scope?: components["schemas"]["PrintSuiteScope"] | null;
+        };
+        /** @description H9 打印组套不可变版本。 */
+        PrintSuiteVersion: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            customer_id?: string | null;
+            /** Format: uuid */
+            delivery_address_id?: string | null;
+            /** Format: date-time */
+            disabled_at?: string | null;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            /** Format: uuid */
+            id: string;
+            items: components["schemas"]["PrintSuiteItem"][];
+            name: string;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            published_at?: string | null;
+            route_code?: string | null;
+            scope: components["schemas"]["PrintSuiteScope"];
+            status: string;
+            /** Format: date-time */
+            tested_at?: string | null;
+            /** Format: int32 */
+            version_no: number;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        /** @description H9 打印组套版本列表。 */
+        PrintSuiteVersionListResponse: {
+            data: components["schemas"]["PrintSuiteVersion"][];
         };
         PrintTemplateBinding: {
             field_path: string;
@@ -7763,6 +9498,64 @@ export interface components {
             carrier_code: string;
             waybill_no?: string | null;
         };
+        /** @description H9 打印机；`connection_type = usb` 的租约语义为单机（仅实际连接它的本机 Agent）。 */
+        Printer: {
+            connection_type: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description 覆盖优先、否则全局默认的当前生效释放模式。 */
+            effective_release_mode: string;
+            /** Format: uuid */
+            id: string;
+            printer_model?: string | null;
+            printer_name: string;
+            /** @description 打印机级释放模式覆盖；空表示继承全局默认。 */
+            release_mode_override?: string | null;
+            site_code: string;
+            /** Format: uuid */
+            site_id: string;
+            site_name: string;
+            status: string;
+        };
+        /** @description H9 打印机列表。 */
+        PrinterListResponse: {
+            data: components["schemas"]["Printer"][];
+        };
+        /**
+         * @description H9 测试打印记录；本机无真实硬件时 result 停留在 `dispatched`，
+         *     `result/result_at/result_note` 为 Print Agent（US-H9-012）或人工回执字段。
+         */
+        PrinterTestPrint: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            printer_id: string;
+            /** Format: date-time */
+            requested_at: string;
+            result: string;
+            /** Format: date-time */
+            result_at?: string | null;
+            result_note?: string | null;
+            /** Format: uuid */
+            tray_id: string;
+        };
+        /** @description H9 纸盒：纸张能力、启用状态与设备标识。 */
+        PrinterTray: {
+            /** Format: date-time */
+            created_at: string;
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            paper_size: string;
+            paper_type: string;
+            /** Format: uuid */
+            printer_id: string;
+            tray_code: string;
+        };
+        /** @description H9 纸盒列表。 */
+        PrinterTrayListResponse: {
+            data: components["schemas"]["PrinterTray"][];
+        };
         /** @description 商品基础档案。 */
         Product: {
             /** @description 批准文号。 */
@@ -7778,43 +9571,173 @@ export interface components {
             created_at: string;
             /** @description 剂型。 */
             dosage_form?: string | null;
+            /** @description 电子监管码关联。 */
+            electronic_regulatory_code?: string | null;
+            /**
+             * Format: double
+             * @description 单品高度（毫米）。
+             */
+            height_mm?: number | null;
             /**
              * Format: uuid
              * @description 商品 ID。
              */
             id: string;
+            /**
+             * Format: double
+             * @description 单品长度（毫米）。
+             */
+            length_mm?: number | null;
             /** @description 生产企业。 */
             manufacturer?: string | null;
+            /** @description 经 M-PM 规整化字段的追加式溯源记录。 */
+            mapping_traces: components["schemas"]["ProductMappingTrace"][];
             /**
              * Format: uuid
              * @description 货主 ID。
              */
             owner_id: string;
+            /** @description 包装层级，转换比统一相对基础单位。 */
+            packaging_levels: components["schemas"]["ProductPackagingLevel"][];
             /** @description 商品编码。 */
             product_code: string;
             /** @description 商品名称。 */
             product_name: string;
             /** @description 规格。 */
-            spec?: string | null;
+            spec: string;
             /** @description 特殊药品分类编码。 */
             special_drug_category_code?: string | null;
             /** @description 启停状态。 */
             status: string;
+            /** @description UDI 唯一码。 */
+            udi_code?: string | null;
             /**
              * Format: date-time
              * @description 更新时间。
              */
             updated_at: string;
+            /**
+             * Format: double
+             * @description 单品体积（立方厘米）。
+             */
+            volume_cm3?: number | null;
+            /**
+             * Format: double
+             * @description 单品重量（克）。
+             */
+            weight_g?: number | null;
+            /**
+             * Format: double
+             * @description 单品宽度（毫米）。
+             */
+            width_mm?: number | null;
         };
         ProductListResponse: {
             data: components["schemas"]["Product"][];
             page: components["schemas"]["PageMeta"];
+        };
+        /** @description 商品字段映射溯源。 */
+        ProductMappingTrace: {
+            /** Format: date-time */
+            created_at: string;
+            field_name: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            rule_id?: string | null;
+            source_system: string;
+            source_value: string;
+            target_value?: string | null;
+        };
+        /** @description M-PM 规整化结果写入项，仅供受控防腐层调用。 */
+        ProductMappingTraceInput: {
+            field_name: string;
+            /** Format: uuid */
+            rule_id?: string | null;
+            source_system: string;
+            source_value: string;
+            target_value?: string | null;
+        };
+        /** @description 商品包装层级。 */
+        ProductPackagingLevel: {
+            /** Format: uuid */
+            id: string;
+            is_base: boolean;
+            is_default: boolean;
+            /** Format: int64 */
+            ratio_to_base: number;
+            /** Format: int32 */
+            sort_order: number;
+            unit_code: string;
+            unit_name: string;
+        };
+        /** @description 商品包装层级写入项。 */
+        ProductPackagingLevelInput: {
+            is_base: boolean;
+            is_default: boolean;
+            /**
+             * Format: int64
+             * @description 相对基础单位的换算数量。
+             */
+            ratio_to_base: number;
+            /** Format: int32 */
+            sort_order: number;
+            unit_code: string;
+            unit_name: string;
         };
         PublishAdminMenuRequest: {
             note?: string | null;
         };
         PublishDrugInspectionProcessingRuleRequest: {
             apply_scope: string;
+        };
+        /** @description H9 送货地址线路绑定发布命令。 */
+        PublishRouteBindingRequest: {
+            /** Format: uuid */
+            customer_id: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            route_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        PurchaseReturnOrder: {
+            approval_source: string;
+            /** Format: date-time */
+            created_at: string;
+            document_type: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            product_code: string;
+            /** Format: int64 */
+            qty: number;
+            reason: string;
+            reject_reason?: string | null;
+            return_no: string;
+            /** Format: date-time */
+            shipped_at?: string | null;
+            /** Format: uuid */
+            shipped_by?: string | null;
+            shipped_by_name?: string | null;
+            source_purchase_order_no: string;
+            status: string;
+            /** Format: uuid */
+            supplier_id?: string | null;
+            supplier_name: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            warehouse_id: string;
+        };
+        PurchaseReturnOrderListResponse: {
+            data: components["schemas"]["PurchaseReturnOrder"][];
+            page: components["schemas"]["PageMeta"];
         };
         PurgeH8ErpMessagesRequest: {
             /** @description 必须为 true；且货主已配置 retention_days 才允许清理终态消息。 */
@@ -8097,15 +10020,28 @@ export interface components {
         };
         /** @description 收货单明细。 */
         ReceivingOrderLine: {
+            /** @description 批号 */
             batch_no?: string | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 预计数量
+             */
             expected_qty: number;
+            /** @description 有效期至 */
             expiry_date?: string | null;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description 明细行号
+             */
             line_no: number;
+            /** @description 商品编码 */
             product_code: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description 商品主数据 ID
+             */
             product_id?: string | null;
+            /** @description 生产日期 */
             production_date?: string | null;
         };
         ReceivingOrderListResponse: {
@@ -8162,7 +10098,101 @@ export interface components {
             /** Format: int64 */
             period_days?: number | null;
         };
+        /** @enum {string} */
+        ReconciliationClaimFailureCode: "erp_pull_failed" | "snapshot_submit_failed";
+        /** @enum {string} */
+        ReconciliationClaimFailureStage: "pull" | "submit";
+        ReconciliationClaimMutation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            lease_expires_at: string;
+            /** Format: uuid */
+            run_id?: string | null;
+            status: string;
+        };
+        ReconciliationClaimResponse: {
+            claim?: components["schemas"]["ReconciliationScheduleClaim"] | null;
+        };
+        /** @enum {string} */
+        ReconciliationDisposition: "wms_truth" | "erp_truth" | "known_difference";
+        ReconciliationInventoryAllocation: {
+            /** Format: uuid */
+            inventory_batch_id: string;
+            /** Format: int64 */
+            quantity: number;
+        };
+        ReconciliationItem: {
+            batch_no: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            difference_qty: number;
+            difference_type: string;
+            /** Format: int64 */
+            erp_qty: number;
+            /** Format: uuid */
+            id: string;
+            product_code: string;
+            resolution_status: string;
+            stock_adjustment_order_ids: string[];
+            /** Format: int64 */
+            wms_qty: number;
+        };
+        ReconciliationItemListResponse: {
+            data: components["schemas"]["ReconciliationItem"][];
+            page: components["schemas"]["PageMeta"];
+        };
+        ReconciliationRule: {
+            enabled: boolean;
+            /** Format: int32 */
+            interval_hours: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ReconciliationRun: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int32 */
+            erp_more_count: number;
+            /** Format: uuid */
+            id: string;
+            items: components["schemas"]["ReconciliationItem"][];
+            /** Format: int32 */
+            matched_count: number;
+            /** Format: uuid */
+            owner_id: string;
+            /** Format: date-time */
+            snapshot_at: string;
+            window_key: string;
+            /** Format: int32 */
+            wms_more_count: number;
+        };
+        ReconciliationScheduleClaim: {
+            /** Format: int32 */
+            attempt_no: number;
+            /** Format: uuid */
+            claim_token: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            lease_expires_at: string;
+            /** Format: uuid */
+            owner_id: string;
+            window_key: string;
+            worker_id: string;
+        };
+        RejectPurchaseReturnRequest: {
+            /** @description 驳回原因（必填，不允许空白）。 */
+            reason: string;
+        };
         RejectReceivingOrderRequest: {
+            reason: string;
+        };
+        /** @description 人工释放设备租约：专用权限 + 原因必填 + 二次确认。 */
+        ReleaseDeviceLeaseRequest: {
+            /** @description 必须为 true 表示已完成二次确认。 */
+            confirm: boolean;
             reason: string;
         };
         RelocateInventoryRequest: {
@@ -8176,6 +10206,13 @@ export interface components {
             to_location_code: string;
             /** Format: uuid */
             to_location_id: string;
+        };
+        RenewReconciliationClaimRequest: {
+            /** Format: uuid */
+            claim_token: string;
+            /** Format: int64 */
+            lease_seconds: number;
+            worker_id: string;
         };
         ReplaceRolePermissionsRequest: {
             permission_codes: string[];
@@ -8250,6 +10287,10 @@ export interface components {
         ResolvePrintTemplateResponse: {
             template: components["schemas"]["PrintTemplateSummary"];
             version: components["schemas"]["PrintTemplateVersion"];
+        };
+        ResolveReconciliationRequest: {
+            allocations?: components["schemas"]["ReconciliationInventoryAllocation"][];
+            disposition: components["schemas"]["ReconciliationDisposition"];
         };
         RetailReplenishmentSuggestion: {
             /** Format: date-time */
@@ -8360,21 +10401,54 @@ export interface components {
             /** Format: int64 */
             grace_period_days?: number | null;
         };
+        /** @description H9 已发布的送货地址线路绑定。 */
+        RouteBinding: {
+            /** Format: date-time */
+            created_at: string;
+            customer_code: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            delivery_address: string;
+            /** Format: uuid */
+            delivery_address_id: string;
+            /** Format: date-time */
+            effective_from: string;
+            /** Format: date-time */
+            effective_to?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_id: string;
+            route_code: string;
+            warehouse_code: string;
+            /** Format: uuid */
+            warehouse_id: string;
+            warehouse_name: string;
+        };
+        /** @description H9 线路绑定列表。 */
+        RouteBindingListResponse: {
+            data: components["schemas"]["RouteBinding"][];
+        };
         SavePrintTemplateRequest: {
             designer_version: string;
-            enabled: boolean;
             field_bindings: components["schemas"]["PrintTemplateBinding"][];
             /** Format: uuid */
             field_library_version_id: string;
             hiprint_json: unknown;
             is_default: boolean;
             paper: unknown;
-            publish: boolean;
             remark?: string | null;
             scope: components["schemas"]["PrintTemplateScope"];
             template_code: string;
+            /** Format: uuid */
+            template_id?: string | null;
             template_name: string;
             template_type_code: string;
+        };
+        /** @description 临时合并或下载的分类 PDF 选择；空数组表示全部已就绪分类。 */
+        SelectCategoryPdfsRequest: {
+            category_pdf_ids: string[];
         };
         SendH4NotificationRequest: {
             dedupe_key: string;
@@ -8397,6 +10471,13 @@ export interface components {
             /** Format: date-time */
             paused_until?: string | null;
             reason: string;
+        };
+        SetIsolationRequest: {
+            isolate: boolean;
+            item_ids: string[];
+        };
+        SetPrintTemplateEnabledRequest: {
+            enabled: boolean;
         };
         SetTaskTypeEnabledRequest: {
             enabled: boolean;
@@ -8608,6 +10689,16 @@ export interface components {
             /** Format: int64 */
             physical_qty: number;
         };
+        SubmitReconciliationRunRequest: {
+            /** Format: uuid */
+            claim_id: string;
+            /** Format: uuid */
+            claim_token: string;
+            items: components["schemas"]["ErpInventorySnapshotItem"][];
+            /** Format: date-time */
+            snapshot_at: string;
+            window_key: string;
+        };
         /** @description 供应商基础档案。 */
         Supplier: {
             contact_name?: string | null;
@@ -8690,6 +10781,8 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /** Format: int32 */
+            sort_order: number;
             source: string;
             /** Format: date-time */
             updated_at: string;
@@ -8839,6 +10932,19 @@ export interface components {
             owner_id: string;
             /** Format: double */
             temperature_celsius: number;
+        };
+        /** @description 使用真实出库订单测试一版归集规则。 */
+        TestAggregationRuleRequest: {
+            order_ids: string[];
+        };
+        /** @description 对指定打印机和纸盒发起测试打印。 */
+        TestPrintRequest: {
+            /** Format: uuid */
+            tray_id: string;
+        };
+        /** @description 用真实归集组样本测试一版打印组套。 */
+        TestPrintSuiteRequest: {
+            group_ids: string[];
         };
         TmsDispatch: {
             carrier_code?: string | null;
@@ -9068,6 +11174,33 @@ export interface components {
             /** Format: uuid */
             zone_id?: string | null;
         };
+        UpdatePrintFieldDefinitionRequest: {
+            description: string;
+            display_name: string;
+            example_value?: unknown;
+            formatting_rule?: string | null;
+            group_code: string;
+            group_name: string;
+            is_table_detail: boolean;
+            masking_rule?: string | null;
+            printable: boolean;
+            sensitive: boolean;
+            /** Format: int32 */
+            sort_order: number;
+            supports_barcode: boolean;
+            supports_qrcode: boolean;
+        };
+        /** @description 维护 H9 打印机状态与释放模式覆盖；`release_mode_override = "inherit"` 表示清除覆盖。 */
+        UpdatePrinterRequest: {
+            release_mode_override?: string | null;
+            status?: string | null;
+        };
+        /** @description 维护 H9 纸盒能力与启用状态。 */
+        UpdatePrinterTrayRequest: {
+            enabled?: boolean | null;
+            paper_size?: string | null;
+            paper_type?: string | null;
+        };
         /** @description 更新商品请求。 */
         UpdateProductRequest: {
             approval_no?: string | null;
@@ -9076,11 +11209,24 @@ export interface components {
                 [key: string]: unknown;
             };
             dosage_form?: string | null;
+            electronic_regulatory_code?: string | null;
+            /** Format: double */
+            height_mm?: number | null;
+            /** Format: double */
+            length_mm?: number | null;
             manufacturer?: string | null;
+            packaging_levels?: components["schemas"]["ProductPackagingLevelInput"][] | null;
             product_name?: string | null;
             spec?: string | null;
             special_drug_category_code?: string | null;
             status?: string | null;
+            udi_code?: string | null;
+            /** Format: double */
+            volume_cm3?: number | null;
+            /** Format: double */
+            weight_g?: number | null;
+            /** Format: double */
+            width_mm?: number | null;
         };
         UpdateReceivingOrderRequest: {
             /** Format: date-time */
@@ -9261,6 +11407,9 @@ export interface components {
             result: string;
             schema_version: string;
             stage: string;
+            /** Format: uuid */
+            warehouse_id?: string | null;
+            wms_resource_id?: string | null;
         };
         UpsertInventoryStatusTransitionRequest: {
             approval_sources: string[];
@@ -9292,6 +11441,11 @@ export interface components {
             type_code: string;
             type_name: string;
         };
+        UpsertReconciliationRuleRequest: {
+            enabled: boolean;
+            /** Format: int32 */
+            interval_hours: number;
+        };
         UpsertSystemDictionaryItemRequest: {
             /** Format: date-time */
             effective_from?: string | null;
@@ -9305,6 +11459,8 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
+            /** Format: int32 */
+            sort_order: number;
         };
         UpsertTaskGroupRequest: {
             enabled: boolean;
@@ -9469,6 +11625,16 @@ export interface components {
         WarehouseZoneListResponse: {
             data: components["schemas"]["WarehouseZone"][];
             page: components["schemas"]["PageMeta"];
+        };
+        /** @description 截单计划的一条结构化周计划。 */
+        WeeklyCutoffSlot: {
+            /** @description Local time in HH:MM. */
+            cutoff_time: string;
+            /**
+             * Format: int32
+             * @description ISO weekday: Monday=1, Sunday=7.
+             */
+            weekday: number;
         };
         WeighPackJobRequest: {
             /** Format: int64 */
@@ -17994,6 +20160,372 @@ export interface operations {
             };
         };
     };
+    push_h8_asn: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+                /** @description ERP 调用目标仓库，必须与 API Key 授权范围一致 */
+                "X-WMS-Warehouse-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8AsnInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description ASN 已完成 M-PM 规整并提交 M2 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、仓库或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_outbound_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+                /** @description ERP 调用目标仓库，必须与 API Key 授权范围一致 */
+                "X-WMS-Warehouse-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8OutboundOrderInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 出库订单已完成 M-PM 规整并提交 M4 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、仓库或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_product_change: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ProductChangeInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 商品变更已完成 M-PM 规整并提交 M1；档案补录消息同时完成 M-QL 回执 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、货主全仓范围或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射、字段或档案补录回执校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_product_master: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ProductMasterInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 商品主数据已完成 M-PM 规整并提交 M1 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、货主全仓范围或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    push_h8_return_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description ERP 消息业务幂等键 */
+                "Idempotency-Key": string;
+                /** @description ERP 调用目标仓库，必须与 API Key 授权范围一致 */
+                "X-WMS-Warehouse-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ReturnOrderInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description 退货申请已完成 M-PM 规整并提交 M2 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8InboundResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、仓库或连接绑定不匹配 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突或消息处理中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema、路由、映射、原批号或业务校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     upsert_h8_erp_message_lifecycle: {
         parameters: {
             query?: never;
@@ -18605,6 +21137,83 @@ export interface operations {
             };
             /** @description 加密主密钥不可用 */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    record_h8_erp_business_receipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 必须与原出站消息幂等键一致 */
+                "Idempotency-Key": string;
+                /** @description 具备 inbound:push scope 的 ERP API Key */
+                "X-WMS-API-Key": string;
+            };
+            path: {
+                /** @description H8 出站消息 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["H8ErpBusinessReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description 业务成功回执进入 acked；明确拒绝进入 dead */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["H8ErpMessage"];
+                };
+            };
+            /** @description 回执绑定或结果非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description API Key 无效 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description scope、货主或仓库越权 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 消息不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 消息状态不允许回执 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -22015,6 +24624,86 @@ export interface operations {
             };
         };
     };
+    revalidate_outbound_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 出库订单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 重新校验出库订单；通过置 confirmed，失败置 validation_exception */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单状态不允许重新校验 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_outbound_review: {
         parameters: {
             query?: never;
@@ -22170,6 +24859,86 @@ export interface operations {
             };
         };
     };
+    void_request_outbound_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 出库订单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 提交作废申请，订单置 void_requested */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库订单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单已进入波次或后续状态，不允许作废申请 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     complete_outbound_pick_task: {
         parameters: {
             query?: never;
@@ -22217,6 +24986,559 @@ export interface operations {
                 };
             };
             /** @description 数量或状态非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_purchase_returns: {
+        parameters: {
+            query?: {
+                /** @description 按退货单状态过滤 */
+                status?: string | null;
+                /** @description 按退货单号/来源采购单号/供应商模糊查询 */
+                q?: string | null;
+                /** @description 返回条数，默认 50，最大 200 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 采购退货出库单列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrderListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_purchase_return: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePurchaseReturnRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建采购退货出库单，初始状态 pending_approval */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 退货单号重复或幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 数量非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_purchase_return: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 采购退货出库单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 采购退货出库单详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrder"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 采购退货出库单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    approve_purchase_return: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 采购退货出库单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 审批通过：pending_approval → approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 采购退货出库单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 当前状态不允许审批 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    pick_purchase_return: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 采购退货出库单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 退货拣货：approved → picking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 采购退货出库单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 当前状态不允许拣货 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reject_purchase_return: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 采购退货出库单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectPurchaseReturnRequest"];
+            };
+        };
+        responses: {
+            /** @description 审批驳回：pending_approval → cancelled，驳回原因必填 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 采购退货出库单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 当前状态不允许驳回或驳回原因缺失 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    review_purchase_return: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 采购退货出库单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 退货复核：picking → reviewed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 采购退货出库单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 当前状态不允许复核 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ship_purchase_return: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 采购退货出库单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 出库交接：reviewed → shipped，记录交接时间与操作人 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseReturnOrder"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 采购退货出库单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 当前状态不允许出库交接 */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -22419,6 +25741,86 @@ export interface operations {
                 };
             };
             /** @description 波次状态不允许取消 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    release_outbound_wave: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 出库波次 ID */
+                wave_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 下发草稿波次：锁定订单库存并生成拣选任务 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutboundWave"];
+                };
+            };
+            /** @description 缺少或非法幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无出库写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 出库波次不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键已用于不同请求 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 波次或订单状态不允许下发 */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -22678,16 +26080,19 @@ export interface operations {
             };
         };
     };
-    execute_mapping: {
+    map_parameter: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description 跨重试保持不变的幂等键 */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExecuteMappingRequest"];
+                "application/json": components["schemas"]["MapParameterRequest"];
             };
         };
         responses: {
@@ -22697,7 +26102,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExecuteMappingResponse"];
+                    "application/json": components["schemas"]["MapParameterResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 未登录 */
@@ -22709,31 +26123,2378 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description 字典不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求无效 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
-    trace_mapping: {
+    list_device_leases: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                /** @description 执行 ID */
-                execution_id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description 参数对照反向追溯 */
+            /** @description 设备租约列表（含释放模式快照与安全状态） */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MappingTraceResponse"];
+                    "application/json": components["schemas"]["DeviceLeaseListResponse"];
                 };
             };
             /** @description 未登录 */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    release_device_lease: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 设备租约 ID */
+                lease_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseDeviceLeaseRequest"];
+            };
+        };
+        responses: {
+            /** @description 人工释放成功或幂等重放；需专用权限+原因+二次确认 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceLease"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 缺少 h9.device_lease.release 专用权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 租约不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 租约已释放，或处于 printing/result_unknown/reconciling 硬安全状态 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 缺少原因或二次确认 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_printers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 打印机列表（含生效释放模式） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_printer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePrinterRequest"];
+            };
+        };
+        responses: {
+            /** @description 打印机创建成功或幂等重放；打印机归属唯一站点 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Printer"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 站点不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 同站点打印机名称已存在 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印机参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_printer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印机 ID */
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePrinterRequest"];
+            };
+        };
+        responses: {
+            /** @description 打印机状态或释放模式覆盖更新成功；运行中的租约保持快照 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Printer"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印机不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    test_print_printer: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印机 ID */
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestPrintRequest"];
+            };
+        };
+        responses: {
+            /** @description 测试指令受控下发并落表；真实硬件回执由 Print Agent/S4 验收登记 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterTestPrint"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印机或纸盒不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印机或纸盒已停用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_printer_trays: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 打印机 ID */
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 纸盒列表（纸张能力/启用状态/设备标识） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterTrayListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印机不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_printer_tray: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印机 ID */
+                printer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePrinterTrayRequest"];
+            };
+        };
+        responses: {
+            /** @description 纸盒创建成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterTray"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 打印机不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 同打印机纸盒设备标识已存在 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 纸盒参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_printer_tray: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印机 ID */
+                printer_id: string;
+                /** @description 纸盒 ID */
+                tray_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePrinterTrayRequest"];
+            };
+        };
+        responses: {
+            /** @description 纸盒能力或启用状态更新成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrinterTray"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 纸盒不存在或不属于该打印机 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_sites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 物理打印站点列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSiteListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_print_site: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePrintSiteRequest"];
+            };
+        };
+        responses: {
+            /** @description 站点创建成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSite"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 站点编码已存在 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 站点参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_site_owner_mappings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 物理打印站点 ID */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 站点货主仓映射列表（含软删行） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSiteOwnerMappingListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 站点不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_print_site_owner_mapping: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 物理打印站点 ID */
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSiteOwnerMappingRequest"];
+            };
+        };
+        responses: {
+            /** @description 映射创建成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSiteOwnerMapping"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 站点不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 同货主+仓库映射已存在 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 映射参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    disable_print_site_owner_mapping: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 物理打印站点 ID */
+                site_id: string;
+                /** @description 映射 ID */
+                mapping_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 映射软删成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSiteOwnerMapping"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印设备维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 映射不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 映射已停用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_aggregation_fields: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已登记的归集维度字段目录（仅等值归组） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AggregationFieldCatalogResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_aggregation_rules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 归集规则版本列表（按版本号倒序） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AggregationRuleVersionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_aggregation_rule_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAggregationRuleDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description 规则草稿创建成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AggregationRuleVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 维度未登记或参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    disable_aggregation_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 规则版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 规则停用成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AggregationRuleVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅已发布版本可停用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_aggregation_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 规则版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 规则发布成功或幂等重放；同货主旧发布版本自动停用 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AggregationRuleVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅已测试版本可发布 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    test_aggregation_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 规则版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestAggregationRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description 样本订单测试成功或幂等重放，返回分组键与预计归集结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AggregationRuleTestResult"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则版本或样本订单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 规则状态不允许测试 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_cutoff_plans: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 截单计划列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutoffPlanListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_cutoff_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCutoffPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description 截单计划草稿创建成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutoffPlan"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 截单计划参数或主数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_cutoff_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 截单计划 ID */
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 截单计划发布成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CutoffPlan"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 截单计划不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 状态非法或同级有效期重叠 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_delivery_note_candidates: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 待截单真实出库订单列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteCandidateListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_delivery_note_groups: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 随货同行单归集结果列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteGroupListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    manual_delivery_note_cutoff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualDeliveryNoteCutoffRequest"];
+            };
+        };
+        responses: {
+            /** @description 人工截单成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryNoteGroup"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单不存在或尚未冻结线路 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 订单已截单或编号规则未配置 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 参数或归集硬边界非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_document_categories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description M1 系统字典 print_document_category 受控分类（含 source_mode） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintDocumentCategoryListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_suites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 打印组套版本列表（含有序打印项，按版本号倒序） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSuiteVersionListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_print_suite_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePrintSuiteDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description 组套草稿创建成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSuiteVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 分类未登记、绑定非法或参数非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    disable_print_suite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 组套版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 组套停用成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSuiteVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 组套版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅已发布版本可停用 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_print_suite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 组套版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 组套发布成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSuiteVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 组套版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 仅已测试版本可发布，或同级同对象有效期重叠 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    test_print_suite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 组套版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestPrintSuiteRequest"];
+            };
+        };
+        responses: {
+            /** @description 样本归集组测试成功或幂等重放，返回解析层级与逐项就绪预检 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSuiteTestResult"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 组套版本或样本归集组不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 组套状态不允许测试 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_route_bindings: {
+        parameters: {
+            query?: {
+                /** @description 可选仓库筛选 */
+                warehouse_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 线路绑定列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteBindingListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_route_binding: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishRouteBindingRequest"];
+            };
+        };
+        responses: {
+            /** @description 线路绑定发布成功或幂等重放 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteBinding"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排维护权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 同一地址的有效期重叠 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 线路绑定参数或主数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_print_suite_instances: {
+        parameters: {
+            query?: {
+                /** @description 可选随货同行单归集组筛选 */
+                group_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 冻结组套实例列表（含组套版本、规则版本、源单据快照与逐项策略） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintSuiteInstanceListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无打印编排读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_category_pdfs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分类 PDF 稳定元数据列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPdfOutputListResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无分类 PDF 查看权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 组套实例不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_category_pdfs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectCategoryPdfsRequest"];
+            };
+        };
+        responses: {
+            /** @description 所选分类 PDF；多分类仅临时合并 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无分类 PDF 下载权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 所选分类尚未就绪 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    emergency_print_category_pdfs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectCategoryPdfsRequest"];
+            };
+        };
+        responses: {
+            /** @description 供浏览器应急打印的所选分类 PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无 PDF 应急打印专用权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 所选分类尚未就绪 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    prepare_category_pdfs: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 首次生成和失败重试必须复用的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 组套实例 ID */
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 分类 PDF 准备完成或受控失败结果 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPdfPreparation"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无分类 PDF 生成权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 源单据未就绪或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description H-FILE 存储失败 */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -22781,6 +28542,78 @@ export interface operations {
             };
         };
     };
+    generate_print_field_library_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeneratePrintFieldLibraryDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description 从当前 OpenAPI schema 生成字段库草稿 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldLibraryVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description schema 不存在或请求非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_print_field_definitions: {
         parameters: {
             query?: never;
@@ -22813,6 +28646,172 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_print_field_definition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 字段库版本 ID */
+                version_id: string;
+                /** @description 字段定义 ID */
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePrintFieldDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description 更新草稿字段元数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldDefinition"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段库版本或字段不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 已发布版本不可修改或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段元数据非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_print_field_library: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 字段库版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 发布字段库草稿 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintFieldLibraryVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段库版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 已发布版本不可重复改写或幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 字段路径已不在当前 OpenAPI schema */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -23124,6 +29123,81 @@ export interface operations {
             };
         };
     };
+    set_print_template_enabled: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印模板 ID */
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPrintTemplateEnabledRequest"];
+            };
+        };
+        responses: {
+            /** @description 停用或启用打印模板主数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplateSummary"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_print_template_versions: {
         parameters: {
             query?: never;
@@ -23156,6 +29230,79 @@ export interface operations {
             };
             /** @description 权限不足 */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_print_template: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 打印模板 ID */
+                template_id: string;
+                /** @description 草稿版本 ID */
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 发布打印模板草稿版本 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintTemplateVersion"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板或版本不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 版本不是最新草稿、已发布、模板类型停用或幂等冲突 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -23486,6 +29633,640 @@ export interface operations {
                 };
             };
             /** @description 审批结论或意见非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    complete_archive_revision_sync: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description H8 Worker 回执幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 档案补录质量联系单 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteArchiveRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description M-QL 已落地且 M2 ASN 已恢复验收 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityLiaisonOrder"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 缺少 H8 写权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 联系单不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description ERP 出站、商品值或 ASN 关联校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    claim_reconciliation_window: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 服务 Worker 本轮认领幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimReconciliationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationClaimResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    fail_reconciliation_claim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 失败上报幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 调度认领 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FailReconciliationClaimRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationClaimMutation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    renew_reconciliation_claim: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 本次续租幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 调度认领 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenewReconciliationClaimRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationClaimMutation"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_reconciliation_items: {
+        parameters: {
+            query?: {
+                product_code?: string | null;
+                batch_no?: string | null;
+                /** @description 逗号分隔差异类型；管理端多选控件提交 canonical CSV。 */
+                difference_type?: string | null;
+                /** @description 逗号分隔处理状态；管理端多选控件提交 canonical CSV。 */
+                resolution_status?: string | null;
+                cursor?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationItemListResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_reconciliation_isolation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetIsolationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": number;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resolve_reconciliation_item: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description 对账差异 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveReconciliationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationItem"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_reconciliation_rule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRule"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upsert_reconciliation_rule: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertReconciliationRuleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRule"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    run_reconciliation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitReconciliationRunRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRun"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             422: {
                 headers: {
                     [name: string]: unknown;

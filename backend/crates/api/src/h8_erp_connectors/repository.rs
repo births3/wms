@@ -6,12 +6,31 @@ use std::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{
     inflight_status_after_activate, inflight_status_after_disable, H8ErpConnector,
-    H8ErpConnectorError, H8ErpConnectorRuntimeConfig, H8_INFLIGHT_PAUSED, H8_INFLIGHT_RUNNING,
+    H8ErpConnectorError, H8ErpConnectorRuntimeConfig, H8ErpConnectorTestResult, H8_INFLIGHT_PAUSED,
+    H8_INFLIGHT_RUNNING,
 };
 
 use super::error::H8ErpConnectorRepoError;
+use super::idempotency::H8IdempotencyWrite;
+use super::persistence;
 use super::row::H8ErpConnectorRow;
+use crate::audit::AuditWriteRequest;
 use crate::sync::lock_recover;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum H8ConnectorStatusTransition {
+    Activate,
+    Disable,
+}
+
+impl H8ConnectorStatusTransition {
+    pub(super) fn inflight_statuses(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Activate => (H8_INFLIGHT_PAUSED, H8_INFLIGHT_RUNNING),
+            Self::Disable => (H8_INFLIGHT_RUNNING, H8_INFLIGHT_PAUSED),
+        }
+    }
+}
 
 #[axum::async_trait]
 pub trait H8ErpConnectorRepository: Send + Sync {
@@ -31,6 +50,12 @@ pub trait H8ErpConnectorRepository: Send + Sync {
         &self,
         connector: &H8ErpConnector,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError>;
+    async fn commit_create(
+        &self,
+        connector: &H8ErpConnector,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnector, H8ErpConnectorRepoError>;
     /// AC15：transport 与 probe 版本都必须匹配加载时版本，用于乐观锁。
     async fn save(
         &self,
@@ -38,7 +63,44 @@ pub trait H8ErpConnectorRepository: Send + Sync {
         observed_version: i64,
         observed_probe_version: i64,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError>;
+    async fn commit_update(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnector, H8ErpConnectorRepoError>;
+    #[allow(clippy::too_many_arguments)]
+    async fn commit_test(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        result: &H8ErpConnectorTestResult,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnectorTestResult, H8ErpConnectorRepoError>;
+    /// 连接状态、在途状态、审计与幂等响应必须在同一事务中提交。
+    #[allow(clippy::too_many_arguments)]
+    async fn commit_status_transition(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        transition: H8ConnectorStatusTransition,
+        audit_request: &AuditWriteRequest,
+        inflight_audit_request: Option<&AuditWriteRequest>,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<(H8ErpConnector, u64), H8ErpConnectorRepoError>;
     async fn delete(&self, owner_id: Uuid, id: Uuid) -> Result<(), H8ErpConnectorRepoError>;
+    async fn commit_delete(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<(), H8ErpConnectorRepoError>;
     async fn list_active(
         &self,
         owner_id: Uuid,
@@ -84,7 +146,7 @@ pub(crate) struct MemoryH8ErpConnectorRepository {
     versions: Mutex<HashMap<(Uuid, Uuid, i64), H8ErpConnectorRuntimeConfig>>,
     /// connector_id -> (status, count of messages)
     inflight: Mutex<HashMap<Uuid, Vec<String>>>,
-    api_key_scopes: Mutex<HashMap<Uuid, Vec<String>>>,
+    api_key_scopes: Mutex<HashMap<(Uuid, Uuid), Vec<String>>>,
 }
 
 #[axum::async_trait]
@@ -144,6 +206,15 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         Ok(connector.clone())
     }
 
+    async fn commit_create(
+        &self,
+        connector: &H8ErpConnector,
+        _audit_request: &AuditWriteRequest,
+        _idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
+        self.insert(connector).await
+    }
+
     async fn save(
         &self,
         connector: &H8ErpConnector,
@@ -176,6 +247,58 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
         Ok(connector.clone())
     }
 
+    async fn commit_update(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        _audit_request: &AuditWriteRequest,
+        _idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
+        self.save(connector, observed_version, observed_probe_version)
+            .await
+    }
+
+    async fn commit_test(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        result: &H8ErpConnectorTestResult,
+        _audit_request: &AuditWriteRequest,
+        _idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnectorTestResult, H8ErpConnectorRepoError> {
+        self.save(connector, observed_version, observed_probe_version)
+            .await?;
+        Ok(result.clone())
+    }
+
+    async fn commit_status_transition(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        transition: H8ConnectorStatusTransition,
+        _audit_request: &AuditWriteRequest,
+        _inflight_audit_request: Option<&AuditWriteRequest>,
+        _idempotency: &H8IdempotencyWrite,
+    ) -> Result<(H8ErpConnector, u64), H8ErpConnectorRepoError> {
+        let saved = self
+            .save(connector, observed_version, observed_probe_version)
+            .await?;
+        let affected = match transition {
+            H8ConnectorStatusTransition::Activate => {
+                self.resume_inflight(connector.owner_id, connector.id)
+                    .await?
+            }
+            H8ConnectorStatusTransition::Disable => {
+                self.pause_inflight(connector.owner_id, connector.id)
+                    .await?
+            }
+        };
+        Ok((saved, affected))
+    }
+
     async fn delete(&self, owner_id: Uuid, id: Uuid) -> Result<(), H8ErpConnectorRepoError> {
         let mut guard = lock_recover(&self.inner);
         let before = guard.len();
@@ -189,6 +312,16 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
             *snapshot_owner != owner_id || *connector_id != id
         });
         Ok(())
+    }
+
+    async fn commit_delete(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        _audit_request: &AuditWriteRequest,
+        _idempotency: &H8IdempotencyWrite,
+    ) -> Result<(), H8ErpConnectorRepoError> {
+        self.delete(owner_id, id).await
     }
 
     async fn list_active(
@@ -254,11 +387,11 @@ impl H8ErpConnectorRepository for MemoryH8ErpConnectorRepository {
 
     async fn load_api_key_scopes(
         &self,
-        _owner_id: Uuid,
+        owner_id: Uuid,
         api_key_id: Uuid,
     ) -> Result<Option<Vec<String>>, H8ErpConnectorRepoError> {
         let guard = lock_recover(&self.api_key_scopes);
-        Ok(guard.get(&api_key_id).cloned())
+        Ok(guard.get(&(owner_id, api_key_id)).cloned())
     }
 
     async fn bind_inflight(
@@ -355,61 +488,16 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         &self,
         connector: &H8ErpConnector,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
-        sqlx::query(
-            r#"
-            INSERT INTO h8_erp_connectors (
-                id, owner_id, connector_code, connector_name, warehouse_ids, directions,
-                message_types, channel_mode, api_base_url, interface_db_host, interface_db_port,
-                interface_db_name, interface_db_username, api_key_id, bearer_secret_alias,
-                interface_db_password_alias, interface_probe_db_username,
-                interface_probe_db_password_alias, interface_probe_config_version,
-                status, config_version, first_activated_at,
-                last_tested_version, last_tested_at, last_tested_succeeded,
-                last_tested_error_summary, created_at, updated_at
-            ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
-            )
-            "#,
-        )
-        .bind(connector.id)
-        .bind(connector.owner_id)
-        .bind(&connector.connector_code)
-        .bind(&connector.connector_name)
-        .bind(&connector.warehouse_ids)
-        .bind(&connector.directions)
-        .bind(&connector.message_types)
-        .bind(&connector.channel_mode)
-        .bind(&connector.api_base_url)
-        .bind(&connector.interface_db_host)
-        .bind(connector.interface_db_port)
-        .bind(&connector.interface_db_name)
-        .bind(&connector.interface_db_username)
-        .bind(connector.api_key_id)
-        .bind(&connector.bearer_secret_alias)
-        .bind(&connector.interface_db_password_alias)
-        .bind(&connector.interface_probe_db_username)
-        .bind(&connector.interface_probe_db_password_alias)
-        .bind(connector.interface_probe_config_version)
-        .bind(&connector.status)
-        .bind(connector.config_version)
-        .bind(connector.first_activated_at)
-        .bind(connector.last_tested_version)
-        .bind(connector.last_tested_at)
-        .bind(connector.last_tested_succeeded)
-        .bind(&connector.last_tested_error_summary)
-        .bind(connector.created_at)
-        .bind(connector.updated_at)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| {
-            let msg = e.to_string();
-            if msg.contains("uq_h8_erp_connectors_owner_code") {
-                H8ErpConnectorRepoError::DuplicateCode
-            } else {
-                H8ErpConnectorRepoError::Db(msg)
-            }
-        })?;
-        Ok(connector.clone())
+        persistence::insert(&self.pool, connector).await
+    }
+
+    async fn commit_create(
+        &self,
+        connector: &H8ErpConnector,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
+        persistence::commit_create(&self.pool, connector, audit_request, idempotency).await
     }
 
     async fn save(
@@ -418,105 +506,90 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         observed_version: i64,
         observed_probe_version: i64,
     ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
-        let result = sqlx::query(
-            r#"
-            UPDATE h8_erp_connectors SET
-                connector_name = $3,
-                warehouse_ids = $4,
-                directions = $5,
-                message_types = $6,
-                channel_mode = $7,
-                api_base_url = $8,
-                interface_db_host = $9,
-                interface_db_port = $10,
-                interface_db_name = $11,
-                interface_db_username = $12,
-                api_key_id = $13,
-                bearer_secret_alias = $14,
-                interface_db_password_alias = $15,
-                interface_probe_db_username = $16,
-                interface_probe_db_password_alias = $17,
-                interface_probe_config_version = $18,
-                status = $19,
-                config_version = $20,
-                first_activated_at = $21,
-                last_tested_version = $22,
-                last_tested_at = $23,
-                last_tested_succeeded = $24,
-                last_tested_error_summary = $25,
-                updated_at = $26
-             WHERE owner_id = $1 AND id = $2 AND config_version = $27
-               AND interface_probe_config_version = $28
-            "#,
+        persistence::save(
+            &self.pool,
+            connector,
+            observed_version,
+            observed_probe_version,
         )
-        .bind(connector.owner_id)
-        .bind(connector.id)
-        .bind(&connector.connector_name)
-        .bind(&connector.warehouse_ids)
-        .bind(&connector.directions)
-        .bind(&connector.message_types)
-        .bind(&connector.channel_mode)
-        .bind(&connector.api_base_url)
-        .bind(&connector.interface_db_host)
-        .bind(connector.interface_db_port)
-        .bind(&connector.interface_db_name)
-        .bind(&connector.interface_db_username)
-        .bind(connector.api_key_id)
-        .bind(&connector.bearer_secret_alias)
-        .bind(&connector.interface_db_password_alias)
-        .bind(&connector.interface_probe_db_username)
-        .bind(&connector.interface_probe_db_password_alias)
-        .bind(connector.interface_probe_config_version)
-        .bind(&connector.status)
-        .bind(connector.config_version)
-        .bind(connector.first_activated_at)
-        .bind(connector.last_tested_version)
-        .bind(connector.last_tested_at)
-        .bind(connector.last_tested_succeeded)
-        .bind(&connector.last_tested_error_summary)
-        .bind(connector.updated_at)
-        .bind(observed_version)
-        .bind(observed_probe_version)
-        .execute(&self.pool)
         .await
-        .map_err(|e| H8ErpConnectorRepoError::Db(e.to_string()))?;
-        if result.rows_affected() == 0 {
-            // 区分「不存在」与「版本冲突」
-            let versions: Option<(i64, i64)> = sqlx::query_as(
-                "SELECT config_version, interface_probe_config_version FROM h8_erp_connectors WHERE owner_id = $1 AND id = $2",
-            )
-            .bind(connector.owner_id)
-            .bind(connector.id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| H8ErpConnectorRepoError::Db(e.to_string()))?;
-            return Err(H8ErpConnectorRepoError::Domain(match versions {
-                Some((config_version, _)) if config_version != observed_version => {
-                    H8ErpConnectorError::VersionConflict
-                }
-                Some((_, probe_version)) if probe_version != observed_probe_version => {
-                    H8ErpConnectorError::ProbeVersionConflict
-                }
-                Some(_) => H8ErpConnectorError::VersionConflict,
-                None => H8ErpConnectorError::NotFound,
-            }));
-        }
-        Ok(connector.clone())
+    }
+
+    async fn commit_update(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnector, H8ErpConnectorRepoError> {
+        persistence::commit_update(
+            &self.pool,
+            connector,
+            observed_version,
+            observed_probe_version,
+            audit_request,
+            idempotency,
+        )
+        .await
+    }
+
+    async fn commit_test(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        result: &H8ErpConnectorTestResult,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<H8ErpConnectorTestResult, H8ErpConnectorRepoError> {
+        persistence::commit_test(
+            &self.pool,
+            connector,
+            observed_version,
+            observed_probe_version,
+            result,
+            audit_request,
+            idempotency,
+        )
+        .await
+    }
+
+    async fn commit_status_transition(
+        &self,
+        connector: &H8ErpConnector,
+        observed_version: i64,
+        observed_probe_version: i64,
+        transition: H8ConnectorStatusTransition,
+        audit_request: &AuditWriteRequest,
+        inflight_audit_request: Option<&AuditWriteRequest>,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<(H8ErpConnector, u64), H8ErpConnectorRepoError> {
+        persistence::commit_status_transition(
+            &self.pool,
+            connector,
+            observed_version,
+            observed_probe_version,
+            transition,
+            audit_request,
+            inflight_audit_request,
+            idempotency,
+        )
+        .await
     }
 
     async fn delete(&self, owner_id: Uuid, id: Uuid) -> Result<(), H8ErpConnectorRepoError> {
-        let result = sqlx::query("DELETE FROM h8_erp_connectors WHERE owner_id = $1 AND id = $2")
-            .bind(owner_id)
-            .bind(id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| H8ErpConnectorRepoError::Db(e.to_string()))?;
-        if result.rows_affected() == 0 {
-            return Err(H8ErpConnectorRepoError::Domain(
-                H8ErpConnectorError::NotFound,
-            ));
-        }
-        Ok(())
+        persistence::delete(&self.pool, owner_id, id).await
+    }
+
+    async fn commit_delete(
+        &self,
+        owner_id: Uuid,
+        id: Uuid,
+        audit_request: &AuditWriteRequest,
+        idempotency: &H8IdempotencyWrite,
+    ) -> Result<(), H8ErpConnectorRepoError> {
+        persistence::commit_delete(&self.pool, owner_id, id, audit_request, idempotency).await
     }
 
     async fn list_active(
@@ -607,7 +680,11 @@ impl H8ErpConnectorRepository for PgH8ErpConnectorRepository {
         let scopes: Option<Vec<String>> = sqlx::query_scalar(
             r#"
             SELECT scopes FROM auth_api_keys
-             WHERE owner_id = $1 AND id = $2 AND status = 'active'
+             WHERE owner_id = $1
+               AND id = $2
+               AND status = 'active'
+               AND expires_at > now()
+               AND (grace_expires_at IS NULL OR grace_expires_at > now())
             "#,
         )
         .bind(owner_id)

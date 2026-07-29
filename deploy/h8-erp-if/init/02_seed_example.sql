@@ -18,10 +18,15 @@ DECLARE @cust UNIQUEIDENTIFIER = '00000000-0000-0000-0000-000000000004';
 
 INSERT INTO dbo.if_in_product_master (
     external_doc_no, owner_id, product_code, product_name, approval_no, spec,
-    dosage_form, manufacturer, storage_condition, idempotency_key, sync_status
+    dosage_form, manufacturer, special_drug_category, storage_condition,
+    udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm, weight_g,
+    packaging_json, idempotency_key, sync_status
 ) VALUES (
     N'DEMO-PM-001', @owner, N'DEMO-P-001', N'演示商品-对乙酰氨基酚片', N'国药准字H000000', N'0.5g*24片',
-    N'片剂', N'演示制药', N'normal', N'h8-demo-pm-001', N'pending'
+    N'片剂', N'演示制药', N'普通药品', N'常温保存',
+    N'06912345678901', N'DEMO-REG-001', 120, 80, 50, 350.5,
+    N'[{"unit":"片","ratio_to_base":1,"is_base":true,"is_default":false,"sort_order":1},{"unit":"盒","ratio_to_base":24,"is_base":false,"is_default":true,"sort_order":2}]',
+    N'h8-demo-pm-001', N'pending'
 );
 
 INSERT INTO dbo.if_in_asn (

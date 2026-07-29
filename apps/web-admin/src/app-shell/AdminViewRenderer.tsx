@@ -1,43 +1,54 @@
+import * as React from "react";
 import type { ReactNode } from "react";
 
-import { FeatureFlagConfigCenterPage } from "@/pages/config-center/FeatureFlagConfigCenterPage";
-import { ErpConnectorConfigPage } from "@/pages/config-center/ErpConnectorConfigPage";
-import { ErpMessageLogPage } from "@/pages/config-center/ErpMessageLogPage";
-import { ErpInterfaceTablePage } from "@/pages/config-center/ErpInterfaceTablePage";
-import { H1AdminMenuPage } from "@/pages/admin-menu/H1AdminMenuPage";
-import { H1RolePermissionPage } from "@/pages/auth/H1RolePermissionPage";
-import { H1SessionPage } from "@/pages/auth/H1SessionPage";
-import { H1ApiKeyPage } from "@/pages/api-key/H1ApiKeyPage";
-import { H4WechatNotifyPage, type H4WechatNotifyMode } from "@/pages/wechat-notify/H4WechatNotifyPage";
-import { M2InboundPage, type M2InboundMode } from "@/pages/inbound/M2InboundPage";
 import { M2InboundDocumentsPage } from "@/pages/inbound/M2InboundDocumentsPage";
-import { M2PutawayStrategyPage } from "@/pages/inbound/M2PutawayStrategyPage";
-import { M3BatchManagementPage } from "@/pages/inventory/M3BatchManagementPage";
-import { M3InventoryStatusConfigPage } from "@/pages/inventory/M3InventoryStatusConfigPage";
-import { M3LocationHistoryPage } from "@/pages/inventory/M3LocationHistoryPage";
-import { M3InventoryCountPage } from "@/pages/inventory/M3InventoryCountPage";
-import { M3MaintenancePage } from "@/pages/inventory/M3MaintenancePage";
-import { M3RelocationPage } from "@/pages/inventory/M3RelocationPage";
-import { M1MasterDataPage, type MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
-import { M4OutboundPage, type M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
-import { H2AuditTrailPage, H3ApiContractPage } from "@/pages/platform/HorizontalCapabilityPages";
-import { H5ExpressPage } from "@/pages/express/H5ExpressPage";
-import { AlertDefinitionPage } from "@/pages/alert-engine/AlertDefinitionPage";
-import { AlertDashboardPage } from "@/pages/alert-engine/AlertDashboardPage";
-import { AlertEscalationPage } from "@/pages/alert-engine/AlertEscalationPage";
-import { H9PrintTemplatePage } from "@/pages/print-template/H9PrintTemplatePage";
-import { MCGDocumentNumberingPage } from "@/pages/document-numbering/MCGDocumentNumberingPage";
-import { DockManagementPage } from "@/pages/dock/DockManagementPage";
-import { DrugInspectionPlatformPage } from "@/pages/drug-inspection/DrugInspectionPlatformPage";
 import { DrugInspectionReviewPage } from "@/pages/drug-inspection/DrugInspectionReviewPage";
 import { DrugInspectionStampPage } from "@/pages/drug-inspection/DrugInspectionStampPage";
-import { TaskTypeConfigPage } from "@/pages/task-engine/TaskTypeConfigPage";
-import { TaskGroupConfigPage } from "@/pages/task-engine/TaskGroupConfigPage";
-import { TaskDispatchPage } from "@/pages/task-engine/TaskDispatchPage";
-import { BillingRuleConfigPage } from "@/pages/billing/BillingRuleConfigPage";
-import { TmsRoutePlanPage } from "@/pages/tms/TmsRoutePlanPage";
+import type { H4WechatNotifyMode } from "@/pages/wechat-notify/H4WechatNotifyPage";
+import type { M2InboundMode } from "@/pages/inbound/M2InboundPage";
+import type { MasterDataViewId } from "@/pages/master-data/M1MasterDataPage";
+import type { M4OutboundMode } from "@/pages/outbound/M4OutboundPage";
 import type { CurrentUser } from "@/features/auth/auth-queries";
 import type { AdminView } from "./admin-view";
+
+// 页面按视图懒加载：每个页面单独分包，首屏只需要工作台外壳。
+const FeatureFlagConfigCenterPage = React.lazy(() => import("@/pages/config-center/FeatureFlagConfigCenterPage").then((m) => ({ default: m.FeatureFlagConfigCenterPage })));
+const ErpConnectorConfigPage = React.lazy(() => import("@/pages/config-center/ErpConnectorConfigPage").then((m) => ({ default: m.ErpConnectorConfigPage })));
+const ErpMessageLogPage = React.lazy(() => import("@/pages/config-center/ErpMessageLogPage").then((m) => ({ default: m.ErpMessageLogPage })));
+const ErpInterfaceTablePage = React.lazy(() => import("@/pages/config-center/ErpInterfaceTablePage").then((m) => ({ default: m.ErpInterfaceTablePage })));
+const H1AdminMenuPage = React.lazy(() => import("@/pages/admin-menu/H1AdminMenuPage").then((m) => ({ default: m.H1AdminMenuPage })));
+const H1RolePermissionPage = React.lazy(() => import("@/pages/auth/H1RolePermissionPage").then((m) => ({ default: m.H1RolePermissionPage })));
+const H1SessionPage = React.lazy(() => import("@/pages/auth/H1SessionPage").then((m) => ({ default: m.H1SessionPage })));
+const H1ApiKeyPage = React.lazy(() => import("@/pages/api-key/H1ApiKeyPage").then((m) => ({ default: m.H1ApiKeyPage })));
+const H4WechatNotifyPage = React.lazy(() => import("@/pages/wechat-notify/H4WechatNotifyPage").then((m) => ({ default: m.H4WechatNotifyPage })));
+const M2InboundPage = React.lazy(() => import("@/pages/inbound/M2InboundPage").then((m) => ({ default: m.M2InboundPage })));
+const M2PutawayStrategyPage = React.lazy(() => import("@/pages/inbound/M2PutawayStrategyPage").then((m) => ({ default: m.M2PutawayStrategyPage })));
+const M3BatchManagementPage = React.lazy(() => import("@/pages/inventory/M3BatchManagementPage").then((m) => ({ default: m.M3BatchManagementPage })));
+const M3InventoryStatusConfigPage = React.lazy(() => import("@/pages/inventory/M3InventoryStatusConfigPage").then((m) => ({ default: m.M3InventoryStatusConfigPage })));
+const M3LocationHistoryPage = React.lazy(() => import("@/pages/inventory/M3LocationHistoryPage").then((m) => ({ default: m.M3LocationHistoryPage })));
+const M3InventoryCountPage = React.lazy(() => import("@/pages/inventory/M3InventoryCountPage").then((m) => ({ default: m.M3InventoryCountPage })));
+const M3MaintenancePage = React.lazy(() => import("@/pages/inventory/M3MaintenancePage").then((m) => ({ default: m.M3MaintenancePage })));
+const M3RelocationPage = React.lazy(() => import("@/pages/inventory/M3RelocationPage").then((m) => ({ default: m.M3RelocationPage })));
+const MrcReconciliationPage = React.lazy(() => import("@/pages/reconciliation/MrcReconciliationPage").then((m) => ({ default: m.MrcReconciliationPage })));
+const M1MasterDataPage = React.lazy(() => import("@/pages/master-data/M1MasterDataPage").then((m) => ({ default: m.M1MasterDataPage })));
+const M4OutboundPage = React.lazy(() => import("@/pages/outbound/M4OutboundPage").then((m) => ({ default: m.M4OutboundPage })));
+const H2AuditTrailPage = React.lazy(() => import("@/pages/platform/HorizontalCapabilityPages").then((m) => ({ default: m.H2AuditTrailPage })));
+const H3ApiContractPage = React.lazy(() => import("@/pages/platform/HorizontalCapabilityPages").then((m) => ({ default: m.H3ApiContractPage })));
+const H5ExpressPage = React.lazy(() => import("@/pages/express/H5ExpressPage").then((m) => ({ default: m.H5ExpressPage })));
+const AlertDefinitionPage = React.lazy(() => import("@/pages/alert-engine/AlertDefinitionPage").then((m) => ({ default: m.AlertDefinitionPage })));
+const AlertDashboardPage = React.lazy(() => import("@/pages/alert-engine/AlertDashboardPage").then((m) => ({ default: m.AlertDashboardPage })));
+const AlertEscalationPage = React.lazy(() => import("@/pages/alert-engine/AlertEscalationPage").then((m) => ({ default: m.AlertEscalationPage })));
+const H9DeliveryNoteAggregationPage = React.lazy(() => import("@/pages/print-orchestration/H9DeliveryNoteAggregationPage").then((m) => ({ default: m.H9DeliveryNoteAggregationPage })));
+const H9PrintDevicePage = React.lazy(() => import("@/pages/print-orchestration/H9PrintDevicePage").then((m) => ({ default: m.H9PrintDevicePage })));
+const H9PrintTemplatePage = React.lazy(() => import("@/pages/print-template/H9PrintTemplatePage").then((m) => ({ default: m.H9PrintTemplatePage })));
+const MCGDocumentNumberingPage = React.lazy(() => import("@/pages/document-numbering/MCGDocumentNumberingPage").then((m) => ({ default: m.MCGDocumentNumberingPage })));
+const DockManagementPage = React.lazy(() => import("@/pages/dock/DockManagementPage").then((m) => ({ default: m.DockManagementPage })));
+const DrugInspectionPlatformPage = React.lazy(() => import("@/pages/drug-inspection/DrugInspectionPlatformPage").then((m) => ({ default: m.DrugInspectionPlatformPage })));
+const TaskTypeConfigPage = React.lazy(() => import("@/pages/task-engine/TaskTypeConfigPage").then((m) => ({ default: m.TaskTypeConfigPage })));
+const TaskGroupConfigPage = React.lazy(() => import("@/pages/task-engine/TaskGroupConfigPage").then((m) => ({ default: m.TaskGroupConfigPage })));
+const TaskDispatchPage = React.lazy(() => import("@/pages/task-engine/TaskDispatchPage").then((m) => ({ default: m.TaskDispatchPage })));
+const BillingRuleConfigPage = React.lazy(() => import("@/pages/billing/BillingRuleConfigPage").then((m) => ({ default: m.BillingRuleConfigPage })));
+const TmsRoutePlanPage = React.lazy(() => import("@/pages/tms/TmsRoutePlanPage").then((m) => ({ default: m.TmsRoutePlanPage })));
 
 export function renderAdminView(
   view: AdminView,
@@ -101,6 +112,7 @@ export function renderAdminView(
   if (view === "m3-counts") return <M3InventoryCountPage />;
   if (view === "m3-maintenance") return <M3MaintenancePage />;
   if (view === "m3-relocations") return <M3RelocationPage />;
+  if (view === "mrc-reconciliation") return <MrcReconciliationPage currentUser={currentUser} />;
   if (view === "mte-task-types") return <TaskTypeConfigPage />;
   if (view === "mte-task-groups") return <TaskGroupConfigPage />;
   if (view === "mte-task-dispatch") return <TaskDispatchPage />;
@@ -120,7 +132,9 @@ export function renderAdminView(
   if (view === "hal-alert-definitions") return <AlertDefinitionPage />;
   if (view === "hal-alert-escalations") return <AlertEscalationPage />;
   if (view === "h5-express") return <H5ExpressPage />;
-  if (view === "h9-print-templates") return <H9PrintTemplatePage />;
+  if (view === "h9-delivery-note-aggregation") return <H9DeliveryNoteAggregationPage currentUser={currentUser} />;
+  if (view === "h9-print-devices") return <H9PrintDevicePage currentUser={currentUser} />;
+  if (view === "h9-print-templates") return <H9PrintTemplatePage currentUser={currentUser} />;
   if (view === "mcg-numbering") return <MCGDocumentNumberingPage />;
   return null;
 }

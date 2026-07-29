@@ -140,13 +140,17 @@ async fn print_template_type_presets_are_queryable_and_require_field_library(poo
     assert_eq!(
         codes,
         vec![
-            PRINT_TEMPLATE_TYPE_ACCEPTANCE_RECORD,
             PRINT_TEMPLATE_TYPE_ASN,
+            PRINT_TEMPLATE_TYPE_ACCEPTANCE_RECORD,
             PRINT_TEMPLATE_TYPE_DELIVERY_NOTE,
             PRINT_TEMPLATE_TYPE_LOCATION_LABEL,
             PRINT_TEMPLATE_TYPE_LPN_LABEL,
             PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
         ]
+    );
+    assert_eq!(
+        items.iter().map(|item| item.sort_order).collect::<Vec<_>>(),
+        vec![10, 20, 30, 40, 50, 60]
     );
     assert!(items.iter().all(|item| item.source == "global"));
     assert!(items
@@ -162,6 +166,7 @@ async fn print_template_type_presets_are_queryable_and_require_field_library(poo
                 owner_id: Some(owner_id),
                 item_name: "坏模板类型".to_string(),
                 enabled: true,
+                sort_order: 10,
                 params: json!({
                     "business_module": "M2",
                     "business_direction": "inbound",
@@ -176,7 +181,141 @@ async fn print_template_type_presets_are_queryable_and_require_field_library(poo
         )
         .await
         .expect_err("enabled print template type without field library must be rejected");
-    assert!(matches!(error, SystemDictionaryError::ParamInvalid { .. }));
+    assert_eq!(
+        error,
+        SystemDictionaryError::PrintTemplateFieldLibraryRequired
+    );
+
+    let blank_error = repo
+        .upsert_item(
+            &ctx(owner_id),
+            SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+            PRINT_TEMPLATE_TYPE_ASN,
+            UpsertSystemDictionaryItemRequest {
+                owner_id: Some(owner_id),
+                item_name: "空字段库模板类型".to_string(),
+                enabled: true,
+                sort_order: 10,
+                params: json!({
+                    "field_library_code": "  ",
+                    "business_module": "M2",
+                    "business_direction": "inbound",
+                    "paper_type": "a4",
+                    "default_scope": "owner"
+                }),
+                effective_from: None,
+                effective_to: None,
+            },
+            now,
+            "system-dictionary-print-template-blank-library",
+        )
+        .await
+        .expect_err("blank field library must be rejected");
+    assert_eq!(
+        blank_error,
+        SystemDictionaryError::PrintTemplateFieldLibraryRequired
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn print_template_type_create_update_disable_are_idempotent_and_audited(pool: PgPool) {
+    let repo = PgSystemDictionaryRepository::new(pool.clone());
+    let owner_id = Uuid::new_v4();
+    let auth = ctx(owner_id);
+    let now = Utc
+        .with_ymd_and_hms(2026, 7, 6, 10, 0, 0)
+        .single()
+        .expect("valid time");
+    let request = UpsertSystemDictionaryItemRequest {
+        owner_id: Some(owner_id),
+        item_name: "货主商品标签".to_string(),
+        enabled: true,
+        sort_order: 5,
+        params: json!({
+            "field_library_code": "m1_product_label_owner",
+            "business_module": "M1",
+            "business_direction": "label",
+            "paper_type": "a4",
+            "default_scope": "owner"
+        }),
+        effective_from: None,
+        effective_to: None,
+    };
+    let created = repo
+        .upsert_item(
+            &auth,
+            SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+            PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
+            request.clone(),
+            now,
+            "h9-template-type-create",
+        )
+        .await
+        .expect("owner template type should create");
+    let replay = repo
+        .upsert_item(
+            &auth,
+            SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+            PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
+            request.clone(),
+            now,
+            "h9-template-type-create",
+        )
+        .await
+        .expect("same create should replay");
+    assert_eq!(replay.value.id, created.value.id);
+    assert!(replay.replayed);
+
+    let mut updated_request = request;
+    updated_request.item_name = "货主商品标签已更新".to_string();
+    repo.upsert_item(
+        &auth,
+        SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+        PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
+        updated_request,
+        now + chrono::Duration::minutes(1),
+        "h9-template-type-update",
+    )
+    .await
+    .expect("owner template type should update");
+    repo.disable_item(
+        &auth,
+        SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
+        PRINT_TEMPLATE_TYPE_PRODUCT_LABEL,
+        DisableSystemDictionaryItemRequest {
+            owner_id: Some(owner_id),
+            disabled_reason: Some("test disable".to_string()),
+        },
+        now + chrono::Duration::minutes(2),
+        "h9-template-type-disable",
+    )
+    .await
+    .expect("owner template type should disable");
+
+    let audits: Vec<(String, serde_json::Value)> = sqlx::query_as(
+        "SELECT action, diff FROM audit_event WHERE resource_id = $1 ORDER BY occurred_at",
+    )
+    .bind(created.value.id.to_string())
+    .fetch_all(&pool)
+    .await
+    .expect("template type audits should query");
+    assert_eq!(
+        audits
+            .iter()
+            .map(|(action, _)| action.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "upsert_system_dictionary_item",
+            "upsert_system_dictionary_item",
+            "disable_system_dictionary_item"
+        ]
+    );
+    assert_eq!(audits[0].1["before"], serde_json::Value::Null);
+    assert_eq!(
+        audits[1].1["after"]["item_name"],
+        json!("货主商品标签已更新")
+    );
+    assert_eq!(audits[2].1["after"]["enabled"], json!(false));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -193,6 +332,7 @@ async fn owner_dictionary_item_overrides_global_and_disable_hides_it(pool: PgPoo
         owner_id: Some(owner_id),
         item_name: "货主采购入库".to_string(),
         enabled: true,
+        sort_order: 10,
         params: valid_document_type_params(),
         effective_from: None,
         effective_to: None,
@@ -304,6 +444,7 @@ async fn special_drug_category_write_replays_once_and_is_queryable_with_one_audi
         owner_id: Some(owner_id),
         item_name: "货主管制药品".to_string(),
         enabled: true,
+        sort_order: 10,
         params: json!({ "requires_dual_sign": true }),
         effective_from: None,
         effective_to: None,
@@ -382,6 +523,7 @@ async fn document_type_rejects_invalid_params(pool: PgPool) {
                 owner_id: Some(owner_id),
                 item_name: "坏参数".to_string(),
                 enabled: true,
+                sort_order: 10,
                 params: json!({
                     "direction": "sideways",
                     "workflow_template": "purchase_inbound"
@@ -396,6 +538,30 @@ async fn document_type_rejects_invalid_params(pool: PgPool) {
         .expect_err("invalid document_type params must be rejected");
 
     assert!(matches!(error, SystemDictionaryError::ParamInvalid { .. }));
+
+    let negative_sort_order = repo
+        .upsert_item(
+            &ctx(owner_id),
+            SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            UpsertSystemDictionaryItemRequest {
+                owner_id: Some(owner_id),
+                item_name: "坏排序号".to_string(),
+                enabled: true,
+                sort_order: -1,
+                params: valid_document_type_params(),
+                effective_from: None,
+                effective_to: None,
+            },
+            now,
+            "system-dictionary-invalid-sort-order",
+        )
+        .await
+        .expect_err("negative sort order must be rejected");
+    assert!(matches!(
+        negative_sort_order,
+        SystemDictionaryError::ParamInvalid { ref field, .. } if field == "sort_order"
+    ));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
