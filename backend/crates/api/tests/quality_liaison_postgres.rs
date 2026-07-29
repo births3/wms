@@ -264,7 +264,7 @@ async fn quality_liaison_api_enforces_permissions_and_designated_approver(pool: 
         )
         .await
         .expect("quality liaison API type should seed");
-    let app = quality_liaison_router(QualityLiaisonAppState::with_postgres(pool));
+    let app = quality_liaison_router(QualityLiaisonAppState::with_postgres(pool.clone()));
     let type_response = app
         .clone()
         .oneshot(
@@ -443,6 +443,20 @@ async fn quality_liaison_api_enforces_permissions_and_designated_approver(pool: 
         .await
         .expect("quality liaison callback should respond");
     assert_eq!(approved.status(), StatusCode::OK);
+    let audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1
+           AND action = ANY($2::text[])",
+    )
+    .bind(owner_id)
+    .bind(vec![
+        "create_quality_liaison",
+        "apply_quality_liaison_approval",
+    ])
+    .fetch_one(&pool)
+    .await
+    .expect("quality liaison API audit evidence should query");
+    assert_eq!(audit_count, 2);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

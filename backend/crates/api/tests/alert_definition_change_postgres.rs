@@ -620,6 +620,17 @@ async fn forced_alert_disable_rolls_back_mql_and_h4_approval(pool: PgPool) {
             .expect("forced alert liaison body should read"),
     )
     .expect("forced alert liaison should deserialize");
+    let liaison_audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1
+           AND resource_id = $2",
+    )
+    .bind(owner_id)
+    .bind(liaison.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .expect("forced alert liaison audit should query");
+    assert_eq!(liaison_audit_count, 1);
 
     let error = PgQualityLiaisonRepository::new(pool.clone())
         .apply_approval_callback(

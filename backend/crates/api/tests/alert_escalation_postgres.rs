@@ -28,7 +28,9 @@ impl WechatProvider for RecordingProvider {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn escalation_rule_limits_levels_and_job_escalates_once_then_stops_after_ack(pool: PgPool) {
+async fn upsert_alert_escalation_rule_limits_levels_and_job_escalates_once_then_stops_after_ack(
+    pool: PgPool,
+) {
     let owner_id = Uuid::new_v4();
     let manager_id = Uuid::new_v4();
     let now = Utc
@@ -76,6 +78,16 @@ async fn escalation_rule_limits_levels_and_job_escalates_once_then_stops_after_a
         )
         .await
         .expect("three-level escalation rule should save");
+    let rule_audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1
+           AND action = 'alert.escalation_rule.upserted'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("escalation rule audit should query");
+    assert_eq!(rule_audit_count, 1);
     let alert_id = seed_escalating_alert(
         &pool,
         owner_id,
