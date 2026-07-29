@@ -149,11 +149,35 @@ export function MasterDataCrudDialog({
   const [form, setForm] = React.useState<MasterDataCrudForm | null>(null);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const locationScopesRef = React.useRef(locationScopes);
+  locationScopesRef.current = locationScopes;
+  const warehouseOptionsRef = React.useRef(warehouseOptions);
+  warehouseOptionsRef.current = warehouseOptions;
 
+  // 仅在编辑目标变化时初始化表单；选项数组经 ref 读取最新值，
+  // 避免选项查询返回（数组引用变化）时把用户已填写的表单清空。
   React.useEffect(() => {
-    setForm(target ? formFromTarget(target, locationScopes[0] ?? null, warehouseOptions[0] ?? null) : null);
+    setForm(
+      target
+        ? formFromTarget(target, locationScopesRef.current[0] ?? null, warehouseOptionsRef.current[0] ?? null)
+        : null,
+    );
     setError(null);
-  }, [target, locationScopes, warehouseOptions]);
+  }, [target]);
+
+  // 选项查询晚于弹窗打开返回时，仅在对应字段仍为空时补默认值，不覆盖用户输入。
+  React.useEffect(() => {
+    setForm((current) => {
+      if (!current) return current;
+      if (current.kind === "location" && current.mode === "create" && !current.scopeKey && locationScopes[0]) {
+        return { ...current, scopeKey: locationScopes[0].key };
+      }
+      if (current.kind === "zone" && current.mode === "create" && !current.warehouseId && warehouseOptions[0]) {
+        return { ...current, warehouseId: warehouseOptions[0].id };
+      }
+      return current;
+    });
+  }, [locationScopes, warehouseOptions]);
 
   if (!target || !form) return null;
   const patch = (value: Partial<MasterDataCrudForm>) => {

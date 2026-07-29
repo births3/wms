@@ -15,7 +15,7 @@ import {
   type QueryPanelValue,
   validateLocationBatchRange,
 } from "@wms/ui";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Printer, Upload } from "lucide-react";
 
 import {
   batchCreateCustomers,
@@ -61,6 +61,11 @@ import {
 } from "./m1-product-page-model";
 import { M1SystemDictionaryPage } from "./SystemDictionaryPage";
 import type { CurrentUser } from "@/features/auth/auth-queries";
+import {
+  H9BusinessPrintDialog,
+  type H9BusinessPrintTarget,
+} from "../print-template/H9BusinessPrintDialog";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
 export const masterDataViewMeta: Record<
   MasterDataViewId,
@@ -144,6 +149,7 @@ export function M1MasterDataPage({ viewId, currentUser }: M1MasterDataPageProps)
 function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProps, "currentUser" | "viewId">) {
   const meta = masterDataViewMeta[viewId];
   const canWrite = currentUser.permissions.includes("m1.master_data.write");
+  const canPrint = currentUser.permissions.includes("h9.print_template.print");
   const rowsQuery = useMasterDataRowsQuery(viewId);
   const warehouseRowsQuery = useMasterDataRowsQuery("m1-warehouses", viewId === "m1-zones");
   const zoneRowsQuery = useMasterDataRowsQuery("m1-zones", viewId === "m1-locations");
@@ -154,12 +160,13 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const locationTypeOptions = locationTypeOptionsQuery.data ?? [];
   const temperatureZoneOptions = useSystemDictionaryItemOptionsQuery("temperature_zone", viewId === "m1-zones").data ?? [];
   const qualityColorOptions = useSystemDictionaryItemOptionsQuery("quality_color", viewId === "m1-zones").data ?? [];
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultM1QueryValue());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultM1QueryValue());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultM1QueryValue, normalizeM1QueryValue);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
   const [rowActionError, setRowActionError] = React.useState<string | null>(null);
   const [disablingId, setDisablingId] = React.useState<string | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
+  const [printTarget, setPrintTarget] = React.useState<H9BusinessPrintTarget | null>(null);
   const [crudTarget, setCrudTarget] = React.useState<MasterDataCrudTarget | null>(null);
   const supplierActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
   const customerActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
@@ -341,6 +348,16 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
     }
   }
 
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+    setSelectedRowKeys([]);
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
+    setSelectedRowKeys([]);
+  }
+
   function selectedRowFrom(keys: string[]) {
     if (keys.length !== 1) return null;
     return rows.find((row) => row.id === keys[0]) ?? null;
@@ -406,8 +423,8 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         },
       }
     : undefined;
-  const gridToolbarActions: DataGridToolbarAction[] = canWrite ? [
-    ...(viewId === "m1-business-partners"
+  const gridToolbarActions: DataGridToolbarAction[] = [
+    ...(canWrite && viewId === "m1-business-partners"
       ? [
           {
             key: "supplier-create",
@@ -439,7 +456,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
           },
         ]
       : []),
-    ...(viewId === "m1-locations"
+    ...(canWrite && viewId === "m1-locations"
       ? [
           {
             key: "location-batch-create",
@@ -450,7 +467,22 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
           },
         ]
       : []),
-  ] : [];
+    ...(canPrint && (viewId === "m1-products" || viewId === "m1-locations")
+      ? [
+          {
+            key: "print-label",
+            label: "标签",
+            description: viewId === "m1-products" ? "打印商品标签" : "打印库位标签",
+            icon: <Printer className="size-4" aria-hidden />,
+            disabled: ({ selectedRowKeys: keys }) => keys.length !== 1,
+            onClick: ({ selectedRowKeys: keys }) => {
+              const row = selectedRowFrom(keys);
+              if (row) setPrintTarget(masterDataPrintTarget(viewId, row));
+            },
+          } satisfies DataGridToolbarAction,
+        ]
+      : []),
+  ];
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
@@ -492,15 +524,10 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeM1QueryValue(next))}
         onQuery={() => {
-          setAppliedQuery(normalizeM1QueryValue(draftQuery));
+          applyQuery(draftQuery);
           setSelectedRowKeys([]);
         }}
-        onReset={() => {
-          const defaults = defaultM1QueryValue();
-          setDraftQuery(defaults);
-          setAppliedQuery(defaults);
-          setSelectedRowKeys([]);
-        }}
+        onReset={clearGridQueryState}
         resetLabel="重置"
       />
 
@@ -535,19 +562,9 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         tableClassName={productTableClassName(viewId)}
         queryState={appliedQuery}
         querySummaryItems={m1QuerySummaryItems}
-        onApplyQueryState={(queryState) => {
-          const next = normalizeM1QueryValue(queryValueFromUnknown(queryState));
-          setDraftQuery(next);
-          setAppliedQuery(next);
-          setSelectedRowKeys([]);
-        }}
-        onClearQueryState={() => {
-          const defaults = defaultM1QueryValue();
-          setDraftQuery(defaults);
-          setAppliedQuery(defaults);
-          setSelectedRowKeys([]);
-        }}
-        selectable={viewId !== "m1-products"}
+        onApplyQueryState={applyGridQueryState}
+        onClearQueryState={clearGridQueryState}
+        selectable={viewId !== "m1-products" || canPrint}
       />
 
       {viewId === "m1-locations" && (
@@ -575,7 +592,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         />
       )}
 
-        <MasterDataCrudDialog
+      <MasterDataCrudDialog
         target={crudTarget}
         locationScopes={locationBatchScopes}
           locationTypeOptions={locationTypeOptions}
@@ -585,8 +602,104 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         onOpenChange={(open) => !open && setCrudTarget(null)}
         onSubmit={submitCrudForm}
       />
+      <H9BusinessPrintDialog
+        open={Boolean(printTarget)}
+        target={printTarget}
+        onOpenChange={(next) => {
+          if (!next) setPrintTarget(null);
+        }}
+        onPrinted={(target) => setLastEvent(`${target.description}已登记打印结果`)}
+      />
     </section>
   );
+}
+
+export function masterDataPrintTarget(
+  viewId: MasterDataViewId,
+  row: MasterDataRow,
+): H9BusinessPrintTarget {
+  if (viewId === "m1-locations" && row.locationFields) {
+    const fields = row.locationFields;
+    return {
+      templateTypeCode: "location_label",
+      businessModule: "M1",
+      businessDocumentType: "location_label",
+      businessDocumentId: row.id,
+      description: `${row.code} · 库位标签`,
+      data: {
+        id: row.id,
+        owner_id: row.ownerId,
+        warehouse_id: fields.warehouseId,
+        zone_id: fields.zoneId,
+        location_code: row.code,
+        row_no: integer(fields.rowNo),
+        column_no: integer(fields.columnNo),
+        layer_no: integer(fields.layerNo),
+        max_volume_cm3: integer(fields.maxVolumeCm3),
+        used_volume_cm3: integer(fields.usedVolumeCm3),
+        max_sku_count: integer(fields.maxSku),
+        location_type: fields.locationTypeCode,
+        bound_owner_id: fields.boundOwnerId,
+        status: row.status,
+        created_at: row.createdAt,
+        updated_at: row.updatedAt,
+      },
+    };
+  }
+  if (viewId === "m1-products" && row.productFields) {
+    const fields = row.productFields;
+    return {
+      templateTypeCode: "product_label",
+      businessModule: "M1",
+      businessDocumentType: "product_label",
+      businessDocumentId: row.id,
+      description: `${row.code} · 商品标签`,
+      data: {
+        id: row.id,
+        owner_id: row.ownerId,
+        product_code: row.code,
+        product_name: row.name,
+        approval_no: fields.approvalNo,
+        spec: fields.spec,
+        dosage_form: fields.dosageForm,
+        manufacturer: fields.manufacturer,
+        udi_code: fields.udiCode,
+        electronic_regulatory_code: fields.electronicRegulatoryCode,
+        length_mm: numberOrNull(fields.lengthMm),
+        width_mm: numberOrNull(fields.widthMm),
+        height_mm: numberOrNull(fields.heightMm),
+        volume_cm3: numberOrNull(fields.volumeCm3),
+        weight_g: numberOrNull(fields.weightG),
+        packaging_levels: fields.packagingLevels.map((level) => ({
+          id: level.id,
+          unit_code: level.unitCode,
+          unit_name: level.unitName,
+          ratio_to_base: level.ratioToBase,
+          is_base: level.isBase,
+          is_default: level.isDefault,
+          sort_order: level.sortOrder,
+        })),
+        mapping_traces: fields.mappingTraces,
+        special_drug_category_code: fields.specialDrugCategoryCode,
+        status: row.status,
+        attrs: fields.attrs,
+        created_at: row.createdAt,
+        updated_at: row.updatedAt,
+      },
+    };
+  }
+  throw new Error("当前基础档案不支持标签打印");
+}
+
+function integer(value: string) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function numberOrNull(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function defaultM1QueryValue(): QueryPanelValue {

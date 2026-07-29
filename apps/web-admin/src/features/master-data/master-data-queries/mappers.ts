@@ -202,6 +202,7 @@ export function locationRow(
     updatedAt: item.updated_at,
     locationFields: {
       owner: item.owner_id,
+      boundOwnerId: item.bound_owner_id ?? null,
       warehouse,
       warehouseId: item.warehouse_id,
       zone,

@@ -31,7 +31,7 @@ export function PrintTemplateTypeFields({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const params = JSON.parse(value) as Record<string, unknown>;
+  const params = parseParams(value);
   const update = (key: string, nextValue: string) => {
     const next = { ...params };
     if (nextValue) next[key] = nextValue;
@@ -94,4 +94,16 @@ function SelectField({
 
 function textParam(params: Record<string, unknown>, key: string) {
   return typeof params[key] === "string" ? params[key] : "";
+}
+
+/** 参数 JSON 解析失败时回退为空对象：字段按 "-"/空值展示，不允许抛异常导致弹窗崩溃。 */
+function parseParams(value: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }

@@ -1,15 +1,6 @@
 import type { DataGridColumn } from "@wms/ui";
 
-import type {
-  MasterDataRow,
-  MasterDataViewId,
-} from "@/features/master-data/master-data-queries";
-
-export function masterDataGridClassName(viewId: MasterDataViewId) {
-  if (viewId === "m1-locations") return "min-w-[1910px]";
-  if (viewId === "m1-products") return "min-w-[2800px]";
-  return "min-w-[1650px]";
-}
+import type { MasterDataRow } from "@/features/master-data/master-data-queries";
 
 export function productColumns(
   baseColumns: DataGridColumn<MasterDataRow>[],

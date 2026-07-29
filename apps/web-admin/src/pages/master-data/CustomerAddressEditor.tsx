@@ -51,6 +51,11 @@ export function CustomerAddressEditor({ customerId }: { customerId: string }) {
   const update = (value: Partial<AddressForm>) => setForm((current) => ({ ...current, ...value }));
   const submit = async () => {
     setError(null);
+    if (!form.province.trim() || !form.city.trim() || !form.district.trim() || !form.detail_address.trim()
+      || !form.contact_name.trim() || !form.contact_phone.trim()) {
+      setError("省 / 市 / 区 / 详细地址 / 联系人 / 联系电话均为必填");
+      return;
+    }
     try {
       if (editing) {
         await updateMutation.mutateAsync({ addressId: editing.id, request: form });
@@ -110,10 +115,12 @@ export function CustomerAddressEditor({ customerId }: { customerId: string }) {
 }
 
 function AddressField({ label, value, onChange, className = "" }: { label: string; value: string; onChange: (value: string) => void; className?: string }) {
+  // 不加 required：地址由本区块的按钮（type=button）提交并在 submit 里手动校验，
+  // 原生 required 只会拦截外层客户编辑表单，导致空白新地址卡死整个弹窗的保存
   return (
     <label className={`grid gap-1 text-xs text-muted-foreground ${className}`}>
       <span>{label}</span>
-      <Input required value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

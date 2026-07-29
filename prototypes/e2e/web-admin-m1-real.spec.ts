@@ -1,9 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { completeH9BusinessPrint } from "./h9-business-print";
 
 const artifactsDir = path.resolve("../apps/web-admin/.e2e-artifacts/m1-real/screenshots");
 const productEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-products");
+const locationEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-locations");
 const businessPartnerEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-business-partners");
 const featureFlagEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-feature-flags");
 const systemDictionaryEvidenceDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-system-dictionary");
@@ -78,6 +80,23 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
       await expect(page.getByText(item.text).first()).toBeVisible();
     }
     await page.screenshot({ path: path.join(artifactsDir, item.shot), fullPage: false });
+    if (item.title === "M1 商品档案" || item.title === "M1 库位管理") {
+      const isProduct = item.title === "M1 商品档案";
+      const row = page.locator("tr", { hasText: item.text }).first();
+      await row.getByRole("checkbox", { name: "选择此行" }).check();
+      await completeH9BusinessPrint(page, {
+        actionName: "标签",
+        dialogName: isProduct ? "M1 商品标签 E2E 模板" : "M1 库位标签 E2E 模板",
+        businessModule: "M1",
+        templateType: isProduct ? "product_label" : "location_label",
+        expectedField: isProduct ? "product_code" : "location_code",
+        expectedValue: item.text,
+        screenshotPath: path.join(
+          isProduct ? productEvidenceDir : locationEvidenceDir,
+          isProduct ? "product-label-preview.png" : "location-label-preview.png",
+        ),
+      });
+    }
     if (item.title === "配置中心") {
       fs.mkdirSync(featureFlagEvidenceDir, { recursive: true });
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -330,11 +349,7 @@ test("M1 供应商资质 PC 真实维护", async ({ page }) => {
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
-  await page.getByRole("button", { name: "基础档案" }).click();
-  const masterDataGroup = page.getByRole("navigation").getByRole("button", { name: "主数据", exact: true });
-  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") await masterDataGroup.click();
-  await page.getByRole("navigation").getByRole("button", { name: /M1 客商档案/ }).click();
-  await expect(page.getByRole("heading", { name: "M1 客商档案" })).toBeVisible();
+  await openBusinessPartners(page);
   await expect(page.getByText("S-M1-E2E-001").first()).toBeVisible();
 
   const row = page.locator("tr", { hasText: "S-M1-E2E-001" }).first();
@@ -368,11 +383,7 @@ test("M1 供应商批量导入调用原子批量接口", async ({ page }) => {
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
-  await page.getByRole("button", { name: "基础档案" }).click();
-  const masterDataGroup = page.getByRole("navigation").getByRole("button", { name: "主数据", exact: true });
-  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") await masterDataGroup.click();
-  await page.getByRole("navigation").getByRole("button", { name: /M1 客商档案/ }).click();
-  await expect(page.getByRole("heading", { name: "M1 客商档案" })).toBeVisible();
+  await openBusinessPartners(page);
 
   const marker = Date.now();
   const firstCode = `S-E2E-BATCH-${marker}-1`;
@@ -411,11 +422,7 @@ test("M1 客户批量导入调用原子批量接口", async ({ page }) => {
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 
-  await page.getByRole("button", { name: "基础档案" }).click();
-  const masterDataGroup = page.getByRole("navigation").getByRole("button", { name: "主数据", exact: true });
-  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") await masterDataGroup.click();
-  await page.getByRole("navigation").getByRole("button", { name: /M1 客商档案/ }).click();
-  await expect(page.getByRole("heading", { name: "M1 客商档案" })).toBeVisible();
+  await openBusinessPartners(page);
 
   const marker = Date.now();
   const firstCode = `C-E2E-BATCH-${marker}-1`;
@@ -473,6 +480,22 @@ test("M-VR 双人策略矩阵真实保存", async ({ page }) => {
   fs.mkdirSync(systemDictionaryEvidenceDir, { recursive: true });
   await page.screenshot({ path: path.join(systemDictionaryEvidenceDir, "dual-person-policy-matrix.png"), fullPage: true });
 });
+
+async function openBusinessPartners(page: Page) {
+  const navigation = page.getByRole("navigation");
+  const masterDataSection = navigation.getByRole("button", { name: "基础档案", exact: true });
+  if ((await masterDataSection.getAttribute("aria-expanded")) !== "true") {
+    await masterDataSection.click();
+    await expect(masterDataSection).toHaveAttribute("aria-expanded", "true");
+  }
+  const masterDataGroup = navigation.getByRole("button", { name: "主数据", exact: true });
+  if ((await masterDataGroup.getAttribute("aria-expanded")) !== "true") {
+    await masterDataGroup.click();
+    await expect(masterDataGroup).toHaveAttribute("aria-expanded", "true");
+  }
+  await navigation.getByRole("button", { name: /M1 客商档案/ }).click();
+  await expect(page.getByRole("heading", { name: "M1 客商档案" })).toBeVisible();
+}
 
 function pad2(value: string) {
   return value.padStart(2, "0");

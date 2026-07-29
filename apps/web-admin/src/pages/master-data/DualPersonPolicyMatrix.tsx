@@ -201,5 +201,6 @@ function configuredPolicy(
   const configured = matches.find((rule) => scope === "owner"
     ? Boolean(rule.owner_id) && !rule.warehouse_id
     : rule.warehouse_id === warehouseId);
-  return configured?.policy ?? matches[0]?.policy ?? "single";
+  // 当前 scope 无匹配规则时展示未配置默认值，不得把其他 scope 的规则值当成已配置展示。
+  return configured?.policy ?? "single";
 }

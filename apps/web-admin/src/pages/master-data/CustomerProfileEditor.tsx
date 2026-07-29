@@ -101,7 +101,7 @@ export function CustomerProfileEditor({ customerId }: { customerId: string }) {
               aria-label="经营范围"
               value={businessScope.join(", ")}
               placeholder="处方药, 医疗器械"
-                onChange={(event) => update({ business_scope: event.target.value.split(",") })}
+                onChange={(event) => update({ business_scope: event.target.value.split(/[,，]/) })}
             />
           </label>
           <div className="grid gap-2 border-t pt-2 md:col-span-2">
@@ -117,7 +117,7 @@ export function CustomerProfileEditor({ customerId }: { customerId: string }) {
               </Button>
             </div>
             {qualifications.map((item, index) => (
-              <div className="grid gap-2 md:grid-cols-[1fr_1fr_10rem_auto]" key={`${index}-${item.certificate_no}`}>
+              <div className="grid gap-2 md:grid-cols-[1fr_1fr_10rem_auto]" key={index}>
                 <Input aria-label={`资质类型-${index + 1}`} placeholder="证照类型" value={item.certificate_type} onChange={(event) => updateQualification(index, { certificate_type: event.target.value })} />
                 <Input aria-label={`资质编号-${index + 1}`} placeholder="证照编号" value={item.certificate_no} onChange={(event) => updateQualification(index, { certificate_no: event.target.value })} />
                 <Input aria-label={`资质有效期-${index + 1}`} type="date" value={item.expires_at ?? ""} onChange={(event) => updateQualification(index, { expires_at: event.target.value || null })} />
@@ -134,10 +134,12 @@ export function CustomerProfileEditor({ customerId }: { customerId: string }) {
 }
 
 function ProfileField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  // 不加 required：本编辑器由自己的"保存档案"按钮（type=button）提交，
+  // 原生 required 只会拦截外层客户编辑表单的提交，导致只改名称也无法保存
   return (
     <label className="grid gap-1 text-xs text-muted-foreground">
       <span>{label}</span>
-      <Input required value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

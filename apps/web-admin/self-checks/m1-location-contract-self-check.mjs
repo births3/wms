@@ -68,5 +68,7 @@ assert.match(
   /currentUser\.permissions\.includes\("m1\.master_data\.write"\)/,
   "M1 主数据页面必须以当前用户权限决定写操作可见性",
 );
-assert.match(pageSource, /const gridToolbarActions: DataGridToolbarAction\[\] = canWrite \?/i, "M1 写操作工具栏必须受权限门控");
+assert.match(pageSource, /canWrite && viewId === "m1-business-partners"[\s\S]*supplier-create[\s\S]*customer-import/, "M1 客商写操作工具栏必须受权限门控");
+assert.match(pageSource, /canWrite && viewId === "m1-locations"[\s\S]*location-batch-create/, "M1 库位批量写操作必须受权限门控");
+assert.match(pageSource, /selectable=\{viewId !== "m1-products" \|\| canPrint\}/, "M1 商品标签打印必须允许具备 H9 权限的用户选择一行");
 assert.match(rendererSource, /<M1MasterDataPage currentUser=\{currentUser\}/, "M1 页面必须接收当前用户权限上下文");

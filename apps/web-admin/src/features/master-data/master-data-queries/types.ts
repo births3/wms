@@ -103,6 +103,7 @@ export interface WarehouseMasterDataFields {
 
 export interface LocationMasterDataFields {
   owner: string;
+  boundOwnerId: string | null;
   /** 仓库业务展示（编码 · 名称），非 UUID */
   warehouse: string;
   warehouseId: string;

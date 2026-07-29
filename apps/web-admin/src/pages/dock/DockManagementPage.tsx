@@ -44,7 +44,11 @@ import {
 } from "@/pages/dock/DockAppointmentCreateDialog";
 import { DockAppointmentChangeDialog } from "@/pages/dock/DockAppointmentChangeDialog";
 import { DockOccupancyBoard } from "@/pages/dock/DockOccupancyBoard";
+import { formatDateTime } from "@/lib/format";
+import { queryString } from "@/lib/query-value";
 import { readSpreadsheetRows } from "@/lib/spreadsheet";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 /**
  * 页面设计契约：列表型；主信息载体为 QueryPanel + DataGrid；标准动作放在 DataGrid；
@@ -100,8 +104,11 @@ const statusOptions = [
 export function DockManagementPage() {
   const warehousesQuery = useMasterDataRowsQuery("m1-warehouses");
   const warehouses = warehousesQuery.data ?? [];
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, setAppliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(
+      () => ({ ...defaultQuery(), warehouseId: warehouses[0]?.id ?? "" }),
+      queryValueFromUnknown,
+    );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [appointmentOpen, setAppointmentOpen] = React.useState(false);
@@ -109,10 +116,11 @@ export function DockManagementPage() {
   const [createForm, setCreateForm] = React.useState<DockForm>(emptyDockForm);
   const [appointmentForm, setAppointmentForm] = React.useState<DockAppointmentForm>(() => emptyDockAppointmentForm());
   const [appointmentValidationError, setAppointmentValidationError] = React.useState<string | null>(null);
+  const [changeValidationError, setChangeValidationError] = React.useState<string | null>(null);
   const [appointments, setAppointments] = React.useState<DockAppointment[]>([]);
   const [appointmentRecordsOpen, setAppointmentRecordsOpen] = React.useState(false);
-  const [changeAppointment, setChangeAppointment] = React.useState<DockAppointment | null>(null);
-  const [cancelAppointmentTarget, setCancelAppointmentTarget] = React.useState<DockAppointment | null>(null);
+  const changeDialog = useDialogState<DockAppointment>();
+  const cancelDialog = useDialogState<DockAppointment>();
   const [changeForm, setChangeForm] = React.useState<DockAppointmentForm>(() => emptyDockAppointmentForm());
   const [editForm, setEditForm] = React.useState<DockEditForm>(emptyDockEditForm);
   const [notice, setNotice] = React.useState<string | null>(null);
@@ -136,7 +144,7 @@ export function DockManagementPage() {
     const nextWarehouseId = warehouses[0].id;
     setDraftQuery((current) => ({ ...current, warehouseId: nextWarehouseId }));
     setAppliedQuery((current) => ({ ...current, warehouseId: nextWarehouseId }));
-  }, [draftQuery.warehouseId, warehouses]);
+  }, [draftQuery.warehouseId, setAppliedQuery, setDraftQuery, warehouses]);
 
   const warehouseOptions = React.useMemo(
     () => warehouses.map((warehouse) => ({ label: `${warehouse.code} ${warehouse.name}`, value: warehouse.id })),
@@ -156,7 +164,7 @@ export function DockManagementPage() {
     { key: "document_no", header: "关联单据", width: 180, minWidth: 150, render: (row) => row.document_no },
     { key: "vehicle_plate_no", header: "车辆 / 司机", width: 190, minWidth: 160, render: (row) => `${row.vehicle_plate_no || "未填车牌"} / ${row.driver_name}` },
     { key: "status", header: "状态", width: 120, minWidth: 100, render: (row) => <StatusBadge status={row.status === "cancelled" ? "isolated" : row.status === "arrived" ? "completed" : "pending"} label={appointmentStatusLabel(row.status)} size="sm" /> },
-    { key: "actions", header: "操作", width: 180, minWidth: 160, render: (row) => <div className="flex gap-2"><Button type="button" size="sm" variant="outline" disabled={row.status === "cancelled" || row.status === "arrived"} onClick={(event) => { event.stopPropagation(); setChangeAppointment(row); setChangeForm(appointmentFormFor(row)); updateAppointment.reset(); }}>变更</Button><Button type="button" size="sm" variant="outline" disabled={row.status === "cancelled" || row.status === "arrived" || cancelAppointment.isPending} onClick={(event) => { event.stopPropagation(); setCancelAppointmentTarget(row); cancelAppointment.reset(); }}>取消</Button></div> },
+    { key: "actions", header: "操作", width: 180, minWidth: 160, render: (row) => <div className="flex gap-2"><Button type="button" size="sm" variant="outline" disabled={row.status === "cancelled" || row.status === "arrived"} onClick={(event) => { event.stopPropagation(); setChangeForm(appointmentFormFor(row)); setChangeValidationError(null); updateAppointment.reset(); changeDialog.openWith(row); }}>变更</Button><Button type="button" size="sm" variant="outline" disabled={row.status === "cancelled" || row.status === "arrived" || cancelAppointment.isPending} onClick={(event) => { event.stopPropagation(); cancelAppointment.reset(); cancelDialog.openWith(row); }}>取消</Button></div> },
   ];
 
   const refreshAction: DataGridRefreshAction = {
@@ -332,7 +340,7 @@ export function DockManagementPage() {
         subtitle="维护仓库月台、作业类型、温区和维护状态"
         actions={notice ? <span className="self-center text-sm text-muted-foreground" role="status">{notice}</span> : undefined}
       />
-      <input ref={importInputRef} className="hidden" type="file" accept=".xlsx,.xls,.csv" onChange={(event) => void handleImport(event)} />
+      <input ref={importInputRef} className="hidden" type="file" accept=".xlsx,.csv" onChange={(event) => void handleImport(event)} />
       <QueryPanel
         fields={dockQueryFields}
         fieldOptions={{ warehouseId: warehouseOptions }}
@@ -340,16 +348,10 @@ export function DockManagementPage() {
         value={draftQuery}
         onValueChange={setDraftQuery}
         onQuery={() => {
-          setAppliedQuery(draftQuery);
-          setSelectedId(null);
+          applyDockQuery(draftQuery);
           setNotice("月台列表已查询");
         }}
-        onReset={() => {
-          const next = { ...defaultQuery(), warehouseId: warehouses[0]?.id ?? "" };
-          setDraftQuery(next);
-          setAppliedQuery(next);
-          setSelectedId(null);
-        }}
+        onReset={clearDockQuery}
       />
       {warehousesQuery.error && <ErrorNotice message={warehousesQuery.error.message} />}
       {docksQuery.error && <ErrorNotice message={docksQuery.error.message} />}
@@ -376,18 +378,8 @@ export function DockManagementPage() {
         tableClassName="min-w-[1280px]"
         queryState={appliedQuery}
         querySummaryItems={querySummaryItems}
-        onApplyQueryState={(next) => {
-          const normalized = queryValueFromUnknown(next);
-          setDraftQuery(normalized);
-          setAppliedQuery(normalized);
-          setSelectedId(null);
-        }}
-        onClearQueryState={() => {
-          const next = { ...defaultQuery(), warehouseId: warehouses[0]?.id ?? "" };
-          setDraftQuery(next);
-          setAppliedQuery(next);
-          setSelectedId(null);
-        }}
+        onApplyQueryState={applyDockQuery}
+        onClearQueryState={clearDockQuery}
       />
       <DockOccupancyBoard
         warehouseSelected={Boolean(warehouseId)}
@@ -438,31 +430,47 @@ export function DockManagementPage() {
         </DialogContent>
       </Dialog>
       <DockAppointmentChangeDialog
-        open={Boolean(changeAppointment)}
-        appointment={changeAppointment}
+        open={changeDialog.open}
+        appointment={changeDialog.target}
         docks={docksQuery.data ?? []}
         form={changeForm}
         pending={updateAppointment.isPending}
-        onOpenChange={(next) => { if (!next) setChangeAppointment(null); }}
-        onFormChange={setChangeForm}
+        onOpenChange={(next) => { if (!next) changeDialog.close(); }}
+        onFormChange={(next) => {
+          setChangeValidationError(null);
+          setChangeForm(next);
+        }}
         onSubmit={submitAppointmentChange}
-        errorMessage={updateAppointment.error?.message}
+        errorMessage={changeValidationError ?? updateAppointment.error?.message}
       />
-      <Dialog open={Boolean(cancelAppointmentTarget)} onOpenChange={(next) => !cancelAppointment.isPending && !next && setCancelAppointmentTarget(null)}>
-        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>取消月台预约</DialogTitle><DialogDescription>确认取消预约 {cancelAppointmentTarget?.appointment_no ?? ""}？已取消预约重复提交会保持已取消状态。</DialogDescription></DialogHeader>{cancelAppointment.error && <ErrorNotice message={cancelAppointment.error.message} />}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={cancelAppointment.isPending}>返回</Button></DialogClose><Button type="button" disabled={cancelAppointment.isPending || !cancelAppointmentTarget} onClick={() => void submitAppointmentCancel()}>{cancelAppointment.isPending ? "取消中..." : "确认取消"}</Button></DialogFooter></DialogContent>
+      <Dialog open={cancelDialog.open} onOpenChange={(next) => !cancelAppointment.isPending && !next && cancelDialog.close()}>
+        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>取消月台预约</DialogTitle><DialogDescription>确认取消预约 {cancelDialog.target?.appointment_no ?? ""}？已取消预约重复提交会保持已取消状态。</DialogDescription></DialogHeader>{cancelAppointment.error && <ErrorNotice message={cancelAppointment.error.message} />}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={cancelAppointment.isPending}>返回</Button></DialogClose><Button type="button" disabled={cancelAppointment.isPending || !cancelDialog.target} onClick={() => void submitAppointmentCancel()}>{cancelAppointment.isPending ? "取消中..." : "确认取消"}</Button></DialogFooter></DialogContent>
       </Dialog>
     </section>
   );
 
+  function applyDockQuery(next: unknown) {
+    applyQuery(queryValueFromUnknown(next));
+    setSelectedId(null);
+  }
+
+  function clearDockQuery() {
+    resetQuery();
+    setSelectedId(null);
+  }
+
   async function submitAppointmentChange(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const changeAppointment = changeDialog.target;
     if (!changeAppointment) return;
     const windowStartAt = dateTimeLocalToIso(changeForm.windowStartAt);
     const windowEndAt = dateTimeLocalToIso(changeForm.windowEndAt);
     if (!windowStartAt || !windowEndAt || new Date(windowEndAt) <= new Date(windowStartAt)) {
       updateAppointment.reset();
+      setChangeValidationError("预约结束时间必须晚于开始时间");
       return;
     }
+    setChangeValidationError(null);
     try {
       const updated = await updateAppointment.mutateAsync({ id: changeAppointment.id, body: {
         dock_id: changeForm.dockId || changeAppointment.dock_id,
@@ -475,17 +483,18 @@ export function DockManagementPage() {
         reason: changeForm.reason?.trim() || null,
       } });
       setAppointments((current) => [updated, ...current.map((item) => item.id === changeAppointment.id ? { ...item, status: "cancelled" } : item)]);
-      setChangeAppointment(null);
+      changeDialog.close();
       setNotice(`预约 ${updated.appointment_no} 已生成新版本`);
     } catch { /* 保留弹窗，错误信息展示在表单中。 */ }
   }
 
   async function submitAppointmentCancel() {
+    const cancelAppointmentTarget = cancelDialog.target;
     if (!cancelAppointmentTarget) return;
     try {
       const cancelled = await cancelAppointment.mutateAsync(cancelAppointmentTarget.id);
       setAppointments((current) => current.map((item) => item.id === cancelAppointmentTarget.id ? cancelled : item));
-      setCancelAppointmentTarget(null);
+      cancelDialog.close();
       setNotice(`预约 ${cancelAppointmentTarget.appointment_no} 已取消`);
     } catch { /* 保留确认框，允许幂等重试。 */ }
   }
@@ -519,10 +528,10 @@ function emptyDockForm(): DockForm { return { dockCode: "", dockType: "receiving
 function emptyDockEditForm(): DockEditForm { return { status: "active", maintenanceRecoveryDate: "" }; }
 function editFormFor(dock: Dock): DockEditForm { return { status: dock.status, maintenanceRecoveryDate: dock.maintenance_recovery_at?.slice(0, 10) ?? "" }; }
 function defaultQuery(): QueryPanelValue { return { warehouseId: "", keyword: "", status: [] }; }
-function queryString(value: unknown): string { return typeof value === "string" ? value : ""; }
+/** 与 @/lib/query-value 不同：月台查询需要按固定字段重建（透传未知字段会污染 warehouseId 逻辑）。 */
 function queryValueFromUnknown(value: unknown): QueryPanelValue {
   if (!value || typeof value !== "object") return defaultQuery();
-  const record = value as Record<string, unknown>;
+  const record = value as QueryPanelValue;
   return {
     warehouseId: queryString(record.warehouseId),
     keyword: queryString(record.keyword),
@@ -570,7 +579,6 @@ function normalizeHeader(value: string) { return value.trim().toLowerCase().repl
 function dockTypeLabel(value: string) { return dockTypeOptions.find((option) => option.value === value)?.label ?? value; }
 function temperatureZoneLabel(value: string) { return temperatureZoneOptions.find((option) => option.value === value)?.label ?? value; }
 function statusLabel(value: string) { return statusOptions.find((option) => option.value === value)?.label ?? value; }
-function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
 function dateToIso(value: string) { return value ? new Date(`${value}T00:00:00`).toISOString() : null; }
 function emptyDockAppointmentForm(): DockAppointmentForm {
   const start = new Date(Date.now() + 60 * 60 * 1000);
@@ -591,7 +599,7 @@ function toDateTimeLocal(value: Date) {
   const offset = value.getTimezoneOffset();
   return new Date(value.getTime() - offset * 60 * 1000).toISOString().slice(0, 16);
 }
-function formatAppointmentNo(value: Date) { return value.toISOString().replace(/[-:TZ.]/g, "").slice(0, 14); }
+function formatAppointmentNo(value: Date) { return value.toISOString().replace(/\D/g, "").slice(0, 14); }
 function dateTimeLocalToIso(value: string) {
   const date = new Date(value);
   return value && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
