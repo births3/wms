@@ -138,9 +138,13 @@ export function H1AdminMenuPage() {
     if (!selectedId && flatNodes[0]) setSelectedId(flatNodes[0].id);
   }, [flatNodes, selectedId]);
 
+  // 仅当选中节点变化、或该节点服务端数据版本变化（保存 / 批量停用 / 回滚后）时才重置表单，
+  // 避免每次树数据刷新引用变化就把用户未保存的编辑覆盖成旧值。
+  const selectedNodeSignature = selectedNode ? JSON.stringify(formFromNode(selectedNode)) : null;
+
   React.useEffect(() => {
-    setForm(formFromNode(selectedNode));
-  }, [selectedNode?.id]);
+    setForm(selectedNodeSignature === null ? formFromNode(null) : JSON.parse(selectedNodeSignature) as NodeForm);
+  }, [selectedNode?.id, selectedNodeSignature]);
 
   async function run<T>(task: Promise<T>, success: string, fallback: string): Promise<boolean> {
     setNotice(null);

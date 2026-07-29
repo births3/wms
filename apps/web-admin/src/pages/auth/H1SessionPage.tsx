@@ -29,6 +29,7 @@ import {
   type AuthSession,
   type CurrentUser,
 } from "@/features/auth/auth-queries";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const sessionQueryFields: QueryPanelField[] = [
   {
@@ -49,8 +50,8 @@ interface H1SessionPageProps {
 
 export function H1SessionPage({ currentUser }: H1SessionPageProps) {
   const canManage = currentUser.permissions.includes("h1.sessions.manage");
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>({ targetUserId: "" });
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>({ targetUserId: "" });
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(() => ({ targetUserId: "" }));
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [dialogAction, setDialogAction] = React.useState<SessionAction>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
@@ -74,9 +75,15 @@ export function H1SessionPage({ currentUser }: H1SessionPageProps) {
       sessions.find((session) => session.session_id === context.selectedRowKeys[0])?.is_current === true,
     onClick: (context) => {
       setSelectedRowKeys(context.selectedRowKeys);
-      setDialogAction("revoke");
+      openDialog("revoke");
     },
   };
+
+  /** 打开确认弹窗时清空上一次遗留的错误文案。 */
+  function openDialog(action: SessionAction) {
+    setActionError(null);
+    setDialogAction(action);
+  }
 
   async function confirmAction() {
     setActionError(null);
@@ -111,7 +118,7 @@ export function H1SessionPage({ currentUser }: H1SessionPageProps) {
               {currentUser.display_name}（{currentUser.username}）· 当前货主 {currentUser.owner_code}
             </p>
           </div>
-          <Button type="button" variant="outline" onClick={() => setDialogAction("revokeOthers")} disabled={busy}>
+          <Button type="button" variant="outline" onClick={() => openDialog("revokeOthers")} disabled={busy}>
             <LogOut className="size-4" aria-hidden />
             登出其他设备
           </Button>
@@ -124,19 +131,17 @@ export function H1SessionPage({ currentUser }: H1SessionPageProps) {
         value={draftQuery}
         onValueChange={setDraftQuery}
         onQuery={() => {
-          setAppliedQuery(draftQuery);
+          applyQuery(draftQuery);
           setSelectedRowKeys([]);
         }}
         onReset={() => {
-          const next = { targetUserId: "" };
-          setDraftQuery(next);
-          setAppliedQuery(next);
+          resetQuery();
           setSelectedRowKeys([]);
         }}
         resetLabel="重置"
         actions={
           canManage && targetUserId ? (
-            <Button type="button" variant="destructive" onClick={() => setDialogAction("kick")} disabled={busy}>
+            <Button type="button" variant="destructive" onClick={() => openDialog("kick")} disabled={busy}>
               <UserX className="size-4" aria-hidden />
               踢出目标用户
             </Button>

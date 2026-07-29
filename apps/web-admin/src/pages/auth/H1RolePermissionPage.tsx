@@ -41,6 +41,9 @@ import {
   type RoleUser,
   type CreateUserRequest,
 } from "@/features/auth/role-permission-queries";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 /**
  * H1RolePermissionPage — 角色、权限矩阵和用户批量授权管理
@@ -86,13 +89,19 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
   const createUserMutation = useCreateUserMutation();
   const roles = rolesQuery.data ?? [];
   const users = usersQuery.data ?? [];
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultRoleQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultRoleQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultRoleQuery, normalizeRoleQuery);
   const [selectedRoleId, setSelectedRoleId] = React.useState<string | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [permissionCodes, setPermissionCodes] = React.useState<string[]>([]);
-  const [roleDialogOpen, setRoleDialogOpen] = React.useState(false);
-  const [roleForm, setRoleForm] = React.useState<RoleForm>(() => emptyRoleForm());
+  const {
+    open: roleDialogOpen,
+    target: roleFormTarget,
+    openWith: openRoleFormWith,
+    setOpen: setRoleDialogOpen,
+    setTarget: setRoleForm,
+  } = useDialogState<RoleForm>();
+  const roleForm = roleFormTarget ?? emptyRoleForm();
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
   const [createUserDialogOpen, setCreateUserDialogOpen] = React.useState(false);
@@ -114,10 +123,18 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
     if (next !== selectedRoleId) setSelectedRoleId(next);
   }, [roles, selectedRoleId]);
 
+  // 仅当选中角色变化、或该角色服务端权限集版本变化（刷新 / 保存后）时才重同步矩阵，
+  // 避免 roles 每次刷新拿到相同数据也把用户未保存的勾选清掉。
+  const selectedRolePermissionSignature = selectedRole ? selectedRole.permission_codes.join("\n") : null;
+
   React.useEffect(() => {
     setSelectedRowKeys(selectedRoleId ? [selectedRoleId] : []);
-    setPermissionCodes(selectedRole?.permission_codes ?? []);
-  }, [selectedRoleId]);
+    setPermissionCodes(
+      selectedRolePermissionSignature === null
+        ? []
+        : selectedRolePermissionSignature.split("\n").filter(Boolean),
+    );
+  }, [selectedRoleId, selectedRolePermissionSignature]);
 
   function selectRole(role: Role) {
     setSelectedRoleId(role.id);
@@ -125,8 +142,7 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
   }
 
   function openRoleDialog(role: Role | null) {
-    setRoleForm(role ? roleFormFromRole(role) : emptyRoleForm());
-    setRoleDialogOpen(true);
+    openRoleFormWith(role ? roleFormFromRole(role) : emptyRoleForm());
   }
 
   async function saveRole() {
@@ -180,6 +196,14 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
     } catch (error) {
       setNotice({ type: "error", text: error instanceof Error ? error.message : "保存权限矩阵失败" });
     }
+  }
+
+  function applyGridQueryState(state: unknown) {
+    applyQuery(queryValueFromUnknown(state));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
   }
 
   async function refreshAll() {
@@ -261,12 +285,8 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
         defaultVisibleFieldKeys={h1RoleCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeRoleQuery(next))}
-        onQuery={() => setAppliedQuery(normalizeRoleQuery(draftQuery))}
-        onReset={() => {
-          const next = defaultRoleQuery();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       <RoleQueryError rolesQuery={rolesQuery} permissionsQuery={permissionsQuery} usersQuery={usersQuery} />
       <div className="grid gap-4 xl:grid-cols-[minmax(32rem,1.1fr)_minmax(28rem,0.9fr)]">
@@ -294,8 +314,8 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
               toolbarActions={toolbarActions}
               queryState={appliedQuery}
               querySummaryItems={querySummaryItems}
-              onApplyQueryState={(state) => { const next = normalizeRoleQuery(queryValueFromUnknown(state)); setDraftQuery(next); setAppliedQuery(next); }}
-              onClearQueryState={() => { const next = defaultRoleQuery(); setDraftQuery(next); setAppliedQuery(next); }}
+              onApplyQueryState={applyGridQueryState}
+              onClearQueryState={clearGridQueryState}
               tableClassName="min-w-[760px]"
             />
           </CardContent>
@@ -542,14 +562,6 @@ function defaultRoleQuery(): RoleQuery {
 
 function normalizeRoleQuery(value: QueryPanelValue): RoleQuery {
   return { keyword: queryString(value.keyword), dataScope: queryString(value.dataScope) };
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as QueryPanelValue : defaultRoleQuery();
-}
-
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
 }
 
 function filterRoles(roles: Role[], query: RoleQuery) {

@@ -36,6 +36,10 @@ import {
   type ApiKey,
   type CreateApiKeyRequest,
 } from "@/features/api-key/api-key-queries";
+import { errorText } from "@/lib/error-text";
+import { formatDateTime } from "@/lib/format";
+import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const apiKeyQueryFields: QueryPanelField[] = [
   {
@@ -164,8 +168,8 @@ type CreateForm = {
 };
 
 export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
-  const [draftQuery, setDraftQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rotateOpen, setRotateOpen] = React.useState(false);
@@ -227,6 +231,14 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
     },
   ];
 
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
+  }
+
   async function refresh() {
     const result = await apiKeysQuery.refetch();
     setNotice(result.error ? { type: "error", text: result.error.message } : { type: "success", text: "API Key 列表已刷新" });
@@ -239,7 +251,7 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
       setSelectedRowKeys([]);
       setNotice({ type: "success", text: "API Key 已吊销；重复吊销保持幂等" });
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, "吊销 API Key 失败") });
+      setNotice({ type: "error", text: errorText(error, "吊销 API Key 失败") });
     }
   }
 
@@ -258,7 +270,7 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
       setCreateOpen(false);
       setNotice({ type: "success", text: `创建成功。明文 secret 只展示一次：${created.secret ?? "未返回"}` });
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, "创建 API Key 失败") });
+      setNotice({ type: "error", text: errorText(error, "创建 API Key 失败") });
     }
   }
 
@@ -276,7 +288,7 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
       setSelectedRowKeys([]);
       setNotice({ type: "success", text: `轮换成功。新 secret 只展示一次：${rotated.new_key.secret ?? "未返回"}` });
     } catch (error) {
-      setNotice({ type: "error", text: errorMessage(error, "轮换 API Key 失败") });
+      setNotice({ type: "error", text: errorText(error, "轮换 API Key 失败") });
     }
   }
 
@@ -292,12 +304,8 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
         defaultVisibleFieldKeys={apiKeyCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={setDraftQuery}
-        onQuery={() => setAppliedQuery(draftQuery)}
-        onReset={() => {
-          const next = defaultQuery();
-          setDraftQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(draftQuery)}
+        onReset={resetQuery}
       />
       <Card className="rounded-lg shadow-sm">
         <CardContent className="p-5">
@@ -311,7 +319,7 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
             onSelectedRowKeysChange={setSelectedRowKeys}
             caption={apiKeysQuery.isPending ? "加载 API Key..." : undefined}
             emptyTitle={apiKeysQuery.isError ? "读取 API Key 失败" : "暂无 API Key"}
-            emptyDescription={apiKeysQuery.isError ? errorMessage(apiKeysQuery.error, "请检查鉴权和数据库连接") : "请使用创建 Key 录入受控调用方"}
+            emptyDescription={apiKeysQuery.isError ? errorText(apiKeysQuery.error, "请检查鉴权和数据库连接") : "请使用创建 Key 录入受控调用方"}
             exportFileBaseName="H1-API-Key"
             refreshAction={refreshAction}
             createAction={createAction}
@@ -319,16 +327,8 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
             toolbarActions={toolbarActions}
             queryState={appliedQuery}
             querySummaryItems={querySummaryItems}
-            onApplyQueryState={(queryState) => {
-              const next = normalizeQuery(queryValueFromUnknown(queryState));
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={() => {
-              const next = defaultQuery();
-              setDraftQuery(next);
-              setAppliedQuery(next);
-            }}
+            onApplyQueryState={applyGridQueryState}
+            onClearQueryState={clearGridQueryState}
           />
         </CardContent>
       </Card>
@@ -387,14 +387,6 @@ function normalizeQuery(value: QueryPanelValue): QueryPanelValue {
   return { keyword: queryString(value.keyword), status: queryString(value.status) };
 }
 
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
-}
-
 function defaultCreateForm(): CreateForm {
   return { callerName: "", purpose: "", warehouseIds: "", scopes: ["inbound:push"], expiresAt: "" };
 }
@@ -414,14 +406,6 @@ function statusVariant(row: ApiKey): "completed" | "isolated" | "expired" {
   if (row.status === "revoked") return "expired";
   if (row.status === "temporarily_disabled") return "isolated";
   return "completed";
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
 }
 
 function NoticePanel({ notice }: { notice: Notice }) {
