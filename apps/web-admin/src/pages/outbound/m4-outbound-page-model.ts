@@ -4,6 +4,7 @@ import type {
   StatusKey,
 } from "@wms/ui";
 
+import { queryRange, queryString, queryStringArray } from "@/lib/query-value";
 import {
   purchaseReturnApprovalSourceLabel,
   purchaseReturnDocumentTypeLabel,
@@ -22,10 +23,47 @@ export function pageMeta(mode: M4OutboundMode) {
   return map[mode];
 }
 
+/**
+ * M4 出库状态 → 中文文案唯一来源。
+ * 查询面板选项、表格徽章、详情弹窗共用，避免同一状态多处维护出现文案漂移
+ * （历史上 in_wave / picking / void_requested 曾在三个文件里各有一份且互相冲突）。
+ */
+export const outboundStatusLabels: Record<string, string> = {
+  draft: "待下发",
+  pending_validation: "待校验",
+  validation_exception: "校验异常",
+  confirmed: "已确认",
+  void_requested: "作废申请中",
+  in_wave: "已进波次",
+  inventory_locked: "库存锁定",
+  picking: "拣货中",
+  picked: "已拣选",
+  picked_short: "短拣待补齐",
+  released: "已下发",
+  reviewed: "已复核",
+  reviewed_short: "短拣已复核",
+  shipped: "已发货",
+  signed: "已签收",
+  pending_approval: "待审批",
+  approved: "已审批",
+  pickup: "提货中",
+  inspecting: "验收中",
+  completed: "已完成",
+  cancelled: "已取消",
+};
+
+export function statusLabel(status: string | null | undefined) {
+  if (!status) return "-";
+  return outboundStatusLabels[status] ?? status;
+}
+
 export function statusOptions(mode: M4OutboundMode) {
-  if (mode === "waves") return [["draft", "待下发"], ["released", "已下发"], ["inventory_locked", "库存锁定"], ["cancelled", "已取消"]];
-  if (mode === "returns") return [["pending_approval", "待审批"], ["approved", "已审批"], ["picking", "拣货中"], ["reviewed", "已复核"], ["shipped", "已发货"], ["cancelled", "已取消"]];
-  return [["pending_validation", "待校验"], ["validation_exception", "校验异常"], ["confirmed", "已确认"], ["inventory_locked", "库存锁定"], ["reviewed", "已复核"], ["shipped", "已发货"]];
+  const keys = mode === "waves"
+    ? ["draft", "released", "inventory_locked", "cancelled"]
+    : mode === "returns"
+      ? ["pending_approval", "approved", "picking", "reviewed", "shipped", "cancelled"]
+      : ["pending_validation", "validation_exception", "confirmed", "inventory_locked", "reviewed", "shipped"];
+  return keys.map((key) => [key, outboundStatusLabels[key] ?? key]);
 }
 
 export function statusKey(status: string | null | undefined): StatusKey {
@@ -96,25 +134,7 @@ function matchesStatus(status: string, statuses: Set<string>) {
   return statuses.size === 0 || statuses.has(status);
 }
 
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function queryStringArray(value: QueryPanelValue[string]) {
-  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
-}
-
-function queryRange(value: QueryPanelValue[string]): QueryPanelRangeValue {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return { from: "", to: "" };
-  return {
-    from: typeof value.from === "string" ? value.from : "",
-    to: typeof value.to === "string" ? value.to : "",
-  };
-}
-
-export function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
-}
+export { queryValueFromUnknown } from "@/lib/query-value";
 
 function dateInRange(value: string | null | undefined, range: QueryPanelRangeValue) {
   const date = value?.slice(0, 10) ?? "";

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const page = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPage.tsx"), "utf8");
+const actionRequests = readFileSync(resolve(root, "src/pages/outbound/m4-outbound-action-requests.ts"), "utf8");
 const queries = readFileSync(resolve(root, "src/features/outbound/outbound-queries.ts"), "utf8");
 const devMockCore = readFileSync(resolve(root, "dev-mocks/web-admin-dev-mock-core.ts"), "utf8");
 const devMock = readFileSync(resolve(root, "dev-mocks/outbound-dev-mock.ts"), "utf8");
@@ -41,8 +42,8 @@ assert.match(page, /useSystemDictionaryItemOptionsQuery\("document_type"/, "M4 �
 assert.match(page, /documentTypeOptions/, "M4 创建弹窗必须使用字典选项");
 assert.doesNotMatch(page, /<option value="sales_outbound">|<option value="purchase_return_outbound">/, "M4 单据类型选项不得在页面硬编码");
 assert.match(page, /await createOutboundOrderMutation\.mutateAsync/, "M4 新建动作必须等待真实 API 返回");
-assert.match(page, /document_type:\s*createForm\.documentType/, "M4 创建请求必须提交单据类型");
-assert.match(page, /wms_order_no:\s*createForm\.wmsOrderNo\.trim\(\)/, "M4 创建请求必须允许空单号交由后端生成");
+assert.match(actionRequests, /document_type:\s*form\.documentType/, "M4 创建请求必须提交单据类型");
+assert.match(actionRequests, /wms_order_no:\s*form\.wmsOrderNo\.trim\(\)/, "M4 创建请求必须允许空单号交由后端生成");
 assert.match(page, /setOrders\(\(value\) => \[created, \.\.\.value\]\)/, "M4 创建成功后必须把后端返回单据加入列表");
 assert.match(page, /createOutboundOrderMutation\.error/, "M4 创建失败必须回显错误");
 assert.match(page, /createOutboundWaveMutation\.error/, "M4 波次创建失败必须回显错误");
@@ -58,6 +59,20 @@ assert.doesNotMatch(page, /if \(action\.kind === "review"\) updateOrder/, "M4 �
 assert.match(page, /reviewOutboundOrderMutation\.mutateAsync/, "M4 复核提交必须等待真实 API 返回");
 assert.match(page, /setOrders\(\(value\) => value\.map\(\(item\) => item\.id === reviewed\.id \? reviewed : item\)\)/, "M4 复核成功后必须使用后端返回订单更新列表");
 assert.match(page, /reviewDetailQuery\.error/, "M4 复核明细读取失败必须回显真实错误");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/orders\/\{id\}\/revalidate"/, "M4 重新校验必须调用真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/orders\/\{id\}\/void-request"/, "M4 作废申请必须调用真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/orders\/\{id\}\/ship"/, "M4 发货交接必须调用真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/waves\/\{wave_id\}\/release"/, "M4 波次下发必须调用真实 API");
+assert.match(queries, /useRevalidateOutboundOrderMutation/, "M4 必须提供重新校验 mutation");
+assert.match(queries, /useVoidRequestOutboundOrderMutation/, "M4 必须提供作废申请 mutation");
+assert.match(queries, /useShipOutboundOrderMutation/, "M4 必须提供发货交接 mutation");
+assert.match(queries, /useReleaseOutboundWaveMutation/, "M4 必须提供波次下发 mutation");
+assert.match(page, /await revalidateOutboundOrderMutation\.mutateAsync/, "M4 重新校验必须等待真实 API 返回");
+assert.match(page, /校验未通过/, "M4 重新校验返回 validation_exception 必须提示校验未通过");
+assert.match(page, /await voidRequestOutboundOrderMutation\.mutateAsync/, "M4 作废申请必须等待真实 API 返回");
+assert.match(page, /await shipOutboundOrderMutation\.mutateAsync/, "M4 发货交接必须等待真实 API 返回");
+assert.match(page, /await releaseOutboundWaveMutation\.mutateAsync/, "M4 波次下发必须等待真实 API 返回");
+assert.doesNotMatch(page, /function updateOrder\b|function updateWave\b/, "M4 订单/波次动作不得再用本地假状态演示成功");
 assert.match(devMockCore, /handleOutboundDevMock/, "M4 dev mock 主入口必须接入出库路由");
 assert.match(devMock, /POST.*\/api\/v1\/outbound\/orders|pathname === "\/api\/v1\/outbound\/orders"/, "M4 dev mock 必须覆盖创建出库单接口");
 assert.match(devMock, /const detailMatch = pathname\.match/, "M4 dev mock 必须覆盖出库订单详情接口");
@@ -67,5 +82,28 @@ assert.match(devMock, /sendJson\(res, 200, order\)/, "M4 dev mock 详情接口�
 assert.match(devMock, /document_type/, "M4 dev mock 必须保留单据类型");
 assert.match(devMock, /POST.*\/api\/v1\/outbound\/waves|pathname === "\/api\/v1\/outbound\/waves"/, "M4 dev mock 必须覆盖创建波次接口");
 assert.match(devMock, /order_ids/, "M4 dev mock 波次接口必须保留订单选择");
+
+// --- 采购退货接入真实 API ---
+assert.match(queries, /api\.GET\("\/api\/v1\/outbound\/purchase-returns"/, "M4 采购退货列表必须读取真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns"/, "M4 必须提供真实创建采购退货单 API 客户端");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns\/\{id\}\/approve"/, "M4 采购退货审批必须调用真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns\/\{id\}\/reject"/, "M4 采购退货驳回必须调用真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns\/\{id\}\/pick"/, "M4 采购退货拣货必须调用真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns\/\{id\}\/review"/, "M4 采购退货复核必须调用真实 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns\/\{id\}\/ship"/, "M4 采购退货出库交接必须调用真实 API");
+assert.match(page, /usePurchaseReturnsQuery/, "M4 页面必须接入采购退货列表 query");
+assert.match(page, /await createPurchaseReturnMutation\.mutateAsync/, "M4 新建采购退货必须等待真实 API 返回");
+assert.match(actionRequests, /return_no:\s*form\.returnNo\.trim\(\)/, "M4 新建采购退货必须提交用户录入的退货单号");
+assert.match(actionRequests, /source_purchase_order_no:\s*form\.sourcePurchaseOrderNo\.trim\(\)/, "M4 新建采购退货必须提交用户录入的原采购入库单");
+assert.match(actionRequests, /warehouse_id:\s*form\.warehouseId/, "M4 新建采购退货必须提交用户选择的仓库");
+assert.match(actionRequests, /carrier_type:\s*form\.carrierType/, "M4 发货交接必须提交用户选择的配送方类型");
+assert.match(actionRequests, /handover_to:\s*form\.handoverTo\.trim\(\)/, "M4 发货交接必须提交用户录入的交接对象");
+assert.doesNotMatch(page, /RTN-M4-PC-|ASN-M2-PC-0001|华东医药供应商|承运交接人/, "M4 真实写接口不得提交固定演示业务数据");
+assert.match(page, /reason: note\.trim\(\)/, "M4 采购退货驳回必须提交弹窗备注作为驳回原因");
+assert.match(page, /returnsQuery\.error/, "M4 采购退货列表读取失败必须回显错误");
+assert.doesNotMatch(page, /function updateReturn\b/, "M4 采购退货动作不得再用本地假状态演示成功");
+assert.doesNotMatch(page, /seedReturns|makeReturn|__WMS_WEB_ADMIN_DEV_PREFILL__/, "M4 页面不得再引用采购退货演示数据或 dev 预填门控");
+assert.match(devMock, /pathname === "\/api\/v1\/outbound\/purchase-returns"/, "M4 dev mock 必须覆盖采购退货列表/创建接口");
+assert.match(devMock, /approve\|reject\|pick\|review\|ship/, "M4 dev mock 必须覆盖采购退货状态动作接口");
 
 console.log("m4 outbound create api self-check passed");

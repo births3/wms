@@ -7,7 +7,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const pageFile = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPage.tsx"), "utf8");
 const actionDialog = readFileSync(resolve(root, "src/pages/outbound/M4OutboundActionDialog.tsx"), "utf8");
-const page = `${pageFile}\n${actionDialog}`;
+const gridColumns = readFileSync(resolve(root, "src/pages/outbound/M4OutboundGridColumns.tsx"), "utf8");
+const page = `${pageFile}\n${actionDialog}\n${gridColumns}`;
 const parts = readFileSync(resolve(root, "src/pages/outbound/M4OutboundPageParts.tsx"), "utf8");
 const detail = readFileSync(resolve(root, "src/pages/outbound/M4OutboundDetailDialog.tsx"), "utf8");
 
@@ -85,6 +86,7 @@ assert.match(canReviewOrderBody(), /picked/, "复核应允许 picked");
 assert.match(canReviewOrderBody(), /picked_short/, "复核应允许 picked_short");
 assert.doesNotMatch(canReviewOrderBody(), /inventory_locked|reviewed|shipped/, "未拣选完成、已复核或已发货订单不得复核");
 assert.match(canShipOrderBody(), /reviewed/, "交接应允许 reviewed");
+assert.match(canShipOrderBody(), /reviewed_short/, "交接应允许 reviewed_short（后端前置 reviewed|reviewed_short）");
 assert.doesNotMatch(canShipOrderBody(), /inventory_locked|shipped/, "未复核/已发货不得交接");
 assert.match(canApproveReturnBody(), /pending_approval/, "审批仅待审批");
 assert.match(canRejectReturnBody(), /pending_approval/, "驳回仅待审批");
