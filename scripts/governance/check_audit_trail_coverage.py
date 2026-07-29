@@ -32,6 +32,7 @@ CHECK_NAME = "check_audit_trail_coverage"
 OPENAPI_JSON = REPO_ROOT / "shared" / "openapi" / "openapi.json"
 DEFAULT_TEST_ROOT = REPO_ROOT / "backend" / "crates" / "api" / "tests"
 WRITE_METHODS = {"post", "put", "patch", "delete"}
+AUDIT_EXEMPT_REASON = "x-audit-exempt-reason"
 SKIP_PATH_PREFIXES = (
     "/api/v1/healthz",
     "/api/v1/auth/login",
@@ -127,6 +128,8 @@ def collect_openapi_write_ops(openapi_path: Path = OPENAPI_JSON) -> list[dict]:
             method_l = method.lower()
             if method_l not in WRITE_METHODS or not isinstance(operation, dict):
                 continue
+            if str(operation.get(AUDIT_EXEMPT_REASON) or "").strip():
+                continue
             ops.append(
                 {
                     "id": f"{method.upper()} {path}",
@@ -137,6 +140,31 @@ def collect_openapi_write_ops(openapi_path: Path = OPENAPI_JSON) -> list[dict]:
                 }
             )
     return ops
+
+
+def collect_openapi_audit_exempt_ops(openapi_path: Path = OPENAPI_JSON) -> list[dict]:
+    if not openapi_path.is_file():
+        return []
+    spec = json.loads(openapi_path.read_text(encoding="utf-8"))
+    exempt: list[dict] = []
+    for path, item in (spec.get("paths") or {}).items():
+        if not isinstance(item, dict):
+            continue
+        for method, operation in item.items():
+            method_l = method.lower()
+            if (
+                method_l in WRITE_METHODS
+                and isinstance(operation, dict)
+                and str(operation.get(AUDIT_EXEMPT_REASON) or "").strip()
+            ):
+                exempt.append(
+                    {
+                        "method": method.upper(),
+                        "path": path,
+                        "path_re": path_to_regex(path),
+                    }
+                )
+    return exempt
 
 
 def _request_method(match: re.Match[str], text: str, end: int) -> str:
@@ -152,8 +180,19 @@ def _enclosing_test_name(text: str, pos: int) -> str | None:
     for match in TEST_FN_RE.finditer(text):
         if match.start() > pos:
             break
-        last = match.group(1)
-    return last
+        last = match
+    if last is None or not _is_test_function(last):
+        return None
+    return last.group(1)
+
+
+def _is_test_function(match: re.Match[str]) -> bool:
+    return bool(
+        re.search(
+            r"#\[(?:[A-Za-z_][A-Za-z0-9_]*::)?test(?:\([^\]]*\))?\]",
+            match.group(0),
+        )
+    )
 
 
 def _test_function_span(text: str, fn_name: str) -> tuple[int, int] | None:
@@ -170,10 +209,14 @@ def _function_bodies(text: str) -> list[str]:
     return [
         text[match.start() : matches[index + 1].start() if index + 1 < len(matches) else len(text)]
         for index, match in enumerate(matches)
+        if _is_test_function(match)
     ]
 
 
-def collect_write_success_tests(test_root: Path) -> list[dict]:
+def collect_write_success_tests(
+    test_root: Path,
+    audit_exempt_ops: list[dict] | None = None,
+) -> list[dict]:
     if not test_root.is_dir():
         return []
     samples: list[dict] = []
@@ -193,13 +236,18 @@ def collect_write_success_tests(test_root: Path) -> list[dict]:
             success_re = re.compile(SUCCESS_STATUS_RE_TEMPLATE.format(variable=re.escape(variable)))
             if not success_re.search(text[match.end() : end]):
                 continue
-            test_name = _enclosing_test_name(text, match.start()) or path.stem
+            test_name = _enclosing_test_name(text, match.start())
+            if test_name is None:
+                continue
             span = _test_function_span(text, test_name)
             body = text[span[0] : span[1]] if span else text
             uri = match.group("uri")
-            if any(uri.startswith(prefix.rstrip("/")) or prefix.rstrip("/") in uri for prefix in SKIP_PATH_PREFIXES if prefix.startswith("/api/v1/reports")):
+            if any(uri.startswith(prefix.rstrip("/")) for prefix in SKIP_PATH_PREFIXES):
                 continue
-            if uri.startswith("/api/v1/reports/"):
+            if any(
+                method == operation["method"] and operation["path_re"].search(uri)
+                for operation in (audit_exempt_ops or [])
+            ):
                 continue
             samples.append(
                 {
@@ -273,7 +321,8 @@ def run_check(
     test_root: Path = DEFAULT_TEST_ROOT,
     auto_shrink: bool = True,
 ) -> dict:
-    samples = collect_write_success_tests(test_root)
+    audit_exempt_ops = collect_openapi_audit_exempt_ops(openapi_path)
+    samples = collect_write_success_tests(test_root, audit_exempt_ops)
     missing_http = find_missing_audit_assertions(samples)
     ops = collect_openapi_write_ops(openapi_path)
     missing_ops = find_missing_openapi_audit_tests(ops, test_root)

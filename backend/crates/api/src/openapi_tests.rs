@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::openapi_contract::{
-        AUTH_EXEMPT_REASON, BEARER_AUTH_SCHEME, COLD_CHAIN_API_KEY_SCHEME,
+        AUDIT_EXEMPT_REASON, AUTH_EXEMPT_REASON, BEARER_AUTH_SCHEME, COLD_CHAIN_API_KEY_SCHEME,
         IDEMPOTENCY_EXEMPT_REASON,
     };
     use crate::ApiDoc;
@@ -548,6 +548,26 @@ mod tests {
                 .is_some_and(|reason| !reason.is_empty()),
             "login should document idempotency exemption",
         );
+        let image_preview_operation = "/paths/~1api~1v1~1drug-inspection~1image-previews/post";
+        for exemption in [AUDIT_EXEMPT_REASON, IDEMPOTENCY_EXEMPT_REASON] {
+            assert!(
+                doc.pointer(&format!("{image_preview_operation}/{exemption}"))
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|reason| !reason.is_empty()),
+                "read-only image preview POST should document {exemption}",
+            );
+        }
+        for operation in [
+            "/paths/~1api~1v1~1auth~1sessions~1revoke-others/post",
+            "/paths/~1api~1v1~1auth~1users~1{user_id}~1kick/post",
+        ] {
+            assert!(
+                doc.pointer(&format!("{operation}/{IDEMPOTENCY_EXEMPT_REASON}"))
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|reason| !reason.is_empty()),
+                "naturally convergent auth revocation should document its idempotency exemption",
+            );
+        }
         for operation in [
             "/paths/~1api~1v1~1master-data~1products/post",
             "/paths/~1api~1v1~1master-data~1suppliers/post",

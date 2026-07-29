@@ -10,6 +10,8 @@ SCRIPTS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPTS))
 
 from check_audit_trail_coverage import (  # noqa: E402
+    collect_openapi_audit_exempt_ops,
+    collect_openapi_write_ops,
     collect_write_success_tests,
     file_covers_operation,
     find_missing_audit_assertions,
@@ -77,6 +79,133 @@ async fn receive_without_audit_check(pool: PgPool) {
     assert "POST /api/v1/inbound/receiving-orders/1/receive :: receive_writes_audit" not in ids
 
 
+def test_audit_http_success_ignores_helpers_and_skipped_paths(tmp_path: Path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "helpers.rs").write_text(
+        """
+async fn login(app: Router) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/login")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+async fn submit_change(app: Router) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/alert-definitions/change-requests")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert collect_write_success_tests(tests) == []
+
+
+def test_audit_openapi_coverage_ignores_helper_function(tmp_path: Path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "helper.rs").write_text(
+        """
+async fn submit_change(app: Router, pool: PgPool) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/alert-definitions/change-requests")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let audit_event: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_event")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(audit_event, 1);
+}
+""",
+        encoding="utf-8",
+    )
+    path = "/api/v1/alert-definitions/change-requests"
+    operation = {
+        "id": f"POST {path}",
+        "method": "POST",
+        "path": path,
+        "operation_id": "create_alert_definition_change_request",
+        "path_re": path_to_regex(path),
+    }
+
+    missing = find_missing_openapi_audit_tests([operation], tests)
+    assert [item["id"] for item in missing] == [operation["id"]]
+
+
+def test_audit_gate_honors_documented_read_only_post_exemption(tmp_path: Path):
+    openapi_path = tmp_path / "openapi.json"
+    openapi_path.write_text(
+        json.dumps(
+            {
+                "paths": {
+                    "/api/v1/demo/preview": {
+                        "post": {
+                            "operationId": "preview_demo",
+                            "x-audit-exempt-reason": "read-only derived preview",
+                        }
+                    },
+                    "/api/v1/demo/write": {
+                        "post": {"operationId": "write_demo"}
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "preview.rs").write_text(
+        """
+#[sqlx::test]
+async fn preview_demo() {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/api/v1/demo/preview")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+""",
+        encoding="utf-8",
+    )
+
+    exempt_ops = collect_openapi_audit_exempt_ops(openapi_path)
+    assert collect_write_success_tests(tests, exempt_ops) == []
+    assert [operation["id"] for operation in collect_openapi_write_ops(openapi_path)] == [
+        "POST /api/v1/demo/write"
+    ]
+
+
 def test_file_covers_repository_style_receive_action():
     text = """
 async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
@@ -93,6 +222,7 @@ def test_openapi_audit_requires_path_and_audit_in_same_file(tmp_path: Path):
     tests.mkdir()
     (tests / "covered.rs").write_text(
         """
+#[sqlx::test]
 async fn receive_ok() {
     receive_receiving_order(...);
     SELECT COUNT(*) FROM audit_event;

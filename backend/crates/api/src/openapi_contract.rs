@@ -15,12 +15,23 @@ use utoipa::{
 pub(crate) const BEARER_AUTH_SCHEME: &str = "BearerAuth";
 pub(crate) const COLD_CHAIN_API_KEY_SCHEME: &str = "ColdChainApiKeyAuth";
 pub(crate) const AUTH_EXEMPT_REASON: &str = "x-auth-exempt-reason";
+pub(crate) const AUDIT_EXEMPT_REASON: &str = "x-audit-exempt-reason";
 pub(crate) const IDEMPOTENCY_EXEMPT_REASON: &str = "x-idempotency-exempt-reason";
+
+struct AuditExemptionGroup {
+    operations: &'static [(&'static str, PathItemType)],
+    reason: &'static str,
+}
 
 struct IdempotencyExemptionGroup {
     operations: &'static [(&'static str, PathItemType)],
     reason: &'static str,
 }
+
+const AUDIT_EXEMPTION_GROUPS: &[AuditExemptionGroup] = &[AuditExemptionGroup {
+    operations: &[("/api/v1/drug-inspection/image-previews", PathItemType::Post)],
+    reason: "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。",
+}];
 
 const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
     IdempotencyExemptionGroup {
@@ -47,6 +58,16 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
     IdempotencyExemptionGroup {
         operations: &[("/api/v1/auth/login", PathItemType::Post)],
         reason: "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+    },
+    IdempotencyExemptionGroup {
+        operations: &[
+            (
+                "/api/v1/auth/sessions/revoke-others",
+                PathItemType::Post,
+            ),
+            ("/api/v1/auth/users/{user_id}/kick", PathItemType::Post),
+        ],
+        reason: "会话批量失效按当前活跃会话集合收敛；重复调用不会再次撤销已失效会话，审计仍记录每次操作。",
     },
     IdempotencyExemptionGroup {
         operations: &[("/api/v1/wechat-notify/settings/test", PathItemType::Post)],
@@ -372,6 +393,13 @@ impl Modify for ContractSecurityAddon {
             for (path, method) in group.operations {
                 if let Some(operation) = operation_mut(openapi, path, method.clone()) {
                     set_extension(operation, IDEMPOTENCY_EXEMPT_REASON, group.reason);
+                }
+            }
+        }
+        for group in AUDIT_EXEMPTION_GROUPS {
+            for (path, method) in group.operations {
+                if let Some(operation) = operation_mut(openapi, path, method.clone()) {
+                    set_extension(operation, AUDIT_EXEMPT_REASON, group.reason);
                 }
             }
         }
