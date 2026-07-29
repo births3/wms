@@ -251,6 +251,19 @@ const IDEMPOTENCY_EXEMPTION_GROUPS: &[IdempotencyExemptionGroup] = &[
         reason:
             "打印模板解析和预览为只读语义，使用 POST 承载复杂模板数据，不要求 Idempotency-Key。",
     },
+    IdempotencyExemptionGroup {
+        operations: &[
+            (
+                "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download",
+                PathItemType::Post,
+            ),
+            (
+                "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print",
+                PathItemType::Post,
+            ),
+        ],
+        reason: "分类 PDF 下载和应急打印只读取冻结附件并返回所选 PDF；每次访问单独写入审计，不创建或变更业务对象。",
+    },
 ];
 
 pub(crate) struct ContractSecurityAddon;

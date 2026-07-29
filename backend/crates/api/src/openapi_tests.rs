@@ -575,6 +575,17 @@ mod tests {
                 .is_some_and(|reason| !reason.is_empty()),
             "H4 settings test should document its read-only POST idempotency exemption",
         );
+        for operation in [
+            "/paths/~1api~1v1~1print-orchestration~1suite-instances~1{instance_id}~1category-pdfs~1download/post",
+            "/paths/~1api~1v1~1print-orchestration~1suite-instances~1{instance_id}~1category-pdfs~1emergency-print/post",
+        ] {
+            assert!(
+                doc.pointer(&format!("{operation}/{IDEMPOTENCY_EXEMPT_REASON}"))
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|reason| !reason.is_empty()),
+                "read-only category PDF POST should document idempotency exemption",
+            );
+        }
         assert!(
             doc.pointer(
                 "/paths/~1api~1v1~1state-machines~1{machine_code}~1transition-validation/get/responses/400",

@@ -12,6 +12,8 @@ use wms_api::{
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
     h8_erp_interface_tables::{h8_erp_interface_table_router, H8ErpInterfaceTableAppState},
     h8_erp_messages::{h8_erp_message_router, H8ErpMessageAppState},
+    print_orchestration_handlers::{print_orchestration_router, PrintOrchestrationAppState},
+    reconciliation_handlers::{reconciliation_router, ReconciliationAppState},
     stock_adjustment_handlers::{stock_adjustment_router, StockAdjustmentAppState},
     wave3_handlers::{wave3_router, Wave3AppState},
 };
@@ -32,11 +34,17 @@ fn protected_routes() -> Router {
         ))
         .merge(wave3_router(Wave3AppState::with_postgres(pool.clone())))
         .merge(stock_adjustment_router(
-            StockAdjustmentAppState::with_postgres(pool),
+            StockAdjustmentAppState::with_postgres(pool.clone()),
         ))
         .merge(h8_erp_connector_router(connectors))
         .merge(h8_erp_interface_table_router(interface_tables))
         .merge(h8_erp_message_router(H8ErpMessageAppState::with_memory()))
+        .merge(print_orchestration_router(
+            PrintOrchestrationAppState::with_postgres(pool.clone()),
+        ))
+        .merge(reconciliation_router(
+            ReconciliationAppState::with_postgres(pool),
+        ))
 }
 
 #[tokio::test]
@@ -92,6 +100,17 @@ async fn protected_routes_reject_unauthenticated_http_requests() {
         (Method::POST, "/api/v1/stock-adjustments/loss-orders/00000000-0000-0000-0000-000000000001/execute"),
         (Method::GET, "/api/v1/stock-adjustments/surplus-orders/00000000-0000-0000-0000-000000000001"),
         (Method::POST, "/api/v1/stock-adjustments/surplus-orders/00000000-0000-0000-0000-000000000001/execute"),
+        (Method::GET, "/api/v1/print-orchestration/delivery-note-candidates"),
+        (Method::GET, "/api/v1/print-orchestration/delivery-note-groups"),
+        (Method::GET, "/api/v1/print-orchestration/route-bindings"),
+        (Method::GET, "/api/v1/print-orchestration/cutoff-plans"),
+        (Method::POST, "/api/v1/print-orchestration/cutoff-plans/00000000-0000-0000-0000-000000000001/publish"),
+        (Method::GET, "/api/v1/print-orchestration/suite-instances/00000000-0000-0000-0000-000000000001/category-pdfs"),
+        (Method::POST, "/api/v1/print-orchestration/suite-instances/00000000-0000-0000-0000-000000000001/category-pdfs/prepare"),
+        (Method::POST, "/api/v1/print-orchestration/suite-instances/00000000-0000-0000-0000-000000000001/category-pdfs/download"),
+        (Method::POST, "/api/v1/print-orchestration/suite-instances/00000000-0000-0000-0000-000000000001/category-pdfs/emergency-print"),
+        (Method::POST, "/api/v1/reconciliation/items/isolation"),
+        (Method::POST, "/api/v1/reconciliation/items/00000000-0000-0000-0000-000000000001/resolve"),
     ];
 
     for (method, uri) in routes {
