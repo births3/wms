@@ -315,6 +315,7 @@ async fn write_attachment_bytes(
 }
 
 include!("drug_inspection_documents_postgres/stamp_copy_cases.rs");
+include!("drug_inspection_documents_postgres/requirement_rule.rs");
 
 fn all_permissions() -> [&'static str; 3] {
     [
@@ -661,6 +662,36 @@ async fn report_upload_review_reuse_and_correction_preserve_version_chain(pool: 
         statuses,
         vec![(1, "superseded".to_string()), (2, "confirmed".to_string())]
     );
+    let evidence: (i64, i64) = sqlx::query_as(
+        "SELECT
+           (SELECT COUNT(*) FROM audit_event
+             WHERE owner_id = $1
+               AND action = ANY($2::text[])),
+           (SELECT COUNT(*) FROM idempotency_request
+             WHERE owner_id = $1
+               AND idempotency_key = ANY($3::text[]))",
+    )
+    .bind(fixture.owner_id)
+    .bind(vec![
+        "di.report_version.created",
+        "di.report_version.submitted",
+        "di.report_version.confirmed",
+        "di.report.reused",
+        "di.report_version.correction_created",
+    ])
+    .bind(vec![
+        "di-create-a",
+        "di-submit-a",
+        "di-confirm-a",
+        "di-reuse-a",
+        "di-correction-a",
+        "di-submit-correction",
+        "di-confirm-correction",
+    ])
+    .fetch_one(&pool)
+    .await
+    .expect("report lifecycle audit and idempotency evidence should query");
+    assert_eq!(evidence, (7, 7));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -751,4 +782,19 @@ async fn upstream_delivery_upload_versions_multiple_asns_atomically(pool: PgPool
     .await
     .expect("history links should query");
     assert_eq!(history_links, 4);
+    let evidence: (i64, i64) = sqlx::query_as(
+        "SELECT
+           (SELECT COUNT(*) FROM audit_event
+             WHERE owner_id = $1
+               AND action = 'di.upstream_delivery.version_created'),
+           (SELECT COUNT(*) FROM idempotency_request
+             WHERE owner_id = $1
+               AND idempotency_key = ANY($2::text[]))",
+    )
+    .bind(fixture.owner_id)
+    .bind(vec!["upstream-first", "upstream-second"])
+    .fetch_one(&pool)
+    .await
+    .expect("upstream delivery audit and idempotency evidence should query");
+    assert_eq!(evidence, (2, 2));
 }

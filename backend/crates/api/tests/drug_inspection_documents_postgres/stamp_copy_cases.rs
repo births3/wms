@@ -203,7 +203,9 @@ async fn publishing_first_stamp_requeues_copy_that_failed_without_a_stamp(pool: 
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn confirmed_report_generates_a_real_stamped_customer_pdf(pool: PgPool) {
+async fn review_drug_inspection_stamp_version_and_approve_drug_inspection_copy_oversize_generate_a_real_pdf(
+    pool: PgPool,
+) {
     let fixture = seed_fixture(&pool).await;
     let storage_root =
         std::env::temp_dir().join(format!("wms-di-copy-{}", Uuid::new_v4().simple()));
