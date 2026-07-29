@@ -4,6 +4,7 @@ import type {
   H4NotificationConfig,
   H4NotificationRecord,
 } from "@/features/wechat-notify/wechat-notify-queries";
+import { formatDateTime } from "@/lib/format";
 
 export const configColumns: DataGridColumn<H4NotificationConfig>[] = [
   {
@@ -218,10 +219,4 @@ function statusKey(status: string): StatusKey {
 
 function stringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "-";
-  return date.toLocaleString("zh-CN", { hour12: false });
 }

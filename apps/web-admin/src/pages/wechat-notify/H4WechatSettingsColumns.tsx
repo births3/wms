@@ -1,6 +1,7 @@
 import { StatusBadge, type DataGridColumn } from "@wms/ui";
 
 import type { H4WechatSettings } from "@/features/wechat-notify/wechat-notify-queries";
+import { formatDateTime } from "@/lib/format";
 
 export const settingsColumns: DataGridColumn<H4WechatSettings>[] = [
   {
@@ -119,9 +120,3 @@ export const settingsColumns: DataGridColumn<H4WechatSettings>[] = [
     render: (row) => formatDateTime(row.updated_at),
   },
 ];
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "-";
-  return date.toLocaleString("zh-CN", { hour12: false });
-}

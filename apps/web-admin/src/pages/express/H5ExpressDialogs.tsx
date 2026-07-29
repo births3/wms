@@ -9,6 +9,8 @@ import {
 } from "@wms/ui";
 
 import type { ExpressTrackingResponse, ExpressWaybill } from "@/features/express/express-queries";
+import { formatDateTime } from "@/lib/format";
+import { providerOptions } from "./h5-express-model";
 
 export interface CarrierForm {
   carrierCode: string;
@@ -47,10 +49,11 @@ export interface WaybillForm {
   packageCount: string;
 }
 
-export function TrackingDialog({ open, waybill, tracking, loading, onOpenChange, onRefresh }: {
+export function TrackingDialog({ open, waybill, tracking, error, loading, onOpenChange, onRefresh }: {
   open: boolean;
   waybill: ExpressWaybill | null;
   tracking: ExpressTrackingResponse | null;
+  error?: string | null;
   loading: boolean;
   onOpenChange: (open: boolean) => void;
   onRefresh: () => void;
@@ -59,6 +62,7 @@ export function TrackingDialog({ open, waybill, tracking, loading, onOpenChange,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>轨迹详情</DialogTitle></DialogHeader>
+        <DialogErrorNotice error={error} />
         {waybill ? (
           <div className="space-y-4">
             <WaybillInfo waybill={waybill} />
@@ -88,9 +92,10 @@ export function TrackingDialog({ open, waybill, tracking, loading, onOpenChange,
   );
 }
 
-export function CancelWaybillDialog({ open, waybill, saving, onOpenChange, onConfirm }: {
+export function CancelWaybillDialog({ open, waybill, error, saving, onOpenChange, onConfirm }: {
   open: boolean;
   waybill: ExpressWaybill | null;
+  error?: string | null;
   saving: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
@@ -99,6 +104,7 @@ export function CancelWaybillDialog({ open, waybill, saving, onOpenChange, onCon
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader><DialogTitle>取消运单</DialogTitle></DialogHeader>
+        <DialogErrorNotice error={error} />
         <div className="text-sm text-muted-foreground">
           确认取消运单 {waybill?.waybill_no ?? "-"}？取消后将写入管理端取消原因。
         </div>
@@ -110,6 +116,8 @@ export function CancelWaybillDialog({ open, waybill, saving, onOpenChange, onCon
     </Dialog>
   );
 }
+
+const waybillPrintAreaId = "h5-waybill-print-area";
 
 export function WaybillPrintDialog({ open, waybill, onOpenChange, onPrinted }: {
   open: boolean;
@@ -125,8 +133,20 @@ export function WaybillPrintDialog({ open, waybill, onOpenChange, onPrinted }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
+        {/* 打印隔离：@media print 只显示面单容器，避免 window.print 把整页（菜单/表格）一并打印。 */}
+        <style>{`@media print {
+          body * { visibility: hidden !important; }
+          #${waybillPrintAreaId}, #${waybillPrintAreaId} * { visibility: visible !important; }
+          #${waybillPrintAreaId} { position: absolute; left: 0; top: 0; width: 100%; }
+        }`}</style>
         <DialogHeader><DialogTitle>打印面单</DialogTitle></DialogHeader>
-        {waybill ? <WaybillInfo waybill={waybill} /> : <div className="text-sm text-muted-foreground">暂无可打印运单。</div>}
+        {waybill ? (
+          <div id={waybillPrintAreaId}>
+            <WaybillInfo waybill={waybill} />
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">暂无可打印运单。</div>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>关闭</Button>
           <Button disabled={!waybill} onClick={printWaybill}>打印</Button>
@@ -136,14 +156,10 @@ export function WaybillPrintDialog({ open, waybill, onOpenChange, onPrinted }: {
   );
 }
 
-const providerOptions = [
-  { label: "自有配送", value: "own_fleet" },
-  { label: "三方快递", value: "third_party_express" },
-];
-
-export function CarrierDialog({ open, form, saving, onFormChange, onOpenChange, onSave }: {
+export function CarrierDialog({ open, form, error, saving, onFormChange, onOpenChange, onSave }: {
   open: boolean;
   form: CarrierForm;
+  error?: string | null;
   saving: boolean;
   onFormChange: (form: CarrierForm) => void;
   onOpenChange: (open: boolean) => void;
@@ -153,6 +169,7 @@ export function CarrierDialog({ open, form, saving, onFormChange, onOpenChange, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>快递商配置</DialogTitle></DialogHeader>
+        <DialogErrorNotice error={error} />
         <div className="grid gap-3 md:grid-cols-2">
           <FormInput label="快递商编码" value={form.carrierCode} onChange={(carrierCode) => onFormChange({ ...form, carrierCode })} />
           <FormInput label="快递商名称" value={form.carrierName} onChange={(carrierName) => onFormChange({ ...form, carrierName })} />
@@ -176,9 +193,10 @@ export function CarrierDialog({ open, form, saving, onFormChange, onOpenChange, 
   );
 }
 
-export function RuleDialog({ open, form, saving, onFormChange, onOpenChange, onSave }: {
+export function RuleDialog({ open, form, error, saving, onFormChange, onOpenChange, onSave }: {
   open: boolean;
   form: RuleForm;
+  error?: string | null;
   saving: boolean;
   onFormChange: (form: RuleForm) => void;
   onOpenChange: (open: boolean) => void;
@@ -188,6 +206,7 @@ export function RuleDialog({ open, form, saving, onFormChange, onOpenChange, onS
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>快递选择规则</DialogTitle></DialogHeader>
+        <DialogErrorNotice error={error} />
         <div className="grid gap-3 md:grid-cols-2">
           <FormInput label="规则编码" value={form.ruleCode} onChange={(ruleCode) => onFormChange({ ...form, ruleCode })} />
           <FormInput label="规则名称" value={form.ruleName} onChange={(ruleName) => onFormChange({ ...form, ruleName })} />
@@ -219,9 +238,10 @@ export function RuleDialog({ open, form, saving, onFormChange, onOpenChange, onS
   );
 }
 
-export function WaybillDialog({ open, form, saving, onFormChange, onOpenChange, onSave }: {
+export function WaybillDialog({ open, form, error, saving, onFormChange, onOpenChange, onSave }: {
   open: boolean;
   form: WaybillForm;
+  error?: string | null;
   saving: boolean;
   onFormChange: (form: WaybillForm) => void;
   onOpenChange: (open: boolean) => void;
@@ -231,6 +251,7 @@ export function WaybillDialog({ open, form, saving, onFormChange, onOpenChange, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader><DialogTitle>快递下单</DialogTitle></DialogHeader>
+        <DialogErrorNotice error={error} />
         <div className="grid gap-3 md:grid-cols-3">
           <FormInput label="包裹号" value={form.packageNo} onChange={(packageNo) => onFormChange({ ...form, packageNo })} />
           <FormInput label="快递商编码" value={form.carrierCode} onChange={(carrierCode) => onFormChange({ ...form, carrierCode })} />
@@ -250,6 +271,16 @@ export function WaybillDialog({ open, form, saving, onFormChange, onOpenChange, 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** 弹窗提交失败提示：渲染在弹窗内部，避免页面层 notice 被模态遮挡。 */
+function DialogErrorNotice({ error }: { error?: string | null }) {
+  if (!error) return null;
+  return (
+    <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" role="alert">
+      {error}
+    </div>
   );
 }
 
@@ -302,10 +333,4 @@ function Info({ label, value, mono = false }: { label: string; value: string; mo
       <div className={mono ? "mt-1 font-mono" : "mt-1"}>{value}</div>
     </div>
   );
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "-";
-  return date.toLocaleString("zh-CN", { hour12: false });
 }

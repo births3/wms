@@ -11,6 +11,8 @@ import {
 } from "@wms/ui";
 
 import type { H4NotificationRecord } from "@/features/wechat-notify/wechat-notify-queries";
+import { formatDateTime } from "@/lib/format";
+import { failureReasonText, statusLabel } from "./H4WechatNotifyColumns";
 
 export type ConfigFormState = {
   eventType: string;
@@ -112,12 +114,13 @@ export function SettingsDialog(props: {
 export function ConfigDialog(props: {
   open: boolean;
   form: ConfigFormState;
+  notice: Notice;
   saving: boolean;
   onFormChange: (form: ConfigFormState) => void;
   onOpenChange: (open: boolean) => void;
   onSave: () => void;
 }) {
-  const { open, form, saving, onFormChange, onOpenChange, onSave } = props;
+  const { open, form, notice, saving, onFormChange, onOpenChange, onSave } = props;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -125,6 +128,7 @@ export function ConfigDialog(props: {
           <DialogTitle>通知配置</DialogTitle>
           <DialogDescription>维护事件类型、模板、企业微信接收人和启停状态。</DialogDescription>
         </DialogHeader>
+        {notice?.type === "error" && <NoticePanel notice={notice} />}
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="事件类型">
             <Input value={form.eventType} onChange={(event) => onFormChange({ ...form, eventType: event.target.value })} />
@@ -162,12 +166,13 @@ export function ConfigDialog(props: {
 export function SendDialog(props: {
   open: boolean;
   form: SendFormState;
+  notice: Notice;
   sending: boolean;
   onFormChange: (form: SendFormState) => void;
   onOpenChange: (open: boolean) => void;
   onSend: () => void;
 }) {
-  const { open, form, sending, onFormChange, onOpenChange, onSend } = props;
+  const { open, form, notice, sending, onFormChange, onOpenChange, onSend } = props;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -175,6 +180,7 @@ export function SendDialog(props: {
           <DialogTitle>试发通知</DialogTitle>
           <DialogDescription>使用模板变量 payload 渲染内容，并写入企业微信发送记录。</DialogDescription>
         </DialogHeader>
+        {notice?.type === "error" && <NoticePanel notice={notice} />}
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="事件类型">
             <Input value={form.eventType} onChange={(event) => onFormChange({ ...form, eventType: event.target.value })} />
@@ -233,12 +239,7 @@ export function RecordDetailDialog({ record, onOpenChange }: { record: H4Notific
                     : "bg-muted/30"
                 }`}
               >
-                {record.failure_reason?.trim()
-                  || (record.status === "failed"
-                    ? "未返回失败原因"
-                    : record.status === "retrying"
-                      ? "重试中，暂无失败原因"
-                      : "-")}
+                {failureReasonText(record)}
               </div>
             </Field>
           </div>
@@ -261,7 +262,6 @@ export function NoticePanel({ notice }: { notice: Notice }) {
     </div>
   );
 }
-
 export function ErrorPanel({ message }: { message: string }) {
   return <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{message}</div>;
 }
@@ -286,17 +286,4 @@ function InfoGrid({ items }: { items: Array<[string, string]> }) {
       ))}
     </div>
   );
-}
-
-function statusLabel(status: string) {
-  if (status === "success") return "成功";
-  if (status === "failed") return "失败";
-  if (status === "retrying") return "重试中";
-  return status;
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "-";
-  return date.toLocaleString("zh-CN", { hour12: false });
 }

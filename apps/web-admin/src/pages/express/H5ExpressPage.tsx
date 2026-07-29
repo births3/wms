@@ -41,6 +41,11 @@ import {
   type RuleForm,
   type WaybillForm,
 } from "./H5ExpressDialogs";
+import { providerLabel, providerOptions, waybillStatusKey, waybillStatusLabel } from "./h5-express-model";
+import { errorText } from "@/lib/error-text";
+import { queryString as libQueryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 type Notice = { type: "success" | "error"; text: string } | null;
 
@@ -54,11 +59,6 @@ const queryFields: QueryPanelField[] = [
   },
 ];
 const h5ExpressCoreQueryFieldKeys = ["q", "enabled"];
-
-const providerOptions = [
-  { label: "自有配送", value: "own_fleet" },
-  { label: "三方快递", value: "third_party_express" },
-];
 
 const carrierColumns: DataGridColumn<ExpressCarrier>[] = [
   {
@@ -240,20 +240,19 @@ const ruleColumns: DataGridColumn<ExpressRoutingRule>[] = [
 ];
 
 export function H5ExpressPage() {
-  const [query, setQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
-  const [appliedQuery, setAppliedQuery] = React.useState<QueryPanelValue>(() => defaultQuery());
+  const { draftQuery: query, setDraftQuery: setQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [selectedCarrierKeys, setSelectedCarrierKeys] = React.useState<string[]>([]);
   const [selectedRuleKeys, setSelectedRuleKeys] = React.useState<string[]>([]);
-  const [carrierForm, setCarrierForm] = React.useState<CarrierForm>(() => emptyCarrierForm());
-  const [ruleForm, setRuleForm] = React.useState<RuleForm>(() => emptyRuleForm());
-  const [waybillForm, setWaybillForm] = React.useState<WaybillForm>(() => emptyWaybillForm());
-  const [carrierDialogOpen, setCarrierDialogOpen] = React.useState(false);
-  const [ruleDialogOpen, setRuleDialogOpen] = React.useState(false);
-  const [waybillDialogOpen, setWaybillDialogOpen] = React.useState(false);
+  const carrierDialog = useDialogState<CarrierForm>();
+  const ruleDialog = useDialogState<RuleForm>();
+  const waybillDialog = useDialogState<WaybillForm>();
   const [trackingDialogOpen, setTrackingDialogOpen] = React.useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [printDialogOpen, setPrintDialogOpen] = React.useState(false);
   const [notice, setNotice] = React.useState<Notice>(null);
+  // 弹窗提交失败的提示渲染在弹窗内部（页面层 notice 只保留成功/刷新提示）。
+  const [dialogError, setDialogError] = React.useState<string | null>(null);
   const [recentWaybill, setRecentWaybill] = React.useState<ExpressWaybill | null>(null);
   const [tracking, setTracking] = React.useState<ExpressTrackingResponse | null>(null);
 
@@ -284,12 +283,8 @@ export function H5ExpressPage() {
         defaultVisibleFieldKeys={h5ExpressCoreQueryFieldKeys}
         value={query}
         onValueChange={(next) => setQuery(normalizeQuery(next))}
-        onQuery={() => setAppliedQuery(normalizeQuery(query))}
-        onReset={() => {
-          const next = defaultQuery();
-          setQuery(next);
-          setAppliedQuery(next);
-        }}
+        onQuery={() => applyQuery(query)}
+        onReset={resetQuery}
       />
 
       <Card className="rounded-lg shadow-sm">
@@ -327,7 +322,7 @@ export function H5ExpressPage() {
                 size="sm"
                 variant="outline"
                 disabled={!canTrackWaybill}
-                onClick={() => setTrackingDialogOpen(true)}
+                onClick={openTrackingDialog}
               >
                 <Route className="size-4" aria-hidden />
                 轨迹
@@ -337,7 +332,7 @@ export function H5ExpressPage() {
                 size="sm"
                 variant="outline"
                 disabled={!canCancelWaybill}
-                onClick={() => setCancelDialogOpen(true)}
+                onClick={openCancelDialog}
               >
                 <Ban className="size-4" aria-hidden />
                 取消
@@ -390,16 +385,8 @@ export function H5ExpressPage() {
               }}
               queryState={appliedQuery}
               querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)}
-              onApplyQueryState={(queryState) => {
-                const next = normalizeQuery(queryValueFromUnknown(queryState));
-                setQuery(next);
-                setAppliedQuery(next);
-              }}
-              onClearQueryState={() => {
-                const next = defaultQuery();
-                setQuery(next);
-                setAppliedQuery(next);
-              }}
+              onApplyQueryState={applyGridQueryState}
+              onClearQueryState={clearGridQueryState}
           />
         </CardContent>
       </Card>
@@ -434,48 +421,44 @@ export function H5ExpressPage() {
             }}
             queryState={appliedQuery}
             querySummaryItems={buildQueryPanelSummaryItems(queryFields, appliedQuery)}
-            onApplyQueryState={(queryState) => {
-              const next = normalizeQuery(queryValueFromUnknown(queryState));
-              setQuery(next);
-              setAppliedQuery(next);
-            }}
-            onClearQueryState={() => {
-              const next = defaultQuery();
-              setQuery(next);
-              setAppliedQuery(next);
-            }}
+            onApplyQueryState={applyGridQueryState}
+            onClearQueryState={clearGridQueryState}
           />
         </CardContent>
       </Card>
 
       <CarrierDialog
-        open={carrierDialogOpen}
-        form={carrierForm}
+        open={carrierDialog.open}
+        form={carrierDialog.target ?? emptyCarrierForm()}
+        error={carrierDialog.open ? dialogError : null}
         saving={upsertCarrier.isPending}
-        onFormChange={setCarrierForm}
-        onOpenChange={setCarrierDialogOpen}
+        onFormChange={carrierDialog.setTarget}
+        onOpenChange={carrierDialog.setOpen}
         onSave={saveCarrier}
       />
       <RuleDialog
-        open={ruleDialogOpen}
-        form={ruleForm}
+        open={ruleDialog.open}
+        form={ruleDialog.target ?? emptyRuleForm()}
+        error={ruleDialog.open ? dialogError : null}
         saving={upsertRule.isPending}
-        onFormChange={setRuleForm}
-        onOpenChange={setRuleDialogOpen}
+        onFormChange={ruleDialog.setTarget}
+        onOpenChange={ruleDialog.setOpen}
         onSave={saveRule}
       />
       <WaybillDialog
-        open={waybillDialogOpen}
-        form={waybillForm}
+        open={waybillDialog.open}
+        form={waybillDialog.target ?? emptyWaybillForm()}
+        error={waybillDialog.open ? dialogError : null}
         saving={createWaybill.isPending}
-        onFormChange={setWaybillForm}
-        onOpenChange={setWaybillDialogOpen}
+        onFormChange={waybillDialog.setTarget}
+        onOpenChange={waybillDialog.setOpen}
         onSave={saveWaybill}
       />
       <TrackingDialog
         open={trackingDialogOpen}
         waybill={recentWaybill}
         tracking={tracking}
+        error={trackingDialogOpen ? dialogError : null}
         loading={trackingMutation.isPending}
         onOpenChange={setTrackingDialogOpen}
         onRefresh={() => recentWaybill && void loadTracking(recentWaybill.waybill_no)}
@@ -483,6 +466,7 @@ export function H5ExpressPage() {
       <CancelWaybillDialog
         open={cancelDialogOpen}
         waybill={recentWaybill}
+        error={cancelDialogOpen ? dialogError : null}
         saving={cancelWaybill.isPending}
         onOpenChange={setCancelDialogOpen}
         onConfirm={() => recentWaybill && void cancelRecentWaybill(recentWaybill.waybill_no)}
@@ -506,64 +490,90 @@ export function H5ExpressPage() {
     setNotice(result.error ? { type: "error", text: result.error.message } : { type: "success", text: "快递选择规则已刷新" });
   }
 
+  function applyGridQueryState(queryState: unknown) {
+    applyQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearGridQueryState() {
+    resetQuery();
+  }
+
   function openCarrierDialog(carrier: ExpressCarrier | null) {
-    setCarrierForm(carrier ? carrierFormFromRow(carrier) : emptyCarrierForm());
-    setCarrierDialogOpen(true);
+    setDialogError(null);
+    carrierDialog.openWith(carrier ? carrierFormFromRow(carrier) : emptyCarrierForm());
   }
 
   function openRuleDialog(rule: ExpressRoutingRule | null) {
-    setRuleForm(rule ? ruleFormFromRow(rule) : emptyRuleForm());
-    setRuleDialogOpen(true);
+    setDialogError(null);
+    ruleDialog.openWith(rule ? ruleFormFromRow(rule) : emptyRuleForm());
   }
 
   function openWaybillDialog(carrier: ExpressCarrier) {
-    setWaybillForm({ ...emptyWaybillForm(), carrierCode: carrier.carrier_code });
-    setWaybillDialogOpen(true);
+    setDialogError(null);
+    waybillDialog.openWith({ ...emptyWaybillForm(), carrierCode: carrier.carrier_code });
+  }
+
+  function openTrackingDialog() {
+    setDialogError(null);
+    setTrackingDialogOpen(true);
+  }
+
+  function openCancelDialog() {
+    setDialogError(null);
+    setCancelDialogOpen(true);
   }
 
   async function saveCarrier() {
+    if (!carrierDialog.target) return;
+    setDialogError(null);
     try {
-      const saved = await upsertCarrier.mutateAsync(carrierRequestFromForm(carrierForm));
-      setCarrierDialogOpen(false);
+      const saved = await upsertCarrier.mutateAsync(carrierRequestFromForm(carrierDialog.target));
+      carrierDialog.close();
       setNotice({ type: "success", text: `${saved.carrier_name} 已保存` });
     } catch (errorValue) {
-      setNotice({ type: "error", text: errorText(errorValue, "保存快递商失败") });
+      setDialogError(errorText(errorValue, "保存快递商失败"));
     }
   }
 
   async function saveRule() {
+    if (!ruleDialog.target) return;
+    setDialogError(null);
     try {
-      const saved = await upsertRule.mutateAsync(ruleRequestFromForm(ruleForm));
-      setRuleDialogOpen(false);
+      const saved = await upsertRule.mutateAsync(ruleRequestFromForm(ruleDialog.target));
+      ruleDialog.close();
       setNotice({ type: "success", text: `${saved.rule_name} 已保存` });
     } catch (errorValue) {
-      setNotice({ type: "error", text: errorText(errorValue, "保存快递规则失败") });
+      setDialogError(errorText(errorValue, "保存快递规则失败"));
     }
   }
 
   async function saveWaybill() {
+    if (!waybillDialog.target) return;
+    setDialogError(null);
     try {
-      const created = await createWaybill.mutateAsync(waybillRequestFromForm(waybillForm));
+      const created = await createWaybill.mutateAsync(waybillRequestFromForm(waybillDialog.target));
       setRecentWaybill(created);
       setTracking(null);
-      setWaybillDialogOpen(false);
+      waybillDialog.close();
       setNotice({ type: "success", text: `${created.waybill_no} 已生成` });
     } catch (errorValue) {
-      setNotice({ type: "error", text: errorText(errorValue, "快递下单失败") });
+      setDialogError(errorText(errorValue, "快递下单失败"));
     }
   }
 
   async function loadTracking(waybillNo: string) {
+    setDialogError(null);
     try {
       const response = await trackingMutation.mutateAsync(waybillNo);
       setTracking(response);
       setNotice({ type: "success", text: `${waybillNo} 轨迹已刷新` });
     } catch (errorValue) {
-      setNotice({ type: "error", text: errorText(errorValue, "查询轨迹失败") });
+      setDialogError(errorText(errorValue, "查询轨迹失败"));
     }
   }
 
   async function cancelRecentWaybill(waybillNo: string) {
+    setDialogError(null);
     try {
       const cancelled = await cancelWaybill.mutateAsync({ waybillNo, request: { reason: "管理端取消" } });
       setRecentWaybill(cancelled);
@@ -571,7 +581,7 @@ export function H5ExpressPage() {
       setCancelDialogOpen(false);
       setNotice({ type: "success", text: `${waybillNo} 已取消` });
     } catch (errorValue) {
-      setNotice({ type: "error", text: errorText(errorValue, "取消快递单失败") });
+      setDialogError(errorText(errorValue, "取消快递单失败"));
     }
   }
 
@@ -599,18 +609,33 @@ function defaultQuery(): QueryPanelValue {
 }
 
 function normalizeQuery(value: QueryPanelValue): QueryPanelValue {
-  return { q: queryString(value.q), enabled: queryStringArray(value.enabled) };
+  return { q: libQueryString(value.q).trim(), enabled: queryStringArray(value.enabled) };
 }
 
 function queryParams(value: QueryPanelValue) {
   const enabled = queryStringArray(value.enabled);
   return {
-    q: queryString(value.q),
+    q: libQueryString(value.q).trim(),
     enabled: enabled.length === 1 ? enabled[0] === "true" : undefined,
   };
 }
 
+// 演示预填仅在 dev server 生效（e2e 走 vite dev 依赖演示值）；生产构建表单一律为空，
+// 避免顺丰 / 张三 / 13800000000 等虚构演示数据被原样保存成真实配置或运单。
 function emptyCarrierForm(): CarrierForm {
+  if (!__WMS_WEB_ADMIN_DEV_PREFILL__) {
+    return {
+      carrierCode: "",
+      carrierName: "",
+      apiUrl: "",
+      apiKeyAlias: "",
+      apiSecretAlias: "",
+      accountNo: "",
+      enabled: true,
+      priority: "10",
+      conditionsText: "{}",
+    };
+  }
   return {
     carrierCode: "SF",
     carrierName: "顺丰速运",
@@ -639,6 +664,18 @@ function carrierFormFromRow(row: ExpressCarrier): CarrierForm {
 }
 
 function emptyRuleForm(): RuleForm {
+  if (!__WMS_WEB_ADMIN_DEV_PREFILL__) {
+    return {
+      ruleCode: "",
+      ruleName: "",
+      deliveryProviderType: "third_party_express",
+      carrierCode: "",
+      priority: "10",
+      enabled: true,
+      fallbackStrategy: "",
+      conditionsText: "{}",
+    };
+  }
   return {
     ruleCode: "DEFAULT_THIRD_PARTY",
     ruleName: "默认三方快递",
@@ -665,6 +702,21 @@ function ruleFormFromRow(row: ExpressRoutingRule): RuleForm {
 }
 
 function emptyWaybillForm(): WaybillForm {
+  if (!__WMS_WEB_ADMIN_DEV_PREFILL__) {
+    return {
+      packageNo: "",
+      carrierCode: "",
+      senderName: "",
+      senderMobile: "",
+      senderAddress: "",
+      receiverName: "",
+      receiverMobile: "",
+      receiverAddress: "",
+      weightGrams: "",
+      volumeCm3: "",
+      packageCount: "1",
+    };
+  }
   return {
     packageNo: `PKG-${Date.now()}`,
     carrierCode: "SF",
@@ -727,38 +779,6 @@ function waybillRequestFromForm(form: WaybillForm): CreateExpressWaybillRequest 
   };
 }
 
-function providerLabel(value: string) {
-  return value === "own_fleet" ? "自有配送" : "三方快递";
-}
-
-function waybillStatusLabel(status: string) {
-  if (status === "created" || status === "pushed") return "已下单";
-  if (status === "printed") return "已打印";
-  if (status === "in_transit") return "运输中";
-  if (status === "delivered") return "已签收";
-  if (status === "cancelled") return "已取消";
-  return status;
-}
-
-function waybillStatusKey(status: string): "completed" | "pending" | "isolated" | "in_progress" {
-  if (status === "delivered" || status === "printed") return "completed";
-  if (status === "cancelled") return "isolated";
-  if (status === "in_transit") return "in_progress";
-  return "pending";
-}
-
-function queryString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function queryStringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" ? value as QueryPanelValue : defaultQuery();
-}
-
 function optionalText(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
@@ -783,8 +803,4 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function errorText(errorValue: unknown, fallback: string) {
-  return errorValue instanceof Error ? errorValue.message : fallback;
 }

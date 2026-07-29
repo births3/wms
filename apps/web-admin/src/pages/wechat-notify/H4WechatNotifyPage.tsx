@@ -38,6 +38,10 @@ import {
 } from "./H4WechatNotifyDialogs";
 import { configColumns, recordColumns } from "./H4WechatNotifyColumns";
 import { settingsColumns } from "./H4WechatSettingsColumns";
+import { errorText as libErrorText } from "@/lib/error-text";
+import { queryRange, queryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
+import { useDialogState } from "@/lib/use-dialog-state";
+import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export type H4WechatNotifyMode = "settings" | "configs" | "records";
 
@@ -85,22 +89,34 @@ const h4NotificationRecordQueryFields: QueryPanelField[] = [
 const h4NotificationRecordCoreQueryFieldKeys = ["eventType", "recipient", "status"];
 
 export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
-  const [settingsQuery, setSettingsQueryState] = React.useState<QueryPanelValue>(() => defaultSettingsQuery());
-  const [appliedSettingsQuery, setAppliedSettingsQuery] = React.useState<QueryPanelValue>(() => defaultSettingsQuery());
-  const [configQuery, setConfigQuery] = React.useState<QueryPanelValue>(() => defaultConfigQuery());
-  const [appliedConfigQuery, setAppliedConfigQuery] = React.useState<QueryPanelValue>(() => defaultConfigQuery());
-  const [recordQuery, setRecordQuery] = React.useState<QueryPanelValue>(() => defaultRecordQuery());
-  const [appliedRecordQuery, setAppliedRecordQuery] = React.useState<QueryPanelValue>(() => defaultRecordQuery());
+  const {
+    draftQuery: settingsQuery,
+    setDraftQuery: setSettingsQueryState,
+    appliedQuery: appliedSettingsQuery,
+    applyQuery: applySettingsQuery,
+    resetQuery: resetSettingsQuery,
+  } = usePageQueryState<QueryPanelValue>(defaultSettingsQuery, normalizeSettingsQuery);
+  const {
+    draftQuery: configQuery,
+    setDraftQuery: setConfigQuery,
+    appliedQuery: appliedConfigQuery,
+    applyQuery: applyConfigQuery,
+    resetQuery: resetConfigQuery,
+  } = usePageQueryState<QueryPanelValue>(defaultConfigQuery, normalizeConfigQuery);
+  const {
+    draftQuery: recordQuery,
+    setDraftQuery: setRecordQuery,
+    appliedQuery: appliedRecordQuery,
+    applyQuery: applyRecordQuery,
+    resetQuery: resetRecordQuery,
+  } = usePageQueryState<QueryPanelValue>(defaultRecordQuery, normalizeRecordQuery);
   const [selectedConfigKeys, setSelectedConfigKeys] = React.useState<string[]>([]);
   const [selectedRecordKeys, setSelectedRecordKeys] = React.useState<string[]>([]);
   const [selectedSettingsKeys, setSelectedSettingsKeys] = React.useState<string[]>([]);
-  const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
-  const [configDialogOpen, setConfigDialogOpen] = React.useState(false);
-  const [sendDialogOpen, setSendDialogOpen] = React.useState(false);
+  const settingsDialog = useDialogState<SettingsFormState>();
+  const configDialog = useDialogState<ConfigFormState>();
+  const sendDialog = useDialogState<SendFormState>();
   const [detailRecord, setDetailRecord] = React.useState<H4NotificationRecord | null>(null);
-  const [settingsForm, setSettingsForm] = React.useState<SettingsFormState>(() => emptySettingsForm());
-  const [configForm, setConfigForm] = React.useState<ConfigFormState>(() => emptyConfigForm());
-  const [sendForm, setSendForm] = React.useState<SendFormState>(() => emptySendForm());
   const [notice, setNotice] = React.useState<Notice>(null);
 
   const settingsParams = normalizeSettingsQuery(appliedSettingsQuery);
@@ -148,18 +164,14 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
     return (
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
         <PageHeader title="H4 参数设置" subtitle="企业微信应用、回调、密钥别名和重试参数" />
-        <NoticePanel notice={settingsDialogOpen ? null : notice} />
+        <NoticePanel notice={settingsDialog.open ? null : notice} />
         <QueryPanel
           fields={h4WechatSettingsQueryFields}
           defaultVisibleFieldKeys={h4WechatSettingsCoreQueryFieldKeys}
           value={settingsQuery}
           onValueChange={(next) => setSettingsQueryState(normalizeSettingsQuery(next))}
-          onQuery={() => setAppliedSettingsQuery(normalizeSettingsQuery(settingsQuery))}
-          onReset={() => {
-            const next = defaultSettingsQuery();
-            setSettingsQueryState(next);
-            setAppliedSettingsQuery(next);
-          }}
+          onQuery={() => applySettingsQuery(settingsQuery)}
+          onReset={resetSettingsQuery}
         />
         {settingsQueryResult.error && <ErrorPanel message={settingsQueryResult.error.message} />}
         <DataGrid
@@ -194,25 +206,17 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
           }}
           queryState={appliedSettingsQuery}
           querySummaryItems={buildQueryPanelSummaryItems(h4WechatSettingsQueryFields, appliedSettingsQuery)}
-          onApplyQueryState={(queryState) => {
-            const next = normalizeSettingsQuery(queryValueFromUnknown(queryState));
-            setSettingsQueryState(next);
-            setAppliedSettingsQuery(next);
-          }}
-          onClearQueryState={() => {
-            const next = defaultSettingsQuery();
-            setSettingsQueryState(next);
-            setAppliedSettingsQuery(next);
-          }}
+          onApplyQueryState={applySettingsGridQueryState}
+          onClearQueryState={clearSettingsGridQueryState}
         />
         <SettingsDialog
-          open={settingsDialogOpen}
-          form={settingsForm}
+          open={settingsDialog.open}
+          form={settingsDialog.target ?? emptySettingsForm()}
           notice={notice}
           saving={upsertSettingsMutation.isPending}
           testing={testSettingsMutation.isPending}
-          onFormChange={setSettingsForm}
-          onOpenChange={setSettingsDialogOpen}
+          onFormChange={settingsDialog.setTarget}
+          onOpenChange={settingsDialog.setOpen}
           onSave={saveSettings}
           onTest={testSettings}
         />
@@ -230,12 +234,8 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
           defaultVisibleFieldKeys={h4NotificationRecordCoreQueryFieldKeys}
           value={recordQuery}
           onValueChange={(next) => setRecordQuery(normalizeRecordQuery(next))}
-          onQuery={() => setAppliedRecordQuery(normalizeRecordQuery(recordQuery))}
-          onReset={() => {
-            const next = defaultRecordQuery();
-            setRecordQuery(next);
-            setAppliedRecordQuery(next);
-          }}
+          onQuery={() => applyRecordQuery(recordQuery)}
+          onReset={resetRecordQuery}
         />
         {recordsQuery.error && <ErrorPanel message={recordsQuery.error.message} />}
         <DataGrid
@@ -273,16 +273,8 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
           ]}
           queryState={appliedRecordQuery}
           querySummaryItems={buildQueryPanelSummaryItems(h4NotificationRecordQueryFields, appliedRecordQuery)}
-          onApplyQueryState={(queryState) => {
-            const next = normalizeRecordQuery(queryValueFromUnknown(queryState));
-            setRecordQuery(next);
-            setAppliedRecordQuery(next);
-          }}
-          onClearQueryState={() => {
-            const next = defaultRecordQuery();
-            setRecordQuery(next);
-            setAppliedRecordQuery(next);
-          }}
+          onApplyQueryState={applyRecordGridQueryState}
+          onClearQueryState={clearRecordGridQueryState}
         />
         <RecordDetailDialog record={detailRecord} onOpenChange={(open) => !open && setDetailRecord(null)} />
       </section>
@@ -292,18 +284,14 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader title="H4 通知配置" subtitle="配置企业微信事件、模板、接收人和启停状态" />
-      <NoticePanel notice={notice} />
+      <NoticePanel notice={configDialog.open || sendDialog.open ? null : notice} />
       <QueryPanel
         fields={h4NotificationConfigQueryFields}
         defaultVisibleFieldKeys={h4NotificationConfigCoreQueryFieldKeys}
         value={configQuery}
         onValueChange={(next) => setConfigQuery(normalizeConfigQuery(next))}
-        onQuery={() => setAppliedConfigQuery(normalizeConfigQuery(configQuery))}
-        onReset={() => {
-          const next = defaultConfigQuery();
-          setConfigQuery(next);
-          setAppliedConfigQuery(next);
-        }}
+        onQuery={() => applyConfigQuery(configQuery)}
+        onReset={resetConfigQuery}
       />
       {configsQuery.error && <ErrorPanel message={configsQuery.error.message} />}
       <DataGrid
@@ -347,31 +335,25 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
         ]}
         queryState={appliedConfigQuery}
         querySummaryItems={buildQueryPanelSummaryItems(h4NotificationConfigQueryFields, appliedConfigQuery)}
-        onApplyQueryState={(queryState) => {
-          const next = normalizeConfigQuery(queryValueFromUnknown(queryState));
-          setConfigQuery(next);
-          setAppliedConfigQuery(next);
-        }}
-        onClearQueryState={() => {
-          const next = defaultConfigQuery();
-          setConfigQuery(next);
-          setAppliedConfigQuery(next);
-        }}
+        onApplyQueryState={applyConfigGridQueryState}
+        onClearQueryState={clearConfigGridQueryState}
       />
       <ConfigDialog
-        open={configDialogOpen}
-        form={configForm}
+        open={configDialog.open}
+        form={configDialog.target ?? emptyConfigForm()}
+        notice={notice}
         saving={upsertMutation.isPending}
-        onFormChange={setConfigForm}
-        onOpenChange={setConfigDialogOpen}
+        onFormChange={configDialog.setTarget}
+        onOpenChange={configDialog.setOpen}
         onSave={saveConfig}
       />
       <SendDialog
-        open={sendDialogOpen}
-        form={sendForm}
+        open={sendDialog.open}
+        form={sendDialog.target ?? emptySendForm()}
+        notice={notice}
         sending={sendMutation.isPending}
-        onFormChange={setSendForm}
-        onOpenChange={setSendDialogOpen}
+        onFormChange={sendDialog.setTarget}
+        onOpenChange={sendDialog.setOpen}
         onSend={sendNotification}
       />
     </section>
@@ -392,31 +374,55 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
     setNotice(result.error ? { type: "error", text: result.error.message } : { type: "success", text: "发送记录已刷新" });
   }
 
+  function applySettingsGridQueryState(queryState: unknown) {
+    applySettingsQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearSettingsGridQueryState() {
+    resetSettingsQuery();
+  }
+
+  function applyConfigGridQueryState(queryState: unknown) {
+    applyConfigQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearConfigGridQueryState() {
+    resetConfigQuery();
+  }
+
+  function applyRecordGridQueryState(queryState: unknown) {
+    applyRecordQuery(queryValueFromUnknown(queryState));
+  }
+
+  function clearRecordGridQueryState() {
+    resetRecordQuery();
+  }
+
   function openSettingsDialog(settings: H4WechatSettings | null) {
-    setSettingsForm(settings ? formFromSettings(settings) : emptySettingsForm());
     setNotice(null);
-    setSettingsDialogOpen(true);
+    settingsDialog.openWith(settings ? formFromSettings(settings) : emptySettingsForm());
   }
 
   function openConfigDialog(config: H4NotificationConfig | null) {
-    setConfigForm(config ? formFromConfig(config) : emptyConfigForm());
-    setConfigDialogOpen(true);
+    setNotice(null);
+    configDialog.openWith(config ? formFromConfig(config) : emptyConfigForm());
   }
 
   function openSendDialog(config: H4NotificationConfig) {
-    setSendForm({
+    setNotice(null);
+    sendDialog.openWith({
       eventType: config.event_type,
       recipientsText: usersFromRule(config.recipient_rule).join(", "),
       dedupeKey: `web-test-${Date.now()}`,
       payloadText: JSON.stringify({ asn_no: "ASN-DEMO", recall_id: "RC-DEMO", message: "企业微信通知测试" }, null, 2),
     });
-    setSendDialogOpen(true);
   }
 
   async function saveSettings() {
+    if (!settingsDialog.target) return;
     try {
-      const saved = await upsertSettingsMutation.mutateAsync(settingsRequest(settingsForm));
-      setSettingsDialogOpen(false);
+      const saved = await upsertSettingsMutation.mutateAsync(settingsRequest(settingsDialog.target));
+      settingsDialog.close();
       setSelectedSettingsKeys([saved.id]);
       setNotice({ type: "success", text: `${saved.corp_id} 已保存` });
     } catch (errorValue) {
@@ -425,9 +431,10 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   }
 
   async function testSettings() {
+    if (!settingsDialog.target) return;
     let saved: H4WechatSettings;
     try {
-      saved = await upsertSettingsMutation.mutateAsync(settingsRequest(settingsForm));
+      saved = await upsertSettingsMutation.mutateAsync(settingsRequest(settingsDialog.target));
     } catch (errorValue) {
       setNotice({ type: "error", text: errorText(errorValue, "保存企业微信参数失败") });
       return;
@@ -436,15 +443,17 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
     setSelectedSettingsKeys([saved.id]);
     try {
       const result = await testSettingsMutation.mutateAsync();
-      setSettingsDialogOpen(false);
+      settingsDialog.close();
       setNotice({ type: result.status === "success" ? "success" : "warning", text: result.message });
     } catch (errorValue) {
-      setSettingsDialogOpen(false);
+      settingsDialog.close();
       setNotice({ type: "error", text: errorText(errorValue, "测试企业微信参数失败") });
     }
   }
 
   async function saveConfig() {
+    const configForm = configDialog.target;
+    if (!configForm) return;
     try {
       const request = {
         event_type: configForm.eventType.trim(),
@@ -457,7 +466,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
         },
       };
       const saved = await upsertMutation.mutateAsync(request);
-      setConfigDialogOpen(false);
+      configDialog.close();
       setNotice({ type: "success", text: `${saved.event_type} 已保存` });
     } catch (errorValue) {
       setNotice({ type: "error", text: errorText(errorValue, "保存通知配置失败") });
@@ -465,6 +474,8 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   }
 
   async function sendNotification() {
+    const sendForm = sendDialog.target;
+    if (!sendForm) return;
     try {
       const sent = await sendMutation.mutateAsync({
         event_type: sendForm.eventType.trim(),
@@ -472,7 +483,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
         dedupe_key: sendForm.dedupeKey.trim(),
         payload: JSON.parse(sendForm.payloadText) as Record<string, unknown>,
       });
-      setSendDialogOpen(false);
+      sendDialog.close();
       setNotice({ type: "success", text: `已生成 ${sent.length} 条发送记录` });
     } catch (errorValue) {
       setNotice({ type: "error", text: errorText(errorValue, "发送企业微信通知失败") });
@@ -649,23 +660,6 @@ function intFromText(value: string, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function queryString(value: QueryPanelValue[string]) {
-  return typeof value === "string" ? value : "";
-}
-
-function queryStringArray(value: QueryPanelValue[string]) {
-  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
-}
-
-function queryRange(value: QueryPanelValue[string]): QueryPanelRangeValue {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return { from: "", to: "" };
-  return { from: typeof value.from === "string" ? value.from : "", to: typeof value.to === "string" ? value.to : "" };
-}
-
-function queryValueFromUnknown(value: unknown): QueryPanelValue {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as QueryPanelValue) : {};
-}
-
 function dateInRange(value: string, range: QueryPanelRangeValue) {
   const date = localDateKey(value);
   return (!range.from || date >= range.from) && (!range.to || date <= range.to);
@@ -680,5 +674,5 @@ function localDateKey(value: string) {
 
 function errorText(errorValue: unknown, fallback: string) {
   if (errorValue instanceof SyntaxError) return "变量 JSON 格式不正确";
-  return errorValue instanceof Error ? errorValue.message : fallback;
+  return libErrorText(errorValue, fallback);
 }
