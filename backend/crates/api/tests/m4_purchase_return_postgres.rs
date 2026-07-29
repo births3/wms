@@ -205,7 +205,8 @@ async fn m4_purchase_return_create_rejects_blank_required_fields(pool: PgPool) {
         .single()
         .expect("valid time");
 
-    let blank_cases: [(&str, fn(&mut CreatePurchaseReturnRequest)); 5] = [
+    type BlankCase = (&'static str, fn(&mut CreatePurchaseReturnRequest));
+    let blank_cases: [BlankCase; 5] = [
         ("return_no", |request: &mut CreatePurchaseReturnRequest| {
             request.return_no = "  ".to_string()
         }),

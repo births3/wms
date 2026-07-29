@@ -461,7 +461,7 @@ impl PgReconciliationRepository {
             || allocations
                 .windows(2)
                 .any(|pair| pair[0].inventory_batch_id == pair[1].inventory_batch_id)
-            || matches!(disposition, ReconciliationDisposition::ErpTruth) != !allocations.is_empty()
+            || matches!(disposition, ReconciliationDisposition::ErpTruth) == allocations.is_empty()
         {
             return Err(ReconciliationError::InvalidRequest);
         }

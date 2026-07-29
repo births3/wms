@@ -9,14 +9,14 @@ use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     path::Path,
-    sync::Mutex,
     thread,
     time::Duration,
 };
+use tokio::sync::Mutex;
 use uuid::Uuid;
 use wms_domain::{H8ErpConnector, H8_INTERFACE_TABLE_REQUIRED_OBJECTS};
 
-static ENV_LOCK: Mutex<()> = Mutex::new(());
+static ENV_LOCK: Mutex<()> = Mutex::const_new(());
 
 struct EnvGuard {
     name: &'static str,
@@ -102,7 +102,7 @@ fn http_server(status: u16) -> (String, thread::JoinHandle<String>) {
 
 #[tokio::test]
 async fn rest_probe_rejects_non_success_health_response() {
-    let _env = ENV_LOCK.lock().expect("env lock");
+    let _env = ENV_LOCK.lock().await;
     let _local_http = EnvGuard::set("WMS_H8_REST_PROBE_ALLOW_LOCAL_HTTP", "true");
     let (base_url, server) = http_server(500);
     let _allowlist = EnvGuard::set(
@@ -124,7 +124,7 @@ async fn rest_probe_rejects_non_success_health_response() {
 
 #[tokio::test]
 async fn interface_probe_rejects_unreachable_worker_transport() {
-    let _env = ENV_LOCK.lock().expect("env lock");
+    let _env = ENV_LOCK.lock().await;
     let listener = TcpListener::bind("127.0.0.1:0").expect("reserve interface port");
     let port = listener.local_addr().expect("interface address").port();
     drop(listener);
@@ -152,7 +152,7 @@ async fn interface_probe_rejects_unreachable_worker_transport() {
 
 #[tokio::test]
 async fn outbound_rest_probe_sends_resolved_bearer_to_health_endpoint() {
-    let _env = ENV_LOCK.lock().expect("env lock");
+    let _env = ENV_LOCK.lock().await;
     let _local_http = EnvGuard::set("WMS_H8_REST_PROBE_ALLOW_LOCAL_HTTP", "true");
     std::env::set_var(
         "WMS_H8_SECRET_ALIASES",
@@ -180,7 +180,7 @@ async fn outbound_rest_probe_sends_resolved_bearer_to_health_endpoint() {
 
 #[tokio::test]
 async fn fallback_requires_rest_and_interface_probe_to_succeed() {
-    let _env = ENV_LOCK.lock().expect("env lock");
+    let _env = ENV_LOCK.lock().await;
     let _local_http = EnvGuard::set("WMS_H8_REST_PROBE_ALLOW_LOCAL_HTTP", "true");
     let (base_url, server) = http_server(200);
     let _allowlist = EnvGuard::set(
@@ -278,9 +278,9 @@ fn interface_contracts_require_each_selected_direction_to_have_a_message() {
     );
 }
 
-#[test]
-fn rest_probe_endpoint_policy_is_fail_closed_and_rejects_ip_bypasses() {
-    let _env = ENV_LOCK.lock().expect("env lock");
+#[tokio::test]
+async fn rest_probe_endpoint_policy_is_fail_closed_and_rejects_ip_bypasses() {
+    let _env = ENV_LOCK.lock().await;
     let _allowlist = EnvGuard::remove("WMS_H8_REST_PROBE_ALLOWED_ENDPOINTS");
     let _local_http = EnvGuard::remove("WMS_H8_REST_PROBE_ALLOW_LOCAL_HTTP");
 
@@ -393,7 +393,7 @@ fn rest_curl_disables_config_before_all_other_options() {
 
 #[tokio::test]
 async fn rest_probe_ignores_curlrc_redirect_and_insecure_options() {
-    let _env = ENV_LOCK.lock().expect("env lock");
+    let _env = ENV_LOCK.lock().await;
     let _local_http = EnvGuard::set("WMS_H8_REST_PROBE_ALLOW_LOCAL_HTTP", "true");
     let curl_home = std::env::temp_dir().join(format!("wms-h8-curlrc-{}", Uuid::new_v4()));
     fs::create_dir_all(&curl_home).expect("create curl home");

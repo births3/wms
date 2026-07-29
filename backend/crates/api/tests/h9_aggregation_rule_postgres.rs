@@ -436,14 +436,15 @@ async fn outbound_creation_persists_all_configurable_aggregation_fields(pool: Pg
         .expect("production outbound create should persist aggregation fields")
         .value;
 
-    let stored: (
+    type StoredAggregationFields = (
         Option<String>,
         Option<String>,
         Option<String>,
         Option<String>,
         Option<String>,
         Option<String>,
-    ) = sqlx::query_as(
+    );
+    let stored: StoredAggregationFields = sqlx::query_as(
         r#"
         SELECT invoice_no, transport_mode_code, department_code,
                sales_group_code, order_group_no, business_type_code

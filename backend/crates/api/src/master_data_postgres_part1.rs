@@ -298,9 +298,7 @@ impl PgMasterDataReadRepository {
         )?;
         let attrs = product_attrs_with_default_source(req.attrs.clone(), "api_import");
         let storage_condition = string_attr(&attrs, "storage_condition");
-        if status == "active" {
-            validate_product_storage_condition(&attrs)?;
-        } else if storage_condition.is_some() {
+        if status == "active" || storage_condition.is_some() {
             validate_product_storage_condition(&attrs)?;
         }
         let request_hash = request_hash(&json!({

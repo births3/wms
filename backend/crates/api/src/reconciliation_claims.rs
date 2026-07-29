@@ -19,6 +19,18 @@ use crate::{
     },
 };
 
+type ReconciliationClaimRow = (Uuid, String, String, DateTime<Utc>, Option<Uuid>);
+type FailedReconciliationClaimRow = (
+    Uuid,
+    String,
+    String,
+    DateTime<Utc>,
+    Option<Uuid>,
+    String,
+    Option<String>,
+    Option<String>,
+);
+
 impl PgReconciliationRepository {
     pub async fn claim_due_window(
         &self,
@@ -235,7 +247,7 @@ impl PgReconciliationRepository {
                 replayed: true,
             });
         }
-        let row: Option<(Uuid, String, String, DateTime<Utc>, Option<Uuid>)> = sqlx::query_as(
+        let row: Option<ReconciliationClaimRow> = sqlx::query_as(
             "SELECT claim_token, worker_id, status, lease_expires_at, run_id
                FROM reconciliation_schedule_claims
               WHERE owner_id=$1 AND id=$2
@@ -331,16 +343,7 @@ impl PgReconciliationRepository {
                 replayed: true,
             });
         }
-        let row: Option<(
-            Uuid,
-            String,
-            String,
-            DateTime<Utc>,
-            Option<Uuid>,
-            String,
-            Option<String>,
-            Option<String>,
-        )> = sqlx::query_as(
+        let row: Option<FailedReconciliationClaimRow> = sqlx::query_as(
             "SELECT claim_token, worker_id, status, lease_expires_at, run_id, window_key,
                     failure_stage, failure_code
                FROM reconciliation_schedule_claims

@@ -571,7 +571,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     assert!(ship_replay.replayed);
     assert_eq!(ship_replay.value.id, shipped.id);
 
-    let persisted_shipment: (
+    type PersistedShipment = (
         String,
         Option<String>,
         String,
@@ -582,7 +582,8 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         Option<f64>,
         serde_json::Value,
         Uuid,
-    ) = sqlx::query_as(
+    );
+    let persisted_shipment: PersistedShipment = sqlx::query_as(
         r#"
         SELECT delivery_provider_type, vehicle_no, plate_no, driver_user_id,
                driver_name, signature_attachment_id, cold_chain,
