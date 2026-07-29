@@ -57,7 +57,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   expect(asnPrintBody.business_document_type).toBe("asn");
   expect(asnPrintBody.business_document_id).toBe(receivingOrderId);
   expect(asnPrintBody.status).toBe("printed");
-  expect((asnPrintBody.data as { asn?: { code?: string } }).asn?.code).toBe(receiptNo);
+  expect((asnPrintBody.data as { order?: { receipt_no?: string } }).order?.receipt_no).toBe(receiptNo);
   await expect(asnPrintResponse.json()).resolves.toMatchObject({ retry_count: 0, status: "printed" });
   await expect(page.getByRole("status").filter({ hasText: "打印记录已写入" })).toBeVisible();
 
@@ -77,7 +77,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
     const retryBody = JSON.parse(retryResponse.request().postData() ?? "{}") as Record<string, unknown>;
     expect(retryBody.business_document_id).toBe(receivingOrderId);
     expect(retryBody.status).toBe(expectedStatus);
-    expect((retryBody.data as { asn?: { code?: string } }).asn?.code).toBe(receiptNo);
+    expect((retryBody.data as { order?: { receipt_no?: string } }).order?.receipt_no).toBe(receiptNo);
     if (expectedStatus === "failed") expect(retryBody.failure_reason).toBe("用户确认浏览器打印失败");
     await expect(retryResponse.json()).resolves.toMatchObject({
       retry_count: expectedRetry,
@@ -141,7 +141,8 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await expect(acceptancePrintDialog).toBeVisible();
   await expect(acceptancePrintDialog).toHaveCSS("opacity", "1");
   await expect(acceptancePrintDialog.getByText("ASN 号")).toBeVisible();
-  await page.screenshot({ path: path.join(artifactsDir, "inspection-print-preview.png") });
+  await expect(acceptancePrintDialog.getByText(receiptNo)).toBeVisible();
+  await acceptancePrintDialog.screenshot({ path: path.join(artifactsDir, "inspection-print-preview.png") });
   await acceptancePrintDialog.getByRole("button", { name: "打印", exact: true }).click();
   await expect(acceptancePrintDialog.getByText("确认打印结果")).toBeVisible();
   const acceptancePrintResponsePromise = page.waitForResponse(
@@ -154,7 +155,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   expect(acceptancePrintBody.business_document_type).toBe("acceptance_record");
   expect(acceptancePrintBody.business_document_id).toBe(receivingOrderId);
   expect(acceptancePrintBody.status).toBe("printed");
-  expect((acceptancePrintBody.data as { receiving?: { actual_qty?: number } }).receiving?.actual_qty).toBe(10);
+  expect((acceptancePrintBody.data as { receipts?: Array<{ actual_qty?: number }> }).receipts?.at(-1)?.actual_qty).toBe(10);
   await expect(acceptancePrintResponse.json()).resolves.toMatchObject({ retry_count: 0, status: "printed" });
   await expect(page.getByRole("status").filter({ hasText: "打印记录已写入" })).toBeVisible();
 
