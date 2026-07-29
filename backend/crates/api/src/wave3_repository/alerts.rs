@@ -130,6 +130,7 @@ impl PgWave3Repository {
                 .unwrap_or(180),
         };
         let until = as_of + chrono::Duration::days(warning_days);
+        let mut tx = self.begin().await?;
         let rows: Vec<(Uuid, String, String, Option<String>, chrono::NaiveDate)> = sqlx::query_as(
             r#"
             SELECT id, product_code, batch_no, location_code, expiry_date
@@ -144,7 +145,7 @@ impl PgWave3Repository {
         .bind(ctx.owner_id)
         .bind(as_of)
         .bind(until)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *tx)
         .await
         .map_err(map_db_error)?;
 
@@ -161,7 +162,7 @@ impl PgWave3Repository {
             )
             .bind(ctx.owner_id)
             .bind(batch_id)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await
             .map_err(map_db_error)?;
             if exists {
@@ -193,11 +194,24 @@ impl PgWave3Repository {
                 "商品 {product_code} 批号 {batch_no} 将于 {expiry_date} 过期，剩余 {days_left} 天"
             ))
             .bind(now)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(map_db_error)?;
             created += 1;
         }
+        let mut audit_event = AuditWriteRequest::from_auth_context(
+            ctx,
+            "generate_near_expiry_alerts",
+            "M3",
+            "inventory_alert_event",
+            as_of.to_string(),
+            None,
+        );
+        audit_event.occurred_at = now;
+        append_event_in_tx(&mut tx, &audit_event)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
         Ok(created)
     }
 

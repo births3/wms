@@ -119,6 +119,7 @@ impl PgWave3Repository {
                 .clamp(1, 365),
         };
         let near_expiry_until = as_of + chrono::Duration::days(horizon);
+        let mut tx = self.begin().await?;
         // 重点养护：每月；一般品种：每季度；另含近效期窗口内批次。
         let batches: Vec<(Uuid,)> = sqlx::query_as(
             r#"
@@ -169,7 +170,7 @@ impl PgWave3Repository {
         .bind(STATUS_QUALIFIED)
         .bind(near_expiry_until)
         .bind(now)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *tx)
         .await
         .map_err(map_db_error)?;
         let mut created = 0;
@@ -185,11 +186,24 @@ impl PgWave3Repository {
             .bind(ctx.owner_id)
             .bind(batch_id)
             .bind(now)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(map_db_error)?;
             created += 1;
         }
+        let mut audit_event = AuditWriteRequest::from_auth_context(
+            ctx,
+            "generate_maintenance_tasks",
+            "M3",
+            "inventory_maintenance_task",
+            as_of.to_string(),
+            None,
+        );
+        audit_event.occurred_at = now;
+        append_event_in_tx(&mut tx, &audit_event)
+            .await
+            .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;
+        tx.commit().await.map_err(map_db_error)?;
         Ok(created)
     }
 

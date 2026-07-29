@@ -101,26 +101,55 @@ async fn relocate_inventory_moves_qty_atomically_and_rejects_quarantined(pool: s
     .expect("batch");
 
     let repository = PgWave3Repository::new(pool.clone());
+    let actor = ctx(owner_id);
+    let request = RelocateInventoryRequest {
+        batch_id,
+        qty: 5,
+        to_location_id: to_id,
+        to_location_code: "A01-01-01-02".to_string(),
+        relocation_mode: Some("direct".to_string()),
+        lpn_code: None,
+        reason: Some("优化库位".to_string()),
+    };
+    let audit = AuditWriteRequest::from_auth_context(
+        &actor,
+        "relocate_inventory",
+        "M3",
+        "inventory_relocation",
+        batch_id.to_string(),
+        None,
+    );
     let result = repository
         .relocate_inventory_with_audit(
-            &ctx(owner_id),
-            RelocateInventoryRequest {
-                batch_id,
-                qty: 5,
-                to_location_id: to_id,
-                to_location_code: "A01-01-01-02".to_string(),
-                relocation_mode: Some("direct".to_string()),
-                lpn_code: None,
-                reason: Some("优化库位".to_string()),
-            },
+            &actor,
+            request.clone(),
             Utc::now(),
             "idem-relocate-1",
-            None,
+            Some(audit.clone()),
         )
         .await
         .expect("relocate");
+    assert!(!result.replayed);
     assert_eq!(result.value.qty, 5);
     assert_eq!(result.value.to_location_code, "A01-01-01-02");
+    let replay = repository
+        .relocate_inventory_with_audit(&actor, request, Utc::now(), "idem-relocate-1", Some(audit))
+        .await
+        .expect("same relocation should replay");
+    assert!(replay.replayed);
+    assert_eq!(replay.value.id, result.value.id);
+    let relocation_evidence: (i64, i64) = sqlx::query_as(
+        "SELECT
+           (SELECT COUNT(*) FROM audit_event
+             WHERE owner_id = $1 AND action = 'relocate_inventory'),
+           (SELECT COUNT(*) FROM idempotency_request
+             WHERE owner_id = $1 AND idempotency_key = 'idem-relocate-1')",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("relocation audit and idempotency evidence should query");
+    assert_eq!(relocation_evidence, (1, 1));
 
     let (from_qty, to_qty): (i64, i64) = sqlx::query_as(
         r#"
@@ -145,7 +174,7 @@ async fn relocate_inventory_moves_qty_atomically_and_rejects_quarantined(pool: s
         .expect("quarantine");
     let blocked = repository
         .relocate_inventory_with_audit(
-            &ctx(owner_id),
+            &actor,
             RelocateInventoryRequest {
                 batch_id,
                 qty: 1,
@@ -284,7 +313,7 @@ async fn near_expiry_alerts_and_lifecycle_are_owner_scoped(pool: sqlx::PgPool) {
     .await
     .expect("batch");
 
-    let repository = PgWave3Repository::new(pool);
+    let repository = PgWave3Repository::new(pool.clone());
     let created = repository
         .generate_near_expiry_alerts(&ctx(owner_id), Utc::now(), Some(180))
         .await
@@ -314,6 +343,15 @@ async fn near_expiry_alerts_and_lifecycle_are_owner_scoped(pool: sqlx::PgPool) {
         .await
         .expect("handle");
     assert_eq!(handled.lifecycle_status, "handled");
+    let generation_audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1 AND action = 'generate_near_expiry_alerts'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("near-expiry generation audit should query");
+    assert_eq!(generation_audit_count, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -352,7 +390,7 @@ async fn abc_recompute_and_manual_override(pool: sqlx::PgPool) {
     .await
     .expect("movement");
 
-    let repository = PgWave3Repository::new(pool);
+    let repository = PgWave3Repository::new(pool.clone());
     let recomputed = repository
         .recompute_abc_classifications(
             &ctx(owner_id),
@@ -389,6 +427,17 @@ async fn abc_recompute_and_manual_override(pool: sqlx::PgPool) {
         .await
         .expect("list");
     assert!(!listed.data.is_empty());
+    let abc_audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1
+           AND action = ANY($2::text[])",
+    )
+    .bind(owner_id)
+    .bind(vec!["recompute_inventory_abc", "override_inventory_abc"])
+    .fetch_one(&pool)
+    .await
+    .expect("ABC audit evidence should query");
+    assert_eq!(abc_audit_count, 2);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -412,7 +461,7 @@ async fn generate_maintenance_tasks_for_near_expiry_batches(pool: sqlx::PgPool) 
     .execute(&pool)
     .await
     .expect("batch");
-    let repository = PgWave3Repository::new(pool);
+    let repository = PgWave3Repository::new(pool.clone());
     let created = repository
         .generate_maintenance_tasks(&ctx(owner_id), Utc::now(), Some(180))
         .await
@@ -428,5 +477,14 @@ async fn generate_maintenance_tasks_for_near_expiry_batches(pool: sqlx::PgPool) 
         )
         .await
         .expect("list");
+    let generation_audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1 AND action = 'generate_maintenance_tasks'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("maintenance generation audit should query");
+    assert_eq!(generation_audit_count, 1);
     assert!(!tasks.is_empty());
 }
