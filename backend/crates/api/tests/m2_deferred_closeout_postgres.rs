@@ -64,6 +64,14 @@ async fn seed_asn_references(
     request: &mut CreateReceivingOrderRequest,
 ) {
     sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'M2 ASN 测试货主') ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(owner_id)
+    .bind(format!("M2-ASN-OWNER-{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed ASN owner");
+    sqlx::query(
         "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, 'M2 ASN 测试仓', 'normal', 'active') ON CONFLICT (owner_id, warehouse_code) DO NOTHING",
     )
     .bind(request.warehouse_id)
@@ -91,7 +99,7 @@ async fn seed_asn_references(
         .product_code
         .clone();
     let product_id: Uuid = sqlx::query_scalar(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, attrs, status) VALUES ($1, $2, $3, 'M2 Test Product', '1 unit', 'normal', '{\"unit_volume_cm3\": 1}', 'active') ON CONFLICT (owner_id, product_code) DO UPDATE SET attrs = EXCLUDED.attrs, status = 'active' RETURNING id",
+        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, volume_cm3, attrs, status) VALUES ($1, $2, $3, 'M2 Test Product', '1 unit', 'normal', 1.0, '{\"unit_volume_cm3\": 1}', 'active') ON CONFLICT (owner_id, product_code) DO UPDATE SET volume_cm3 = EXCLUDED.volume_cm3, attrs = EXCLUDED.attrs, status = 'active' RETURNING id",
     )
     .bind(Uuid::new_v4())
     .bind(owner_id)

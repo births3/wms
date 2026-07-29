@@ -65,6 +65,14 @@ async fn seed_active_supplier_and_warehouse(pool: &PgPool, owner_id: Uuid) -> (U
     let supplier_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
     sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'Wave 3 测试货主') ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(owner_id)
+    .bind(format!("W3-OWNER-{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("seed owner");
+    sqlx::query(
         "INSERT INTO suppliers (id, owner_id, supplier_code, supplier_name, uscc, status) VALUES ($1, $2, $3, 'Active Supplier', $4, 'active')",
     )
     .bind(supplier_id)
@@ -423,7 +431,7 @@ async fn receiving_order_update_rejects_cross_owner_and_missing_master_data(pool
         .await
         .expect("failed updates must roll back");
     assert_eq!(persisted.warehouse_id, order.warehouse_id);
-    assert_eq!(persisted.lines[0].product_id, None);
+    assert_eq!(persisted.lines[0].product_id, order.lines[0].product_id);
     let audit_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND resource_id = $2",
     )
