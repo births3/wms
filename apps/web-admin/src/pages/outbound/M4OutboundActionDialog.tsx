@@ -272,19 +272,40 @@ export function M4OutboundActionDialog({ action, target, createForm, shipForm, d
             </>
           ) : action.kind === "ship" ? (
             <>
-              <label className="grid gap-1 text-sm">承运方式（必选）
+              <label className="grid gap-1 text-sm">配送方类型（必选）
                 <select
                   className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                   required
-                  value={shipForm.carrierType}
-                  onChange={(event) => setShipForm((value) => ({ ...value, carrierType: event.target.value }))}
+                  value={shipForm.deliveryProviderType}
+                  onChange={(event) => setShipForm((value) => ({ ...value, deliveryProviderType: event.target.value }))}
                 >
-                  <option value="">请选择承运方式</option>
+                  <option value="">请选择配送方类型</option>
                   {outboundCarrierTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <TextField label="交接对象（必填）" required value={shipForm.handoverTo} onChange={(handoverTo) => setShipForm((value) => ({ ...value, handoverTo }))} placeholder="承运商 / 快递员 / 司机姓名" />
+              <TextField label="车牌号（必填）" required value={shipForm.plateNo} onChange={(plateNo) => setShipForm((value) => ({ ...value, plateNo }))} />
+              {shipForm.deliveryProviderType === "own_fleet" ? (
+                <>
+                  <TextField label="车辆编号（必填）" required value={shipForm.vehicleNo} onChange={(vehicleNo) => setShipForm((value) => ({ ...value, vehicleNo }))} />
+                  <TextField label="司机用户 ID（必填）" required value={shipForm.driverUserId} onChange={(driverUserId) => setShipForm((value) => ({ ...value, driverUserId }))} />
+                </>
+              ) : shipForm.deliveryProviderType === "third_party_express" ? (
+                <>
+                  <TextField label="快递员姓名（必填）" required value={shipForm.courierName} onChange={(courierName) => setShipForm((value) => ({ ...value, courierName }))} />
+                  <TextField label="快递员电话（必填）" required value={shipForm.courierPhone} onChange={(courierPhone) => setShipForm((value) => ({ ...value, courierPhone }))} />
+                </>
+              ) : null}
+              <TextField
+                label={`签字附件 ID（${shipForm.deliveryProviderType === "third_party_express" ? "必填" : "可选"}）`}
+                required={shipForm.deliveryProviderType === "third_party_express"}
+                value={shipForm.signatureAttachmentId}
+                onChange={(signatureAttachmentId) => setShipForm((value) => ({ ...value, signatureAttachmentId }))}
+                placeholder="H-FILE 附件 UUID"
+              />
               <TextField label="件数（必填正整数）" type="number" required value={shipForm.packageCount} onChange={(packageCount) => setShipForm((value) => ({ ...value, packageCount }))} />
+              <TextField label="装车温度（冷链订单必填）" type="number" value={shipForm.loadingTemperatureCelsius} onChange={(loadingTemperatureCelsius) => setShipForm((value) => ({ ...value, loadingTemperatureCelsius }))} />
+              <TextField label="保温箱编号（冷链订单必填）" value={shipForm.insulatedContainerNo} onChange={(insulatedContainerNo) => setShipForm((value) => ({ ...value, insulatedContainerNo }))} />
+              <TextField label="冰袋数量（冷链订单必填）" type="number" value={shipForm.icePackCount} onChange={(icePackCount) => setShipForm((value) => ({ ...value, icePackCount }))} />
               <TextField
                 className="md:col-span-2"
                 label="备注"
@@ -327,7 +348,7 @@ function actionMeta(kind: ActionKind) {
     "cancel-wave": { title: "取消波次", description: "仅未开始拣选的波次可取消。", submitLabel: "确认取消" },
     review: { title: "复核", description: "包装站复核完成后提交。", submitLabel: "提交复核" },
     print: { title: "打印", description: "提交随货同行单或快递面单打印任务。", submitLabel: "提交打印" },
-    ship: { title: "发货交接", description: "记录交接对象并确认发货。", submitLabel: "确认发货" },
+    ship: { title: "发货交接", description: "记录车辆、司机或快递员、签字及冷链交接信息。", submitLabel: "确认发货" },
     "create-return": { title: "新建采购退货单", description: "创建退供应商的出库申请。", submitLabel: "创建采购退货单" },
     "approve-return": { title: "采购退货审批", description: "审批退供应商出库申请，备注可选。", submitLabel: "审批通过" },
     "reject-return": { title: "采购退货驳回", description: "驳回退供应商出库申请，备注必填。", submitLabel: "确认驳回" },

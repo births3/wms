@@ -32731,6 +32731,23 @@
           }
         }
       },
+      "OutboundColdChainPackage": {
+        "type": "object",
+        "required": [
+          "insulated_container_no",
+          "ice_pack_count"
+        ],
+        "properties": {
+          "ice_pack_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "insulated_container_no": {
+            "type": "string"
+          }
+        }
+      },
       "OutboundOrder": {
         "type": "object",
         "required": [
@@ -32786,6 +32803,14 @@
           "required_ship_at": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "shipment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutboundShipment"
+              }
+            ],
             "nullable": true
           },
           "short_pick": {
@@ -32868,6 +32893,89 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "OutboundShipment": {
+        "type": "object",
+        "required": [
+          "id",
+          "delivery_provider_type",
+          "plate_no",
+          "cold_chain",
+          "cold_chain_packages",
+          "package_count",
+          "handover_by",
+          "shipped_at",
+          "created_at"
+        ],
+        "properties": {
+          "cold_chain": {
+            "type": "boolean"
+          },
+          "cold_chain_packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutboundColdChainPackage"
+            }
+          },
+          "courier_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "courier_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_provider_type": {
+            "type": "string"
+          },
+          "driver_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "driver_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "handover_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "loading_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "package_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "plate_no": {
+            "type": "string"
+          },
+          "shipped_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signature_attachment_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "vehicle_no": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -35652,25 +35760,53 @@
       "ShipOutboundOrderRequest": {
         "type": "object",
         "required": [
-          "carrier_type",
-          "handover_to",
+          "delivery_provider_type",
+          "plate_no",
           "package_count"
         ],
         "properties": {
-          "carrier_type": {
+          "cold_chain_packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutboundColdChainPackage"
+            }
+          },
+          "courier_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "courier_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "delivery_provider_type": {
             "type": "string"
           },
-          "handover_to": {
-            "type": "string"
+          "driver_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "loading_temperature_celsius": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           },
           "package_count": {
             "type": "integer",
             "format": "int32",
             "minimum": 0
           },
-          "shipped_at": {
+          "plate_no": {
+            "type": "string"
+          },
+          "signature_attachment_id": {
             "type": "string",
-            "format": "date-time",
+            "format": "uuid",
+            "nullable": true
+          },
+          "vehicle_no": {
+            "type": "string",
             "nullable": true
           }
         }

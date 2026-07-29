@@ -451,4 +451,46 @@ mod tests {
             "newer write contracts should keep Idempotency-Key header",
         );
     }
+
+    #[test]
+    fn openapi_exposes_outbound_handover_persistence_contract() {
+        let doc: serde_json::Value = serde_json::from_str(
+            &ApiDoc::openapi()
+                .to_pretty_json()
+                .expect("openapi json should serialize"),
+        )
+        .expect("openapi json should parse as value");
+
+        for field in [
+            "vehicle_no",
+            "plate_no",
+            "driver_user_id",
+            "signature_attachment_id",
+            "loading_temperature_celsius",
+            "cold_chain_packages",
+        ] {
+            assert!(
+                doc.pointer(&format!(
+                    "/components/schemas/ShipOutboundOrderRequest/properties/{field}"
+                ))
+                .is_some(),
+                "shipping request should expose {field}",
+            );
+        }
+        assert!(
+            doc.pointer("/components/schemas/OutboundOrder/properties/shipment")
+                .is_some(),
+            "outbound order should expose persisted shipment",
+        );
+        assert!(
+            doc.pointer("/components/schemas/OutboundShipment")
+                .is_some(),
+            "shipment response schema should be registered",
+        );
+        assert!(
+            doc.pointer("/components/schemas/OutboundColdChainPackage")
+                .is_some(),
+            "cold-chain package schema should be registered",
+        );
+    }
 }

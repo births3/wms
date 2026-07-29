@@ -71,6 +71,7 @@ export function M4OutboundDetailDialog({ target, open, onOpenChange }: M4Outboun
 }
 
 function OrderDetail({ order }: { order: OutboundOrder }) {
+  const shipment = order.shipment;
   return (
     <section className="grid gap-4">
       <div className="grid gap-4 md:grid-cols-2">
@@ -103,7 +104,13 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
         <DetailBlock
           title="交接"
           rows={[
-            ["交接时间", order.status === "shipped" ? formatDateTime(order.updated_at) : "—"],
+            ["配送方", shipment ? deliveryProviderLabel(shipment.delivery_provider_type) : "—"],
+            ["车辆 / 车牌", shipment ? `${shipment.vehicle_no ?? "第三方车辆"} / ${shipment.plate_no}` : "—"],
+            ["司机 / 快递员", shipment?.driver_name ?? shipment?.courier_name ?? "—"],
+            ["快递员电话", shipment?.courier_phone ?? "—"],
+            ["签字证据", shipment?.signature_attachment_id ? "已关联附件" : shipment?.driver_user_id ? "已关联司机用户" : "—"],
+            ["冷链装车", shipment?.cold_chain ? `${shipment.loading_temperature_celsius ?? "-"}℃ / ${shipment.cold_chain_packages.length} 个保温箱` : "非冷链"],
+            ["交接时间", shipment ? formatDateTime(shipment.shipped_at) : "—"],
           ]}
         />
       </div>
@@ -113,6 +120,10 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
       }))} />
     </section>
   );
+}
+
+function deliveryProviderLabel(value: string) {
+  return value === "own_fleet" ? "自有车队" : "第三方快递";
 }
 
 function documentTypeLabel(value: string) {

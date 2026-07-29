@@ -116,8 +116,16 @@ export function isUuid(value: string) {
 }
 
 export interface OutboundShipForm {
-  carrierType: string;
-  handoverTo: string;
+  deliveryProviderType: string;
+  vehicleNo: string;
+  plateNo: string;
+  driverUserId: string;
+  courierName: string;
+  courierPhone: string;
+  signatureAttachmentId: string;
+  loadingTemperatureCelsius: string;
+  insulatedContainerNo: string;
+  icePackCount: string;
   packageCount: string;
 }
 
@@ -131,25 +139,92 @@ export const outboundCarrierTypeOptions: Array<{
 ];
 
 export function defaultOutboundShipForm(): OutboundShipForm {
-  return { carrierType: "", handoverTo: "", packageCount: "1" };
+  return {
+    deliveryProviderType: "",
+    vehicleNo: "",
+    plateNo: "",
+    driverUserId: "",
+    courierName: "",
+    courierPhone: "",
+    signatureAttachmentId: "",
+    loadingTemperatureCelsius: "",
+    insulatedContainerNo: "",
+    icePackCount: "",
+    packageCount: "1",
+  };
 }
 
 export function buildShipOutboundRequest(
   form: OutboundShipForm,
 ): ShipOutboundOrderRequest {
-  const carrierValid = outboundCarrierTypeOptions.some(
-    (option) => option.value === form.carrierType,
+  const providerValid = outboundCarrierTypeOptions.some(
+    (option) => option.value === form.deliveryProviderType,
   );
-  if (!carrierValid) throw new Error("请选择承运方式");
-  const handoverTo = form.handoverTo.trim();
-  if (!handoverTo) throw new Error("请填写交接对象");
+  if (!providerValid) throw new Error("请选择配送方类型");
+  const plateNo = form.plateNo.trim();
+  if (!plateNo) throw new Error("请填写车牌号");
   const packageCount = Number(form.packageCount);
   if (!Number.isInteger(packageCount) || packageCount <= 0) {
     throw new Error("件数必须为正整数");
   }
+
+  const signatureAttachmentId = form.signatureAttachmentId.trim() || null;
+  if (signatureAttachmentId && !isUuid(signatureAttachmentId)) {
+    throw new Error("签字附件 ID 必须是 UUID");
+  }
+
+  const ownFleet = form.deliveryProviderType === "own_fleet";
+  const vehicleNo = form.vehicleNo.trim() || null;
+  const driverUserId = form.driverUserId.trim() || null;
+  const courierName = form.courierName.trim() || null;
+  const courierPhone = form.courierPhone.trim() || null;
+  if (ownFleet) {
+    if (!vehicleNo) throw new Error("请填写车辆编号");
+    if (!driverUserId || !isUuid(driverUserId)) {
+      throw new Error("司机用户 ID 必须是 UUID");
+    }
+  } else if (!courierName || !courierPhone || !signatureAttachmentId) {
+    throw new Error("第三方快递须填写快递员姓名、电话和签字附件 ID");
+  }
+
+  const temperatureText = form.loadingTemperatureCelsius.trim();
+  const containerNo = form.insulatedContainerNo.trim();
+  const icePackText = form.icePackCount.trim();
+  const hasColdChainFields = Boolean(
+    temperatureText || containerNo || icePackText,
+  );
+  const loadingTemperature = temperatureText
+    ? Number(temperatureText)
+    : null;
+  const icePackCount = icePackText ? Number(icePackText) : 0;
+  if (
+    hasColdChainFields &&
+    (!temperatureText ||
+      !Number.isFinite(loadingTemperature) ||
+      !containerNo ||
+      !Number.isInteger(icePackCount) ||
+      icePackCount < 0)
+  ) {
+    throw new Error("冷链交接须填写有效装车温度、保温箱编号和冰袋数量");
+  }
+
   return {
-    carrier_type: form.carrierType,
-    handover_to: handoverTo,
+    delivery_provider_type: form.deliveryProviderType,
+    vehicle_no: ownFleet ? vehicleNo : null,
+    plate_no: plateNo,
+    driver_user_id: ownFleet ? driverUserId : null,
+    courier_name: ownFleet ? null : courierName,
+    courier_phone: ownFleet ? null : courierPhone,
+    signature_attachment_id: signatureAttachmentId,
+    loading_temperature_celsius: loadingTemperature,
+    cold_chain_packages: hasColdChainFields
+      ? [
+          {
+            insulated_container_no: containerNo,
+            ice_pack_count: icePackCount,
+          },
+        ]
+      : [],
     package_count: packageCount,
   };
 }

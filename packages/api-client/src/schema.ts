@@ -7422,6 +7422,11 @@ export interface components {
             batch_id: string;
             reason: string;
         };
+        OutboundColdChainPackage: {
+            /** Format: int32 */
+            ice_pack_count: number;
+            insulated_container_no: string;
+        };
         OutboundOrder: {
             /** Format: date-time */
             created_at: string;
@@ -7439,6 +7444,7 @@ export interface components {
             owner_id: string;
             /** Format: date-time */
             required_ship_at?: string | null;
+            shipment?: components["schemas"]["OutboundShipment"] | null;
             short_pick: boolean;
             status: string;
             /** Format: date-time */
@@ -7466,6 +7472,32 @@ export interface components {
         OutboundOrderListResponse: {
             data: components["schemas"]["OutboundOrder"][];
             page: components["schemas"]["PageMeta"];
+        };
+        OutboundShipment: {
+            cold_chain: boolean;
+            cold_chain_packages: components["schemas"]["OutboundColdChainPackage"][];
+            courier_name?: string | null;
+            courier_phone?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            delivery_provider_type: string;
+            driver_name?: string | null;
+            /** Format: uuid */
+            driver_user_id?: string | null;
+            /** Format: uuid */
+            handover_by: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: double */
+            loading_temperature_celsius?: number | null;
+            /** Format: int32 */
+            package_count: number;
+            plate_no: string;
+            /** Format: date-time */
+            shipped_at: string;
+            /** Format: uuid */
+            signature_attachment_id?: string | null;
+            vehicle_no?: string | null;
         };
         OutboundWave: {
             /** Format: date-time */
@@ -8370,12 +8402,20 @@ export interface components {
             enabled: boolean;
         };
         ShipOutboundOrderRequest: {
-            carrier_type: string;
-            handover_to: string;
+            cold_chain_packages?: components["schemas"]["OutboundColdChainPackage"][];
+            courier_name?: string | null;
+            courier_phone?: string | null;
+            delivery_provider_type: string;
+            /** Format: uuid */
+            driver_user_id?: string | null;
+            /** Format: double */
+            loading_temperature_celsius?: number | null;
             /** Format: int32 */
             package_count: number;
-            /** Format: date-time */
-            shipped_at?: string | null;
+            plate_no: string;
+            /** Format: uuid */
+            signature_attachment_id?: string | null;
+            vehicle_no?: string | null;
         };
         ShippedCustomerHint: {
             /** Format: uuid */
