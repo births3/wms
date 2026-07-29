@@ -143,6 +143,15 @@ async fn reconciliation_http_enforces_permissions_and_rule_contract(pool: PgPool
         .await
         .unwrap();
     assert_eq!(due_response.status(), StatusCode::OK);
+    let rule_audit_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+          WHERE owner_id = $1 AND action = 'upsert_reconciliation_rule'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("reconciliation rule audit evidence should query");
+    assert_eq!(rule_audit_count, 1);
     let run_response = ingest_app
         .oneshot(
             Request::builder()

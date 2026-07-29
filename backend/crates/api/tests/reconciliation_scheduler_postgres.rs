@@ -139,6 +139,15 @@ async fn service_workers_claim_once_renew_and_take_over_expired_lease(pool: PgPo
     let token = first["claim_token"].as_str().expect("claim response token");
     let worker_id = first["worker_id"].as_str().expect("claim response worker");
     assert_eq!(first["attempt_no"], 1);
+    let claim_audits: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM audit_event
+          WHERE owner_id=$1 AND action='claim_reconciliation_window'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("load reconciliation claim audit");
+    assert_eq!(claim_audits, 1);
 
     let (_, replay) = claim(
         service.clone(),
