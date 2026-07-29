@@ -8,9 +8,8 @@ pub async fn ship_outbound_order(
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<OutboundOrder>, Wave4RepositoryError> {
-        if req.package_count == 0 {
-            return Err(Wave4RepositoryError::InvalidQuantity);
-        }
+        validate_ship_outbound_request(&req)
+            .map_err(Wave4RepositoryError::ShipmentValidation)?;
         let request_hash = request_hash(&serde_json::json!({
             "outbound_order_id": order_id,
             "request": req,

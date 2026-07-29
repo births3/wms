@@ -151,7 +151,6 @@ export function buildShipOutboundRequest(
     carrier_type: form.carrierType,
     handover_to: handoverTo,
     package_count: packageCount,
-    shipped_at: new Date().toISOString(),
   };
 }
 

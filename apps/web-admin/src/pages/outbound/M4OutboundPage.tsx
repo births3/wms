@@ -337,13 +337,8 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     ? [
         { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 220, width: 240, onDoubleClick: (row) => openOrderDetail(row.id), render: (row) => <OrderNoSummary order={row} /> },
         { key: "product", header: "计划件数", minWidth: 120, render: (row) => <ReviewSummary order={row} /> },
-        { key: "customer_id", header: "客户 / 配送", minWidth: 160, render: (row) => (
-          <div className="text-sm">
-            <CustomerCell customerId={row.customer_id} />
-            <div className="mt-0.5 text-xs text-muted-foreground">配送 第三方快递</div>
-          </div>
-        ) },
-        { key: "required_ship_at", header: "包裹 / 车牌", minWidth: 150, render: () => <TwoLine top="包裹数量 1" bottom="车牌号 沪A-12345" /> },
+        { key: "customer_id", header: "客户 / 门店", minWidth: 160, render: (row) => <CustomerCell customerId={row.customer_id} /> },
+        { key: "required_ship_at", header: "要求发货", minWidth: 150, render: (row) => formatDate(row.required_ship_at) },
         { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(row.created_at) },
         { key: "status", header: "状态", minWidth: 130, filter: { type: "multiSelect", options: statusOptions(mode).map(([value, label]) => ({ value, label })) }, render: (row) => <StatusBadge status={statusKey(row.status)} label={statusLabel(row.status)} size="sm" /> },
       ]

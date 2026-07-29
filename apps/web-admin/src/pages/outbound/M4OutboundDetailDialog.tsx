@@ -94,21 +94,16 @@ function OrderDetail({ order }: { order: OutboundOrder }) {
           ]}
         />
         <DetailBlock
-          title="校验与配送"
+          title="校验与复核"
           rows={[
             ["校验结果", order.status === "validation_exception" ? "校验异常" : "指定批号库存充足"],
             ["复核模式", "包装站复核"],
-            ["配送方", "第三方快递"],
-            ["包裹数量", "1"],
           ]}
         />
         <DetailBlock
-          title="交接字段"
+          title="交接"
           rows={[
             ["交接时间", order.status === "shipped" ? formatDateTime(order.updated_at) : "—"],
-            ["车牌号", order.status === "shipped" ? "沪A-12345" : "—"],
-            ["装车温度", "—"],
-            ["签字", order.status === "shipped" ? "已签字" : "—"],
           ]}
         />
       </div>

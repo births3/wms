@@ -119,6 +119,7 @@ impl IntoResponse for Wave4HandlerError {
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidTraceabilityEvent)
             | Wave4HandlerError::Repository(Wave4RepositoryError::ShortPickNotReplenished)
             | Wave4HandlerError::Repository(Wave4RepositoryError::ReviewValidation(_))
+            | Wave4HandlerError::Repository(Wave4RepositoryError::ShipmentValidation(_))
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidStatus { .. })
             | Wave4HandlerError::Repository(Wave4RepositoryError::InvalidStateTransition {
                 ..

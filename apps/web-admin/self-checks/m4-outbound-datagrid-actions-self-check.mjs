@@ -105,6 +105,7 @@ assert.match(queries, /\/api\/v1\/outbound\/orders\/\{id\}\/ship/, "发货 mutat
 assert.match(pageFile, /shipOutboundOrderMutation\.mutateAsync/, "发货交接不能只改页面内存状态");
 assert.doesNotMatch(pageFile, /action\.kind === "ship"\)\s*updateOrder/, "发货交接不得用本地 updateOrder 冒充成功");
 assert.match(actionDialog, /客户药检副本.*不.*发货|发货.*不.*客户药检副本/, "发货弹窗应明确客户药检副本不参与发货阻断");
+assert.doesNotMatch(pageFile, /配送 第三方快递|包裹数量 1|车牌号 沪A-12345/, "复核发货列表不得展示未由 API 返回的静态交接数据");
 assert.match(canApproveReturnBody(), /pending_approval/, "审批仅待审批");
 assert.match(canRejectReturnBody(), /pending_approval/, "驳回仅待审批");
 assert.match(canPickReturnBody(), /approved/, "拣货仅已审批");
@@ -128,10 +129,7 @@ assert.match(page, /titleWithDocNo|meta\.title.*docNo|\$\{meta\.title\} · \$\{t
 // --- 详情去原型说明字段 ---
 assert.doesNotMatch(detail, /作废审批入口/, "OrderDetail 不得展示原型说明字段「作废审批入口」");
 assert.doesNotMatch(detail, /未进波次订单可申请/, "OrderDetail 不得展示「未进波次订单可申请」说明文案");
-assert.match(detail, /装车温度/, "交接字段应保留装车温度");
-assert.match(detail, /\["装车温度",\s*"—"\]/, "装车温度空值应显示「—」");
-assert.doesNotMatch(detail, /\["装车温度",\s*"冷链时必填"\]/, "装车温度不得把 placeholder 当值");
-assert.match(parts, /\["装车温度",\s*"",\s*"冷链时必填"\]/, "发货表单装车温度应空值 + placeholder");
+assert.doesNotMatch(detail, /沪A-12345|已签字|\["配送方"|\["包裹数量"|\["车牌号"|\["装车温度"|\["签字"/, "订单详情不得展示未由 API 返回的静态交接数据");
 
 function canValidateOrderBody() {
   return functionBody(page, "canValidateOrder");

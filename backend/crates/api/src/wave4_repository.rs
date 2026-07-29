@@ -8,11 +8,11 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    validate_review_submission, CompletePickTaskRequest, CreateOutboundOrderRequest,
-    CreateOutboundWaveRequest, InventoryBatch, OutboundOrder, OutboundOrderLine, OutboundWave,
-    ReviewOutboundOrderRequest, ReviewValidationError, ShipOutboundOrderRequest,
-    TemperatureExcursionEvent, TraceabilityOutboundReport, TraceabilityOutboundReportRequest,
-    TraceabilityStatusChangeEvent,
+    validate_review_submission, validate_ship_outbound_request, CompletePickTaskRequest,
+    CreateOutboundOrderRequest, CreateOutboundWaveRequest, InventoryBatch, OutboundOrder,
+    OutboundOrderLine, OutboundWave, ReviewOutboundOrderRequest, ReviewValidationError,
+    ShipOutboundOrderRequest, ShipOutboundValidationError, TemperatureExcursionEvent,
+    TraceabilityOutboundReport, TraceabilityOutboundReportRequest, TraceabilityStatusChangeEvent,
 };
 
 use crate::{
@@ -70,6 +70,7 @@ pub enum Wave4RepositoryError {
         approval_source: String,
     },
     ReviewValidation(ReviewValidationError),
+    ShipmentValidation(ShipOutboundValidationError),
     InvalidQuantity,
     DocumentNumbering(String),
     InvalidTraceabilityEvent,

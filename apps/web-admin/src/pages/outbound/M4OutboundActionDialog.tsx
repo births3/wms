@@ -285,7 +285,6 @@ export function M4OutboundActionDialog({ action, target, createForm, shipForm, d
               </label>
               <TextField label="交接对象（必填）" required value={shipForm.handoverTo} onChange={(handoverTo) => setShipForm((value) => ({ ...value, handoverTo }))} placeholder="承运商 / 快递员 / 司机姓名" />
               <TextField label="件数（必填正整数）" type="number" required value={shipForm.packageCount} onChange={(packageCount) => setShipForm((value) => ({ ...value, packageCount }))} />
-              <ActionExtraFields kind={action.kind} />
               <TextField
                 className="md:col-span-2"
                 label="备注"

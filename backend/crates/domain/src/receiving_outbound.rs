@@ -334,6 +334,31 @@ pub struct ShipOutboundOrderRequest {
     pub shipped_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ShipOutboundValidationError {
+    InvalidCarrierType,
+    MissingHandover,
+    InvalidPackageCount,
+}
+
+pub fn validate_ship_outbound_request(
+    request: &ShipOutboundOrderRequest,
+) -> Result<(), ShipOutboundValidationError> {
+    if !matches!(
+        request.carrier_type.as_str(),
+        "own_fleet" | "third_party_express"
+    ) {
+        return Err(ShipOutboundValidationError::InvalidCarrierType);
+    }
+    if request.handover_to.trim().is_empty() {
+        return Err(ShipOutboundValidationError::MissingHandover);
+    }
+    if request.package_count == 0 {
+        return Err(ShipOutboundValidationError::InvalidPackageCount);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
@@ -341,9 +366,10 @@ mod tests {
 
     use super::{
         validate_create_receiving_order_request, validate_review_submission,
-        CreateReceivingOrderRequest, OutboundOrderLine, ReceivingOrderLine,
-        ReceivingOrderRequestValidationError, ReviewOutboundOrderLineRequest,
-        ReviewOutboundOrderRequest, ReviewValidationError, UpdateReceivingOrderRequest,
+        validate_ship_outbound_request, CreateReceivingOrderRequest, OutboundOrderLine,
+        ReceivingOrderLine, ReceivingOrderRequestValidationError, ReviewOutboundOrderLineRequest,
+        ReviewOutboundOrderRequest, ReviewValidationError, ShipOutboundOrderRequest,
+        ShipOutboundValidationError, UpdateReceivingOrderRequest,
         RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND, REVIEW_MODE_PDA_LOOSE,
     };
 
@@ -386,6 +412,35 @@ mod tests {
                     .expect("valid current time"),
             ),
             Err(ReceivingOrderRequestValidationError::MissingSupplier)
+        );
+    }
+
+    #[test]
+    fn ship_request_requires_supported_carrier_handover_and_package_count() {
+        let mut request = ShipOutboundOrderRequest {
+            carrier_type: "third_party_express".to_string(),
+            handover_to: "快递员".to_string(),
+            package_count: 1,
+            shipped_at: None,
+        };
+        assert_eq!(validate_ship_outbound_request(&request), Ok(()));
+
+        request.carrier_type = "other".to_string();
+        assert_eq!(
+            validate_ship_outbound_request(&request),
+            Err(ShipOutboundValidationError::InvalidCarrierType)
+        );
+        request.carrier_type = "own_fleet".to_string();
+        request.handover_to = "   ".to_string();
+        assert_eq!(
+            validate_ship_outbound_request(&request),
+            Err(ShipOutboundValidationError::MissingHandover)
+        );
+        request.handover_to = "司机".to_string();
+        request.package_count = 0;
+        assert_eq!(
+            validate_ship_outbound_request(&request),
+            Err(ShipOutboundValidationError::InvalidPackageCount)
         );
     }
 
