@@ -195,6 +195,7 @@ nav:
     - 数据库表目录: database/table-catalog.md
     - 数据库设计审查矩阵: database/database-design-review.md
     - 文件存储方案: infra/file-storage.md
+    - H9 独立浏览器 Render Worker: infra/h9-render-worker.md
     - 缓存策略: infra/cache-strategy.md
     - 易用性基线 (v25): infra/usability-baseline.md
     - 分库分表决策矩阵 (v25): infra/sharding-decision-matrix.md
@@ -211,6 +212,7 @@ nav:
     - US-H9-006 随货同行单归集与截单验收 (2026-07-26): reviews/us-h9-006-acceptance-2026-07-26.md
     - US-H9-007 归集维度规则配置验收 (2026-07-27): reviews/us-h9-007-acceptance-2026-07-27.md
     - US-H9-008 打印组套配置与就绪策略验收 (2026-07-27): reviews/us-h9-008-acceptance-2026-07-27.md
+    - US-H9-009 分类 PDF 渲染与留存验收 (2026-07-28): reviews/us-h9-009-acceptance-2026-07-28.md
     - US-H9-011 打印机、纸盒与设备租约验收 (2026-07-27): reviews/us-h9-011-acceptance-2026-07-27.md
     - M2 入库模块整体审查 (2026-07-18): reviews/m2-overall-review-2026-07-18.md
     - M3 库存模块整体审查 (2026-07-18): reviews/m3-overall-review-2026-07-18.md
