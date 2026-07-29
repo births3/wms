@@ -333,7 +333,7 @@ async fn same_level_same_object_overlap_rejected_on_publish(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn suite_lifecycle_replays_audits_and_rejects_rewrite(pool: PgPool) {
+async fn print_suite_test_lifecycle_replays_audits_and_rejects_rewrite(pool: PgPool) {
     let scope = seed_scope(&pool).await;
     let service = PrintOrchestrationService::with_postgres(pool.clone());
     let order = seed_order(&pool, &scope, "SO-H9-008-L01", Some("INV-H9-008-L01")).await;

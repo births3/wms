@@ -648,6 +648,16 @@ async fn cutoff_plan_publish_rejects_same_level_overlap_and_resolves_customer_fi
         .await
         .expect_err("same-level effective period overlap must fail");
     assert_eq!(error, PrintOrchestrationError::EffectivePeriodOverlap);
+    let idempotency_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM idempotency_request
+         WHERE owner_id = $1
+           AND idempotency_key LIKE 'h9-cutoff-plan-%'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("cutoff plan idempotency evidence should query");
+    assert_eq!(idempotency_count, 7);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

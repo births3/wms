@@ -272,7 +272,7 @@ async fn scheduled_cutoff_splits_one_address_by_published_rule_key(pool: PgPool)
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn rule_lifecycle_replays_audits_and_rejects_rewrite(pool: PgPool) {
+async fn aggregation_rule_test_lifecycle_replays_audits_and_rejects_rewrite(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
     let customer_id = Uuid::new_v4();

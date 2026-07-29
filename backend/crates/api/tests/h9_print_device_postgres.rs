@@ -153,7 +153,9 @@ async fn insert_lease(
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn site_scoped_devices_enforce_boundaries_and_capabilities(pool: PgPool) {
+async fn disable_site_owner_mapping_create_and_update_printer_tray_and_test_print_are_idempotent(
+    pool: PgPool,
+) {
     let owner_id = Uuid::new_v4();
     seed_owner(&pool, owner_id, "H9D01").await;
     let auth = ctx(owner_id, &["h9.print_device.read", "h9.print_device.write"]);
@@ -215,13 +217,20 @@ async fn site_scoped_devices_enforce_boundaries_and_capabilities(pool: PgPool) {
     assert_eq!(mapping_conflict, Err(PrintDeviceError::MappingConflict));
 
     // 停用软删后允许重新映射；重复停用被拒绝
-    let disabled = service
+    let disabled_mutation = service
         .disable_site_owner_mapping(&auth, site.id, mapping.id, now, "h9d-map-disable")
         .await
-        .expect("mapping should disable")
-        .value;
+        .expect("mapping should disable");
+    assert!(!disabled_mutation.replayed);
+    let disabled = disabled_mutation.value;
     assert_eq!(disabled.status, "disabled");
     assert!(disabled.disabled_at.is_some());
+    let disabled_replay = service
+        .disable_site_owner_mapping(&auth, site.id, mapping.id, now, "h9d-map-disable")
+        .await
+        .expect("same mapping disable should replay");
+    assert!(disabled_replay.replayed);
+    assert_eq!(disabled_replay.value.id, disabled.id);
     let disable_again = service
         .disable_site_owner_mapping(&auth, site.id, mapping.id, now, "h9d-map-disable-2")
         .await;
@@ -273,11 +282,18 @@ async fn site_scoped_devices_enforce_boundaries_and_capabilities(pool: PgPool) {
     assert_eq!(orphan, Err(PrintDeviceError::SiteNotFound));
 
     // AC2：纸盒纸张能力、启用状态与设备标识
-    let tray = service
+    let tray_mutation = service
         .create_printer_tray(&auth, printer.id, tray_request("TRAY-1"), now, "h9d-tray-1")
         .await
-        .expect("tray should create")
-        .value;
+        .expect("tray should create");
+    assert!(!tray_mutation.replayed);
+    let tray = tray_mutation.value;
+    let tray_replay = service
+        .create_printer_tray(&auth, printer.id, tray_request("TRAY-1"), now, "h9d-tray-1")
+        .await
+        .expect("same tray create should replay");
+    assert!(tray_replay.replayed);
+    assert_eq!(tray_replay.value.id, tray.id);
     let tray_conflict = service
         .create_printer_tray(
             &auth,
@@ -288,25 +304,40 @@ async fn site_scoped_devices_enforce_boundaries_and_capabilities(pool: PgPool) {
         )
         .await;
     assert_eq!(tray_conflict, Err(PrintDeviceError::TrayConflict));
-    let updated_tray = service
+    let tray_update_request = UpdatePrinterTrayRequest {
+        paper_size: Some("A5".to_string()),
+        paper_type: Some("不干胶标签纸".to_string()),
+        enabled: Some(false),
+    };
+    let updated_tray_mutation = service
         .update_printer_tray(
             &auth,
             printer.id,
             tray.id,
-            UpdatePrinterTrayRequest {
-                paper_size: Some("A5".to_string()),
-                paper_type: Some("不干胶标签纸".to_string()),
-                enabled: Some(false),
-            },
+            tray_update_request.clone(),
             now,
             "h9d-tray-update",
         )
         .await
-        .expect("tray capability should update")
-        .value;
+        .expect("tray capability should update");
+    assert!(!updated_tray_mutation.replayed);
+    let updated_tray = updated_tray_mutation.value;
     assert_eq!(updated_tray.paper_size, "A5");
     assert_eq!(updated_tray.paper_type, "不干胶标签纸");
     assert!(!updated_tray.enabled);
+    let updated_tray_replay = service
+        .update_printer_tray(
+            &auth,
+            printer.id,
+            tray.id,
+            tray_update_request,
+            now,
+            "h9d-tray-update",
+        )
+        .await
+        .expect("same tray update should replay");
+    assert!(updated_tray_replay.replayed);
+    assert_eq!(updated_tray_replay.value.id, updated_tray.id);
 
     // AC3：测试打印落表；停用纸盒拒绝
     let disabled_tray_test = service
@@ -334,18 +365,26 @@ async fn site_scoped_devices_enforce_boundaries_and_capabilities(pool: PgPool) {
         )
         .await
         .expect("tray should re-enable");
-    let test_print = service
+    let test_print_request = TestPrintRequest { tray_id: tray.id };
+    let test_print_mutation = service
         .test_print(
             &auth,
             printer.id,
-            TestPrintRequest { tray_id: tray.id },
+            test_print_request.clone(),
             now,
             "h9d-test-1",
         )
         .await
-        .expect("test print should dispatch")
-        .value;
+        .expect("test print should dispatch");
+    assert!(!test_print_mutation.replayed);
+    let test_print = test_print_mutation.value;
     assert_eq!(test_print.result, "dispatched");
+    let test_print_replay = service
+        .test_print(&auth, printer.id, test_print_request, now, "h9d-test-1")
+        .await
+        .expect("same test print should replay");
+    assert!(test_print_replay.replayed);
+    assert_eq!(test_print_replay.value.id, test_print.id);
     let stored_result: String =
         sqlx::query_scalar("SELECT result FROM h9_printer_test_prints WHERE id = $1")
             .bind(test_print.id)
@@ -397,6 +436,42 @@ async fn site_scoped_devices_enforce_boundaries_and_capabilities(pool: PgPool) {
         cross_lease_error.contains("foreign key"),
         "unexpected: {cross_lease_error}"
     );
+
+    for (action, expected) in [
+        ("disable_print_site_owner_mapping", 1i64),
+        ("create_printer_tray", 1),
+        ("update_printer_tray", 2),
+        ("test_print_printer", 1),
+    ] {
+        let audit_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND module = 'H9' AND action = $2",
+        )
+        .bind(owner_id)
+        .bind(action)
+        .fetch_one(&pool)
+        .await
+        .expect("print device audit count should load");
+        assert_eq!(audit_count, expected, "audit missing for {action}");
+    }
+    let idempotency_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+          FROM idempotency_request
+         WHERE owner_id = $1
+           AND idempotency_key = ANY($2)
+        "#,
+    )
+    .bind(owner_id)
+    .bind([
+        "h9d-map-disable",
+        "h9d-tray-1",
+        "h9d-tray-update",
+        "h9d-test-1",
+    ])
+    .fetch_one(&pool)
+    .await
+    .expect("print device idempotency rows should load");
+    assert_eq!(idempotency_count, 4);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
