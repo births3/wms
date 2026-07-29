@@ -69,7 +69,7 @@ evidence_refs = ["backend/crates/api/tests/wave3_postgres.rs", "prototypes/e2e/w
 
 [evidence_profiles.M4]
 backend_files = ["backend/crates/api/src/wave4_handlers.rs", "backend/crates/api/src/wave4_repository.rs"]
-database_objects = ["outbound_orders", "outbound_order_lines", "outbound_waves"]
+database_objects = ["outbound_orders", "outbound_order_lines", "outbound_waves", "outbound_shipments"]
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres", "pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 evidence_refs = ["backend/crates/api/tests/wave4_postgres.rs", "prototypes/e2e/web-admin-shell.spec.ts"]
 
@@ -3310,9 +3310,62 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-M4-006"
 title = "发货与交接"
 module = "M4"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-m4-outbound-pick.md"
+types = ["write", "api_change", "frontend_interaction", "integration", "inventory_change", "config_rule", "critical_path", "audit_compliance", "pda_runtime", "hardware_runtime", "external_runtime"]
+frontend_pages = ["m4-review"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m4-real"]
+api_paths = [
+  "GET /api/v1/outbound/orders",
+  "GET /api/v1/outbound/orders/{id}",
+  "POST /api/v1/outbound/orders/{id}/ship",
+]
+database_objects = [
+  "outbound_orders",
+  "outbound_order_lines",
+  "outbound_shipments",
+  "products",
+  "auth_users",
+  "auth_user_owner_bindings",
+  "attachments",
+  "inventory_batches",
+  "inventory_movements",
+  "audit_event",
+  "idempotency_request",
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-domain receiving_outbound --lib",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api openapi_exposes_outbound_handover_persistence_contract --lib",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres outbound_complete_pick_review_ship_replays_and_deducts_inventory -- --exact --test-threads=1",
+  "pnpm --filter @wms/web-admin exec tsc --noEmit",
+  "node apps/web-admin/self-checks/m4-outbound-datagrid-actions-self-check.mjs",
+  "just openapi-check",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m4-outbound-pick.md",
+  "backend/crates/domain/src/receiving_outbound.rs",
+  "backend/crates/api/src/wave4_handlers.rs",
+  "backend/crates/api/src/wave4_repository.rs",
+  "backend/crates/api/src/wave4_repository_part1.rs",
+  "backend/crates/api/src/wave4_repository_part2.rs",
+  "backend/crates/api/src/wave4_repository_shipment.rs",
+  "backend/crates/api/src/openapi_doc.rs",
+  "backend/crates/api/src/openapi_tests.rs",
+  "backend/crates/api/tests/wave4_postgres/review.rs",
+  "backend/migrations/202606040001_wave4_outbound_tables.sql",
+  "backend/migrations/202606280002_database_design_standard_alignment.sql",
+  "backend/migrations/202607260001_h_file_attachments.sql",
+  "apps/web-admin/src/features/outbound/outbound-queries.ts",
+  "apps/web-admin/src/pages/outbound/m4-outbound-page-helpers.ts",
+  "apps/web-admin/src/pages/outbound/M4OutboundActionDialog.tsx",
+  "apps/web-admin/src/pages/outbound/M4OutboundDetailDialog.tsx",
+  "prototypes/e2e/web-admin-m4-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m4-outbound/outbound-handover-fields.png",
+  "shared/openapi/openapi.json",
+  "packages/api-client/src/schema.ts",
+]
+reason = "已补发货交接持久化切片：车辆编号/车牌、货主有效司机及姓名快照、第三方快递员、H-FILE 签字附件、按商品储存条件服务端判定的冷链温度与保温箱/冰袋配置、包裹数、交接人和服务端交接时间进入 PostgreSQL、OpenAPI、API 回读、PC 表单及详情；真实 PostgreSQL 测试覆盖写入、回读、库存实扣、幂等和审计，真实浏览器验证 PC 交接字段。故事仍不能整体关闭：M10/H5 系统带出配送方/车辆/运单、M-PK-004 配置复用、批量交接、H9 打印、M-VR 发货节点双人策略、PDA 签字/离线/硬件及外部在途证据尚未闭环。"
 owner = "M4 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "补齐 M10/H5/M-PK-004/M-VR/H9 依赖、批量交接、PDA 签字离线和真实外部/硬件/E2E 证据后再移入 stories。"
 
 [[deferred_stories]]
 id = "US-M4-007"
