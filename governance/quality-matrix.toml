@@ -2126,7 +2126,8 @@ api_paths = [
 database_objects = [
   "h9_print_suite_versions",
   "h9_print_suite_items",
-  "h9_ingested_document_files",
+  "attachments",
+  "h9_document_file_bindings",
   "h9_print_suite_instances",
   "h9_print_suite_instance_items",
   "h9_delivery_note_groups",
@@ -2182,15 +2183,82 @@ governance = "verified"
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 
-[[deferred_stories]]
+[[stories]]
 id = "US-H9-009"
 title = "分类 PDF 渲染与留存"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "integration", "api_change", "frontend_interaction", "audit_compliance"]
-reason = "分类 PDF 与 H-FILE 边界已确认；尚未实现 Render Worker、分类 PDF、哈希、保留策略、API 和测试。"
-owner = "H9 打印能力负责人"
-resume_when = "冻结 H-FILE 接口和 PDF 输入契约后，实现单分类渲染幂等切片，再扩展部分/全部分类打印。"
+frontend_pages = ["h9-delivery-note-aggregation"]
+navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
+api_paths = [
+  "GET /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs",
+  "POST /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare",
+  "POST /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download",
+  "POST /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print",
+]
+database_objects = [
+  "attachments",
+  "h9_document_file_bindings",
+  "h9_category_pdf_preparations",
+  "h9_category_pdf_outputs",
+  "h9_print_suite_instances",
+  "h9_print_suite_instance_items",
+  "audit_event",
+]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+]
+e2e_screenshots = [
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdfs-ready.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdfs-selection.png" },
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdf-rendered-document.png" },
+]
+test_checks = [
+  "pnpm --dir apps/h9-render-worker test",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib print_orchestration::render_worker::tests",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h9_print_suite_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib print_orchestration_handlers::tests",
+  "pnpm --dir apps/web-admin run build",
+  "just openapi-check",
+]
+evidence_refs = [
+  "backend/crates/api/src/file_attachment.rs",
+  "backend/crates/api/src/pdf_document.rs",
+  "backend/crates/api/src/print_orchestration/render_worker.rs",
+  "backend/crates/api/src/print_orchestration/category_pdf.rs",
+  "backend/crates/api/tests/h9_print_suite_postgres/category_pdf.rs",
+  "backend/migrations/202607280001_h_file_h9_category_pdfs.sql",
+  "apps/web-admin/src/pages/print-orchestration/H9CategoryPdfPanel.tsx",
+  "apps/h9-render-worker/src/server.mjs",
+  "apps/h9-render-worker/test/render-worker.test.mjs",
+  "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdfs-ready.png",
+  "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdfs-selection.png",
+  "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdf-rendered-document.png",
+  "docs/infra/file-storage.md",
+  "docs/infra/h9-render-worker.md",
+  "docs/reviews/us-h9-009-acceptance-2026-07-28.md",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "verified"
+frontend = "verified"
+api = "verified"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 
 [[deferred_stories]]
 id = "US-H9-010"
