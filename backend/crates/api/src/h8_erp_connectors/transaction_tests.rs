@@ -302,23 +302,55 @@ async fn seed_testing_connector(pool: &PgPool, probe_ready: bool) -> (Uuid, Uuid
         .execute(pool)
         .await
         .unwrap();
+    let api_key_id = seed_receipt_api_key(pool, owner_id).await;
     sqlx::query(
         r#"INSERT INTO h8_erp_connectors (
                id, owner_id, connector_code, connector_name, directions, message_types,
-               channel_mode, api_base_url, bearer_secret_alias, status, config_version
+               channel_mode, api_base_url, api_key_id, bearer_secret_alias, status, config_version
            ) VALUES (
                $1,$2,'WRITE-ERP','Write ERP',ARRAY['outbound'],
-               ARRAY['putaway_complete'],'rest',$3,$4,'testing',1
+               ARRAY['putaway_complete'],'rest',$3,$4,$5,'testing',1
            )"#,
     )
     .bind(connector_id)
     .bind(owner_id)
     .bind(probe_ready.then_some("https://erp.example.com"))
+    .bind(probe_ready.then_some(api_key_id))
     .bind(probe_ready.then_some("vault://h8/write/token"))
     .execute(pool)
     .await
     .unwrap();
     (owner_id, connector_id)
+}
+
+async fn seed_receipt_api_key(pool: &PgPool, owner_id: Uuid) -> Uuid {
+    let user_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_users (id, username, display_name, password_hash) VALUES ($1,$2,$2,'test-hash')",
+    )
+    .bind(user_id)
+    .bind(format!("h8-receipt-user-{user_id}"))
+    .execute(pool)
+    .await
+    .unwrap();
+    let api_key_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO auth_api_keys (
+               id, owner_id, caller_name, purpose, scopes, responsible_user_id,
+               key_hash, status, expires_at
+           ) VALUES (
+               $1,$2,'H8 ERP receipt','connector transaction test',
+               ARRAY['outbound:receipt'],$3,$4,'active',now() + INTERVAL '30 days'
+           )"#,
+    )
+    .bind(api_key_id)
+    .bind(owner_id)
+    .bind(user_id)
+    .bind(format!("test-hash-{api_key_id}"))
+    .execute(pool)
+    .await
+    .unwrap();
+    api_key_id
 }
 
 fn json_request(
@@ -423,6 +455,7 @@ async fn create_audit_failure_rolls_back_connector_and_idempotency(pool: PgPool)
         .execute(&pool)
         .await
         .unwrap();
+    let api_key_id = seed_receipt_api_key(&pool, owner_id).await;
     reject_audit_action(&pool, "h8_connector_create").await;
     let request = json_request(
         owner_id,
@@ -437,6 +470,7 @@ async fn create_audit_failure_rolls_back_connector_and_idempotency(pool: PgPool)
             "message_types": ["putaway_complete"],
             "channel_mode": "rest",
             "api_base_url": "https://erp.example.com",
+            "api_key_id": api_key_id,
             "bearer_secret_alias": "vault://h8/atomic/token"
         }),
     );
