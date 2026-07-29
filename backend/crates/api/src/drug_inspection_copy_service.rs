@@ -270,12 +270,11 @@ impl DrugInspectionCopyService {
             r#"
             SELECT id
               FROM drug_inspection_customer_copy_jobs
-             WHERE attempt_count < 3
-               AND (
-                   status IN ('queued', 'failed')
-                   -- 进程崩溃遗留的 processing 任务按 10 分钟租约回收，避免永久卡死。
+             WHERE (
+                   (status IN ('queued', 'failed') AND attempt_count < 3)
+                   -- 崩溃不等于一次已记录失败；即使第三次 claim 崩溃，超时租约仍须可回收。
                    OR (status = 'processing' AND started_at < now() - interval '10 minutes')
-               )
+             )
              ORDER BY created_at
              FOR UPDATE SKIP LOCKED
              LIMIT 1
@@ -648,10 +647,8 @@ async fn claim_source(
            AND stamp_attachment.owner_id = stamp.owner_id
          WHERE job.id = $1
            AND ($2::UUID IS NULL OR job.owner_id = $2)
-           AND job.attempt_count < 3
            AND (
-               job.status IN ('queued', 'failed')
-               -- 与 claim_next 一致：超时 processing 可回收，否则租约查询选中后此处会 NotFound。
+               (job.status IN ('queued', 'failed') AND job.attempt_count < 3)
                OR (
                    job.status = 'processing'
                    AND job.started_at < now() - interval '10 minutes'
@@ -668,7 +665,10 @@ async fn claim_source(
     .ok_or(DrugInspectionCopyServiceError::NotFound)?;
     let now = Utc::now();
     sqlx::query(
-        "UPDATE drug_inspection_customer_copy_jobs SET status = 'processing', attempt_count = attempt_count + 1, started_at = $2, finished_at = NULL, last_error = NULL, updated_at = $2 WHERE id = $1",
+        "UPDATE drug_inspection_customer_copy_jobs
+            SET status = 'processing', attempt_count = LEAST(attempt_count + 1, 3),
+                started_at = $2, finished_at = NULL, last_error = NULL, updated_at = $2
+          WHERE id = $1",
     )
     .bind(job_id)
     .bind(now)

@@ -6,6 +6,9 @@ CREATE TABLE IF NOT EXISTS outbound_orders (
     wms_order_no      TEXT NOT NULL,
     erp_order_no      TEXT,
     customer_id       UUID NOT NULL,
+    delivery_address_id UUID NOT NULL,
+    delivery_address_snapshot JSONB NOT NULL
+        CHECK (jsonb_typeof(delivery_address_snapshot) = 'object'),
     warehouse_id      UUID NOT NULL,
     required_ship_at  TIMESTAMPTZ,
     status            TEXT NOT NULL,

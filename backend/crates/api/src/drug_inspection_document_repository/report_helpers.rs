@@ -81,7 +81,8 @@ pub(super) async fn validate_asn_batch(
     product_id: Uuid,
     batch_no: &str,
 ) -> Result<(), DrugInspectionDocumentRepositoryError> {
-    let value: Option<(i64, Option<bool>, Option<bool>, Option<bool>)> = sqlx::query_as(
+    type AsnBatchMatch = (i64, Option<bool>, Option<bool>, Option<bool>);
+    let value: Option<AsnBatchMatch> = sqlx::query_as(
         r#"
         SELECT COUNT(DISTINCT product_id),
                BOOL_OR(product_id = $3 AND batch_no = $4),

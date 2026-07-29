@@ -96,8 +96,7 @@ SET permission_name = EXCLUDED.permission_name;
 
 GRANT SELECT, INSERT, UPDATE ON drug_inspection_stamp_versions TO wms_app;
 GRANT SELECT, INSERT, UPDATE ON drug_inspection_customer_copy_jobs TO wms_app;
--- publish_processing_rule 发布后需要回写 reprocess_job_count，必须授 UPDATE。
-GRANT SELECT, INSERT, UPDATE ON drug_inspection_processing_rule_versions TO wms_app;
+GRANT SELECT, INSERT ON drug_inspection_processing_rule_versions TO wms_app;
 
 INSERT INTO admin_menu_draft_nodes (
     id, parent_id, level, code, path, title, view_id, icon_key,

@@ -77,6 +77,132 @@ async fn stamp_publish_requires_two_people_and_freezes_the_published_version(poo
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn stamp_version_rejects_png_outside_the_validated_upload_channel(pool: PgPool) {
+    let fixture = seed_fixture(&pool).await;
+    sqlx::query("UPDATE attachments SET module = 'H-FILE' WHERE id = $1")
+        .bind(fixture.stamp_attachment_id)
+        .execute(&pool)
+        .await
+        .expect("stamp fixture module should update");
+
+    let error = PgDrugInspectionStampRepository::new(pool)
+        .create_version(
+            &context(fixture.owner_id, fixture.uploader_id, &all_permissions()),
+            CreateDrugInspectionStampVersionRequest {
+                png_attachment_id: fixture.stamp_attachment_id,
+                relative_x: 0.7,
+                relative_y: 0.75,
+                relative_width: 0.2,
+            },
+            "stamp-invalid-upload-channel",
+        )
+        .await
+        .expect_err("stamp must come from the validated M-DI upload channel");
+    assert!(matches!(
+        error,
+        wms_api::drug_inspection_document_repository::DrugInspectionDocumentRepositoryError::Conflict(
+            "stamp_attachment_entity_mismatch"
+        )
+    ));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn publishing_first_stamp_requeues_copy_that_failed_without_a_stamp(pool: PgPool) {
+    let fixture = seed_fixture(&pool).await;
+    let uploader = context(fixture.owner_id, fixture.uploader_id, &all_permissions());
+    let reviewer = context(fixture.owner_id, fixture.reviewer_id, &all_permissions());
+    let reports = PgDrugInspectionDocumentRepository::new(pool.clone());
+    let draft = reports
+        .create_version(
+            &uploader,
+            CreateDrugInspectionVersionRequest {
+                asn_id: fixture.first_asn_id,
+                product_id: fixture.product_id,
+                batch_no: "BATCH-A".to_string(),
+                report_no: "REPORT-MISSING-STAMP".to_string(),
+                original_file_id: fixture.first_attachment_id,
+                source: "manual_upload".to_string(),
+                processing_mode: "none".to_string(),
+                qualified: true,
+            },
+            "missing-stamp-report-create",
+        )
+        .await
+        .expect("report should create");
+    reports
+        .submit_version(&uploader, draft.id, "missing-stamp-report-submit")
+        .await
+        .expect("report should submit");
+    let confirmed = reports
+        .review_version(
+            &reviewer,
+            draft.id,
+            ReviewDrugInspectionVersionRequest {
+                decision: "confirmed".to_string(),
+                comment: None,
+            },
+            "missing-stamp-report-confirm",
+        )
+        .await
+        .expect("report confirmation must not wait for stamp configuration");
+    assert_eq!(confirmed.stamp_version_id, None);
+
+    let service = DrugInspectionCopyService::new(pool.clone(), std::env::temp_dir());
+    assert!(matches!(
+        service.process_next().await,
+        Err(DrugInspectionCopyServiceError::Conflict(
+            "published_stamp_missing"
+        ))
+    ));
+
+    let stamps = PgDrugInspectionStampRepository::new(pool.clone());
+    let stamp = stamps
+        .create_version(
+            &uploader,
+            CreateDrugInspectionStampVersionRequest {
+                png_attachment_id: fixture.stamp_attachment_id,
+                relative_x: 0.7,
+                relative_y: 0.75,
+                relative_width: 0.2,
+            },
+            "missing-stamp-create",
+        )
+        .await
+        .expect("stamp should create");
+    stamps
+        .submit_version(&uploader, stamp.id, "missing-stamp-submit")
+        .await
+        .expect("stamp should submit");
+    stamps
+        .review_version(
+            &reviewer,
+            stamp.id,
+            ReviewDrugInspectionStampVersionRequest {
+                decision: "published".to_string(),
+                comment: None,
+            },
+            "missing-stamp-publish",
+        )
+        .await
+        .expect("stamp should publish");
+
+    let state: (Option<Uuid>, String, i32, Option<String>) = sqlx::query_as(
+        "SELECT version.stamp_version_id, job.status, job.attempt_count, job.last_error
+           FROM drug_inspection_report_versions AS version
+           JOIN drug_inspection_customer_copy_jobs AS job
+             ON job.report_version_id = version.id
+            AND job.owner_id = version.owner_id
+          WHERE version.owner_id = $1 AND version.id = $2",
+    )
+    .bind(fixture.owner_id)
+    .bind(draft.id)
+    .fetch_one(&pool)
+    .await
+    .expect("requeued copy state should query");
+    assert_eq!(state, (Some(stamp.id), "queued".to_string(), 0, None));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn confirmed_report_generates_a_real_stamped_customer_pdf(pool: PgPool) {
     let fixture = seed_fixture(&pool).await;
     let storage_root =
@@ -165,6 +291,18 @@ async fn confirmed_report_generates_a_real_stamped_customer_pdf(pool: PgPool) {
     assert_eq!(confirmed.stamp_version_id, Some(stamp.id));
     assert_eq!(confirmed.customer_copy_status, "queued");
 
+    sqlx::query(
+        "UPDATE drug_inspection_customer_copy_jobs
+            SET status = 'processing', attempt_count = 3,
+                started_at = now() - interval '11 minutes'
+          WHERE owner_id = $1 AND report_version_id = $2",
+    )
+    .bind(fixture.owner_id)
+    .bind(draft.id)
+    .execute(&pool)
+    .await
+    .expect("expired third claim should seed");
+
     let service = DrugInspectionCopyService::new(pool.clone(), storage_root.clone());
     let job = service
         .process_next()
@@ -172,6 +310,7 @@ async fn confirmed_report_generates_a_real_stamped_customer_pdf(pool: PgPool) {
         .expect("copy processing should succeed")
         .expect("copy job should exist");
     assert_eq!(job.status, "succeeded");
+    assert_eq!(job.attempt_count, 3);
     let (status, file_id): (String, Option<Uuid>) = sqlx::query_as(
         "SELECT customer_copy_status, customer_copy_file_id FROM drug_inspection_report_versions WHERE id = $1",
     )
@@ -227,6 +366,20 @@ async fn confirmed_report_generates_a_real_stamped_customer_pdf(pool: PgPool) {
         .await
         .expect("processing rule should publish");
     assert_eq!(rule.reprocess_job_count, 1);
+    let app_can_update_rule_versions: bool = sqlx::query_scalar(
+        "SELECT has_table_privilege(
+            'wms_app',
+            'drug_inspection_processing_rule_versions',
+            'UPDATE'
+        )",
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("processing rule privileges should query");
+    assert!(
+        !app_can_update_rule_versions,
+        "published processing rule versions must stay insert-only"
+    );
     let replayed = stamps
         .publish_processing_rule(
             &uploader,

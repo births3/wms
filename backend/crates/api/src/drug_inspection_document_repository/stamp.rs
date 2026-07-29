@@ -46,8 +46,9 @@ impl PgDrugInspectionStampRepository {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
         }
-        let attachment: Option<(bool, bool)> = sqlx::query_as(
-            "SELECT content_type = 'image/png', entity_type = 'drug_inspection_stamp'
+        let attachment: Option<(bool, bool, bool)> = sqlx::query_as(
+            "SELECT content_type = 'image/png', module = 'M-DI',
+                    entity_type = 'drug_inspection_stamp'
              FROM attachments WHERE owner_id = $1 AND id = $2",
         )
         .bind(ctx.owner_id)
@@ -56,14 +57,14 @@ impl PgDrugInspectionStampRepository {
         .await
         .map_err(map_db_error)?;
         match attachment {
-            Some((true, true)) => {}
-            Some((false, _)) | None => {
+            Some((true, true, true)) => {}
+            Some((false, _, _)) | None => {
                 return Err(DrugInspectionDocumentRepositoryError::Conflict(
                     "stamp_must_be_png",
                 ));
             }
             // 非图章上传通道的 PNG 未经透明度校验，配置成图章会让副本任务批量失败。
-            Some((true, false)) => {
+            Some((true, _, _)) => {
                 return Err(DrugInspectionDocumentRepositoryError::Conflict(
                     "stamp_attachment_entity_mismatch",
                 ));
@@ -223,16 +224,45 @@ impl PgDrugInspectionStampRepository {
             .execute(&mut *tx)
             .await
             .map_err(map_db_error)?;
+            // 确认时尚无图章的版本在首个图章发布后固定到该版本，失败副本才具备重试条件。
+            sqlx::query(
+                "UPDATE drug_inspection_report_versions AS version
+                    SET stamp_version_id = $2, updated_at = $3
+                  WHERE version.owner_id = $1
+                    AND version.stamp_version_id IS NULL
+                    AND EXISTS (
+                        SELECT 1
+                          FROM drug_inspection_customer_copy_jobs AS job
+                         WHERE job.owner_id = version.owner_id
+                           AND job.report_version_id = version.id
+                           AND job.status = 'failed'
+                           AND job.last_error LIKE '%published_stamp_missing%'
+                    )",
+            )
+            .bind(ctx.owner_id)
+            .bind(version_id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
             // 仅重排队因缺已发布图章失败的任务；其它失败原因（坏图、超限等）保持 failed，避免误重跑。
             sqlx::query(
-                "UPDATE drug_inspection_customer_copy_jobs
+                "UPDATE drug_inspection_customer_copy_jobs AS job
                     SET status = 'queued', attempt_count = 0, last_error = NULL, updated_at = $2
-                  WHERE owner_id = $1
-                    AND status = 'failed'
-                    AND last_error LIKE '%published_stamp_missing%'",
+                  WHERE job.owner_id = $1
+                    AND job.status = 'failed'
+                    AND job.last_error LIKE '%published_stamp_missing%'
+                    AND EXISTS (
+                        SELECT 1
+                          FROM drug_inspection_report_versions AS version
+                         WHERE version.owner_id = job.owner_id
+                           AND version.id = job.report_version_id
+                           AND version.stamp_version_id = $3
+                    )",
             )
             .bind(ctx.owner_id)
             .bind(now)
+            .bind(version_id)
             .execute(&mut *tx)
             .await
             .map_err(map_db_error)?;
@@ -340,23 +370,6 @@ impl PgDrugInspectionStampRepository {
         .map_err(map_db_error)?;
         let id = Uuid::new_v4();
         let rule_code = format!("mdi-image-v{version_number}");
-        sqlx::query(
-            "INSERT INTO drug_inspection_processing_rule_versions (
-                id, owner_id, version_number, rule_code, apply_scope,
-                reprocess_job_count, published_by, published_at
-             )
-             VALUES ($1, $2, $3, $4, $5, 0, $6, $7)",
-        )
-        .bind(id)
-        .bind(ctx.owner_id)
-        .bind(version_number)
-        .bind(&rule_code)
-        .bind(request.apply_scope.trim())
-        .bind(ctx.user_id)
-        .bind(now)
-        .execute(&mut *tx)
-        .await
-        .map_err(map_db_error)?;
         let reprocess_job_count = if request.apply_scope.trim() == "reprocess_current" {
             let affected = sqlx::query(
                 r#"
@@ -397,14 +410,21 @@ impl PgDrugInspectionStampRepository {
         };
         let value: DrugInspectionProcessingRuleVersion =
             sqlx::query_as::<_, ProcessingRuleVersionRow>(
-                "UPDATE drug_inspection_processing_rule_versions
-             SET reprocess_job_count = $3
-             WHERE owner_id = $1 AND id = $2
-             RETURNING *",
+                "INSERT INTO drug_inspection_processing_rule_versions (
+                    id, owner_id, version_number, rule_code, apply_scope,
+                    reprocess_job_count, published_by, published_at
+                 )
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 RETURNING *",
             )
-            .bind(ctx.owner_id)
             .bind(id)
+            .bind(ctx.owner_id)
+            .bind(version_number)
+            .bind(&rule_code)
+            .bind(request.apply_scope.trim())
             .bind(reprocess_job_count)
+            .bind(ctx.user_id)
+            .bind(now)
             .fetch_one(&mut *tx)
             .await
             .map(Into::into)
