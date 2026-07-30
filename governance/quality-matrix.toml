@@ -4399,6 +4399,7 @@ e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-cu
 e2e_screenshots = [
   { page = "customer-portal-login", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/login-desktop.png" },
   { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/address-scope.png" },
+  { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/order-grid-detail-columns.png" },
   { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/orders-mobile.png" },
   { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/order-batch-current.png" },
   { page = "customer-portal-orders", spec = "prototypes/e2e/customer-portal-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/customer-portal/processing-state.png" },
@@ -4463,6 +4464,7 @@ evidence_refs = [
   "apps/customer-portal/src/App.tsx",
   "apps/customer-portal/src/LoginPage.tsx",
   "apps/customer-portal/src/OrdersPage.tsx",
+  "apps/customer-portal/src/OrderGridColumns.tsx",
   "apps/customer-portal/src/ExportsPage.tsx",
   "apps/customer-portal/src/UsersPage.tsx",
   "apps/customer-portal/src/portal.css",
@@ -4470,6 +4472,7 @@ evidence_refs = [
   "prototypes/e2e/customer-portal-real.spec.ts",
   "artifacts/screenshot-portal/real-web/customer-portal/login-desktop.png",
   "artifacts/screenshot-portal/real-web/customer-portal/address-scope.png",
+  "artifacts/screenshot-portal/real-web/customer-portal/order-grid-detail-columns.png",
   "artifacts/screenshot-portal/real-web/customer-portal/orders-mobile.png",
   "artifacts/screenshot-portal/real-web/customer-portal/order-batch-current.png",
   "artifacts/screenshot-portal/real-web/customer-portal/processing-state.png",

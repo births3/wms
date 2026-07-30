@@ -55,23 +55,46 @@ pub async fn list_orders(
 ) -> Result<Json<Vec<OrderSummary>>, PortalError> {
     let keyword = query.keyword.map(|value| format!("%{}%", value.trim()));
     let rows = sqlx::query(
-        "SELECT
-             o.id, o.order_no, o.status, o.delivery_address_id, a.address_name,
+        "WITH line_rollup AS (
+             SELECT order_id,
+                    ARRAY_AGG(product_code ORDER BY id) AS product_codes,
+                    ARRAY_AGG(product_name ORDER BY id) AS product_names,
+                    ARRAY_AGG(batch_no ORDER BY id) AS batch_nos,
+                    ARRAY_AGG(quantity::double precision ORDER BY id) AS quantities,
+                    COUNT(*) AS line_count
+             FROM portal_order_lines
+             GROUP BY order_id
+         ),
+         report_rollup AS (
+             SELECT l.order_id,
+                    COUNT(DISTINCT r.id) FILTER (
+                        WHERE r.customer_copy_status = 'available'
+                    ) AS available_report_count,
+                    COUNT(DISTINCT l.id) FILTER (
+                        WHERE r.id IS NULL OR r.customer_copy_status <> 'available'
+                    ) AS pending_report_count
+             FROM portal_order_lines l
+             LEFT JOIN portal_report_versions r
+               ON r.product_id = l.product_id
+              AND r.batch_no = l.batch_no
+              AND r.is_current
+             GROUP BY l.order_id
+         )
+         SELECT
+             o.id, o.order_no, o.status,
+             c.customer_code, c.customer_name,
+             o.delivery_address_id, a.address_code,
+             o.address_snapshot->>'address_name' AS address_name,
+             lines.product_codes, lines.product_names, lines.batch_nos, lines.quantities,
              o.shipped_at, o.signed_at,
-             COUNT(DISTINCT l.id) AS line_count,
-             COUNT(DISTINCT r.id) FILTER (
-                 WHERE r.customer_copy_status = 'available'
-             ) AS available_report_count,
-             COUNT(DISTINCT l.id) FILTER (
-                 WHERE r.id IS NULL OR r.customer_copy_status <> 'available'
-             ) AS pending_report_count
+             lines.line_count,
+             reports.available_report_count,
+             reports.pending_report_count
          FROM portal_orders o
+         JOIN portal_customers c ON c.id = o.customer_id
          JOIN portal_customer_addresses a ON a.id = o.delivery_address_id
-         JOIN portal_order_lines l ON l.order_id = o.id
-         LEFT JOIN portal_report_versions r
-           ON r.product_id = l.product_id
-          AND r.batch_no = l.batch_no
-          AND r.is_current
+         JOIN line_rollup lines ON lines.order_id = o.id
+         JOIN report_rollup reports ON reports.order_id = o.id
          WHERE o.customer_id = $1
            AND o.status IN ('shipped', 'signed')
            AND (
@@ -86,11 +109,17 @@ pub async fn list_orders(
            AND (
                $6::text IS NULL
                OR o.order_no ILIKE $6
-               OR l.product_code ILIKE $6
-               OR l.product_name ILIKE $6
-               OR l.batch_no ILIKE $6
+               OR EXISTS (
+                   SELECT 1
+                   FROM portal_order_lines keyword_line
+                   WHERE keyword_line.order_id = o.id
+                     AND (
+                         keyword_line.product_code ILIKE $6
+                         OR keyword_line.product_name ILIKE $6
+                         OR keyword_line.batch_no ILIKE $6
+                     )
+               )
            )
-         GROUP BY o.id, a.address_name
          ORDER BY o.shipped_at DESC, o.order_no",
     )
     .bind(auth.customer_id)
@@ -262,8 +291,15 @@ fn order_summary_from_row(row: sqlx::postgres::PgRow) -> Result<OrderSummary, sq
         id: row.try_get("id")?,
         order_no: row.try_get("order_no")?,
         status: row.try_get("status")?,
+        customer_code: row.try_get("customer_code")?,
+        customer_name: row.try_get("customer_name")?,
         delivery_address_id: row.try_get("delivery_address_id")?,
+        address_code: row.try_get("address_code")?,
         address_name: row.try_get("address_name")?,
+        product_codes: row.try_get("product_codes")?,
+        product_names: row.try_get("product_names")?,
+        batch_nos: row.try_get("batch_nos")?,
+        quantities: row.try_get("quantities")?,
         shipped_at: row.try_get("shipped_at")?,
         signed_at: row.try_get("signed_at")?,
         line_count: row.try_get("line_count")?,

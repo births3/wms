@@ -558,14 +558,22 @@ components:
           type: string
         address_name:
           type: string
+          description: 订单冻结的送货地址名称，取自订单地址快照
     OrderSummary:
       type: object
       required:
         - id
         - order_no
         - status
+        - customer_code
+        - customer_name
         - delivery_address_id
+        - address_code
         - address_name
+        - product_codes
+        - product_names
+        - batch_nos
+        - quantities
         - shipped_at
         - line_count
         - available_report_count
@@ -579,11 +587,34 @@ components:
         status:
           type: string
           enum: [shipped, signed]
+        customer_code:
+          type: string
+        customer_name:
+          type: string
         delivery_address_id:
           type: string
           format: uuid
+        address_code:
+          type: string
         address_name:
           type: string
+        product_codes:
+          type: array
+          items:
+            type: string
+        product_names:
+          type: array
+          items:
+            type: string
+        batch_nos:
+          type: array
+          items:
+            type: string
+        quantities:
+          type: array
+          items:
+            type: number
+            format: double
         shipped_at:
           type: string
           format: date-time

@@ -89,7 +89,7 @@ fn order_payload(
         "order_no": order_no,
         "status": status,
         "delivery_address_id": address_id,
-        "address_snapshot": { "address": format!("{order_no} 收货地址") },
+        "address_snapshot": { "address_name": format!("{order_no} 收货地址") },
         "shipped_at": Utc::now() - Duration::hours(1),
         "signed_at": if status == "signed" { Some(Utc::now()) } else { None },
         "updated_at": Utc::now(),
@@ -313,14 +313,27 @@ async fn independent_projection_and_address_history_permissions_are_enforced(poo
             .await
             .expect("orders should respond");
         assert_eq!(response.status(), StatusCode::OK);
+        let orders = response_json(response).await;
         assert_eq!(
-            response_json(response)
-                .await
-                .as_array()
-                .expect("orders should be array")
-                .len(),
+            orders.as_array().expect("orders should be array").len(),
             expected
         );
+        if expected == 2 {
+            let order = orders
+                .as_array()
+                .expect("orders should be array")
+                .iter()
+                .find(|order| order["order_no"] == "SO-A")
+                .expect("SO-A should be listed");
+            assert_eq!(order["customer_code"], "C-REAL");
+            assert_eq!(order["customer_name"], "真实客户");
+            assert_eq!(order["address_code"], "A-001");
+            assert_eq!(order["address_name"], "SO-A 收货地址");
+            assert_eq!(order["product_codes"], json!(["P-001"]));
+            assert_eq!(order["product_names"], json!(["真实药品"]));
+            assert_eq!(order["batch_nos"], json!(["BATCH-001"]));
+            assert_eq!(order["quantities"], json!([12.0]));
+        }
     }
     let denied = app
         .clone()
@@ -344,8 +357,11 @@ async fn independent_projection_and_address_history_permissions_are_enforced(poo
         ))
         .await
         .expect("current order should respond");
+    let current_only = response_json(current_only).await;
+    assert_eq!(current_only["lines"][0]["product_code"], "P-001");
+    assert_eq!(current_only["lines"][0]["product_name"], "真实药品");
     assert_eq!(
-        response_json(current_only).await["lines"][0]["reports"]
+        current_only["lines"][0]["reports"]
             .as_array()
             .expect("current reports should be array")
             .len(),
@@ -652,6 +668,7 @@ async fn real_download_and_zip_are_scoped_deduplicated_and_expiring(pool: PgPool
         .read_to_string(&mut manifest)
         .expect("manifest should read");
     assert!(manifest.contains("SO-MISSING"));
+    assert!(manifest.contains("SO-ZIP-1 收货地址"));
     assert!(manifest.contains("资料暂缺"));
 
     sqlx::query(

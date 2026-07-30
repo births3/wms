@@ -25,8 +25,15 @@ export interface OrderSummary {
   id: string;
   order_no: string;
   status: "shipped" | "signed";
+  customer_code: string;
+  customer_name: string;
   delivery_address_id: string;
+  address_code: string;
   address_name: string;
+  product_codes: string[];
+  product_names: string[];
+  batch_nos: string[];
+  quantities: number[];
   shipped_at: string;
   signed_at: string | null;
   line_count: number;

@@ -138,13 +138,63 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
     await expect(page.getByRole("combobox", { name: "客户地址" }).locator("option")).toHaveCount(3);
     await page.getByRole("combobox", { name: "客户地址" }).selectOption(addressA);
     await expect(page.locator("tbody tr")).toHaveCount(3);
+    await page.setViewportSize({ width: 1920, height: 900 });
+    const orderGridScroller = page
+      .locator(".portal-table-shell table")
+      .locator("xpath=..");
+    expect(await orderGridScroller.evaluate((element) => element.clientWidth)).toBeGreaterThan(1400);
+    for (const heading of [
+      "订单号",
+      "客户编码",
+      "客户名称",
+      "地址编码",
+      "送货地址",
+      "商品编码",
+      "商品名称",
+      "批号",
+      "数量",
+      "状态",
+      "发货时间",
+      "签收时间",
+      "资料状态",
+      "操作",
+    ]) {
+      await expect(
+        page.getByRole("columnheader").filter({
+          has: page.getByText(heading, { exact: true }),
+        }),
+      ).toBeVisible();
+    }
+    const currentOrderRow = orderRow(page, `${runTag}-A-001`);
+    await expect(currentOrderRow).toContainText("PORTAL-E2E");
+    await expect(currentOrderRow).toContainText("E2E 连锁客户");
+    await expect(currentOrderRow).toContainText("A");
+    await expect(currentOrderRow).toContainText("上海浦东一店");
+    await expect(currentOrderRow).toContainText("P-BATCH-A");
+    await expect(currentOrderRow).toContainText("E2E 药品 BATCH-A");
+    await expect(currentOrderRow).toContainText("BATCH-A");
+    await expect(currentOrderRow).toContainText("10");
     await capture(page, "address-scope.png");
+    await orderGridScroller.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect(
+      page.getByRole("columnheader").filter({
+        has: page.getByText("资料状态", { exact: true }),
+      }),
+    ).toBeInViewport();
+    await orderGridScroller.screenshot({
+      path: path.join(evidenceDir, "order-grid-detail-columns.png"),
+    });
+    await orderGridScroller.evaluate((element) => {
+      element.scrollLeft = 0;
+    });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole("navigation", { name: "客户平台导航" })).toBeVisible();
     await capture(page, "orders-mobile.png");
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    await page.getByTestId(`portal-order-${runTag}-A-001`).getByRole("button", { name: "查看资料" }).click();
+    await currentOrderRow.getByRole("button", { name: "查看资料" }).click();
     await expect(page.getByTestId("portal-batch-BATCH-A")).toBeVisible();
     await expect(page.getByText(`${runTag}-REPORT-V2`)).toBeVisible();
     await expect(page.getByText(`${runTag}-REPORT-V1`)).toHaveCount(0);
@@ -170,7 +220,7 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
       `${runTag}-A-002`,
       `${runTag}-B-MISSING`,
     ]) {
-      await page.getByRole("checkbox", { name: `选择订单 ${orderNo}` }).check();
+      await orderRow(page, orderNo).getByRole("checkbox", { name: "选择此行" }).check();
     }
     const createExportResponse = page.waitForResponse(
       (response) =>
@@ -203,14 +253,14 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
   test("处理中、历史权限和无地址越权均由真实查询库控制", async ({ page }) => {
     await login(page, "portal-multi");
     await searchRun(page);
-    await page.getByTestId(`portal-order-${runTag}-B-PROCESSING`).getByRole("button", { name: "查看资料" }).click();
+    await orderRow(page, `${runTag}-B-PROCESSING`).getByRole("button", { name: "查看资料" }).click();
     await expect(page.getByText(`${runTag}-PROCESSING`)).toBeVisible();
     await expect(page.getByRole("button", { name: "处理中" })).toBeDisabled();
     await capture(page, "processing-state.png");
 
     await relogin(page, "portal-history");
     await searchRun(page);
-    await page.getByTestId(`portal-order-${runTag}-A-001`).getByRole("button", { name: "查看资料" }).click();
+    await orderRow(page, `${runTag}-A-001`).getByRole("button", { name: "查看资料" }).click();
     await expect(page.getByText(`${runTag}-REPORT-V1`)).toBeVisible();
     await expect(page.getByText("历史版本", { exact: true })).toBeVisible();
     await expect(page.getByText("更正原因：更正前版本")).toBeVisible();
@@ -262,7 +312,7 @@ test.describe.serial("独立客户药检单平台真实链路", () => {
 
     await page.getByRole("button", { name: "订单与药检单" }).click();
     await searchRun(page);
-    await page.getByRole("checkbox", { name: `选择订单 ${runTag}-A-OVERSIZE` }).check();
+    await orderRow(page, `${runTag}-A-OVERSIZE`).getByRole("checkbox", { name: "选择此行" }).check();
     await page.getByTestId("portal-create-export").click();
     await expect(page.getByRole("alert")).toContainText("不超过 2GB");
     await capture(page, "export-2gb-rejected.png");
@@ -313,6 +363,10 @@ async function searchRun(page: Page) {
   await page.getByLabel("订单关键词").fill(runTag);
   await page.getByRole("button", { name: "查询", exact: true }).click();
   await expect(page.getByText(new RegExp(`共 \\d+ 个订单`))).toBeVisible();
+}
+
+function orderRow(page: Page, orderNo: string) {
+  return page.getByRole("row").filter({ hasText: orderNo });
 }
 
 async function projectOrder(

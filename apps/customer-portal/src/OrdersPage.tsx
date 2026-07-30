@@ -7,7 +7,6 @@ import {
   Download,
   FileClock,
   FileText,
-  MapPin,
   Package,
   Search,
   X,
@@ -15,6 +14,7 @@ import {
 import {
   Button,
   Checkbox,
+  DataGrid,
   Input,
   StatusBadge,
 } from "@wms/ui";
@@ -26,7 +26,8 @@ import {
   listAddresses,
   listOrders,
 } from "./api";
-import type { LoginResponse, OrderSummary, ReportSummary } from "./types";
+import { buildOrderGridColumns, formatPortalTime } from "./OrderGridColumns";
+import type { LoginResponse, ReportSummary } from "./types";
 
 export function OrdersPage(props: {
   session: LoginResponse;
@@ -43,6 +44,7 @@ export function OrdersPage(props: {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [includeHistory, setIncludeHistory] = useState(false);
   const [message, setMessage] = useState("");
+  const columns = useMemo(() => buildOrderGridColumns(setDetailId), []);
 
   const addresses = useQuery({
     queryKey: ["portal-addresses", userId],
@@ -66,23 +68,11 @@ export function OrdersPage(props: {
     },
   });
 
-  const allVisibleSelected =
-    Boolean(orders.data?.length) &&
-    orders.data?.every((order) => selected.includes(order.id));
   const orderCount = orders.data?.length ?? 0;
   const availableCount =
     orders.data?.reduce((total, order) => total + order.available_report_count, 0) ?? 0;
   const pendingCount =
     orders.data?.reduce((total, order) => total + order.pending_report_count, 0) ?? 0;
-  const toggleAll = (checked: boolean) => {
-    const visibleIds = orders.data?.map((order) => order.id) ?? [];
-    setSelected((current) =>
-      checked
-        ? Array.from(new Set([...current, ...visibleIds]))
-        : current.filter((id) => !visibleIds.includes(id)),
-    );
-  };
-
   return (
     <div className="portal-page" data-testid="portal-orders-page">
       <section className="portal-page-header">
@@ -197,11 +187,6 @@ export function OrdersPage(props: {
       <section className="portal-table-shell">
         <div className="portal-table-toolbar">
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <Checkbox
-              checked={allVisibleSelected}
-              onCheckedChange={(value) => toggleAll(value === true)}
-              aria-label="选择当前结果全部订单"
-            />
             <span>
               共 {orders.data?.length ?? 0} 个订单，已选 {selected.length} 个
             </span>
@@ -234,39 +219,22 @@ export function OrdersPage(props: {
           <EmptyState text="正在读取独立查询库…" />
         ) : orders.error ? (
           <ErrorBanner error={orders.error} />
-        ) : orders.data?.length ? (
-          <div className="overflow-x-auto">
-            <table className="portal-table portal-responsive-table">
-              <thead>
-                <tr>
-                  <th className="w-12">选择</th>
-                  <th>订单号</th>
-                  <th>客户地址</th>
-                  <th>状态</th>
-                  <th>发货时间</th>
-                  <th>资料状态</th>
-                  <th className="w-24">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.data.map((order) => (
-                  <OrderRow
-                    key={order.id}
-                    order={order}
-                    checked={selected.includes(order.id)}
-                    onCheck={(checked) =>
-                      setSelected((current) =>
-                        checked
-                          ? [...current, order.id]
-                          : current.filter((id) => id !== order.id),
-                      )
-                    }
-                    onOpen={() => setDetailId(order.id)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+        ) : orders.data ? (
+          <DataGrid
+            storageKey="customer-portal.orders"
+            columns={columns}
+            data={orders.data}
+            rowKey={(order) => order.id}
+            selectable
+            selectedRowKeys={selected}
+            onSelectedRowKeysChange={setSelected}
+            defaultPageSize={20}
+            pageSizeOptions={[20, 50, 100]}
+            emptyTitle="当前账号和筛选范围内没有可查询订单"
+            tableClassName="min-w-[2240px]"
+            showPrintAction={false}
+            showExportAction={false}
+          />
         ) : (
           <EmptyState text="当前账号和筛选范围内没有可查询订单" />
         )}
@@ -302,59 +270,6 @@ function SummaryMetric(props: {
         </strong>
       </span>
     </article>
-  );
-}
-
-function OrderRow(props: {
-  order: OrderSummary;
-  checked: boolean;
-  onCheck: (checked: boolean) => void;
-  onOpen: () => void;
-}) {
-  const available = props.order.available_report_count;
-  const pending = props.order.pending_report_count;
-  return (
-    <tr data-testid={`portal-order-${props.order.order_no}`}>
-      <td data-mobile="select">
-        <Checkbox
-          checked={props.checked}
-          onCheckedChange={(value) => props.onCheck(value === true)}
-          aria-label={`选择订单 ${props.order.order_no}`}
-        />
-      </td>
-      <td data-label="订单号" className="font-medium text-slate-900">
-        {props.order.order_no}
-      </td>
-      <td data-label="客户地址">
-        <span className="flex items-center gap-1.5">
-          <MapPin className="size-4 text-slate-400" />
-          {props.order.address_name}
-        </span>
-      </td>
-      <td data-label="状态">
-        <StatusBadge
-          status={props.order.status === "signed" ? "completed" : "in_progress"}
-          size="sm"
-          label={props.order.status === "signed" ? "已签收" : "已发货"}
-        />
-      </td>
-      <td data-label="发货时间">{formatTime(props.order.shipped_at)}</td>
-      <td data-label="资料状态">
-        <div className="flex flex-wrap gap-2">
-          {available ? (
-            <span className="text-xs font-medium text-emerald-700">{available} 份可下载</span>
-          ) : null}
-          {pending ? (
-            <span className="text-xs font-medium text-amber-700">{pending} 项暂缺/处理中</span>
-          ) : null}
-        </div>
-      </td>
-      <td data-mobile="action">
-        <Button type="button" variant="outline" size="sm" onClick={props.onOpen}>
-          查看资料
-        </Button>
-      </td>
-    </tr>
   );
 }
 
@@ -527,7 +442,7 @@ function ReportRow(props: { report: ReportSummary; onDownload: () => void }) {
               )}
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              版本 V{report.version_number} · 确认于 {formatTime(report.confirmed_at)}
+              版本 V{report.version_number} · 确认于 {formatPortalTime(report.confirmed_at)}
             </div>
             {report.modification_reason ? (
               <div className="mt-1 text-xs text-slate-500">
@@ -565,14 +480,4 @@ function ErrorBanner(props: { error: unknown }) {
       {props.error instanceof Error ? props.error.message : "请求失败"}
     </div>
   );
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }

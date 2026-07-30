@@ -377,7 +377,8 @@ async fn fetch_manifest_rows(
     include_history: bool,
 ) -> Result<Vec<ManifestRow>, PortalError> {
     let rows = sqlx::query(
-        "SELECT o.order_no, a.address_name, l.product_code, l.product_name, l.batch_no,
+        "SELECT o.order_no, o.address_snapshot->>'address_name' AS address_name,
+                l.product_code, l.product_name, l.batch_no,
                 r.id AS report_version_id, r.version_number,
                 r.customer_copy_file_name AS file_name,
                 r.customer_copy_storage_key AS storage_key,
@@ -391,7 +392,6 @@ async fn fetch_manifest_rows(
                 END AS status
          FROM portal_export_job_orders jo
          JOIN portal_orders o ON o.id = jo.order_id
-         JOIN portal_customer_addresses a ON a.id = o.delivery_address_id
          JOIN portal_order_lines l ON l.order_id = o.id
          LEFT JOIN portal_report_versions r
            ON r.product_id = l.product_id
