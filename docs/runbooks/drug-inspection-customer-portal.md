@@ -77,6 +77,9 @@ PORTAL_DATABASE_URL='postgres://portal:***@127.0.0.1:5432/wms_customer_portal_e2
 pnpm --dir apps/customer-portal run test:e2e:real
 ```
 
+真实 E2E 配置会拒绝库名不以 `_e2e` 结尾的连接串，禁止复用开发查询库或 WMS
+业务库，以免边界数据、测试账号和导出任务污染开发数据。
+
 ## 监控与告警
 
 ### WMS H2 投影桥

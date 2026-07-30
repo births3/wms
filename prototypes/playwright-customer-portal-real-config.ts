@@ -13,6 +13,14 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ||
 
 if (!databaseURL) throw new Error("PORTAL_DATABASE_URL is required for customer portal real E2E");
 
+const databaseName = decodeURIComponent(new URL(databaseURL).pathname.replace(/^\/+/, ""));
+if (!databaseName.endsWith("_e2e")) {
+  throw new Error(
+    `customer portal real E2E refuses non-isolated database "${databaseName}"; ` +
+      "the database name must end with _e2e",
+  );
+}
+
 export default defineConfig({
   testDir: "./e2e",
   testMatch: /customer-portal-real\.spec\.ts/,
