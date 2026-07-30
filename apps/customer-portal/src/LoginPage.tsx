@@ -6,8 +6,12 @@ import { login } from "./api";
 import type { LoginResponse } from "./types";
 
 export function LoginPage(props: { onLogin: (session: LoginResponse) => void }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(
+    import.meta.env.DEV ? import.meta.env.VITE_PORTAL_DEV_USERNAME ?? "" : "",
+  );
+  const [password, setPassword] = useState(
+    import.meta.env.DEV ? import.meta.env.VITE_PORTAL_DEV_PASSWORD ?? "" : "",
+  );
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
