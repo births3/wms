@@ -81,3 +81,46 @@ def test_table_catalog_check_mode_detects_stale_output(tmp_path, capsys):
         "--check",
     ]) == 1
     assert "不是最新" in capsys.readouterr().err
+
+
+def test_table_catalog_tracks_create_without_if_alter_references_and_schema_events(tmp_path):
+    migrations = tmp_path / "backend" / "migrations"
+    migrations.mkdir(parents=True)
+    migrations.joinpath("202601010001_create.sql").write_text(
+        """
+        CREATE TABLE parent_orders (
+            id UUID PRIMARY KEY
+        );
+        CREATE TABLE child_events (
+            id UUID PRIMARY KEY,
+            parent_id UUID REFERENCES parent_orders(id)
+        );
+        """,
+        encoding="utf-8",
+    )
+    migrations.joinpath("202601010002_changes.sql").write_text(
+        """
+        ALTER TABLE child_events ADD COLUMN note TEXT;
+        ALTER TABLE child_events
+            ADD CONSTRAINT child_events_parent_fk FOREIGN KEY (parent_id)
+            REFERENCES parent_orders(id);
+        ALTER TABLE child_events RENAME TO child_event_log;
+        DROP TABLE legacy_events;
+        """,
+        encoding="utf-8",
+    )
+
+    tables = catalog.collect_catalog(tmp_path)
+    child = next(table for table in tables if table.name == "child_events")
+    events = catalog.collect_schema_events(tmp_path)
+    rendered = catalog.format_catalog(tables, events)
+
+    assert child.references == ["parent_orders"]
+    assert child.alter_migrations == ["backend/migrations/202601010002_changes.sql"]
+    assert {(event.kind, event.table, event.target) for event in events} == {
+        ("alter", "child_events", None),
+        ("rename", "child_events", "child_event_log"),
+        ("drop", "legacy_events", None),
+    }
+    assert "## Schema 变更事件" in rendered
+    assert "`child_event_log`" in rendered

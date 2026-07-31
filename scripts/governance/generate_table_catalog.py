@@ -6,15 +6,29 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 CREATE_TABLE_HEAD_RE = re.compile(
-    r"\bCREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+([a-z_][a-z0-9_]*)",
+    r"\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+([a-z_][a-z0-9_]*)",
     re.IGNORECASE,
 )
+ALTER_TABLE_RE = re.compile(
+    r"\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?([a-z_][a-z0-9_]*)",
+    re.IGNORECASE,
+)
+DROP_TABLE_RE = re.compile(
+    r"\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-z_][a-z0-9_]*)",
+    re.IGNORECASE,
+)
+RENAME_TABLE_RE = re.compile(
+    r"\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?"
+    r"([a-z_][a-z0-9_]*)\s+RENAME\s+TO\s+([a-z_][a-z0-9_]*)",
+    re.IGNORECASE,
+)
+REFERENCES_RE = re.compile(r"\bREFERENCES\s+([a-z_][a-z0-9_]*)", re.IGNORECASE)
 PARTITION_RE = re.compile(
     r"PARTITION\s+OF\s+([a-z_][a-z0-9_]*)",
     re.IGNORECASE,
@@ -48,6 +62,16 @@ class TableInfo:
     columns: list[ColumnInfo]
     indexes: list[str]
     partition_of: str | None = None
+    references: list[str] = field(default_factory=list)
+    alter_migrations: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class SchemaEvent:
+    kind: str
+    table: str
+    migration: str
+    target: str | None = None
 
 
 def module_name(path: Path) -> str:
@@ -143,7 +167,16 @@ def parse_tables(sql: str, migration_path: Path) -> list[TableInfo]:
 
         if cursor < len(sql) and sql[cursor] == "(":
             body, _ = read_parenthesized(sql, cursor)
-            tables.append(TableInfo(table_name, migration, module, parse_columns(body), []))
+            tables.append(
+                TableInfo(
+                    table_name,
+                    migration,
+                    module,
+                    parse_columns(body),
+                    [],
+                    references=sorted(set(REFERENCES_RE.findall(body.lower()))),
+                )
+            )
             continue
 
         partition = PARTITION_RE.match(sql, cursor)
@@ -159,6 +192,39 @@ def parse_tables(sql: str, migration_path: Path) -> list[TableInfo]:
     return tables
 
 
+def parse_schema_events(sql: str, migration_path: Path) -> list[SchemaEvent]:
+    migration = f"backend/migrations/{migration_path.name}"
+    events = [
+        SchemaEvent("alter", match.group(1).lower(), migration)
+        for match in ALTER_TABLE_RE.finditer(sql)
+    ]
+    events.extend(
+        SchemaEvent("drop", match.group(1).lower(), migration)
+        for match in DROP_TABLE_RE.finditer(sql)
+    )
+    events.extend(
+        SchemaEvent("rename", match.group(1).lower(), migration, match.group(2).lower())
+        for match in RENAME_TABLE_RE.finditer(sql)
+    )
+    return events
+
+
+def parse_alter_references(sql: str) -> dict[str, list[str]]:
+    references: dict[str, list[str]] = {}
+    statements = re.finditer(
+        r"\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?"
+        r"(?P<table>[a-z_][a-z0-9_]*)(?P<body>.*?);",
+        sql,
+        re.IGNORECASE | re.DOTALL,
+    )
+    for statement in statements:
+        table = statement.group("table").lower()
+        targets = {target.lower() for target in REFERENCES_RE.findall(statement.group("body"))}
+        if targets:
+            references.setdefault(table, []).extend(sorted(targets))
+    return references
+
+
 def parse_indexes(sql: str) -> dict[str, list[str]]:
     indexes: dict[str, list[str]] = {}
     for match in CREATE_INDEX_RE.finditer(sql):
@@ -172,14 +238,37 @@ def parse_indexes(sql: str) -> dict[str, list[str]]:
 def collect_catalog(repo_root: Path = REPO_ROOT) -> list[TableInfo]:
     migrations_dir = repo_root / "backend" / "migrations"
     tables: list[TableInfo] = []
+    alter_migrations: dict[str, set[str]] = {}
+    alter_references: dict[str, set[str]] = {}
     for path in sorted(migrations_dir.glob("*.sql")):
         sql = path.read_text(encoding="utf-8")
         parsed_tables = parse_tables(sql, path)
         parsed_indexes = parse_indexes(sql)
+        migration = f"backend/migrations/{path.name}"
+        for event in parse_schema_events(sql, path):
+            if event.kind == "alter":
+                alter_migrations.setdefault(event.table, set()).add(migration)
+        for table, references in parse_alter_references(sql).items():
+            alter_references.setdefault(table, set()).update(references)
         for table in parsed_tables:
             table.indexes = sorted(parsed_indexes.get(table.name, []))
         tables.extend(parsed_tables)
+    for table in tables:
+        table.references = sorted(set(table.references) | alter_references.get(table.name, set()))
+        table.alter_migrations = sorted(
+            migration
+            for migration in alter_migrations.get(table.name, set())
+            if migration != table.migration
+        )
     return tables
+
+
+def collect_schema_events(repo_root: Path = REPO_ROOT) -> list[SchemaEvent]:
+    migrations_dir = repo_root / "backend" / "migrations"
+    events: list[SchemaEvent] = []
+    for path in sorted(migrations_dir.glob("*.sql")):
+        events.extend(parse_schema_events(path.read_text(encoding="utf-8"), path))
+    return sorted(set(events), key=lambda event: (event.migration, event.table, event.kind, event.target or ""))
 
 
 def owner_scope(table: TableInfo) -> str:
@@ -194,7 +283,7 @@ def md(value: str) -> str:
     return value.replace("|", "\\|").replace("\n", " ")
 
 
-def format_catalog(tables: list[TableInfo]) -> str:
+def format_catalog(tables: list[TableInfo], schema_events: list[SchemaEvent] | None = None) -> str:
     index_count = sum(len(table.indexes) for table in tables)
     migrations = sorted({table.migration for table in tables})
     lines = [
@@ -213,13 +302,14 @@ def format_catalog(tables: list[TableInfo]) -> str:
         "",
         "## 表清单",
         "",
-        "| 表 | 模块 | 迁移 | 货主字段 | 字段数 | 索引数 |",
-        "|---|---|---|---|---:|---:|",
+        "| 表 | 模块 | 创建迁移 | 货主字段 | 字段数 | 索引数 | ALTER 迁移数 | 引用表数 |",
+        "|---|---|---|---|---:|---:|---:|---:|",
     ]
     for table in tables:
         lines.append(
             f"| `{table.name}` | {md(table.module)} | `{table.migration}` | "
-            f"{md(owner_scope(table))} | {len(table.columns)} | {len(table.indexes)} |"
+            f"{md(owner_scope(table))} | {len(table.columns)} | {len(table.indexes)} | "
+            f"{len(table.alter_migrations)} | {len(table.references)} |"
         )
 
     lines.extend(["", "## 字段明细", ""])
@@ -231,6 +321,8 @@ def format_catalog(tables: list[TableInfo]) -> str:
             f"- 迁移：`{table.migration}`",
             f"- 货主字段：{owner_scope(table)}",
             f"- 索引：{', '.join(f'`{index}`' for index in table.indexes) if table.indexes else '无'}",
+            f"- ALTER 迁移：{', '.join(f'`{migration}`' for migration in table.alter_migrations) if table.alter_migrations else '无'}",
+            f"- 引用表：{', '.join(f'`{reference}`' for reference in table.references) if table.references else '无'}",
             "",
         ])
         if table.partition_of:
@@ -241,6 +333,18 @@ def format_catalog(tables: list[TableInfo]) -> str:
         for column in table.columns:
             lines.append(f"| `{column.name}` | `{md(column.definition)}` |")
         lines.append("")
+    events = schema_events or []
+    lines.extend([
+        "## Schema 变更事件",
+        "",
+        "| 类型 | 表 | 目标 | 迁移 |",
+        "|---|---|---|---|",
+    ])
+    for event in events:
+        lines.append(
+            f"| {event.kind} | `{event.table}` | "
+            f"{f'`{event.target}`' if event.target else '—'} | `{event.migration}` |"
+        )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -265,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     tables = collect_catalog(args.repo_root)
-    content = format_catalog(tables)
+    content = format_catalog(tables, collect_schema_events(args.repo_root))
     output = resolved_output(args.repo_root, args.output)
     current = output.read_text(encoding="utf-8") if output.exists() else None
     ok = current == content
