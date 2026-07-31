@@ -77,10 +77,19 @@ impl PgPrintOrchestrationRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<CutoffPlan>, PrintOrchestrationError> {
         let request_hash = json_request_hash(&request)?;
+        let path = "/api/v1/print-orchestration/cutoff-plans";
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(plan) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(plan) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: plan,
@@ -133,7 +142,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            "/api/v1/print-orchestration/cutoff-plans",
+            path,
             "cutoff_plan",
             &plan,
             now,
@@ -155,10 +164,19 @@ impl PgPrintOrchestrationRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<CutoffPlan>, PrintOrchestrationError> {
         let request_hash = json_request_hash(&json!({ "plan_id": plan_id }))?;
+        let path = format!("/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(plan) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(plan) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: plan,
@@ -201,7 +219,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            &format!("/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish"),
+            &path,
             "cutoff_plan",
             &plan,
             now,

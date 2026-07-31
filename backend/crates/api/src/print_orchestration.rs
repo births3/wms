@@ -60,3 +60,15 @@ pub enum PrintOrchestrationError {
     Database(String),
     Serialize(String),
 }
+
+impl From<crate::idempotency::IdempotencyError> for PrintOrchestrationError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
+}

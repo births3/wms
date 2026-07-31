@@ -84,10 +84,19 @@ impl PgPrintOrchestrationRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<RouteBinding>, PrintOrchestrationError> {
         let request_hash = json_request_hash(&request)?;
+        let path = "/api/v1/print-orchestration/route-bindings";
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(binding) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(binding) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: binding,
@@ -157,7 +166,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            "/api/v1/print-orchestration/route-bindings",
+            path,
             "route_binding",
             &binding,
             now,

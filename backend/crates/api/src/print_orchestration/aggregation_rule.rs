@@ -93,7 +93,7 @@ impl PgPrintOrchestrationRepository {
         let data = rows
             .into_iter()
             .map(|row| {
-                Ok(AggregationFieldDefinition {
+                Ok::<_, PrintOrchestrationError>(AggregationFieldDefinition {
                     field_code: AggregationFieldCode::try_from(row.field_code.as_str())
                         .map_err(|_| PrintOrchestrationError::InvalidRequest)?,
                     display_name: row.display_name,
@@ -138,10 +138,19 @@ impl PgPrintOrchestrationRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<AggregationRuleVersion>, PrintOrchestrationError> {
         let request_hash = json_request_hash(&request)?;
+        let path = "/api/v1/print-orchestration/aggregation-rules/versions";
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(rule) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(rule) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: rule,
@@ -186,7 +195,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            "/api/v1/print-orchestration/aggregation-rules/versions",
+            path,
             "aggregation_rule_version",
             &rule,
             now,
@@ -212,10 +221,20 @@ impl PgPrintOrchestrationRepository {
             "version_id": version_id,
             "order_ids": request.order_ids,
         }))?;
+        let path =
+            format!("/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(result) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(result) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: result,
@@ -260,7 +279,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            &format!("/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test"),
+            &path,
             "aggregation_rule_test",
             &result,
             now,
@@ -323,10 +342,21 @@ impl PgPrintOrchestrationRepository {
             "version_id": version_id,
             "target_status": target_status,
         }))?;
+        let endpoint = format!(
+            "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/{target_status}"
+        );
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(rule) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(rule) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            &endpoint,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: rule,
@@ -389,9 +419,6 @@ impl PgPrintOrchestrationRepository {
             .map_err(map_db_error)?
         };
         let rule = AggregationRuleVersion::try_from(row)?;
-        let endpoint = format!(
-            "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/{target_status}"
-        );
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,

@@ -221,11 +221,27 @@ async fn manual_cutoff_freezes_one_boundary_numbers_audits_and_replays(pool: PgP
     assert_eq!(created.value.delivery_note_no, "SHTX-H9006-20260726-0001");
 
     let replay = service
-        .manual_cutoff(&auth, request, now, "h9-cutoff-006")
+        .manual_cutoff(&auth, request.clone(), now, "h9-cutoff-006")
         .await
         .expect("same cutoff request should replay");
     assert!(replay.replayed);
     assert_eq!(replay.value, created.value);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("h9-cutoff-006")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = service
+        .manual_cutoff(&auth, request, now, "h9-cutoff-006")
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(
+        metadata_conflict,
+        PrintOrchestrationError::IdempotencyConflict
+    );
 
     let group_orders: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM h9_delivery_note_group_orders WHERE owner_id = $1 AND group_id = $2",

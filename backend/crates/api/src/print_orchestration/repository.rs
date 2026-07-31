@@ -1,7 +1,6 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{DeliveryNoteGroup, ManualDeliveryNoteCutoffRequest};
@@ -9,6 +8,7 @@ use wms_domain::{DeliveryNoteGroup, ManualDeliveryNoteCutoffRequest};
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     document_numbering::{GenerateDocumentNumberRequest, PgDocumentNumberingService},
+    idempotency,
     operation_context::OperationContext as AuthContext,
 };
 
@@ -52,10 +52,19 @@ impl PgPrintOrchestrationRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<DeliveryNoteGroup>, PrintOrchestrationError> {
         let request_hash = json_request_hash(&request)?;
+        let path = "/api/v1/print-orchestration/delivery-note-groups/manual-cutoff";
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(group) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(group) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: group,
@@ -115,7 +124,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            "/api/v1/print-orchestration/delivery-note-groups/manual-cutoff",
+            path,
             "delivery_note_group",
             &group,
             now,
@@ -179,10 +188,19 @@ impl PgPrintOrchestrationRepository {
             "route_code": boundary.route_code,
             "scheduled_at": scheduled_at,
         }))?;
+        let path = "/internal/h9/run-scheduled-cutoffs";
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, &idempotency_key).await?;
-        if let Some(groups) =
-            replay_idempotency(&mut tx, ctx.owner_id, &idempotency_key, &request_hash, now).await?
+        if let Some(groups) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            &idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(groups);
         }
@@ -240,7 +258,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             &idempotency_key,
             &request_hash,
-            "/internal/h9/run-scheduled-cutoffs",
+            path,
             "delivery_note_groups",
             &groups,
             now,
@@ -469,13 +487,9 @@ pub(super) async fn lock_idempotency_key(
     owner_id: Uuid,
     idempotency_key: &str,
 ) -> Result<(), PrintOrchestrationError> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))")
-        .bind(owner_id.to_string())
-        .bind(idempotency_key)
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, "print-orchestration", owner_id, idempotency_key)
         .await
-        .map_err(map_db_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 pub(super) async fn replay_idempotency<T: DeserializeOwned>(
@@ -483,39 +497,21 @@ pub(super) async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     idempotency_key: &str,
     request_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, PrintOrchestrationError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        r#"
-        SELECT request_hash, response_body, expires_at
-          FROM idempotency_request
-         WHERE owner_id = $1 AND idempotency_key = $2
-         FOR UPDATE
-        "#,
+    idempotency::replay(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        now,
     )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    let Some((stored_hash, response_body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(PrintOrchestrationError::IdempotencyConflict);
-    }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| PrintOrchestrationError::Serialize(error.to_string()))
+    .map_err(Into::into)
 }
 
 pub(super) async fn store_idempotency_success<T: Serialize>(
@@ -535,43 +531,26 @@ pub(super) async fn store_idempotency_success<T: Serialize>(
         .and_then(Value::as_str)
         .unwrap_or("delivery_note_group")
         .to_string();
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id,
-            expires_at, created_at
-        )
-        VALUES (
-            $1, $2, $3, $4, 'POST', $5,
-            200, $6, $7, $8, $9, $10
-        )
-        "#,
+    idempotency::store_success(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        "POST",
+        path,
+        resource_type,
+        &resource_id,
+        response,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(path)
-    .bind(response_body)
-    .bind(resource_type)
-    .bind(resource_id)
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map(|_| ())
-    .map_err(map_db_error)
+    .map_err(Into::into)
 }
 
 pub(super) fn json_request_hash<T: Serialize>(
     value: &T,
 ) -> Result<String, PrintOrchestrationError> {
-    let bytes = serde_json::to_vec(value)
-        .map_err(|error| PrintOrchestrationError::Serialize(error.to_string()))?;
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    Ok(hex::encode(hasher.finalize()))
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 pub(super) fn map_db_error(error: sqlx::Error) -> PrintOrchestrationError {

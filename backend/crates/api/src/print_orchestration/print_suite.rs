@@ -198,10 +198,19 @@ impl PgPrintOrchestrationRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<PrintSuiteVersion>, PrintOrchestrationError> {
         let request_hash = json_request_hash(&request)?;
+        let path = "/api/v1/print-orchestration/print-suites/versions";
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(suite) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(suite) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: suite,
@@ -286,7 +295,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            "/api/v1/print-orchestration/print-suites/versions",
+            path,
             "print_suite_version",
             &suite,
             now,
@@ -312,10 +321,19 @@ impl PgPrintOrchestrationRepository {
             "version_id": version_id,
             "group_ids": request.group_ids,
         }))?;
+        let path = format!("/api/v1/print-orchestration/print-suites/versions/{version_id}/test");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(result) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(result) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: result,
@@ -385,7 +403,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            &format!("/api/v1/print-orchestration/print-suites/versions/{version_id}/test"),
+            &path,
             "print_suite_test",
             &result,
             now,
@@ -410,10 +428,20 @@ impl PgPrintOrchestrationRepository {
             "version_id": version_id,
             "target_status": "published",
         }))?;
+        let path =
+            format!("/api/v1/print-orchestration/print-suites/versions/{version_id}/publish");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(suite) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(suite) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: suite,
@@ -454,7 +482,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            &format!("/api/v1/print-orchestration/print-suites/versions/{version_id}/publish"),
+            &path,
             "print_suite_version",
             &suite,
             now,
@@ -479,10 +507,20 @@ impl PgPrintOrchestrationRepository {
             "version_id": version_id,
             "target_status": "disabled",
         }))?;
+        let path =
+            format!("/api/v1/print-orchestration/print-suites/versions/{version_id}/disable");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(suite) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(suite) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value: suite,
@@ -519,7 +557,7 @@ impl PgPrintOrchestrationRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
-            &format!("/api/v1/print-orchestration/print-suites/versions/{version_id}/disable"),
+            &path,
             "print_suite_version",
             &suite,
             now,
