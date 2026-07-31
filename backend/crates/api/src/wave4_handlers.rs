@@ -31,6 +31,7 @@ use crate::{
         PgWave4Repository, TemperatureExcursionDisposition, Wave4RepositoryError,
         APPROVAL_SOURCE_TEMPERATURE_EXCURSION,
     },
+    wave4_service::Wave4ShippingService,
 };
 
 const M4_READ_PERMISSION: &str = "m4.read";
@@ -38,6 +39,7 @@ const M4_READ_PERMISSION: &str = "m4.read";
 #[derive(Clone, Debug)]
 pub struct Wave4AppState {
     pub wave4_repository: Arc<PgWave4Repository>,
+    pub shipping_service: Arc<Wave4ShippingService<PgWave4Repository>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -49,8 +51,10 @@ struct ListOutboundOrdersQuery {
 
 impl Wave4AppState {
     pub fn with_postgres(pool: PgPool) -> Self {
+        let wave4_repository = Arc::new(PgWave4Repository::new(pool));
         Self {
-            wave4_repository: Arc::new(PgWave4Repository::new(pool)),
+            shipping_service: Arc::new(Wave4ShippingService::new(Arc::clone(&wave4_repository))),
+            wave4_repository,
         }
     }
 }

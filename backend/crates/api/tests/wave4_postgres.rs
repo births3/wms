@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::{NaiveDate, TimeZone, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -9,6 +11,7 @@ use wms_api::{
     wave4_repository::{
         PgWave4Repository, Wave4RepositoryError, APPROVAL_SOURCE_TEMPERATURE_EXCURSION,
     },
+    wave4_service::Wave4ShippingService,
 };
 use wms_domain::{
     CompletePickTaskRequest, CreateOutboundOrderLineRequest, CreateOutboundOrderRequest,
@@ -193,6 +196,7 @@ include!("wave4_postgres/document_numbering.rs");
 include!("wave4_postgres/temperature.rs");
 include!("wave4_postgres/wave_reads.rs");
 include!("wave4_postgres/review.rs");
+include!("wave4_postgres/rollback.rs");
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool: PgPool) {

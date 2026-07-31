@@ -6,6 +6,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     let second_reviewer_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
     let repo = PgWave4Repository::new(pool.clone());
+    let shipping_service = Wave4ShippingService::new(Arc::new(repo.clone()));
     let now = Utc
         .with_ymd_and_hms(2026, 6, 5, 8, 0, 0)
         .single()
@@ -539,14 +540,13 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         Wave4RepositoryError::InvalidSignatureAttachment
     ));
 
-    let shipped = repo
+    let shipped = shipping_service
         .ship_outbound_order(
             &reviewer_ctx,
             order.id,
             ship_request.clone(),
             now,
             "outbound-ship-1",
-            None,
         )
         .await
         .expect("replenished order can ship")
@@ -564,8 +564,8 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     assert!(shipment.cold_chain);
     assert_eq!(shipment.loading_temperature_celsius, Some(4.2));
     assert_eq!(shipment.handover_by, reviewer_ctx.user_id);
-    let ship_replay = repo
-        .ship_outbound_order(&ctx, order.id, ship_request, now, "outbound-ship-1", None)
+    let ship_replay = shipping_service
+        .ship_outbound_order(&ctx, order.id, ship_request, now, "outbound-ship-1")
         .await
         .expect("same-key outbound ship should replay");
     assert!(ship_replay.replayed);

@@ -117,17 +117,9 @@ async fn ship_outbound_order_handler(
     ctx.require_permission("m4.write")?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     let now = Utc::now();
-    let audit = AuditWriteRequest::from_auth_context(
-        &ctx,
-        "ship_outbound_order",
-        "M4",
-        "outbound_order",
-        id.to_string(),
-        None,
-    );
     let outcome = state
-        .wave4_repository
-        .ship_outbound_order(&ctx, id, req, now, &idempotency_key, Some(audit))
+        .shipping_service
+        .ship_outbound_order(&ctx, id, req, now, &idempotency_key)
         .await?;
     Ok(Json(outcome.value))
 }

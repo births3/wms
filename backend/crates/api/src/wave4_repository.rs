@@ -1,7 +1,7 @@
 //! Wave 4 repository helpers for cross-module business closures.
 // @governance: skip-page-size shared row types and transaction helpers serve five include! slices.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, future::Future, pin::Pin};
 
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde::{de::DeserializeOwned, Serialize};
@@ -55,6 +55,27 @@ pub struct TemperatureExcursionDisposition {
 pub struct IdempotentMutation<T> {
     pub value: T,
     pub replayed: bool,
+}
+
+pub type ShipOutboundOrderFuture<'a> = Pin<
+    Box<
+        dyn Future<Output = Result<IdempotentMutation<OutboundOrder>, Wave4RepositoryError>>
+            + Send
+            + 'a,
+    >,
+>;
+
+pub trait ShipOutboundOrderPort: Send + Sync {
+    /// Persists one complete shipment operation in the repository transaction boundary.
+    fn persist_ship_outbound_order<'a>(
+        &'a self,
+        ctx: &'a AuthContext,
+        order_id: Uuid,
+        req: ShipOutboundOrderRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &'a str,
+        audit: Option<AuditWriteRequest>,
+    ) -> ShipOutboundOrderFuture<'a>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -212,6 +233,28 @@ include!("wave4_repository_waves.rs");
 include!("wave4_repository_actions.rs");
 include!("wave4_repository_returns.rs");
 include!("wave4_repository_customer_portal.rs");
+
+impl ShipOutboundOrderPort for PgWave4Repository {
+    fn persist_ship_outbound_order<'a>(
+        &'a self,
+        ctx: &'a AuthContext,
+        order_id: Uuid,
+        req: ShipOutboundOrderRequest,
+        now: DateTime<Utc>,
+        idempotency_key: &'a str,
+        audit: Option<AuditWriteRequest>,
+    ) -> ShipOutboundOrderFuture<'a> {
+        Box::pin(PgWave4Repository::ship_outbound_order(
+            self,
+            ctx,
+            order_id,
+            req,
+            now,
+            idempotency_key,
+            audit,
+        ))
+    }
+}
 
 async fn lock_outbound_order(
     tx: &mut Transaction<'_, Postgres>,

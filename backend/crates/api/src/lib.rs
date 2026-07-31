@@ -111,6 +111,7 @@ pub mod wave3_handlers;
 pub mod wave3_repository;
 pub mod wave4_handlers;
 pub mod wave4_repository;
+pub mod wave4_service;
 pub mod wave5_handlers;
 pub mod wave5_repository;
 pub mod wechat_notify;
