@@ -66,6 +66,7 @@ TIER_SCRIPTS: dict[str, list[str]] = {
         "check_bounded_contexts.py",
         "check_multi_end_consistency.py",
         "check_observability.py",
+        "check_redis_usage_inventory.py",
         "check_m1_master_data_source_actions.py",
         "check_error_codes.py",
         "check_baseline_health.py",

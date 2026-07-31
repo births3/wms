@@ -297,6 +297,7 @@ G1 决策层（法规 / 合同 / 业务与合规确认 / ADR）
 | `check_owner_scope_sql.py` | 从 migration 识别含 `owner_id` 的租户表，静态扫描仓储层 SQL 的 owner 写入与过滤谓词 | L3/L5 | ✅ 已有（T1）|
 | `check_baseline_health.py` | baseline 数量单调下降 + 过期检测（防止滥用 baseline 抑制噪音）| 跨层 | ✅ 已有（T1，v0.4 加入）|
 | `check_governance_coverage.py` | 所有 `check_*` / `validate_*` 治理脚本，以及被 gate-rules.toml 用作 evidence gate 的 `report_*` 脚本，必须被运行器覆盖，并纳入 smoke 或记录明确豁免 | 跨层 | ✅ 已有（T1，元治理）|
+| `check_redis_usage_inventory.py` | Redis 运行时代码、依赖和部署引用必须进入 REDIS-01 事实清单 | L2 | ✅ 已有（T1，REDIS-01）|
 | `check_wave6_evidence_preflight.py` | Wave 6 evidence runbook / just 入口 / validator 链路完整性 | L4 | ✅ 已有（T1，Wave 6）|
 | `validate_governance_consistency.py` | governance.md 引用的 ADR/规范都存在且状态有效 | L2 | Wave 2（占位）|
 | `validate_domain_glossary.py` | L3 文档术语与代码命名一致 | L3 | Wave 3（占位）|
