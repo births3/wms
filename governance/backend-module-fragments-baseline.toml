@@ -1,0 +1,126 @@
+version = 1
+scope = "backend.no-new-numeric-include-fragment"
+
+[[fragments]]
+parent = "backend/crates/api/src/bin/wms_audit_baseline_load.rs"
+include = "wms_audit_baseline_load/wms_audit_baseline_load_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/bin/wms_audit_baseline_load.rs"
+include = "wms_audit_baseline_load/wms_audit_baseline_load_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/bin/wms_audit_baseline_load.rs"
+include = "wms_audit_baseline_load/wms_audit_baseline_load_part3.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/document_numbering_repository.rs"
+include = "document_numbering_repository_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/document_numbering_repository.rs"
+include = "document_numbering_repository_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/document_numbering_repository.rs"
+include = "document_numbering_repository_part3.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/express.rs"
+include = "express_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/express.rs"
+include = "express_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_handlers.rs"
+include = "master_data_handlers_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_postgres.rs"
+include = "master_data_postgres_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_postgres.rs"
+include = "master_data_postgres_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_postgres.rs"
+include = "master_data_postgres_part3.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_orchestration/print_suite.rs"
+include = "print_suite_support.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_template.rs"
+include = "print_template_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_template.rs"
+include = "print_template_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_template.rs"
+include = "print_template_part3.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_handlers.rs"
+include = "wave3_handlers_part3.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_handlers.rs"
+include = "wave3_handlers_part4.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_handlers.rs"
+include = "wave3_handlers_part4b.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_handlers.rs"
+include = "wave3_handlers_part5.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_handlers.rs"
+include = "wave3_handlers_part6.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_helpers.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_part1b.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_part2b.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_part3.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave5_repository.rs"
+include = "wave5_repository_part1.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave5_repository.rs"
+include = "wave5_repository_part2.rs"
