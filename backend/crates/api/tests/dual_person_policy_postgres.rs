@@ -239,7 +239,7 @@ async fn owner_rule_is_dual_confirmed_idempotent_audited_and_dictionary_synced(p
     let replay = repository
         .upsert(
             &write_ctx(owner_id, actor_id),
-            request,
+            request.clone(),
             Utc::now(),
             "mvr-matrix-owner-1",
         )
@@ -247,6 +247,27 @@ async fn owner_rule_is_dual_confirmed_idempotent_audited_and_dictionary_synced(p
         .expect("same request should replay");
     assert_eq!(first.value.id, replay.value.id);
     assert!(replay.replayed);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'POST', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("mvr-matrix-owner-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repository
+        .upsert(
+            &write_ctx(owner_id, actor_id),
+            request,
+            Utc::now(),
+            "mvr-matrix-owner-1",
+        )
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(
+        metadata_conflict,
+        DualPersonPolicyError::IdempotencyConflict
+    );
 
     let resolved = repository
         .resolve(

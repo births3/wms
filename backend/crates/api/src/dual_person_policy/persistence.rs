@@ -1,12 +1,16 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{DualPersonPolicy, DualPersonPolicyRule, UpsertDualPersonPolicyRuleRequest};
 
+use crate::idempotency;
+
 use super::{map_database_error, DualPersonPolicyError, PolicyRuleRow};
+
+const IDEMPOTENCY_METHOD: &str = "PUT";
+const IDEMPOTENCY_PATH: &str = "/api/v1/m-vr/dual-person-policy/rules";
 
 pub(super) fn row_to_domain(
     row: PolicyRuleRow,
@@ -148,21 +152,13 @@ pub(super) async fn lock_key(
     owner_id: Uuid,
     key: &str,
 ) -> Result<(), DualPersonPolicyError> {
-    let digest = Sha256::digest(format!("mvr-dual-person:{owner_id}:{key}").as_bytes());
-    let mut bytes = [0_u8; 8];
-    bytes.copy_from_slice(&digest[..8]);
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(i64::from_be_bytes(bytes))
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, "dual-person-policy", owner_id, key)
         .await
-        .map_err(map_database_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 pub(super) fn request_hash<T: Serialize>(value: &T) -> Result<String, DualPersonPolicyError> {
-    let bytes = serde_json::to_vec(value)
-        .map_err(|error| DualPersonPolicyError::Serialize(error.to_string()))?;
-    Ok(hex::encode(Sha256::digest(bytes)))
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 pub(super) fn json_value<T: Serialize>(value: &T) -> Result<Value, DualPersonPolicyError> {
@@ -176,32 +172,17 @@ pub(super) async fn replay_idempotency(
     request_hash: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<DualPersonPolicyRule>, DualPersonPolicyError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 FOR UPDATE",
+    idempotency::replay(
+        tx,
+        owner_id,
+        key,
+        request_hash,
+        IDEMPOTENCY_METHOD,
+        IDEMPOTENCY_PATH,
+        now,
     )
-    .bind(owner_id)
-    .bind(key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(map_database_error)?;
-    let Some((stored_hash, response, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_database_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(DualPersonPolicyError::IdempotencyConflict);
-    }
-    serde_json::from_value(response)
-        .map(Some)
-        .map_err(|error| DualPersonPolicyError::Serialize(error.to_string()))
+    .map_err(Into::into)
 }
 
 pub(super) async fn store_idempotency_success(
@@ -212,25 +193,18 @@ pub(super) async fn store_idempotency_success(
     value: &DualPersonPolicyRule,
     now: DateTime<Utc>,
 ) -> Result<(), DualPersonPolicyError> {
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id, expires_at, created_at
-        ) VALUES ($1,$2,$3,$4,'PUT','/api/v1/m-vr/dual-person-policy/rules',200,$5,
-                  'dual_person_policy_rule',$6,$7,$8)
-        "#,
+    idempotency::store_success(
+        tx,
+        owner_id,
+        key,
+        request_hash,
+        IDEMPOTENCY_METHOD,
+        IDEMPOTENCY_PATH,
+        "dual_person_policy_rule",
+        &value.id.to_string(),
+        value,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(key)
-    .bind(request_hash)
-    .bind(json_value(value)?)
-    .bind(value.id.to_string())
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_database_error)?;
-    Ok(())
+    .map_err(Into::into)
 }
