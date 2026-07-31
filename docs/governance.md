@@ -298,6 +298,7 @@ G1 决策层（法规 / 合同 / 业务与合规确认 / ADR）
 | `check_baseline_health.py` | baseline 数量单调下降 + 过期检测（防止滥用 baseline 抑制噪音）| 跨层 | ✅ 已有（T1，v0.4 加入）|
 | `check_governance_coverage.py` | 所有 `check_*` / `validate_*` 治理脚本，以及被 gate-rules.toml 用作 evidence gate 的 `report_*` 脚本，必须被运行器覆盖，并纳入 smoke 或记录明确豁免 | 跨层 | ✅ 已有（T1，元治理）|
 | `check_redis_usage_inventory.py` | Redis 运行时代码、依赖和部署引用必须进入 REDIS-01 事实清单 | L2 | ✅ 已有（T1，REDIS-01）|
+| `check_frontend_no_bare_fetch.py` | 生产 `apps/**/src` 统一通过共享 API 客户端访问 HTTP，禁止裸 `fetch(` 绕过契约 | L3 | ✅ 已有（T1，AR-07）|
 | `check_wave6_evidence_preflight.py` | Wave 6 evidence runbook / just 入口 / validator 链路完整性 | L4 | ✅ 已有（T1，Wave 6）|
 | `validate_governance_consistency.py` | governance.md 引用的 ADR/规范都存在且状态有效 | L2 | Wave 2（占位）|
 | `validate_domain_glossary.py` | L3 文档术语与代码命名一致 | L3 | Wave 3（占位）|
@@ -472,7 +473,8 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 | Wave 1 | `check_handler_test_coverage.py`（baseline 起步）| T2 | `backend/crates/api/src/**` |
 | Wave 1 | `check_field_coding_standards.py`（字段命名/类型/加密/审计）| T1 | `docs/compliance/gsp-field-traceability.md` + `docs/domain/user-stories-*.md` |
 | Wave 1 | `check_business_rules_registry.py`（业务规则字段引用）| T1 | `docs/compliance/gsp-business-rules-registry.md` + `docs/domain/user-stories-*.md` |
-| Wave 1 | `check_openapi_in_sync.py` / `validate_openapi_artifacts.py` / `check_openapi_contract.py` | T2 | `shared/openapi/openapi.json` + `backend/crates/api/**` + `backend/crates/domain/**` + `packages/api-client/src/schema.ts` |
+| Wave 1 | `check_openapi_in_sync.py` / `validate_openapi_artifacts.py` / `check_openapi_contract.py` | T2 | 主 WMS：`shared/openapi/openapi.json` + `backend/crates/api/**` + `backend/crates/domain/**` + `packages/api-client/src/schema.ts` |
+| Wave 1 | `check_openapi_in_sync.py` | T2 | 客户平台：`shared/openapi/customer-portal-openapi.yaml` + `apps/customer-portal/src/schema.ts` |
 | Wave 3 | `check_audit_trail_coverage.py` / `check_idempotency_test.py` | T3 | `backend/crates/api/src/**` |
 | Wave 3 | `check_cold_chain_data_freshness.py` | T3 | `backend/crates/domain/src/cold_chain/**` |
 | Wave 4-6 | `report_wave6_pre_release.py`（L7 / runtime evidence） | T4 | （CI 全量，非 diff 触发）|

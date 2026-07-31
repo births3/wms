@@ -2,13 +2,13 @@ import createClient from "openapi-fetch";
 
 import type { paths } from "./schema";
 
-export type ApiClient = ReturnType<typeof createClient<paths>>;
+export type ApiClient<Paths extends {} = paths> = ReturnType<typeof createClient<Paths>>;
 
-export function createApiClient(opts: {
+export function createApiClient<Paths extends {} = paths>(opts: {
   baseUrl: string;
   authToken?: () => string | null;
-}): ApiClient {
-  return createClient<paths>({
+}): ApiClient<Paths> {
+  return createClient<Paths>({
     baseUrl: opts.baseUrl,
     fetch: async (input: Request) => {
       const headers = new Headers(input.headers);

@@ -517,6 +517,13 @@ checks = ["check_secrets"]
 tier = "T1"
 
 [[rules]]
+match = "apps/**/src/**"
+checks = ["check_frontend_no_bare_fetch"]
+tier = "T1"
+rule_ids = ["GOV-FRONTEND-NO-BARE-FETCH"]
+source = "docs/adr/0043-direct-production-frontend-workflow.md"
+
+[[rules]]
 match = "apps/**"
 checks = ["check_page_size"]
 tier = "T1"
@@ -768,6 +775,16 @@ tier = "T2"
 [[rules]]
 match = "packages/api-client/src/schema.ts"
 checks = ["check_openapi_in_sync", "validate_openapi_artifacts", "check_openapi_contract"]
+tier = "T2"
+
+[[rules]]
+match = "shared/openapi/customer-portal-openapi.yaml"
+checks = ["check_openapi_in_sync"]
+tier = "T2"
+
+[[rules]]
+match = "apps/customer-portal/src/schema.ts"
+checks = ["check_openapi_in_sync"]
 tier = "T2"
 
 # Wave 3 启用：API 写路径的审计与幂等覆盖；脚本缺失时 strict 必须失败

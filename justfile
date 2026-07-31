@@ -536,13 +536,14 @@ dev-api-worktree-verify path port="18081":
       echo "LAN URL: http://$lan_ip:$port/"
     fi
 
-# 生成主仓 OpenAPI JSON 并刷新 @wms/api-client 类型
+# 生成主仓与客户门户 OpenAPI 生成物
 openapi-sync:
     @cd backend && cargo run --quiet --bin openapi-export > ../shared/openapi/openapi.json
     @test -s shared/openapi/openapi.json
     @pnpm --filter @wms/api-client gen:schema
+    @pnpm --dir apps/customer-portal run gen:schema
 
-# 检查主仓 OpenAPI JSON 与后端 utoipa 定义同步
+# 检查主仓及客户门户 OpenAPI 生成物同步
 openapi-check:
     @python3 scripts/governance/check_openapi_in_sync.py --strict
 

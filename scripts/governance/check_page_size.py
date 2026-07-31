@@ -57,6 +57,7 @@ SOURCE_DIRS = (
 SOURCE_SUFFIXES = (".rs", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py")
 GENERATED_FILES = {
     "packages/api-client/src/schema.ts",
+    "apps/customer-portal/src/schema.ts",
 }
 BASELINE_PATH = REPO_ROOT / "governance" / "source-size-baseline.toml"
 

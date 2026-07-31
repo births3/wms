@@ -1,5 +1,6 @@
-import { JsonApiError, requestJson } from "@wms/api-client";
+import { createApiClient, JsonApiError } from "@wms/api-client";
 
+import type { components, paths } from "./schema";
 import type {
   Address,
   DownloadUrl,
@@ -11,145 +12,118 @@ import type {
 } from "./types";
 
 const baseUrl = import.meta.env.VITE_PORTAL_API_BASE_URL ?? "";
+type PortalError = components["schemas"]["Error"];
 
 let onSessionExpired: (() => void) | null = null;
 
-/** 注册会话过期回调；仅带 token 的接口返回 401 时触发，登录接口自身的 401（密码错误）不受影响。 */
+/** 注册会话过期回调；登录接口自身的 401（密码错误）不触发回调。 */
 export function setSessionExpiredHandler(handler: (() => void) | null) {
   onSessionExpired = handler;
 }
 
-async function authorizedJson<T>(opts: {
-  path: string;
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  authToken: string;
-  body?: unknown;
-}): Promise<T> {
-  try {
-    return await requestJson<T>({ baseUrl, ...opts });
-  } catch (error) {
-    if (error instanceof JsonApiError && error.status === 401) {
-      onSessionExpired?.();
-      throw new JsonApiError("登录已过期，请重新登录", error.status, error.code);
-    }
-    throw error;
+function portalApi(authToken?: string) {
+  return createApiClient<paths>({
+    baseUrl,
+    authToken: () => authToken ?? null,
+  });
+}
+
+function readData<T>(
+  result: { data?: T; error?: PortalError; response: Response },
+  fallback: string,
+  authenticated = false,
+): T {
+  if (result.data !== undefined) return result.data;
+  if (authenticated && result.response.status === 401) {
+    onSessionExpired?.();
+    throw new JsonApiError("登录已过期，请重新登录", result.response.status, result.error?.code);
   }
+  throw new JsonApiError(result.error?.message ?? fallback, result.response.status, result.error?.code);
 }
 
 export function login(username: string, password: string) {
-  return requestJson<LoginResponse>({
-    baseUrl,
-    path: "/api/v1/auth/login",
-    method: "POST",
-    body: { username, password },
-  });
+  return portalApi().POST("/api/v1/auth/login", { body: { username, password } }).then((result) =>
+    readData<LoginResponse>(result, "登录失败"),
+  );
 }
 
 export function listAddresses(token: string) {
-  return authorizedJson<Address[]>({
-    path: "/api/v1/addresses",
-    authToken: token,
-  });
+  return portalApi(token).GET("/api/v1/addresses").then((result) =>
+    readData<Address[]>(result, "读取地址失败", true),
+  );
 }
 
 export function listOrders(
   token: string,
   query: { addressId?: string; status?: string; keyword?: string },
 ) {
-  const params = new URLSearchParams();
-  if (query.addressId) params.set("address_id", query.addressId);
-  if (query.status) params.set("status", query.status);
-  if (query.keyword) params.set("keyword", query.keyword);
-  return authorizedJson<OrderSummary[]>({
-    path: `/api/v1/orders?${params.toString()}`,
-    authToken: token,
-  });
+  const status = query.status === "shipped" || query.status === "signed" ? query.status : undefined;
+  return portalApi(token)
+    .GET("/api/v1/orders", {
+      params: {
+        query: {
+          address_id: query.addressId,
+          status,
+          keyword: query.keyword,
+        },
+      },
+    })
+    .then((result) => readData<OrderSummary[]>(result, "读取订单失败", true));
 }
 
 export function getOrder(token: string, orderId: string) {
-  return authorizedJson<OrderDetail>({
-    path: `/api/v1/orders/${orderId}`,
-    authToken: token,
-  });
+  return portalApi(token)
+    .GET("/api/v1/orders/{order_id}", { params: { path: { order_id: orderId } } })
+    .then((result) => readData<OrderDetail>(result, "读取订单详情失败", true));
 }
 
 export function authorizeReportDownload(token: string, reportId: string) {
-  return authorizedJson<DownloadUrl>({
-    path: `/api/v1/report-versions/${reportId}/download`,
-    method: "POST",
-    authToken: token,
-  });
+  return portalApi(token)
+    .POST("/api/v1/report-versions/{report_version_id}/download", {
+      params: { path: { report_version_id: reportId } },
+    })
+    .then((result) => readData<DownloadUrl>(result, "授权药检单下载失败", true));
 }
 
-export function createExport(
-  token: string,
-  orderIds: string[],
-  includeHistory: boolean,
-) {
-  return authorizedJson<ExportJob>({
-    path: "/api/v1/exports",
-    method: "POST",
-    authToken: token,
-    body: { order_ids: orderIds, include_history: includeHistory },
-  });
+export function createExport(token: string, orderIds: string[], includeHistory: boolean) {
+  return portalApi(token)
+    .POST("/api/v1/exports", { body: { order_ids: orderIds, include_history: includeHistory } })
+    .then((result) => readData<ExportJob>(result, "创建导出任务失败", true));
 }
 
 export function listExports(token: string) {
-  return authorizedJson<ExportJob[]>({
-    path: "/api/v1/exports",
-    authToken: token,
-  });
+  return portalApi(token).GET("/api/v1/exports").then((result) =>
+    readData<ExportJob[]>(result, "读取导出任务失败", true),
+  );
 }
 
 export function authorizeExportDownload(token: string, exportId: string) {
-  return authorizedJson<DownloadUrl>({
-    path: `/api/v1/exports/${exportId}/download`,
-    method: "POST",
-    authToken: token,
-  });
+  return portalApi(token)
+    .POST("/api/v1/exports/{export_id}/download", { params: { path: { export_id: exportId } } })
+    .then((result) => readData<DownloadUrl>(result, "授权导出下载失败", true));
 }
 
 export function listUsers(token: string) {
-  return authorizedJson<PortalUser[]>({
-    path: "/api/v1/users",
-    authToken: token,
-  });
+  return portalApi(token).GET("/api/v1/users").then((result) =>
+    readData<PortalUser[]>(result, "读取客户账号失败", true),
+  );
 }
 
 export function createUser(
   token: string,
-  request: {
-    username: string;
-    display_name: string;
-    password: string;
-    role: "customer_admin" | "customer_user";
-    can_view_report_history: boolean;
-    address_ids: string[];
-  },
+  request: components["schemas"]["CreateUserRequest"],
 ) {
-  return authorizedJson<PortalUser>({
-    path: "/api/v1/users",
-    method: "POST",
-    authToken: token,
-    body: request,
-  });
+  return portalApi(token).POST("/api/v1/users", { body: request }).then((result) =>
+    readData<PortalUser>(result, "创建客户账号失败", true),
+  );
 }
 
 export function updateUser(
   token: string,
   userId: string,
-  request: {
-    display_name: string;
-    role: "customer_admin" | "customer_user";
-    status: "active" | "disabled";
-    can_view_report_history: boolean;
-    address_ids: string[];
-  },
+  request: components["schemas"]["UpdateUserRequest"],
 ) {
-  return authorizedJson<PortalUser>({
-    path: `/api/v1/users/${userId}`,
-    method: "PUT",
-    authToken: token,
-    body: request,
-  });
+  return portalApi(token)
+    .PUT("/api/v1/users/{user_id}", { params: { path: { user_id: userId } }, body: request })
+    .then((result) => readData<PortalUser>(result, "更新客户账号失败", true));
 }

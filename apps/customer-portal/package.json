@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 9011 --strictPort",
-    "build": "tsc --noEmit && vite build",
+    "build": "pnpm run test:self-checks && tsc --noEmit && vite build",
+    "gen:schema": "pnpm --filter @wms/api-client exec openapi-typescript ../../shared/openapi/customer-portal-openapi.yaml --output ../../apps/customer-portal/src/schema.ts",
+    "test:self-checks": "node self-checks/api-client-self-check.mjs",
     "test:e2e:real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-customer-portal-real-config.ts"
   },
   "dependencies": {

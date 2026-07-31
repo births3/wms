@@ -61,6 +61,7 @@ GOVERNANCE_SCRIPTS = [
     "check_multi_end_consistency.py",
     "check_observability.py",
     "check_redis_usage_inventory.py",
+    "check_frontend_no_bare_fetch.py",
     "check_secrets.py",
     "check_integration_contract.py",
     "check_wave6_evidence_preflight.py",

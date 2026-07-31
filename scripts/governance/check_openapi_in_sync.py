@@ -17,7 +17,7 @@ Tier：T2（< 120s；含 cargo run 编译耗时）
 不覆盖：
   - 实际服务运行时的 OpenAPI 暴露（应由 axum router 同源生成）
 
-注：spike-003 已在 Wave 0.5 验证；Wave 1 W1.C 起本脚本只校验主仓路径。
+注：主 WMS 与客户门户均由各自契约生成物驱动；本脚本同时校验两条链路。
 """
 from __future__ import annotations
 
@@ -34,6 +34,8 @@ REPO_ROOT = _THIS.parent.parent.parent
 BACKEND_DIR = REPO_ROOT / "backend"
 SHARED_OPENAPI = REPO_ROOT / "shared" / "openapi" / "openapi.json"
 API_CLIENT_SCHEMA = REPO_ROOT / "packages" / "api-client" / "src" / "schema.ts"
+PORTAL_OPENAPI = REPO_ROOT / "shared" / "openapi" / "customer-portal-openapi.yaml"
+PORTAL_SCHEMA = REPO_ROOT / "apps" / "customer-portal" / "src" / "schema.ts"
 EXPORT_BIN = "openapi-export"
 CARGO_EXPORT_TIMEOUT_SECONDS = 90
 SCHEMA_EXPORT_TIMEOUT_SECONDS = 20
@@ -85,6 +87,20 @@ def main(argv: list[str] | None = None) -> int:
             _emit_json("missing_schema_ts", ok=False, schema_path=str(API_CLIENT_SCHEMA.relative_to(REPO_ROOT)))
         else:
             print(f"✘ {API_CLIENT_SCHEMA.relative_to(REPO_ROOT)} 不存在；请跑 just openapi-sync", file=sys.stderr)
+        return 1
+
+    if not PORTAL_OPENAPI.exists():
+        if args.json:
+            _emit_json("missing_portal_openapi", ok=False, portal_openapi_path=str(PORTAL_OPENAPI.relative_to(REPO_ROOT)))
+        else:
+            print(f"✘ {PORTAL_OPENAPI.relative_to(REPO_ROOT)} 不存在；请检查客户门户契约", file=sys.stderr)
+        return 1
+
+    if not PORTAL_SCHEMA.exists():
+        if args.json:
+            _emit_json("missing_portal_schema", ok=False, portal_schema_path=str(PORTAL_SCHEMA.relative_to(REPO_ROOT)))
+        else:
+            print(f"✘ {PORTAL_SCHEMA.relative_to(REPO_ROOT)} 不存在；请跑 pnpm --dir apps/customer-portal run gen:schema", file=sys.stderr)
         return 1
 
     # 跑 cargo run --bin openapi-export
@@ -230,16 +246,85 @@ def main(argv: list[str] | None = None) -> int:
             print("    然后 git add 提交。", file=sys.stderr)
         return 1
 
+    with tempfile.TemporaryDirectory() as tmpdir:
+        generated_portal_schema = Path(tmpdir) / "customer-portal-schema.ts"
+        try:
+            portal_schema_result = subprocess.run(
+                [
+                    "pnpm",
+                    "--filter",
+                    "@wms/api-client",
+                    "exec",
+                    "openapi-typescript",
+                    "../../shared/openapi/customer-portal-openapi.yaml",
+                    "--output",
+                    str(generated_portal_schema),
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=SCHEMA_EXPORT_TIMEOUT_SECONDS,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            if args.json:
+                _emit_json("portal_schema_generator_unavailable", ok=not args.strict, error=str(e))
+            else:
+                print(f"⚠ 客户门户 openapi-typescript 不可用或超时：{e}", file=sys.stderr)
+            return 0 if not args.strict else 2
+
+        if portal_schema_result.returncode != 0:
+            if args.json:
+                _emit_json("portal_schema_export_failed", ok=False, stderr=portal_schema_result.stderr)
+            else:
+                print(f"✘ 客户门户 schema.ts 生成失败：\n{portal_schema_result.stderr}", file=sys.stderr)
+            return 1
+
+        generated_portal_schema_text = _read_text(generated_portal_schema)
+        committed_portal_schema_text = _read_text(PORTAL_SCHEMA)
+
+    if generated_portal_schema_text != committed_portal_schema_text:
+        import difflib
+
+        diff_lines = list(
+            difflib.unified_diff(
+                committed_portal_schema_text.splitlines(),
+                generated_portal_schema_text.splitlines(),
+                fromfile=f"committed: {PORTAL_SCHEMA.relative_to(REPO_ROOT)}",
+                tofile="generated: customer-portal-openapi-typescript",
+                lineterm="",
+                n=2,
+            )
+        )
+
+        if args.json:
+            _emit_json(
+                "portal_schema_out_of_sync",
+                ok=False,
+                portal_schema_path=str(PORTAL_SCHEMA.relative_to(REPO_ROOT)),
+                diff_preview="\n".join(diff_lines[:30]),
+            )
+        else:
+            print("✘ 客户门户 schema.ts 不同步！customer-portal-openapi.yaml 改了但生成物没重生。", file=sys.stderr)
+            print(f"  路径: {PORTAL_SCHEMA.relative_to(REPO_ROOT)}", file=sys.stderr)
+            print("\n  diff 前 30 行：", file=sys.stderr)
+            for line in diff_lines[:30]:
+                print(f"  {line}", file=sys.stderr)
+            print("\n  → 请跑：pnpm --dir apps/customer-portal run gen:schema", file=sys.stderr)
+        return 1
+
     if args.json:
         _emit_json(
             "ok",
             ok=True,
             openapi_path=str(SHARED_OPENAPI.relative_to(REPO_ROOT)),
             schema_path=str(API_CLIENT_SCHEMA.relative_to(REPO_ROOT)),
+            portal_openapi_path=str(PORTAL_OPENAPI.relative_to(REPO_ROOT)),
+            portal_schema_path=str(PORTAL_SCHEMA.relative_to(REPO_ROOT)),
         )
     else:
         print(f"✓ openapi 同步：{SHARED_OPENAPI.relative_to(REPO_ROOT)}")
         print(f"✓ api-client schema 同步：{API_CLIENT_SCHEMA.relative_to(REPO_ROOT)}")
+        print(f"✓ 客户门户契约同步：{PORTAL_OPENAPI.relative_to(REPO_ROOT)} → {PORTAL_SCHEMA.relative_to(REPO_ROOT)}")
     return 0
 
 
