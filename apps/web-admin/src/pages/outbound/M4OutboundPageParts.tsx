@@ -1,6 +1,6 @@
 import { Input, StatusBadge } from "@wms/ui";
 
-import type { OutboundOrder, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
+import type { OutboundOrder, PurchaseReturnOrder } from "./m4-outbound-page-model";
 
 export function OutboundPageErrors({
   messages,

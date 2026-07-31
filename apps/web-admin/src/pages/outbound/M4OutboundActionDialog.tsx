@@ -12,7 +12,7 @@ import {
 } from "@wms/ui";
 import { CheckCircle2, ClipboardCheck, Truck, XCircle } from "lucide-react";
 
-import type { OutboundOrder, OutboundWave, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
+import type { OutboundOrder, OutboundWave, PurchaseReturnOrder } from "./m4-outbound-page-model";
 import { ActionExtraFields, TextField } from "./M4OutboundPageParts";
 import {
   outboundCarrierTypeOptions,

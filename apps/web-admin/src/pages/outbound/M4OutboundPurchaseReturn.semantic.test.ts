@@ -1,4 +1,4 @@
-import type { PurchaseReturnOrder } from "./M4OutboundDetailDialog";
+import type { PurchaseReturnOrder } from "./m4-outbound-page-model";
 
 type AssertTrue<T extends true> = T;
 type AssertFalse<T extends false> = T;

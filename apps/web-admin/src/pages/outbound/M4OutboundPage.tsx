@@ -14,11 +14,6 @@ import {
 } from "@wms/ui";
 import {
   M4OutboundDetailDialog,
-  statusLabel,
-  type DetailTarget,
-  type OutboundOrder,
-  type OutboundWave,
-  type PurchaseReturnOrder,
 } from "./M4OutboundDetailDialog";
 import {
   M4OutboundActionDialog,
@@ -70,8 +65,13 @@ import {
   normalizeM4OutboundQueryValue,
   queryValueFromUnknown,
   pageMeta,
+  statusLabel,
   statusOptions,
+  type DetailTarget,
   type M4OutboundMode,
+  type OutboundOrder,
+  type OutboundWave,
+  type PurchaseReturnOrder,
 } from "./m4-outbound-page-model";
 import {
   outboundOrderColumns,

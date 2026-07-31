@@ -14,7 +14,7 @@ import type {
   OutboundOrder,
   OutboundWave,
   PurchaseReturnOrder,
-} from "./M4OutboundDetailDialog";
+} from "./m4-outbound-page-model";
 import {
   statusKey,
   statusLabel,

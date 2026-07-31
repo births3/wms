@@ -18,21 +18,14 @@ import {
   DialogTitle,
   StatusBadge,
 } from "@wms/ui";
-import type { components } from "@wms/api-client";
-
 import { formatDateTime } from "@/lib/format";
-import { statusLabel } from "./m4-outbound-page-model";
-
-export { statusLabel };
-
-export type OutboundOrder = components["schemas"]["OutboundOrder"];
-export type OutboundWave = components["schemas"]["OutboundWave"];
-export type PurchaseReturnOrder = components["schemas"]["PurchaseReturnOrder"];
-
-export type DetailTarget =
-  | { kind: "order"; value: OutboundOrder }
-  | { kind: "wave"; value: OutboundWave; orders: OutboundOrder[] }
-  | { kind: "return"; value: PurchaseReturnOrder };
+import {
+  statusLabel,
+  type DetailTarget,
+  type OutboundOrder,
+  type OutboundWave,
+  type PurchaseReturnOrder,
+} from "./m4-outbound-page-model";
 
 interface M4OutboundDetailDialogProps {
   target: DetailTarget | null;

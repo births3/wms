@@ -4,7 +4,7 @@ import type {
   OutboundOrder,
   OutboundWave,
   PurchaseReturnOrder,
-} from "./M4OutboundDetailDialog";
+} from "./m4-outbound-page-model";
 
 export const outboundOwnerId = "00000000-0000-0000-0000-000000000001";
 export const outboundWarehouseId = "00000000-0000-0000-0000-000000003001";

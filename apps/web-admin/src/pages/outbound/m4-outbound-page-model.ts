@@ -1,9 +1,18 @@
+import type { components } from "@wms/api-client";
 import type { QueryPanelValue, StatusKey } from "@wms/ui";
 
 import { queryString } from "@/lib/query-value";
-import type { OutboundOrder, OutboundWave, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
+
+export type OutboundOrder = components["schemas"]["OutboundOrder"];
+export type OutboundWave = components["schemas"]["OutboundWave"];
+export type PurchaseReturnOrder = components["schemas"]["PurchaseReturnOrder"];
 
 export type M4OutboundMode = "orders" | "waves" | "review" | "returns";
+
+export type DetailTarget =
+  | { kind: "order"; value: OutboundOrder }
+  | { kind: "wave"; value: OutboundWave; orders: OutboundOrder[] }
+  | { kind: "return"; value: PurchaseReturnOrder };
 
 export function pageMeta(mode: M4OutboundMode) {
   const map = {
