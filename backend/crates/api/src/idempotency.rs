@@ -203,3 +203,25 @@ pub(crate) async fn load_response(
     .await
     .map_err(IdempotencyError::Database)
 }
+
+pub(crate) async fn update_response<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    response: &T,
+) -> Result<(), IdempotencyError> {
+    let response_body = serde_json::to_value(response)
+        .map_err(|error| IdempotencyError::Serialize(error.to_string()))?;
+    sqlx::query(
+        "UPDATE idempotency_request SET response_body = $4 WHERE owner_id = $1 AND idempotency_key = $2 AND request_hash = $3",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .bind(request_hash)
+    .bind(response_body)
+    .execute(&mut **tx)
+    .await
+    .map_err(IdempotencyError::Database)?;
+    Ok(())
+}
