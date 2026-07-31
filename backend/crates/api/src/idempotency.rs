@@ -81,6 +81,42 @@ pub(crate) async fn replay<T: DeserializeOwned>(
         .map_err(|error| IdempotencyError::Serialize(error.to_string()))
 }
 
+/// 兼容尚未携带路由元数据的旧调用方；新写入路径应使用 [`replay`]。
+pub(crate) async fn replay_hash_only<T: DeserializeOwned>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<T>, IdempotencyError> {
+    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 FOR UPDATE",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(IdempotencyError::Database)?;
+    let Some((stored_hash, response_body, expires_at)) = row else {
+        return Ok(None);
+    };
+    if expires_at <= now {
+        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
+            .bind(owner_id)
+            .bind(key)
+            .execute(&mut **tx)
+            .await
+            .map_err(IdempotencyError::Database)?;
+        return Ok(None);
+    }
+    if stored_hash != request_hash {
+        return Err(IdempotencyError::Conflict);
+    }
+    serde_json::from_value(response_body)
+        .map(Some)
+        .map_err(|error| IdempotencyError::Serialize(error.to_string()))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn store_success<T: Serialize>(
     tx: &mut Transaction<'_, Postgres>,

@@ -1,8 +1,7 @@
 //! Wave 3 PostgreSQL repository, aligned with ADR-0034.
 
-use chrono::{DateTime, Duration, NaiveDate, Utc};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use chrono::{DateTime, NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -25,6 +24,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
+    idempotency,
     inventory::STATUS_QUALIFIED,
     operation_context::OperationContext as AuthContext,
 };
@@ -147,6 +147,18 @@ pub enum Wave3RepositoryError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<crate::idempotency::IdempotencyError> for Wave3RepositoryError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 #[derive(Clone, FromRow)]
