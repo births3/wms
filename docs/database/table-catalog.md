@@ -1,12 +1,12 @@
 # 数据库表目录
 
-> 本文件由 `python3 scripts/governance/generate_table_catalog.py` 从 `backend/migrations/*.sql` 生成；不要手工修改表清单。业务解释以用户故事、ADR 和迁移脚本为准。本文件随表数量自然超过普通文档行数阈值，行数门禁按生成物处理。
+> 本文件由 `python3 scripts/governance/generate_table_catalog.py` 从 `backend/migrations/*.sql` 生成；不要手工修改表清单。业务解释以用户故事、ADR 和迁移脚本为准。按日期动态创建的分区保留在 migration 函数中，不计入静态表清单。本文件随表数量自然超过普通文档行数阈值，行数门禁按生成物处理。
 
 ## 统计
 
 - 迁移文件：61
-- 数据表：194
-- 索引：170
+- 数据表：193
+- 索引：168
 
 ## 表清单
 
@@ -200,7 +200,6 @@
 | `h9_printer_test_prints` | h9_print_devices | `backend/migrations/202607270001_h9_print_devices.sql` | 无 | 9 | 1 | 0 | 2 |
 | `h9_print_suite_versions` | h9_print_suites | `backend/migrations/202607270002_h9_print_suites.sql` | 有 | 21 | 1 | 0 | 1 |
 | `h9_print_suite_items` | h9_print_suites | `backend/migrations/202607270002_h9_print_suites.sql` | 有 | 14 | 0 | 0 | 2 |
-| `h9_ingested_document_files` | h9_print_suites | `backend/migrations/202607270002_h9_print_suites.sql` | 有 | 11 | 2 | 0 | 0 |
 | `h9_print_suite_instances` | h9_print_suites | `backend/migrations/202607270002_h9_print_suites.sql` | 有 | 13 | 0 | 0 | 2 |
 | `h9_print_suite_instance_items` | h9_print_suites | `backend/migrations/202607270002_h9_print_suites.sql` | 有 | 17 | 0 | 0 | 2 |
 | `h9_document_file_bindings` | h_file_h9_category_pdfs | `backend/migrations/202607280001_h_file_h9_category_pdfs.sql` | 有 | 8 | 0 | 0 | 1 |
@@ -4625,29 +4624,6 @@
 | `template_version_id` | `template_version_id UUID` |
 | `external_file_ref` | `external_file_ref TEXT` |
 | `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
-
-### `h9_ingested_document_files`
-
-- 模块：h9_print_suites
-- 迁移：`backend/migrations/202607270002_h9_print_suites.sql`
-- 货主字段：有
-- 索引：`h9_ingested_document_files_batch_idx`, `h9_ingested_document_files_invoice_idx`
-- ALTER 迁移：无
-- 引用表：无
-
-| 字段 | SQL 定义 |
-|---|---|
-| `id` | `id UUID PRIMARY KEY` |
-| `owner_id` | `owner_id UUID NOT NULL` |
-| `category_code` | `category_code TEXT NOT NULL` |
-| `file_ref` | `file_ref TEXT NOT NULL` |
-| `file_version` | `file_version INT NOT NULL DEFAULT 1` |
-| `content_hash` | `content_hash TEXT NOT NULL` |
-| `status` | `status TEXT NOT NULL DEFAULT 'valid'` |
-| `invoice_no` | `invoice_no TEXT` |
-| `product_code` | `product_code TEXT` |
-| `batch_no` | `batch_no TEXT` |
-| `ingested_at` | `ingested_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
 
 ### `h9_print_suite_instances`
 

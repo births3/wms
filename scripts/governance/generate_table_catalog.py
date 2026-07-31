@@ -237,7 +237,7 @@ def parse_indexes(sql: str) -> dict[str, list[str]]:
 
 def collect_catalog(repo_root: Path = REPO_ROOT) -> list[TableInfo]:
     migrations_dir = repo_root / "backend" / "migrations"
-    tables: list[TableInfo] = []
+    tables_by_name: dict[str, TableInfo] = {}
     alter_migrations: dict[str, set[str]] = {}
     alter_references: dict[str, set[str]] = {}
     for path in sorted(migrations_dir.glob("*.sql")):
@@ -248,11 +248,14 @@ def collect_catalog(repo_root: Path = REPO_ROOT) -> list[TableInfo]:
         for event in parse_schema_events(sql, path):
             if event.kind == "alter":
                 alter_migrations.setdefault(event.table, set()).add(migration)
+            elif event.kind == "drop":
+                tables_by_name.pop(event.table, None)
         for table, references in parse_alter_references(sql).items():
             alter_references.setdefault(table, set()).update(references)
         for table in parsed_tables:
             table.indexes = sorted(parsed_indexes.get(table.name, []))
-        tables.extend(parsed_tables)
+            tables_by_name[table.name] = table
+    tables = list(tables_by_name.values())
     for table in tables:
         table.references = sorted(set(table.references) | alter_references.get(table.name, set()))
         table.alter_migrations = sorted(
@@ -292,6 +295,7 @@ def format_catalog(tables: list[TableInfo], schema_events: list[SchemaEvent] | N
         "> 本文件由 `python3 scripts/governance/generate_table_catalog.py` "
         "从 `backend/migrations/*.sql` 生成；不要手工修改表清单。"
         "业务解释以用户故事、ADR 和迁移脚本为准。"
+        "按日期动态创建的分区保留在 migration 函数中，不计入静态表清单。"
         "本文件随表数量自然超过普通文档行数阈值，行数门禁按生成物处理。",
         "",
         "## 统计",

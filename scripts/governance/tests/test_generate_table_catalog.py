@@ -95,6 +95,9 @@ def test_table_catalog_tracks_create_without_if_alter_references_and_schema_even
             id UUID PRIMARY KEY,
             parent_id UUID REFERENCES parent_orders(id)
         );
+        CREATE TABLE legacy_events (
+            id UUID PRIMARY KEY
+        );
         """,
         encoding="utf-8",
     )
@@ -117,6 +120,7 @@ def test_table_catalog_tracks_create_without_if_alter_references_and_schema_even
 
     assert child.references == ["parent_orders"]
     assert child.alter_migrations == ["backend/migrations/202601010002_changes.sql"]
+    assert [table.name for table in tables] == ["parent_orders", "child_events"]
     assert {(event.kind, event.table, event.target) for event in events} == {
         ("alter", "child_events", None),
         ("rename", "child_events", "child_event_log"),
