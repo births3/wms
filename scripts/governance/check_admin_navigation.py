@@ -152,19 +152,25 @@ def scan_view_contract(
         "renderer": renderer_views,
         "dev menu seed": set(dev_views),
     }
+    source_files = {
+        "menuSections": APP_TSX,
+        "defaultMenuTree": APP_TSX,
+        "renderer": ADMIN_VIEW_RENDERER_TSX,
+        "dev menu seed": ADMIN_MENU_DEV_MOCK_TS,
+    }
     issues: list[Issue] = []
     for source_name, actual in actual_sources.items():
         missing = sorted(expected - actual)
         extra = sorted(actual - expected)
         if missing:
-            issues.append(Issue(rel(APP_TSX), f"{source_name} 缺少 AdminView: {', '.join(missing)}"))
+            issues.append(Issue(rel(source_files[source_name]), f"{source_name} 缺少 AdminView: {', '.join(missing)}"))
         if extra:
-            issues.append(Issue(rel(APP_TSX), f"{source_name} 包含未登记 AdminView: {', '.join(extra)}"))
+            issues.append(Issue(rel(source_files[source_name]), f"{source_name} 包含未登记 AdminView: {', '.join(extra)}"))
 
     for source_name, values in (("menuSections", menu_views), ("defaultMenuTree", tree_views), ("dev menu seed", dev_views)):
         duplicates = sorted({value for value in values if values.count(value) > 1})
         if duplicates:
-            issues.append(Issue(rel(APP_TSX), f"{source_name} 重复登记 AdminView: {', '.join(duplicates)}"))
+            issues.append(Issue(rel(source_files[source_name]), f"{source_name} 重复登记 AdminView: {', '.join(duplicates)}"))
     return issues
 
 
@@ -217,6 +223,9 @@ def scan() -> list[Issue]:
     for path in (PAGE_TSX, QUERY_TS):
         if not path.exists():
             issues.append(Issue(rel(path), "缺少基础档案管理端页面或查询层文件"))
+    for path in (ADMIN_VIEW_TS, MASTER_DATA_TYPES_TS, ADMIN_MENU_DEV_MOCK_TS):
+        if not path.exists():
+            issues.append(Issue(rel(path), "缺少管理端 view、主数据类型或开发菜单种子文件"))
     issues.extend(
         scan_view_contract(
             text,

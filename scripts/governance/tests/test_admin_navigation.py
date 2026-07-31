@@ -53,4 +53,6 @@ def test_admin_navigation_view_contract_rejects_missing_renderer_view():
         check.ADMIN_MENU_DEV_MOCK_TS.read_text(encoding="utf-8"),
     )
 
-    assert any("renderer" in issue.message and "h5-express" in issue.message for issue in issues)
+    renderer_issues = [issue for issue in issues if "renderer" in issue.message and "h5-express" in issue.message]
+    assert renderer_issues
+    assert renderer_issues[0].file == "apps/web-admin/src/app-shell/AdminViewRenderer.tsx"
