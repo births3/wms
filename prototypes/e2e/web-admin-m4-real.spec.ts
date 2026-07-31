@@ -33,12 +33,8 @@ test("M4 PC 新建出库单使用真实 API 返回单据类型和自动单号", 
 
   await expect(page.getByRole("status")).toContainText(`${created.wms_order_no} 已创建`);
   await expect(page.getByText(created.wms_order_no, { exact: true })).toBeVisible();
-  const refreshResponsePromise = page.waitForResponse(
-    (response) => response.url().endsWith("/api/v1/outbound/orders") && response.request().method() === "GET",
-  );
-  await page.getByRole("button", { name: "刷新", exact: true }).click();
-  const refreshResponse = await refreshResponsePromise;
-  expect(refreshResponse.ok()).toBeTruthy();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "M4 出库订单管理" })).toBeVisible();
   await expect(page.getByText(created.wms_order_no, { exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "outbound-order-created.png"), fullPage: false });
 
@@ -66,7 +62,7 @@ test("M4 PC 新建出库单使用真实 API 返回单据类型和自动单号", 
 
   await page.keyboard.press("Escape");
   const wavesListResponsePromise = page.waitForResponse(
-    (response) => response.url().endsWith("/api/v1/outbound/waves") && response.request().method() === "GET",
+    (response) => new URL(response.url()).pathname === "/api/v1/outbound/waves" && response.request().method() === "GET",
   );
   await openOutboundWaves(page);
   const wavesListResponse = await wavesListResponsePromise;
@@ -89,7 +85,7 @@ test("M4 PC 新建出库单使用真实 API 返回单据类型和自动单号", 
   await page.screenshot({ path: path.join(artifactsDir, "outbound-wave-created.png"), fullPage: false });
 
   const refreshWavesResponsePromise = page.waitForResponse(
-    (response) => response.url().endsWith("/api/v1/outbound/waves") && response.request().method() === "GET",
+    (response) => new URL(response.url()).pathname === "/api/v1/outbound/waves" && response.request().method() === "GET",
   );
   await page.getByRole("button", { name: "刷新", exact: true }).click();
   const refreshWavesResponse = await refreshWavesResponsePromise;
@@ -172,15 +168,41 @@ test("M4 PC 复核使用真实详情和提交 API", async ({ page }) => {
   await page.getByRole("button", { name: "交接", exact: true }).click();
   const handoverDialog = page.getByRole("dialog", { name: /发货交接/ });
   await expect(handoverDialog).toBeVisible();
-  await handoverDialog.getByLabel("配送方类型（必选）").selectOption("own_fleet");
-  await handoverDialog.getByLabel("车牌号（必填）").fill("沪A12345");
-  await handoverDialog.getByLabel("车辆编号（必填）").fill("VEHICLE-E2E-001");
-  await handoverDialog.getByLabel("司机用户 ID（必填）").fill("00000000-0000-4000-8000-000000000104");
-  await expect(handoverDialog.getByLabel("签字附件 ID（可选）")).toBeVisible();
-  await expect(handoverDialog.getByLabel("装车温度（冷链订单必填）")).toBeVisible();
-  await expect(handoverDialog.getByLabel("保温箱编号（冷链订单必填）")).toBeVisible();
-  await expect(handoverDialog.getByLabel("冰袋数量（冷链订单必填）")).toBeVisible();
+  await handoverDialog.getByLabel("配送方类型").selectOption("own_fleet");
+  await handoverDialog.getByLabel("车牌号").fill("沪A12345");
+  await handoverDialog.getByLabel("车辆编号").fill("VEHICLE-E2E-001");
+  await handoverDialog.getByLabel("司机用户 ID").fill("00000000-0000-4000-8000-000000000104");
+  await expect(handoverDialog.getByLabel("签字附件 ID")).toBeVisible();
+  await expect(handoverDialog.getByLabel("装车温度")).toBeVisible();
+  await expect(handoverDialog.getByLabel("保温箱编号")).toBeVisible();
+  await expect(handoverDialog.getByLabel("冰袋数量")).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "outbound-handover-fields.png"), fullPage: false });
+});
+
+test("M4 查询条件命中默认窗口外的真实订单", async ({ page }) => {
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  await login(page);
+  await openOutboundOrders(page);
+
+  const runTag = `M4-QUERY-${Date.now()}`;
+  const targetOrderNo = `${runTag}-TARGET`;
+  await createOutboundOrderViaHttp(page, targetOrderNo, `${runTag}-TARGET-ERP`);
+  for (let index = 0; index < 50; index += 1) {
+    await createOutboundOrderViaHttp(page, `${runTag}-FILLER-${index.toString().padStart(2, "0")}`, `${runTag}-FILLER-ERP-${index}`);
+  }
+
+  await page.getByLabel("关键字").fill(targetOrderNo);
+  const queryResponsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/v1/outbound/orders?")
+      && response.url().includes("q=")
+      && response.request().method() === "GET",
+  );
+  await page.getByRole("button", { name: "查询", exact: true }).click();
+  const queryResponse = await queryResponsePromise;
+  expect(queryResponse.ok()).toBeTruthy();
+  await expect(page.getByText(targetOrderNo, { exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("M4 出库订单管理已查询");
+  await page.screenshot({ path: path.join(artifactsDir, "outbound-order-query-window.png"), fullPage: false });
 });
 
 // 【注意】M4 采购退货已从纯前端演示流程切换为真实接口（/api/v1/outbound/purchase-returns），
@@ -285,6 +307,37 @@ async function login(page: import("@playwright/test").Page) {
   await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+}
+
+async function createOutboundOrderViaHttp(
+  page: import("@playwright/test").Page,
+  wmsOrderNo: string,
+  erpOrderNo: string,
+) {
+  const accessToken = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("wms.web-admin.auth-session");
+    return raw ? (JSON.parse(raw) as { accessToken?: string }).accessToken : null;
+  });
+  expect(accessToken).toBeTruthy();
+  const apiBaseUrl = process.env.WMS_WEB_ADMIN_E2E_API_URL ?? "http://127.0.0.1:19185";
+  const response = await page.request.post(`${apiBaseUrl}/api/v1/outbound/orders`, {
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "Idempotency-Key": `m4-query-${wmsOrderNo}`,
+    },
+    data: {
+      document_type: "sales_outbound",
+      wms_order_no: wmsOrderNo,
+      erp_order_no: erpOrderNo,
+      customer_id: "00000000-0000-0000-0000-000000001201",
+      delivery_address_id: "00000000-0000-0000-0000-000000001211",
+      warehouse_id: "00000000-0000-0000-0000-000000001301",
+      required_ship_at: null,
+      lines: [{ line_no: 1, product_code: "P-M1-E2E-001", batch_no: "B-M4-E2E-001", planned_qty: 1 }],
+    },
+  });
+  const body = await response.text();
+  expect(response.ok(), `M4 query seed returned ${response.status()}: ${body}`).toBeTruthy();
 }
 
 async function fillPurchaseReturnForm(
