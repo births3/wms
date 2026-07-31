@@ -353,7 +353,7 @@ async fn owner_dictionary_item_overrides_global_and_disable_hides_it(pool: PgPoo
             &ctx,
             SYSTEM_DICTIONARY_DOCUMENT_TYPE,
             DOCUMENT_TYPE_PURCHASE_INBOUND,
-            request,
+            request.clone(),
             now,
             "system-dictionary-owner-override",
         )
@@ -362,6 +362,30 @@ async fn owner_dictionary_item_overrides_global_and_disable_hides_it(pool: PgPoo
     assert_eq!(created.value.id, replay.value.id);
     assert_eq!(created.value.source, "owner");
     assert!(replay.replayed);
+
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'POST', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("system-dictionary-owner-override")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repo
+        .upsert_item(
+            &ctx,
+            SYSTEM_DICTIONARY_DOCUMENT_TYPE,
+            DOCUMENT_TYPE_PURCHASE_INBOUND,
+            request,
+            now,
+            "system-dictionary-owner-override",
+        )
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(
+        metadata_conflict,
+        SystemDictionaryError::IdempotencyConflict
+    );
 
     let item_rows: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)::BIGINT FROM system_dictionary_items WHERE dict_code = $1 AND item_code = $2 AND owner_id = $3",

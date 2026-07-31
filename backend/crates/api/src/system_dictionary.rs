@@ -1,9 +1,8 @@
 //! US-M1-011 system dictionary first backend slice.
 
-use chrono::{DateTime, Duration, Utc};
-use serde::{de::DeserializeOwned, Serialize};
+use chrono::{DateTime, Utc};
+use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -17,7 +16,10 @@ use wms_domain::{
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
+    idempotency::{self, IdempotencyError},
 };
+
+const IDEMPOTENCY_NAMESPACE: &str = "system-dictionary";
 
 mod system_dictionary_rows;
 mod system_dictionary_validation;
@@ -48,6 +50,16 @@ pub enum SystemDictionaryError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<IdempotencyError> for SystemDictionaryError {
+    fn from(error: IdempotencyError) -> Self {
+        match error {
+            IdempotencyError::Conflict => Self::IdempotencyConflict,
+            IdempotencyError::Database(error) => Self::Database(error.to_string()),
+            IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 impl PgSystemDictionaryRepository {
@@ -184,15 +196,30 @@ impl PgSystemDictionaryRepository {
         }
         ensure_request_owner(ctx, req.owner_id)?;
 
-        let request_hash = request_hash(&serde_json::json!({
+        let request_hash = idempotency::request_hash(&serde_json::json!({
             "dict_code": dict_code,
             "item_code": item_code,
             "request": &req,
         }))?;
         let mut tx = self.begin().await?;
-        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        idempotency::lock_key(
+            &mut tx,
+            IDEMPOTENCY_NAMESPACE,
+            ctx.owner_id,
+            idempotency_key,
+        )
+        .await?;
+        let path = format!("/api/v1/system-dictionaries/{dict_code}/items/{item_code}");
+        if let Some(value) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PUT",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -282,7 +309,7 @@ impl PgSystemDictionaryRepository {
             idempotency_key,
             &request_hash,
             "PUT",
-            &format!("/api/v1/system-dictionaries/{dict_code}/items/{item_code}"),
+            &path,
             before.as_ref(),
             &item,
             "upsert_system_dictionary_item",
@@ -304,16 +331,31 @@ impl PgSystemDictionaryRepository {
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<SystemDictionaryItem>, SystemDictionaryError> {
-        let request_hash = request_hash(&serde_json::json!({
+        let request_hash = idempotency::request_hash(&serde_json::json!({
             "dict_code": dict_code,
             "item_code": item_code,
             "request": &req,
         }))?;
         ensure_request_owner(ctx, req.owner_id)?;
         let mut tx = self.begin().await?;
-        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        idempotency::lock_key(
+            &mut tx,
+            IDEMPOTENCY_NAMESPACE,
+            ctx.owner_id,
+            idempotency_key,
+        )
+        .await?;
+        let path = format!("/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable");
+        if let Some(value) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PATCH",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -359,7 +401,7 @@ impl PgSystemDictionaryRepository {
             idempotency_key,
             &request_hash,
             "PATCH",
-            &format!("/api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable"),
+            &path,
             before.as_ref(),
             &item,
             "disable_system_dictionary_item",
@@ -627,7 +669,7 @@ async fn finish_mutation<T: Serialize>(
         .and_then(Value::as_str)
         .unwrap_or("system_dictionary_item")
         .to_string();
-    store_idempotency_success(
+    idempotency::store_success(
         &mut tx,
         ctx.owner_id,
         idempotency_key,
@@ -635,7 +677,7 @@ async fn finish_mutation<T: Serialize>(
         method,
         path,
         "system_dictionary_item",
-        resource_id.clone(),
+        &resource_id,
         response,
         now,
     )
@@ -654,119 +696,6 @@ async fn finish_mutation<T: Serialize>(
         .map_err(|error| SystemDictionaryError::Audit(format!("{error:?}")))?;
     tx.commit().await.map_err(map_db_error)?;
     Ok(())
-}
-
-async fn replay_idempotency<T: DeserializeOwned>(
-    tx: &mut Transaction<'_, Postgres>,
-    owner_id: Uuid,
-    idempotency_key: &str,
-    request_hash: &str,
-    now: DateTime<Utc>,
-) -> Result<Option<T>, SystemDictionaryError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        r#"
-        SELECT request_hash, response_body, expires_at
-          FROM idempotency_request
-         WHERE owner_id = $1 AND idempotency_key = $2
-         FOR UPDATE
-        "#,
-    )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-    let Some((stored_hash, response_body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(SystemDictionaryError::IdempotencyConflict);
-    }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| SystemDictionaryError::Serialize(error.to_string()))
-}
-
-async fn lock_idempotency_key(
-    tx: &mut Transaction<'_, Postgres>,
-    owner_id: Uuid,
-    idempotency_key: &str,
-) -> Result<(), SystemDictionaryError> {
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(idempotency_lock_id(owner_id, idempotency_key))
-        .fetch_one(&mut **tx)
-        .await
-        .map_err(map_db_error)?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn store_idempotency_success<T: Serialize>(
-    tx: &mut Transaction<'_, Postgres>,
-    owner_id: Uuid,
-    idempotency_key: &str,
-    request_hash: &str,
-    method: &str,
-    path: &str,
-    resource_type: &str,
-    resource_id: String,
-    response: &T,
-    now: DateTime<Utc>,
-) -> Result<(), SystemDictionaryError> {
-    let response_body = serde_json::to_value(response)
-        .map_err(|error| SystemDictionaryError::Serialize(error.to_string()))?;
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id, expires_at, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, 200, $7, $8, $9, $10, $11)
-        "#,
-    )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(method)
-    .bind(path)
-    .bind(response_body)
-    .bind(resource_type)
-    .bind(resource_id)
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-    Ok(())
-}
-
-fn request_hash(value: &Value) -> Result<String, SystemDictionaryError> {
-    let text = serde_json::to_string(value)
-        .map_err(|error| SystemDictionaryError::Serialize(error.to_string()))?;
-    let mut hasher = Sha256::new();
-    hasher.update(text.as_bytes());
-    Ok(hex::encode(hasher.finalize()))
-}
-
-fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
-    let mut hasher = Sha256::new();
-    hasher.update(owner_id.as_bytes());
-    hasher.update([0]);
-    hasher.update(idempotency_key.as_bytes());
-    let digest = hasher.finalize();
-    let mut bytes = [0_u8; 8];
-    bytes.copy_from_slice(&digest[..8]);
-    i64::from_be_bytes(bytes)
 }
 
 fn map_db_error(error: sqlx::Error) -> SystemDictionaryError {
