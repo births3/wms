@@ -258,6 +258,19 @@ async fn task_main_chain_enforces_qualification_state_machine_and_idempotency(po
         .expect("same request should replay");
     assert_eq!(replay.value.id, first.value.id);
     assert!(replay.replayed);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PUT', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("mte-create-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repository
+        .create_task(&manager, request.clone(), now, "mte-create-1")
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(metadata_conflict, TaskEngineError::IdempotencyConflict);
     let mut aliased_source = request;
     aliased_source.source_task_key = "caller-supplied-alias".to_string();
     let source_replay = repository

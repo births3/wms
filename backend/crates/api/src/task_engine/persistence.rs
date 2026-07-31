@@ -430,34 +430,21 @@ async fn replay_idempotency<T: serde::de::DeserializeOwned>(
     owner_id: Uuid,
     idempotency_key: &str,
     request_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, TaskEngineError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 FOR UPDATE",
+    idempotency::replay(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        now,
     )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(map_database_error)?;
-    let Some((stored_hash, response, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_database_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(TaskEngineError::IdempotencyConflict);
-    }
-    serde_json::from_value(response)
-        .map(Some)
-        .map_err(|error| TaskEngineError::Serialize(error.to_string()))
+    .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -473,29 +460,21 @@ async fn store_idempotency_success<T: Serialize>(
     response: &T,
     now: DateTime<Utc>,
 ) -> Result<(), TaskEngineError> {
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id, expires_at, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, 200, $7, $8, $9, $10, $11)
-        "#,
+    let resource_id = resource_id.to_string();
+    idempotency::store_success(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        resource_type,
+        &resource_id,
+        response,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(method)
-    .bind(path)
-    .bind(json_value(response)?)
-    .bind(resource_type)
-    .bind(resource_id.to_string())
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_database_error)?;
-    Ok(())
+    .map_err(Into::into)
 }
 
 async fn lock_key(
@@ -504,15 +483,9 @@ async fn lock_key(
     owner_id: Uuid,
     key: &str,
 ) -> Result<(), TaskEngineError> {
-    let digest = Sha256::digest(format!("{namespace}:{owner_id}:{key}").as_bytes());
-    let mut bytes = [0_u8; 8];
-    bytes.copy_from_slice(&digest[..8]);
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(i64::from_be_bytes(bytes))
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, namespace, owner_id, key)
         .await
-        .map_err(map_database_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 fn normalize_code(value: &str) -> Result<String, TaskEngineError> {
@@ -544,9 +517,7 @@ fn normalized_optional_text(
 }
 
 fn request_hash(value: &Value) -> Result<String, TaskEngineError> {
-    let bytes =
-        serde_json::to_vec(value).map_err(|error| TaskEngineError::Serialize(error.to_string()))?;
-    Ok(hex::encode(Sha256::digest(bytes)))
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 fn json_value<T: Serialize>(value: &T) -> Result<Value, TaskEngineError> {

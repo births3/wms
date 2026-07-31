@@ -1,7 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -15,6 +14,7 @@ use wms_domain::{
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
+    idempotency::{self, IdempotencyError},
 };
 
 #[derive(Clone, Debug)]
@@ -55,6 +55,16 @@ pub enum TaskEngineError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<IdempotencyError> for TaskEngineError {
+    fn from(error: IdempotencyError) -> Self {
+        match error {
+            IdempotencyError::Conflict => Self::IdempotencyConflict,
+            IdempotencyError::Database(error) => Self::Database(format!("{error:?}")),
+            IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 #[derive(Clone, Debug, FromRow)]

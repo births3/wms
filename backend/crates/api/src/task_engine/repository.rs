@@ -114,6 +114,7 @@ impl PgTaskEngineRepository {
             "operation": "upsert_priority_rule",
             "request": request,
         }))?;
+        let path = "/api/v1/task-engine/priority-rule";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_key(&mut tx, "mte-idempotency", ctx.owner_id, idempotency_key).await?;
         if let Some(value) = replay_idempotency::<TaskPriorityRule>(
@@ -121,6 +122,8 @@ impl PgTaskEngineRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PUT",
+            path,
             now,
         )
         .await?
@@ -174,7 +177,7 @@ impl PgTaskEngineRepository {
             idempotency_key,
             &request_hash,
             "PUT",
-            "/api/v1/task-engine/priority-rule",
+            path,
             "task_priority_rule",
             value.id,
             &value,
@@ -203,6 +206,7 @@ impl PgTaskEngineRepository {
             "task_group_code": task_group_code,
             "request": request,
         }))?;
+        let path = format!("/api/v1/task-engine/task-groups/{task_group_code}");
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_key(&mut tx, "mte-idempotency", ctx.owner_id, idempotency_key).await?;
         if let Some(value) = replay_idempotency::<TaskGroup>(
@@ -210,6 +214,8 @@ impl PgTaskEngineRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PUT",
+            &path,
             now,
         )
         .await?
@@ -300,7 +306,7 @@ impl PgTaskEngineRepository {
             idempotency_key,
             &request_hash,
             "PUT",
-            &format!("/api/v1/task-engine/task-groups/{task_group_code}"),
+            &path,
             "task_group",
             value.id,
             &value,
@@ -326,6 +332,7 @@ impl PgTaskEngineRepository {
             "operation": "create_task",
             "request": request,
         }))?;
+        let path = "/api/v1/task-engine/tasks";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_key(&mut tx, "mte-idempotency", ctx.owner_id, idempotency_key).await?;
         if let Some(value) = replay_idempotency::<WarehouseTask>(
@@ -333,6 +340,8 @@ impl PgTaskEngineRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            path,
             now,
         )
         .await?
@@ -349,7 +358,7 @@ impl PgTaskEngineRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            "/api/v1/task-engine/tasks",
+            path,
             "warehouse_task",
             value.id,
             &value,
@@ -427,6 +436,7 @@ impl PgTaskEngineRepository {
             "task_id": task_id,
             "request": request,
         }))?;
+        let path = format!("/api/v1/task-engine/tasks/{task_id}/transitions");
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_key(&mut tx, "mte-idempotency", ctx.owner_id, idempotency_key).await?;
         if let Some(value) = replay_idempotency::<WarehouseTask>(
@@ -434,6 +444,8 @@ impl PgTaskEngineRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            &path,
             now,
         )
         .await?
@@ -454,7 +466,7 @@ impl PgTaskEngineRepository {
                 idempotency_key,
                 &request_hash,
                 "POST",
-                &format!("/api/v1/task-engine/tasks/{task_id}/transitions"),
+                &path,
                 "warehouse_task",
                 value.id,
                 &value,
@@ -546,7 +558,7 @@ impl PgTaskEngineRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            &format!("/api/v1/task-engine/tasks/{task_id}/transitions"),
+            &path,
             "warehouse_task",
             value.id,
             &value,
