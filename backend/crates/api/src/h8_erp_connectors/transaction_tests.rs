@@ -413,28 +413,15 @@ async fn reject_audit_action(pool: &PgPool, action: &str) {
 }
 
 async fn reject_idempotency_path(pool: &PgPool, path: &str) {
-    sqlx::query(
-        r#"
-        CREATE FUNCTION reject_h8_connector_idempotency() RETURNS trigger
-        LANGUAGE plpgsql AS $$
-        BEGIN
-            RAISE EXCEPTION 'forced H8 connector idempotency failure';
-        END;
-        $$;
-        "#,
-    )
-    .execute(pool)
-    .await
-    .unwrap();
-    sqlx::query(&format!(
-        "CREATE TRIGGER reject_h8_connector_idempotency \
-         BEFORE INSERT ON idempotency_request FOR EACH ROW \
-         WHEN (NEW.path = '{path}') \
-         EXECUTE FUNCTION reject_h8_connector_idempotency()"
-    ))
-    .execute(pool)
-    .await
-    .unwrap();
+    crate::idempotency::reject_insert_path_for_test(pool, path)
+        .await
+        .unwrap();
+}
+
+async fn count_idempotency(pool: &PgPool, owner_id: Uuid, key: &str) -> i64 {
+    crate::idempotency::count_for_test(pool, owner_id, key)
+        .await
+        .unwrap()
 }
 
 fn status_request(owner_id: Uuid, connector_id: Uuid, action: &str) -> Request<Body> {
@@ -481,19 +468,24 @@ async fn create_audit_failure_rolls_back_connector_and_idempotency(pool: PgPool)
         .unwrap();
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
-    let evidence: (i64, i64, i64) = sqlx::query_as(
+    let evidence: (i64, i64) = sqlx::query_as(
         r#"SELECT
                (SELECT COUNT(*) FROM h8_erp_connectors WHERE owner_id=$1),
                (SELECT COUNT(*) FROM audit_event
-                 WHERE owner_id=$1 AND action='h8_connector_create'),
-               (SELECT COUNT(*) FROM idempotency_request
-                 WHERE owner_id=$1 AND idempotency_key='atomic-create')"#,
+                 WHERE owner_id=$1 AND action='h8_connector_create')"#,
     )
     .bind(owner_id)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(evidence, (0, 0, 0));
+    assert_eq!(
+        (
+            evidence.0,
+            evidence.1,
+            count_idempotency(&pool, owner_id, "atomic-create").await
+        ),
+        (0, 0, 0)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -519,12 +511,10 @@ async fn update_idempotency_failure_rolls_back_connector_and_audit(pool: PgPool)
         .unwrap();
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
-    let evidence: (String, i64, i64) = sqlx::query_as(
+    let evidence: (String, i64) = sqlx::query_as(
         r#"SELECT c.connector_name,
                   (SELECT COUNT(*) FROM audit_event
-                    WHERE owner_id=$1 AND action='h8_connector_update'),
-                  (SELECT COUNT(*) FROM idempotency_request
-                    WHERE owner_id=$1 AND idempotency_key='atomic-update')
+                    WHERE owner_id=$1 AND action='h8_connector_update')
              FROM h8_erp_connectors c
             WHERE c.owner_id=$1 AND c.id=$2"#,
     )
@@ -533,7 +523,14 @@ async fn update_idempotency_failure_rolls_back_connector_and_audit(pool: PgPool)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(evidence, ("Write ERP".into(), 0, 0));
+    assert_eq!(
+        (
+            evidence.0,
+            evidence.1,
+            count_idempotency(&pool, owner_id, "atomic-update").await
+        ),
+        ("Write ERP".into(), 0, 0)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -553,12 +550,10 @@ async fn test_audit_failure_rolls_back_result_and_idempotency(pool: PgPool) {
         .unwrap();
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
-    let evidence: (Option<bool>, i64, i64) = sqlx::query_as(
+    let evidence: (Option<bool>, i64) = sqlx::query_as(
         r#"SELECT c.last_tested_succeeded,
                   (SELECT COUNT(*) FROM audit_event
-                    WHERE owner_id=$1 AND action='h8_connector_test'),
-                  (SELECT COUNT(*) FROM idempotency_request
-                    WHERE owner_id=$1 AND idempotency_key='atomic-test')
+                    WHERE owner_id=$1 AND action='h8_connector_test')
              FROM h8_erp_connectors c
             WHERE c.owner_id=$1 AND c.id=$2"#,
     )
@@ -567,7 +562,14 @@ async fn test_audit_failure_rolls_back_result_and_idempotency(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(evidence, (None, 0, 0));
+    assert_eq!(
+        (
+            evidence.0,
+            evidence.1,
+            count_idempotency(&pool, owner_id, "atomic-test").await
+        ),
+        (None, 0, 0)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -583,20 +585,25 @@ async fn delete_idempotency_failure_rolls_back_connector_and_audit(pool: PgPool)
         .unwrap();
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
-    let evidence: (i64, i64, i64) = sqlx::query_as(
+    let evidence: (i64, i64) = sqlx::query_as(
         r#"SELECT
                (SELECT COUNT(*) FROM h8_erp_connectors WHERE owner_id=$1 AND id=$2),
                (SELECT COUNT(*) FROM audit_event
-                 WHERE owner_id=$1 AND action='h8_connector_delete'),
-               (SELECT COUNT(*) FROM idempotency_request
-                 WHERE owner_id=$1 AND idempotency_key='atomic-delete')"#,
+                 WHERE owner_id=$1 AND action='h8_connector_delete')"#,
     )
     .bind(owner_id)
     .bind(connector_id)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(evidence, (1, 0, 0));
+    assert_eq!(
+        (
+            evidence.0,
+            evidence.1,
+            count_idempotency(&pool, owner_id, "atomic-delete").await
+        ),
+        (1, 0, 0)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -611,23 +618,28 @@ async fn status_idempotency_failure_rolls_back_connector_inflight_and_audit(pool
         .unwrap();
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
-    let evidence: (String, String, i64, i64) = sqlx::query_as(
+    let evidence: (String, String, i64) = sqlx::query_as(
         r#"SELECT c.status, f.status,
                   (SELECT COUNT(*) FROM audit_event
-                    WHERE owner_id=$1 AND action='h8_connector_disable'),
-                  (SELECT COUNT(*) FROM idempotency_request
-                    WHERE owner_id=$1 AND idempotency_key=$3)
+                    WHERE owner_id=$1 AND action='h8_connector_disable')
              FROM h8_erp_connectors c
              JOIN h8_erp_in_flight_messages f ON f.connector_id=c.id
             WHERE c.owner_id=$1 AND c.id=$2"#,
     )
     .bind(owner_id)
     .bind(connector_id)
-    .bind(format!("atomic-disable-{connector_id}"))
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(evidence, ("active".into(), "running".into(), 0, 0));
+    assert_eq!(
+        (
+            evidence.0,
+            evidence.1,
+            evidence.2,
+            count_idempotency(&pool, owner_id, &format!("atomic-disable-{connector_id}")).await
+        ),
+        ("active".into(), "running".into(), 0, 0)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -657,20 +669,25 @@ async fn delete_replay_returns_no_content_without_duplicate_audit(pool: PgPool) 
         }
     }
 
-    let evidence: (i64, i64, i64) = sqlx::query_as(
+    let evidence: (i64, i64) = sqlx::query_as(
         r#"SELECT
                (SELECT COUNT(*) FROM h8_erp_connectors WHERE owner_id=$1 AND id=$2),
                (SELECT COUNT(*) FROM audit_event
-                 WHERE owner_id=$1 AND action='h8_connector_delete'),
-               (SELECT COUNT(*) FROM idempotency_request
-                 WHERE owner_id=$1 AND idempotency_key='atomic-delete-replay')"#,
+                 WHERE owner_id=$1 AND action='h8_connector_delete')"#,
     )
     .bind(owner_id)
     .bind(connector_id)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(evidence, (0, 1, 1));
+    assert_eq!(
+        (
+            evidence.0,
+            evidence.1,
+            count_idempotency(&pool, owner_id, "atomic-delete-replay").await
+        ),
+        (0, 1, 1)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -703,20 +720,25 @@ async fn concurrent_delete_rechecks_idempotency_after_not_found(pool: PgPool) {
     assert_eq!(first.unwrap().status(), StatusCode::NO_CONTENT);
     assert_eq!(second.unwrap().status(), StatusCode::NO_CONTENT);
 
-    let evidence: (i64, i64, i64) = sqlx::query_as(
+    let evidence: (i64, i64) = sqlx::query_as(
         r#"SELECT
                (SELECT COUNT(*) FROM h8_erp_connectors WHERE owner_id=$1 AND id=$2),
                (SELECT COUNT(*) FROM audit_event
-                 WHERE owner_id=$1 AND action='h8_connector_delete'),
-               (SELECT COUNT(*) FROM idempotency_request
-                 WHERE owner_id=$1 AND idempotency_key='atomic-delete-concurrent')"#,
+                 WHERE owner_id=$1 AND action='h8_connector_delete')"#,
     )
     .bind(owner_id)
     .bind(connector_id)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(evidence, (0, 1, 1));
+    assert_eq!(
+        (
+            evidence.0,
+            evidence.1,
+            count_idempotency(&pool, owner_id, "atomic-delete-concurrent").await
+        ),
+        (0, 1, 1)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

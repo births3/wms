@@ -225,3 +225,46 @@ pub(crate) async fn update_response<T: Serialize>(
     .map_err(IdempotencyError::Database)?;
     Ok(())
 }
+
+#[cfg(test)]
+pub(crate) async fn count_for_test(
+    pool: &PgPool,
+    owner_id: Uuid,
+    key: &str,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_one(pool)
+    .await
+}
+
+#[cfg(test)]
+pub(crate) async fn reject_insert_path_for_test(
+    pool: &PgPool,
+    path: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        CREATE FUNCTION reject_idempotency_insert() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION 'forced idempotency insert failure';
+        END;
+        $$;
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(&format!(
+        "CREATE TRIGGER reject_idempotency_insert \
+         BEFORE INSERT ON idempotency_request FOR EACH ROW \
+         WHEN (NEW.path = '{path}') \
+         EXECUTE FUNCTION reject_idempotency_insert()"
+    ))
+    .execute(pool)
+    .await
+    .map(|_| ())
+}
