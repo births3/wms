@@ -150,6 +150,105 @@ test("M3 库存状态规则使用真实 API 保存货主覆盖", async ({ page }
   await page.screenshot({ path: path.join(statusConfigArtifactsDir, "owner-transition-saved.png"), fullPage: false });
 });
 
+test("M3 盘点、养护和移库真实写入并从 PostgreSQL 回读", async ({ page }) => {
+  await login(page);
+  const artifactsRoot = path.resolve("../artifacts/screenshot-portal/real-web/m3-ops");
+  fs.mkdirSync(artifactsRoot, { recursive: true });
+
+  await openM3Page(page, "M3 库存盘点");
+  await page.getByRole("button", { name: "新建盘点", exact: true }).click();
+  const countDialog = page.getByRole("dialog").filter({ hasText: "新建盘点单" });
+  await countDialog.getByLabel("商品编码").fill("P-M1-E2E-001");
+  const countCreateResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/counts") && response.request().method() === "POST",
+  );
+  const countListResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/counts") && response.request().method() === "GET",
+  );
+  await countDialog.getByRole("button", { name: "创建", exact: true }).click();
+  expect((await countCreateResponse).ok()).toBeTruthy();
+  const countListBody = await (await countListResponse).json() as {
+    data: Array<{ id: string; product_code: string | null; status: string; lines: Array<{ batch_no: string; physical_qty: number | null }> }>;
+  };
+  const count = countListBody.data.find((item) => item.product_code === "P-M1-E2E-001");
+  expect(count).toEqual(expect.objectContaining({ status: "in_progress" }));
+  const countRow = page.getByRole("row").filter({ hasText: "P-M1-E2E-001" }).first();
+  await countRow.getByRole("button", { name: "明细", exact: true }).click();
+  const countDetailDialog = page.getByRole("dialog").filter({ hasText: "盘点明细" });
+  await countDetailDialog.getByLabel("实盘数量-B-M4-E2E-001").fill("100");
+  const submitCountResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/v1/inventory/counts/") &&
+      response.url().includes("/lines/") && response.url().endsWith("/submit") &&
+      response.request().method() === "POST",
+  );
+  const countReadbackResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/counts") && response.request().method() === "GET",
+  );
+  await countDetailDialog.getByRole("button", { name: "提交实盘", exact: true }).click();
+  expect((await submitCountResponse).ok()).toBeTruthy();
+  const countReadback = await (await countReadbackResponse).json() as typeof countListBody;
+  const submittedCount = countReadback.data.find((item) => item.id === count?.id);
+  expect(submittedCount?.lines).toEqual(expect.arrayContaining([
+    expect.objectContaining({ batch_no: "B-M4-E2E-001", physical_qty: 100 }),
+  ]));
+  await page.screenshot({ path: path.join(artifactsRoot, "count-submitted.png"), fullPage: false });
+
+  await openM3Page(page, "M3 在库养护");
+  const generateMaintenanceResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/maintenance/tasks/generate") && response.request().method() === "POST",
+  );
+  const maintenanceListResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/v1/inventory/maintenance/tasks") && response.request().method() === "GET",
+  );
+  await page.getByRole("button", { name: "生成计划", exact: true }).click();
+  expect((await generateMaintenanceResponse).ok()).toBeTruthy();
+  const maintenanceList = await (await maintenanceListResponse).json() as {
+    data: Array<{ id: string; batch_no: string; status: string }>;
+  };
+  const task = maintenanceList.data.find((item) => item.batch_no === "B-M4-E2E-001");
+  expect(task).toEqual(expect.objectContaining({ status: "pending" }));
+  const taskRow = page.getByRole("row").filter({ hasText: "B-M4-E2E-001" }).first();
+  await taskRow.getByRole("button", { name: "提交结果", exact: true }).click();
+  const maintenanceDialog = page.getByRole("dialog").filter({ hasText: "提交养护结果" });
+  const createMaintenanceResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/maintenance/records") && response.request().method() === "POST",
+  );
+  const maintenanceReadbackResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/v1/inventory/maintenance/tasks") && response.request().method() === "GET",
+  );
+  await maintenanceDialog.getByRole("button", { name: "提交养护结果", exact: true }).click();
+  expect((await createMaintenanceResponse).ok()).toBeTruthy();
+  const maintenanceReadback = await (await maintenanceReadbackResponse).json() as typeof maintenanceList;
+  expect(maintenanceReadback.data.find((item) => item.id === task?.id)).toEqual(
+    expect.objectContaining({ status: "completed" }),
+  );
+  await page.screenshot({ path: path.join(artifactsRoot, "maintenance-completed.png"), fullPage: false });
+
+  await openM3Page(page, "M3 库内移库");
+  await page.getByRole("button", { name: "发起移库", exact: true }).click();
+  const relocationDialog = page.getByRole("dialog").filter({ hasText: "发起直接移库" });
+  await relocationDialog.getByLabel("批次 ID").fill("00000000-0000-0000-0000-000000001501");
+  await relocationDialog.getByLabel("数量").fill("5");
+  await relocationDialog.getByLabel("目标库位 ID").fill("00000000-0000-0000-0000-000000001402");
+  await relocationDialog.getByLabel("目标库位编码").fill("A01-01-02-04");
+  await relocationDialog.getByLabel("原因").fill("M3 real E2E 移库");
+  const relocationResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/relocations") && response.request().method() === "POST",
+  );
+  const relocationReadbackResponse = page.waitForResponse(
+    (response) => response.url().endsWith("/api/v1/inventory/relocations") && response.request().method() === "GET",
+  );
+  await relocationDialog.getByRole("button", { name: "提交", exact: true }).click();
+  expect((await relocationResponse).ok()).toBeTruthy();
+  const relocationReadback = await (await relocationReadbackResponse).json() as {
+    data: Array<{ batch_no: string; qty: number; to_location_code: string }>;
+  };
+  expect(relocationReadback.data).toEqual(expect.arrayContaining([
+    expect.objectContaining({ batch_no: "B-M4-E2E-001", qty: 5, to_location_code: "A01-01-02-04" }),
+  ]));
+  await page.screenshot({ path: path.join(artifactsRoot, "relocation-created.png"), fullPage: false });
+});
+
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
@@ -170,4 +269,17 @@ async function openInventoryBatches(page: import("@playwright/test").Page) {
   }
   await target.click();
   await expect(page.getByRole("heading", { name: "M3 批号管理" })).toBeVisible();
+}
+
+async function openM3Page(page: import("@playwright/test").Page, name: string) {
+  const viewByTitle = {
+    "M3 库存盘点": "m3-counts",
+    "M3 在库养护": "m3-maintenance",
+    "M3 库内移库": "m3-relocations",
+  } as const;
+  const view = viewByTitle[name as keyof typeof viewByTitle];
+  if (!view) throw new Error(`unknown M3 view: ${name}`);
+  await page.goto(`${new URL(page.url()).origin}/#/${view}`);
+  await page.reload();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
 }

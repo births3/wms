@@ -547,10 +547,16 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no,
             max_volume_cm3, used_volume_cm3, max_sku_count, location_type, bound_owner_id, status
         )
-        VALUES (
+        VALUES
+        (
             '00000000-0000-0000-0000-000000001401', '00000000-0000-0000-0000-000000000001',
             '00000000-0000-0000-0000-000000001301', '00000000-0000-0000-0000-000000001302',
             'A01-01-02-03', 1, 2, 3, 1000000, 0, 1, 'storage', NULL, 'available'
+        ),
+        (
+            '00000000-0000-0000-0000-000000001402', '00000000-0000-0000-0000-000000000001',
+            '00000000-0000-0000-0000-000000001301', '00000000-0000-0000-0000-000000001302',
+            'A01-01-02-04', 1, 2, 4, 1000000, 0, 1, 'storage', NULL, 'available'
         )
         ON CONFLICT (owner_id, location_code) DO UPDATE
         SET warehouse_id = EXCLUDED.warehouse_id,
