@@ -123,6 +123,27 @@ async fn platform_config_is_owner_scoped_idempotent_audited_and_redacted(pool: P
     assert_eq!(replay.status(), StatusCode::OK);
     assert_eq!(response_json(replay).await["id"], first_id);
 
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_a)
+    .bind("di-platform-a-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/v1/drug-inspection/platforms",
+            context(owner_a, &write_permissions),
+            Some("di-platform-a-1"),
+            first_payload.clone(),
+        ))
+        .await
+        .expect("metadata conflict request should complete");
+    assert_eq!(metadata_conflict.status(), StatusCode::CONFLICT);
+
     let mut changed_payload = first_payload.clone();
     changed_payload["timeout_seconds"] = json!(60);
     let conflict = app

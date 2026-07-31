@@ -1,7 +1,6 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -12,6 +11,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
+    idempotency,
     operation_context::OperationContext as AuthContext,
 };
 
@@ -76,10 +76,19 @@ impl PgDrugInspectionRepository {
             .map_err(DrugInspectionRepositoryError::Invalid)?;
         let request_hash = request_hash(&request)?;
         let now = Utc::now();
+        let path = "/api/v1/drug-inspection/platforms";
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(IdempotentMutation {
@@ -140,7 +149,7 @@ impl PgDrugInspectionRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            "/api/v1/drug-inspection/platforms",
+            path,
             &value,
             before.map(|row| audit_snapshot(&DrugInspectionPlatform::from(row))),
             "di.platform.upserted",
@@ -166,10 +175,19 @@ impl PgDrugInspectionRepository {
             .map_err(DrugInspectionRepositoryError::Invalid)?;
         let request_hash = request_hash(&(platform_id, &request))?;
         let now = Utc::now();
+        let path = format!("/api/v1/drug-inspection/platforms/{platform_id}/status");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PATCH",
+            &path,
+            now,
+        )
+        .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(IdempotentMutation {
@@ -207,7 +225,7 @@ impl PgDrugInspectionRepository {
             idempotency_key,
             &request_hash,
             "PATCH",
-            &format!("/api/v1/drug-inspection/platforms/{platform_id}/status"),
+            &path,
             &value,
             Some(audit_snapshot(&DrugInspectionPlatform::from(before))),
             "di.platform.status_changed",
@@ -236,6 +254,18 @@ pub enum DrugInspectionRepositoryError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<crate::idempotency::IdempotencyError> for DrugInspectionRepositoryError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 #[derive(Clone, Debug, FromRow)]
@@ -353,30 +383,20 @@ async fn finish_mutation(
     action: &str,
     now: DateTime<Utc>,
 ) -> Result<(), DrugInspectionRepositoryError> {
-    let response_body = serde_json::to_value(value)
-        .map_err(|error| DrugInspectionRepositoryError::Serialize(error.to_string()))?;
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id, expires_at, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, 200, $7, 'drug_inspection_platform', $8, $9, $10)
-        "#,
+    idempotency::store_success(
+        tx,
+        ctx.owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        "drug_inspection_platform",
+        &value.id.to_string(),
+        value,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(ctx.owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(method)
-    .bind(path)
-    .bind(&response_body)
-    .bind(value.id.to_string())
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_db_error)?;
+    .map_err(DrugInspectionRepositoryError::from)?;
 
     let mut audit = AuditWriteRequest::from_auth_context(
         ctx,
@@ -401,13 +421,9 @@ async fn lock_idempotency_key(
     owner_id: Uuid,
     idempotency_key: &str,
 ) -> Result<(), DrugInspectionRepositoryError> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))")
-        .bind(owner_id.to_string())
-        .bind(idempotency_key)
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, "drug-inspection-platform", owner_id, idempotency_key)
         .await
-        .map_err(map_db_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 async fn replay_idempotency<T: DeserializeOwned>(
@@ -415,45 +431,25 @@ async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     idempotency_key: &str,
     request_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, DrugInspectionRepositoryError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        r#"
-        SELECT request_hash, response_body, expires_at
-          FROM idempotency_request
-         WHERE owner_id = $1 AND idempotency_key = $2
-         FOR UPDATE
-        "#,
+    idempotency::replay(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        now,
     )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    let Some((stored_hash, response_body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(DrugInspectionRepositoryError::IdempotencyConflict);
-    }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| DrugInspectionRepositoryError::Serialize(error.to_string()))
+    .map_err(Into::into)
 }
 
 fn request_hash<T: Serialize>(value: &T) -> Result<String, DrugInspectionRepositoryError> {
-    let bytes = serde_json::to_vec(value)
-        .map_err(|error| DrugInspectionRepositoryError::Serialize(error.to_string()))?;
-    Ok(hex::encode(Sha256::digest(bytes)))
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 fn validate_status(value: &str) -> Result<(), DrugInspectionRepositoryError> {
