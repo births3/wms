@@ -58,9 +58,13 @@ def check(
         "resolved": resolved,
         "new_violations": new_violations,
         "message": (
-            "幂等表直接访问没有新增，基线可继续收缩"
-            if not new_violations
-            else "发现未登记的幂等表直接访问"
+            "发现未登记的幂等表直接访问"
+            if new_violations
+            else (
+                "幂等表直接访问基线已归零"
+                if not baseline
+                else "幂等表直接访问没有新增，基线可继续收缩"
+            )
         ),
     }
 

@@ -60,3 +60,9 @@ def test_resolved_baseline_is_reported_and_does_not_fail(tmp_path: Path):
     assert result["ok"] is True
     assert result["resolved"] == ["backend/crates/api/src/legacy.rs"]
     assert result["remaining_count"] == 0
+
+
+def test_project_idempotency_baseline_is_empty_after_all_migrations():
+    assert MODULE.load_baseline() == set()
+    result = MODULE.check()
+    assert result["message"] == "幂等表直接访问基线已归零"
