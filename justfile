@@ -375,6 +375,34 @@ web-admin-h8-real-e2e:
     psql "$admin_url" -v ON_ERROR_STOP=1 -q -c "CREATE DATABASE \"${database_name}\""
     DATABASE_URL="$test_url" pnpm --dir apps/web-admin run test:e2e:h8-real
 
+# H5 快递真实后端 E2E；基于 DATABASE_URL / WMS_DB_URL 创建并回收一次性 `_e2e` 数据库
+web-admin-h5-real-e2e:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -z "${DATABASE_URL:-}" && -z "${WMS_DB_URL:-}" && -f .env ]]; then
+      set -a
+      source .env
+      set +a
+    fi
+    source_url="${DATABASE_URL:-${WMS_DB_URL:-}}"
+    if [[ -z "$source_url" ]]; then
+      echo "DATABASE_URL or WMS_DB_URL is required for H5 real-data E2E" >&2
+      exit 2
+    fi
+    url_without_query="${source_url%%\?*}"
+    query=""
+    if [[ "$source_url" == *"?"* ]]; then query="?${source_url#*\?}"; fi
+    base_url="${url_without_query%/*}"
+    database_name="wms_h5_${RANDOM}_$$_e2e"
+    admin_url="${base_url}/postgres${query}"
+    test_url="${base_url}/${database_name}${query}"
+    cleanup() {
+      psql "$admin_url" -q -c "DROP DATABASE IF EXISTS \"${database_name}\" WITH (FORCE)" || true
+    }
+    trap cleanup EXIT
+    psql "$admin_url" -v ON_ERROR_STOP=1 -q -c "CREATE DATABASE \"${database_name}\""
+    DATABASE_URL="$test_url" pnpm --dir apps/web-admin run test:e2e:h5-real
+
 # 客户平台真实 E2E；基于 DATABASE_URL / WMS_DB_URL 创建并回收一次性 `_e2e` 数据库
 customer-portal-real-e2e:
     #!/usr/bin/env bash
