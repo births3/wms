@@ -1,95 +1,41 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { components } from "@wms/api-client";
 
 import { ApiError } from "@/features/auth/auth-queries";
 import { api } from "@/lib/api";
-import { readAccessToken } from "@/lib/auth-session";
-import { apiBaseUrl } from "@/lib/api";
 
-async function authFetch(path: string, init?: RequestInit) {
-  const token = readAccessToken();
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    credentials: "include",
-  });
-  if (!response.ok) {
-    let body: unknown = null;
-    try {
-      body = await response.json();
-    } catch {
-      body = null;
-    }
-    throw new ApiError(body as { code: string; details: Record<string, unknown>; message: string; severity: string; trace_id: string } | undefined, "库存操作失败", response.status);
-  }
-  return response.json();
-}
+export type InventoryCountSummary = components["schemas"]["InventoryCount"];
+export type MaintenanceTask = components["schemas"]["MaintenanceTask"];
+export type InventoryRelocation = components["schemas"]["InventoryRelocation"];
+type CreateInventoryCountRequest = components["schemas"]["CreateInventoryCountRequest"];
+type SubmitInventoryCountLineRequest = components["schemas"]["SubmitInventoryCountLineRequest"];
+type ApproveInventoryCountRequest = components["schemas"]["ApproveInventoryCountRequest"];
+type CreateMaintenanceRecordRequest = components["schemas"]["CreateMaintenanceRecordRequest"];
+type RelocateInventoryRequest = components["schemas"]["RelocateInventoryRequest"];
 
-export type InventoryCountSummary = {
-  id: string;
-  count_type: string;
-  status: string;
-  product_code?: string | null;
-  started_at: string;
-  created_at: string;
-  lines: Array<{ id: string; product_code: string; batch_no: string; book_qty: number; physical_qty?: number | null; variance_qty?: number | null }>;
-};
-
-export type MaintenanceTask = {
-  id: string;
-  product_code: string;
-  batch_no: string;
-  location_code: string;
-  planned_at: string;
-  status: string;
-  created_at: string;
-};
-
-export type InventoryRelocation = {
-  id: string;
-  product_code: string;
-  batch_no: string;
-  qty: number;
-  from_location_code: string;
-  to_location_code: string;
-  status: string;
-  created_at: string;
-};
+const idempotencyKey = (prefix: string) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
 
 export function useInventoryCountsQuery() {
   return useQuery<InventoryCountSummary[], ApiError>({
     queryKey: ["inventory", "counts"],
     queryFn: async () => {
-      const body = await authFetch("/api/v1/inventory/counts");
-      return (body.data ?? []) as InventoryCountSummary[];
+      const result = await api.GET("/api/v1/inventory/counts");
+      if (!result.data) throw new ApiError(result.error, "读取盘点单失败", result.response.status);
+      return result.data.data;
     },
   });
 }
 
 export function useCreateInventoryCountMutation() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (body: { count_type: string; product_code?: string }) => {
-      const token = readAccessToken();
-      const response = await fetch(`${apiBaseUrl}/api/v1/inventory/counts`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "Idempotency-Key": `web-m3-count-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify(body),
+  return useMutation<InventoryCountSummary, ApiError, CreateInventoryCountRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST("/api/v1/inventory/counts", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-m3-count") } },
+        body,
       });
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), "创建盘点单失败", response.status);
-      }
-      return response.json();
+      if (!result.data) throw new ApiError(result.error, "创建盘点单失败", result.response.status);
+      return result.data;
     },
     onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "counts"] }),
   });
@@ -97,27 +43,21 @@ export function useCreateInventoryCountMutation() {
 
 export function useSubmitInventoryCountLineMutation() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { countId: string; lineId: string; physical_qty: number }) => {
-      const token = readAccessToken();
-      const response = await fetch(
-        `${apiBaseUrl}/api/v1/inventory/counts/${input.countId}/lines/${input.lineId}/submit`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            "Idempotency-Key": `web-m3-count-line-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          credentials: "include",
-          body: JSON.stringify({ physical_qty: input.physical_qty }),
+  return useMutation<
+    components["schemas"]["InventoryCountLine"],
+    ApiError,
+    { countId: string; lineId: string; physical_qty: number }
+  >({
+    mutationFn: async ({ countId, lineId, physical_qty }) => {
+      const result = await api.POST("/api/v1/inventory/counts/{id}/lines/{line_id}/submit", {
+        params: {
+          path: { id: countId, line_id: lineId },
+          header: { "Idempotency-Key": idempotencyKey("web-m3-count-line") },
         },
-      );
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), "提交实盘数量失败", response.status);
-      }
-      return response.json();
+        body: { physical_qty } satisfies SubmitInventoryCountLineRequest,
+      });
+      if (!result.data) throw new ApiError(result.error, "提交实盘数量失败", result.response.status);
+      return result.data;
     },
     onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "counts"] }),
   });
@@ -125,28 +65,24 @@ export function useSubmitInventoryCountLineMutation() {
 
 export function useApproveInventoryCountMutation() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { countId: string; approval_source?: string; approval_id?: string }) => {
-      const token = readAccessToken();
-      const response = await fetch(`${apiBaseUrl}/api/v1/inventory/counts/${input.countId}/approve`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "Idempotency-Key": `web-m3-count-approve-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  return useMutation<
+    InventoryCountSummary,
+    ApiError,
+    { countId: string; approval_source?: string; approval_id?: string }
+  >({
+    mutationFn: async ({ countId, approval_source, approval_id }) => {
+      const result = await api.POST("/api/v1/inventory/counts/{id}/approve", {
+        params: {
+          path: { id: countId },
+          header: { "Idempotency-Key": idempotencyKey("web-m3-count-approve") },
         },
-        credentials: "include",
-        body: JSON.stringify({
-          // 默认普通审批源；超阈值时服务端要求「盘点-高级」，由调用方覆盖。
-          approval_source: input.approval_source ?? "盘点",
-          approval_id: input.approval_id ?? input.countId,
-        }),
+        body: {
+          approval_source: approval_source ?? "盘点",
+          approval_id: approval_id ?? countId,
+        } satisfies ApproveInventoryCountRequest,
       });
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), "审批盘点差异失败", response.status);
-      }
-      return response.json();
+      if (!result.data) throw new ApiError(result.error, "审批盘点差异失败", result.response.status);
+      return result.data;
     },
     onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "counts"] }),
   });
@@ -158,51 +94,32 @@ export function useMaintenanceTasksQuery() {
     queryFn: async () => {
       const result = await api.GET("/api/v1/inventory/maintenance/tasks", { params: { query: {} } });
       if (!result.data) throw new ApiError(result.error, "读取养护任务失败", result.response.status);
-      return result.data.data as MaintenanceTask[];
+      return result.data.data;
     },
   });
 }
 
 export function useGenerateMaintenanceTasksMutation() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: async () => authFetch("/api/v1/inventory/maintenance/tasks/generate", { method: "POST", body: "{}" }),
+  return useMutation<void, ApiError>({
+    mutationFn: async () => {
+      const result = await api.POST("/api/v1/inventory/maintenance/tasks/generate");
+      if (result.error) throw new ApiError(result.error, "生成养护计划失败", result.response.status);
+    },
     onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "maintenance-tasks"] }),
   });
 }
 
 export function useCreateMaintenanceRecordMutation() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (body: {
-      task_id: string;
-      temperature_celsius: number;
-      humidity_percent: number;
-      appearance: string;
-      packaging: string;
-      pest: string;
-      rodent: string;
-      mildew: string;
-      conclusion: string;
-      exception_type?: string | null;
-      notes?: string | null;
-    }) => {
-      const token = readAccessToken();
-      const response = await fetch(`${apiBaseUrl}/api/v1/inventory/maintenance/records`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "Idempotency-Key": `web-m3-maint-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify(body),
+  return useMutation<components["schemas"]["MaintenanceRecord"], ApiError, CreateMaintenanceRecordRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST("/api/v1/inventory/maintenance/records", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-m3-maint") } },
+        body,
       });
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), "提交养护结果失败", response.status);
-      }
-      return response.json();
+      if (!result.data) throw new ApiError(result.error, "提交养护结果失败", result.response.status);
+      return result.data;
     },
     onSuccess: () => void client.invalidateQueries({ queryKey: ["inventory", "maintenance-tasks"] }),
   });
@@ -212,38 +129,23 @@ export function useInventoryRelocationsQuery() {
   return useQuery<InventoryRelocation[], ApiError>({
     queryKey: ["inventory", "relocations"],
     queryFn: async () => {
-      const body = await authFetch("/api/v1/inventory/relocations");
-      return (body.data ?? []) as InventoryRelocation[];
+      const result = await api.GET("/api/v1/inventory/relocations");
+      if (!result.data) throw new ApiError(result.error, "读取移库记录失败", result.response.status);
+      return result.data.data;
     },
   });
 }
 
 export function useRelocateInventoryMutation() {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (body: {
-      batch_id: string;
-      qty: number;
-      to_location_id: string;
-      to_location_code: string;
-      reason?: string;
-    }) => {
-      const token = readAccessToken();
-      const response = await fetch(`${apiBaseUrl}/api/v1/inventory/relocations`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          "Idempotency-Key": `web-m3-relocate-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify(body),
+  return useMutation<InventoryRelocation, ApiError, RelocateInventoryRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST("/api/v1/inventory/relocations", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-m3-relocate") } },
+        body,
       });
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), "移库失败", response.status);
-      }
-      return response.json();
+      if (!result.data) throw new ApiError(result.error, "移库失败", result.response.status);
+      return result.data;
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["inventory", "relocations"] });

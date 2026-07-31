@@ -9,8 +9,8 @@ use uuid::Uuid;
 use wms_domain::{
     HandleInventoryAlertRequest, InventoryAbcClassification, InventoryAbcListResponse,
     InventoryAbcQuery, InventoryAlertEvent, InventoryAlertListResponse, InventoryAlertQuery,
-    InventoryRecallImpact, InventoryRelocation, OverrideInventoryAbcRequest,
-    RecomputeInventoryAbcRequest, RelocateInventoryRequest,
+    InventoryRecallImpact, InventoryRelocation, InventoryRelocationListResponse,
+    OverrideInventoryAbcRequest, RecomputeInventoryAbcRequest, RelocateInventoryRequest,
 };
 
 use super::{
@@ -54,15 +54,18 @@ pub(super) fn apply_m3_ops_routes(router: Router<Wave3AppState>) -> Router<Wave3
 async fn list_inventory_relocations_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
-) -> Result<Json<serde_json::Value>, Wave3HandlerError> {
+) -> Result<Json<InventoryRelocationListResponse>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.read", "m3.relocation.write"])?;
     let data = ops_repository(&state)?
         .list_inventory_relocations(&ctx)
         .await?;
-    Ok(Json(serde_json::json!({
-        "data": data,
-        "page": { "count": data.len(), "next_cursor": null }
-    })))
+    Ok(Json(InventoryRelocationListResponse {
+        page: wms_domain::PageMeta {
+            count: data.len() as u32,
+            next_cursor: None,
+        },
+        data,
+    }))
 }
 
 async fn relocate_inventory_handler(

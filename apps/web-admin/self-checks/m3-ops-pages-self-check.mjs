@@ -35,4 +35,6 @@ assert.match(countPage, /提交实盘/, "盘点页应有提交实盘");
 assert.match(countPage, /审批差异/, "盘点页应有审批差异");
 assert.match(queries, /\/api\/v1\/inventory\/maintenance\/tasks/, "养护 API");
 assert.match(queries, /\/api\/v1\/inventory\/relocations/, "移库 API");
+assert.doesNotMatch(queries, /\bfetch\s*\(/, "M3 查询必须统一使用生成的 api-client");
+assert.match(queries, /api\.(GET|POST)\("\/api\/v1\/inventory\//, "M3 查询必须通过 api-client");
 console.log("m3 ops pages self-check passed");

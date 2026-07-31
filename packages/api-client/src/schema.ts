@@ -8611,6 +8611,10 @@ export interface components {
             variance_qty?: number | null;
             variance_type?: string | null;
         };
+        InventoryCountListResponse: {
+            data: components["schemas"]["InventoryCount"][];
+            page: components["schemas"]["PageMeta"];
+        };
         InventoryMovement: {
             /** Format: uuid */
             batch_id: string;
@@ -8675,6 +8679,10 @@ export interface components {
             to_location_id: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        InventoryRelocationListResponse: {
+            data: components["schemas"]["InventoryRelocation"][];
+            page: components["schemas"]["PageMeta"];
         };
         InventoryStatusChange: {
             approval_id: string;
@@ -21949,7 +21957,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["InventoryCountListResponse"];
+                };
             };
             /** @description 未登录 */
             401: {
@@ -22508,7 +22518,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["InventoryRelocationListResponse"];
+                };
             };
             /** @description 未登录 */
             401: {

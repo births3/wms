@@ -8,7 +8,7 @@ use chrono::Utc;
 use uuid::Uuid;
 use wms_domain::{
     ApproveInventoryCountRequest, CreateInventoryCountRequest, InventoryCount, InventoryCountLine,
-    SubmitInventoryCountLineRequest,
+    InventoryCountListResponse, SubmitInventoryCountLineRequest,
 };
 
 use super::{
@@ -39,7 +39,7 @@ pub(super) fn apply_inventory_count_routes(router: Router<Wave3AppState>) -> Rou
 async fn list_inventory_counts_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
-) -> Result<Json<serde_json::Value>, Wave3HandlerError> {
+) -> Result<Json<InventoryCountListResponse>, Wave3HandlerError> {
     require_any_permission(
         &ctx,
         &[
@@ -51,10 +51,13 @@ async fn list_inventory_counts_handler(
     let data = inventory_count_repository(&state)?
         .list_inventory_counts(&ctx)
         .await?;
-    Ok(Json(serde_json::json!({
-        "data": data,
-        "page": { "count": data.len(), "next_cursor": null }
-    })))
+    Ok(Json(InventoryCountListResponse {
+        page: wms_domain::PageMeta {
+            count: data.len() as u32,
+            next_cursor: None,
+        },
+        data,
+    }))
 }
 
 async fn create_inventory_count_handler(

@@ -2118,8 +2118,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。",
-        "x-idempotency-exempt-reason": "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。"
+        "x-idempotency-exempt-reason": "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。",
+        "x-auth-exempt-reason": "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。"
       }
     },
     "/api/v1/attachments/{attachment_id}/content": {
@@ -7610,8 +7610,8 @@
             }
           }
         },
-        "x-idempotency-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。",
-        "x-audit-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。"
+        "x-audit-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。",
+        "x-idempotency-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。"
       }
     },
     "/api/v1/drug-inspection/inbound-documents": {
@@ -14431,7 +14431,14 @@
         "operationId": "list_inventory_counts",
         "responses": {
           "200": {
-            "description": "盘点单列表"
+            "description": "盘点单列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryCountListResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "未登录",
@@ -15201,7 +15208,14 @@
         "operationId": "list_inventory_relocations",
         "responses": {
           "200": {
-            "description": "移库记录列表"
+            "description": "移库记录列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryRelocationListResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "未登录",
@@ -39729,6 +39743,24 @@
           }
         }
       },
+      "InventoryCountListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryCount"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "InventoryMovement": {
         "type": "object",
         "required": [
@@ -39932,6 +39964,24 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "InventoryRelocationListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryRelocation"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },

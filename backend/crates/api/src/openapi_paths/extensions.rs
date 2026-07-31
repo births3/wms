@@ -403,7 +403,7 @@ pub(crate) fn list_shipped_customers_for_batch() {}
 #[allow(dead_code)]
 pub(crate) fn process_status_erp_outbox() {}
 
-#[utoipa::path(get, path = "/api/v1/inventory/counts", tag = "inventory", responses((status = 200, description = "盘点单列表"), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/inventory/counts", tag = "inventory", responses((status = 200, description = "盘点单列表", body = InventoryCountListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_inventory_counts() {}
 
@@ -411,7 +411,7 @@ pub(crate) fn list_inventory_counts() {}
 #[allow(dead_code)]
 pub(crate) fn generate_maintenance_tasks() {}
 
-#[utoipa::path(get, path = "/api/v1/inventory/relocations", tag = "inventory", responses((status = 200, description = "移库记录列表"), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/inventory/relocations", tag = "inventory", responses((status = 200, description = "移库记录列表", body = InventoryRelocationListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_inventory_relocations() {}
 

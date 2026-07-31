@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::common::PageMeta;
+
 pub const INVENTORY_COUNT_TYPE_CYCLE: &str = "cycle";
 pub const INVENTORY_COUNT_TYPE_FULL: &str = "full";
 pub const INVENTORY_COUNT_TYPE_BLIND: &str = "blind";
@@ -60,6 +62,12 @@ pub struct InventoryCount {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub lines: Vec<InventoryCountLine>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryCountListResponse {
+    pub data: Vec<InventoryCount>,
+    pub page: PageMeta,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

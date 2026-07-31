@@ -41,6 +41,12 @@ pub struct InventoryRelocation {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct InventoryRelocationListResponse {
+    pub data: Vec<InventoryRelocation>,
+    pub page: PageMeta,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct InventoryAlertQuery {
     pub alert_type: Option<String>,
