@@ -49,10 +49,19 @@ impl PgReconciliationRepository {
             lease_seconds: req.lease_seconds,
         };
         let hash = request_hash(&normalized)?;
+        let path = "/api/v1/reconciliation/claims";
         let mut tx = self.pool.begin().await.map_err(db)?;
         lock_idempotency(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -89,7 +98,7 @@ impl PgReconciliationRepository {
                         idempotency_key,
                         &hash,
                         "POST",
-                        "/api/v1/reconciliation/claims",
+                        path,
                         "reconciliation_schedule_claim",
                         ctx.owner_id.to_string(),
                         &value,
@@ -204,7 +213,7 @@ impl PgReconciliationRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/reconciliation/claims",
+            path,
             "reconciliation_schedule_claim",
             resource_id,
             &value,
@@ -237,10 +246,19 @@ impl PgReconciliationRepository {
             lease_seconds: req.lease_seconds,
         };
         let hash = request_hash(&(claim_id, &normalized))?;
+        let path = format!("/api/v1/reconciliation/claims/{claim_id}/renew");
         let mut tx = self.pool.begin().await.map_err(db)?;
         lock_idempotency(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -306,7 +324,7 @@ impl PgReconciliationRepository {
             idempotency_key,
             &hash,
             "POST",
-            &format!("/api/v1/reconciliation/claims/{claim_id}/renew"),
+            &path,
             "reconciliation_schedule_claim",
             claim_id.to_string(),
             &value,
@@ -333,10 +351,19 @@ impl PgReconciliationRepository {
         }
         let failure_code = claim_failure_code_text(req.error_code);
         let hash = request_hash(&(claim_id, &req))?;
+        let path = format!("/api/v1/reconciliation/claims/{claim_id}/failed");
         let mut tx = self.pool.begin().await.map_err(db)?;
         lock_idempotency(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -440,7 +467,7 @@ impl PgReconciliationRepository {
             idempotency_key,
             &hash,
             "POST",
-            &format!("/api/v1/reconciliation/claims/{claim_id}/failed"),
+            &path,
             "reconciliation_schedule_claim",
             claim_id.to_string(),
             &value,

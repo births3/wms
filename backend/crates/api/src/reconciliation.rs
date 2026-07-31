@@ -14,6 +14,7 @@ use wms_domain::{
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::AuthContext,
+    idempotency::IdempotencyError,
     stock_adjustment::PgStockAdjustmentRepository,
 };
 
@@ -107,6 +108,16 @@ pub enum ReconciliationError {
     StockAdjustment(String),
 }
 
+impl From<IdempotencyError> for ReconciliationError {
+    fn from(error: IdempotencyError) -> Self {
+        match error {
+            IdempotencyError::Conflict => Self::IdempotencyConflict,
+            IdempotencyError::Database(error) => Self::Database(error.to_string()),
+            IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct PgReconciliationRepository {
     pub(crate) pool: PgPool,
@@ -133,10 +144,19 @@ impl PgReconciliationRepository {
     ) -> Result<IdempotentMutation<ReconciliationRun>, ReconciliationError> {
         let req = normalize_request(req)?;
         let hash = request_hash(&(&req.window_key, req.snapshot_at, &req.items))?;
+        let path = "/api/v1/reconciliation/runs";
         let mut tx = self.pool.begin().await.map_err(db)?;
         lock_idempotency(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -165,7 +185,7 @@ impl PgReconciliationRepository {
                 idempotency_key,
                 &hash,
                 "POST",
-                "/api/v1/reconciliation/runs",
+                path,
                 "reconciliation_run",
                 value.id.to_string(),
                 &value,
@@ -329,7 +349,7 @@ impl PgReconciliationRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/reconciliation/runs",
+            path,
             "reconciliation_run",
             run_id.to_string(),
             &value,
@@ -358,10 +378,19 @@ impl PgReconciliationRepository {
             return Err(ReconciliationError::InvalidRequest);
         }
         let hash = request_hash(&(&item_ids, isolate))?;
+        let path = "/api/v1/reconciliation/items/isolation";
         let mut tx = self.pool.begin().await.map_err(db)?;
         lock_idempotency(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -427,7 +456,7 @@ impl PgReconciliationRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/reconciliation/items/isolation",
+            path,
             "reconciliation_item",
             item_ids
                 .iter()
@@ -471,10 +500,19 @@ impl PgReconciliationRepository {
             ReconciliationDisposition::ErpTruth => "erp_truth",
         };
         let hash = request_hash(&(item_id, disposition_name, &allocations))?;
+        let path = "/api/v1/reconciliation/items/{id}/resolve";
         let mut tx = self.pool.begin().await.map_err(db)?;
         lock_idempotency(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -591,7 +629,7 @@ impl PgReconciliationRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/reconciliation/items/{id}/resolve",
+            path,
             "reconciliation_item",
             item_id.to_string(),
             &item,

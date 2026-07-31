@@ -292,11 +292,24 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
     );
 
     let replay = repository
-        .run(&actor, request, Utc::now(), "rc-run-1")
+        .run(&actor, request.clone(), Utc::now(), "rc-run-1")
         .await
         .unwrap();
     assert!(replay.replayed);
     assert_eq!(replay.value.id, first.value.id);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PUT', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("rc-run-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repository
+        .run(&actor, request, Utc::now(), "rc-run-1")
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(metadata_conflict, ReconciliationError::IdempotencyConflict);
     let (same_claim_id, same_claim_token) =
         seed_active_claim(&pool, owner_id, "2026-07-23T18").await;
     let same_window = repository

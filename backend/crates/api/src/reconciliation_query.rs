@@ -251,10 +251,19 @@ impl PgReconciliationRepository {
             return Err(ReconciliationError::InvalidRequest);
         }
         let hash = request_hash(&req)?;
+        let path = "/api/v1/reconciliation/rule";
         let mut tx = self.pool.begin().await.map_err(db)?;
         lock_idempotency(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "PUT",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -307,7 +316,7 @@ impl PgReconciliationRepository {
             idempotency_key,
             &hash,
             "PUT",
-            "/api/v1/reconciliation/rule",
+            path,
             "reconciliation_rule",
             ctx.owner_id.to_string(),
             &value,
