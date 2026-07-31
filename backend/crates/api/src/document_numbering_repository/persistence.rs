@@ -1,4 +1,40 @@
-fn validate_template(template: &str) -> Result<(), DocumentNumberingError> {
+use chrono::{DateTime, Datelike, Utc};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
+use sqlx::{Postgres, Transaction};
+use uuid::Uuid;
+use wms_domain::DocumentNumberAllocation;
+
+use crate::{
+    audit::{append_event_in_tx, AuditWriteRequest},
+    idempotency,
+    operation_context::OperationContext as AuthContext,
+};
+
+use super::support::map_db_error;
+use super::{
+    AllocationRow, AllocationWithHashRow, DocumentNumberingError, GenerateDocumentNumberRequest,
+    RuleRow, UpsertDocumentNumberRuleRequest,
+};
+
+pub(super) fn validate_rule_request(
+    req: &UpsertDocumentNumberRuleRequest,
+) -> Result<(), DocumentNumberingError> {
+    if req.sequence_width <= 0 || req.sequence_width > 18 {
+        return Err(DocumentNumberingError::InvalidRule);
+    }
+    if !matches!(req.reset_policy.as_str(), "daily" | "continuous") {
+        return Err(DocumentNumberingError::InvalidRule);
+    }
+    if let (Some(from), Some(to)) = (req.effective_from, req.effective_to) {
+        if to <= from {
+            return Err(DocumentNumberingError::InvalidEffectiveWindow);
+        }
+    }
+    validate_template(&req.template)
+}
+
+pub(super) fn validate_template(template: &str) -> Result<(), DocumentNumberingError> {
     if !template.contains("{SEQ}") {
         return Err(DocumentNumberingError::TemplateInvalid);
     }
@@ -22,7 +58,7 @@ fn validate_template(template: &str) -> Result<(), DocumentNumberingError> {
     }
     Ok(())
 }
-async fn load_rule_id_for_update(
+pub(super) async fn load_rule_id_for_update(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     rule_code: &str,
@@ -42,7 +78,7 @@ async fn load_rule_id_for_update(
     .map_err(map_db_error)
 }
 
-async fn ensure_document_type_valid(
+pub(super) async fn ensure_document_type_valid(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     document_type: &str,
@@ -106,7 +142,7 @@ async fn ensure_document_type_valid(
     Ok(())
 }
 
-async fn load_owner_code(
+pub(super) async fn load_owner_code(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
 ) -> Result<String, DocumentNumberingError> {
@@ -118,7 +154,7 @@ async fn load_owner_code(
         .ok_or(DocumentNumberingError::RuleNotFound)
 }
 
-async fn load_effective_rule(
+pub(super) async fn load_effective_rule(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     document_type: &str,
@@ -146,7 +182,7 @@ async fn load_effective_rule(
     .ok_or(DocumentNumberingError::RuleNotFound)
 }
 
-async fn next_sequence_value(
+pub(super) async fn next_sequence_value(
     tx: &mut Transaction<'_, Postgres>,
     rule_id: Uuid,
     counter_key: &str,
@@ -210,7 +246,7 @@ async fn next_sequence_value(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn insert_allocation(
+pub(super) async fn insert_allocation(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     req: &GenerateDocumentNumberRequest,
@@ -251,7 +287,7 @@ async fn insert_allocation(
     Ok(row.into())
 }
 
-async fn load_allocation_by_idempotency(
+pub(super) async fn load_allocation_by_idempotency(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     idempotency_key: &str,
@@ -277,7 +313,7 @@ async fn load_allocation_by_idempotency(
     }))
 }
 
-async fn append_generation_audit(
+pub(super) async fn append_generation_audit(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &AuthContext,
     allocation: &DocumentNumberAllocation,
@@ -299,7 +335,7 @@ async fn append_generation_audit(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn finish_rule_mutation<T: Serialize>(
+pub(super) async fn finish_rule_mutation<T: Serialize>(
     mut tx: Transaction<'_, Postgres>,
     ctx: &AuthContext,
     idempotency_key: &str,
@@ -346,7 +382,7 @@ async fn finish_rule_mutation<T: Serialize>(
     Ok(())
 }
 
-async fn replay_idempotency<T: DeserializeOwned>(
+pub(super) async fn replay_idempotency<T: DeserializeOwned>(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     idempotency_key: &str,
@@ -368,7 +404,7 @@ async fn replay_idempotency<T: DeserializeOwned>(
     .map_err(Into::into)
 }
 
-fn counter_key(
+pub(super) fn counter_key(
     owner_id: Uuid,
     document_type: &str,
     reset_policy: &str,
@@ -385,7 +421,7 @@ fn counter_key(
     }
 }
 
-fn render_number(
+pub(super) fn render_number(
     rule: &RuleRow,
     owner_code: &str,
     sequence_value: i64,

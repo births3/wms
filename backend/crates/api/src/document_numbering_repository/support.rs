@@ -1,4 +1,16 @@
-async fn lock_idempotency_key(
+use serde_json::Value;
+use sqlx::{Postgres, Transaction};
+use uuid::Uuid;
+use wms_domain::DocumentNumberAllocation;
+
+use crate::idempotency;
+
+use super::{
+    AllocationRow, AllocationWithHashRow, DocumentNumberRule, DocumentNumberRuleRow,
+    DocumentNumberingError, GenerateDocumentNumberRequest,
+};
+
+pub(super) async fn lock_idempotency_key(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     idempotency_key: &str,
@@ -8,7 +20,7 @@ async fn lock_idempotency_key(
         .map_err(Into::into)
 }
 
-fn document_number_request_hash(
+pub(super) fn document_number_request_hash(
     req: &GenerateDocumentNumberRequest,
 ) -> Result<String, DocumentNumberingError> {
     json_request_hash(
@@ -17,11 +29,11 @@ fn document_number_request_hash(
     )
 }
 
-fn json_request_hash(value: &Value) -> Result<String, DocumentNumberingError> {
+pub(super) fn json_request_hash(value: &Value) -> Result<String, DocumentNumberingError> {
     idempotency::request_hash(value).map_err(Into::into)
 }
 
-fn map_db_error(error: sqlx::Error) -> DocumentNumberingError {
+pub(super) fn map_db_error(error: sqlx::Error) -> DocumentNumberingError {
     DocumentNumberingError::Database(error.to_string())
 }
 
