@@ -10,6 +10,7 @@ use wms_domain::{
 use crate::{
     auth::AuthContext,
     document_numbering::{GenerateDocumentNumberRequest, PgDocumentNumberingService},
+    idempotency::IdempotencyError,
 };
 
 mod actions;
@@ -41,6 +42,16 @@ pub enum QualityLiaisonError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<IdempotencyError> for QualityLiaisonError {
+    fn from(error: IdempotencyError) -> Self {
+        match error {
+            IdempotencyError::Conflict => Self::IdempotencyConflict,
+            IdempotencyError::Database(error) => Self::Database(error.to_string()),
+            IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -125,10 +136,19 @@ impl PgQualityLiaisonRepository {
         validate_type_request(&request)?;
         let request = normalize_type_request(request);
         let hash = request_hash(&serde_json::json!({"action":"upsert_type","request":request}))?;
+        let path = "/api/v1/quality-liaisons/types/{type_code}";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "PUT",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentQualityLiaisonMutation {
                 value,
@@ -195,7 +215,7 @@ impl PgQualityLiaisonRepository {
             idempotency_key,
             &hash,
             "PUT",
-            "/api/v1/quality-liaisons/types/{type_code}",
+            path,
             "quality_liaison_type",
             value.id,
             &value,
@@ -220,10 +240,19 @@ impl PgQualityLiaisonRepository {
         validate_create_request(&request)?;
         let request = normalize_create_request(request);
         let hash = request_hash(&serde_json::json!({"action":"create","request":request}))?;
+        let path = "/api/v1/quality-liaisons";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentQualityLiaisonMutation {
                 value,
@@ -321,7 +350,7 @@ impl PgQualityLiaisonRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/quality-liaisons",
+            path,
             "quality_liaison_order",
             value.id,
             &value,
@@ -355,10 +384,19 @@ impl PgQualityLiaisonRepository {
             "order_id":order_id,
             "request":request,
         }))?;
+        let path = "/api/v1/quality-liaisons/{id}/approval-callback";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentQualityLiaisonMutation {
                 value,
@@ -443,7 +481,7 @@ impl PgQualityLiaisonRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/quality-liaisons/{id}/approval-callback",
+            path,
             "quality_liaison_order",
             value.id,
             &value,
@@ -498,10 +536,19 @@ impl PgQualityLiaisonRepository {
             "order_id":order_id,
             "request":request,
         }))?;
+        let path = "/api/v1/quality-liaisons/{id}/archive-sync-callback";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentQualityLiaisonMutation {
                 value,
@@ -617,7 +664,7 @@ impl PgQualityLiaisonRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/quality-liaisons/{id}/archive-sync-callback",
+            path,
             "quality_liaison_order",
             value.id,
             &value,

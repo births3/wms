@@ -142,11 +142,24 @@ async fn type_config_create_and_approval_callback_are_atomic_and_idempotent(pool
     assert_eq!(h4_approval.3, "pending");
 
     let create_replay = repository
-        .create(&creator, create_request, now, "ql-create")
+        .create(&creator, create_request.clone(), now, "ql-create")
         .await
         .expect("same create request should replay");
     assert!(create_replay.replayed);
     assert_eq!(create_replay.value.id, created.value.id);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PUT', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("ql-create")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repository
+        .create(&creator, create_request, now, "ql-create")
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(metadata_conflict, QualityLiaisonError::IdempotencyConflict);
 
     let approver = ctx(owner_id, approver_id);
     let empty_opinion = repository
