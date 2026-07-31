@@ -192,12 +192,32 @@ async fn attachment_upload_confirm_download_is_owner_scoped_idempotent_and_audit
             "/api/v1/attachments/confirm",
             write_context.clone(),
             Some("h-file-confirm"),
-            confirm_payload,
+            confirm_payload.clone(),
         ))
         .await
         .expect("confirm replay should respond");
     assert_eq!(replay.status(), StatusCode::OK);
     assert_eq!(response_json(replay).await["id"], attachment_id);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("h-file-confirm")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/attachments/confirm",
+            write_context.clone(),
+            Some("h-file-confirm"),
+            confirm_payload,
+        ))
+        .await
+        .expect("confirm metadata conflict should respond");
+    assert_eq!(metadata_conflict.status(), StatusCode::CONFLICT);
 
     let url_response = app
         .clone()

@@ -11,6 +11,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
+    idempotency,
     operation_context::OperationContext as AuthContext,
 };
 
@@ -58,6 +59,18 @@ pub enum FileAttachmentRepositoryError {
     Serialize(String),
 }
 
+impl From<crate::idempotency::IdempotencyError> for FileAttachmentRepositoryError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
+}
+
 impl PgFileAttachmentRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -73,11 +86,20 @@ impl PgFileAttachmentRepository {
             .validate()
             .map_err(FileAttachmentRepositoryError::Invalid)?;
         let request_hash = request_hash(&request)?;
+        let path = "/api/v1/attachments/uploads";
         let now = Utc::now();
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
@@ -124,7 +146,7 @@ impl PgFileAttachmentRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            "/api/v1/attachments/uploads",
+            path,
             "h_file_upload_session",
             upload_id,
             &value,
@@ -220,11 +242,20 @@ impl PgFileAttachmentRepository {
         idempotency_key: &str,
     ) -> Result<FileAttachment, FileAttachmentRepositoryError> {
         let request_hash = request_hash(&request)?;
+        let path = "/api/v1/attachments/confirm";
         let now = Utc::now();
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
@@ -304,7 +335,7 @@ impl PgFileAttachmentRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            "/api/v1/attachments/confirm",
+            path,
             "attachment",
             value.id,
             &value,
@@ -562,13 +593,9 @@ async fn lock_idempotency_key(
     owner_id: Uuid,
     idempotency_key: &str,
 ) -> Result<(), FileAttachmentRepositoryError> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))")
-        .bind(owner_id.to_string())
-        .bind(idempotency_key)
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, "file-attachment", owner_id, idempotency_key)
         .await
-        .map_err(map_db_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 async fn replay_idempotency<T: DeserializeOwned>(
@@ -576,39 +603,21 @@ async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     idempotency_key: &str,
     request_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, FileAttachmentRepositoryError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        r#"
-        SELECT request_hash, response_body, expires_at
-          FROM idempotency_request
-         WHERE owner_id = $1 AND idempotency_key = $2
-         FOR UPDATE
-        "#,
+    idempotency::replay(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        now,
     )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    let Some((stored_hash, response_body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(FileAttachmentRepositoryError::IdempotencyConflict);
-    }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| FileAttachmentRepositoryError::Serialize(error.to_string()))
+    .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -624,38 +633,24 @@ async fn store_idempotency<T: Serialize>(
     value: &T,
     now: DateTime<Utc>,
 ) -> Result<(), FileAttachmentRepositoryError> {
-    let response_body = serde_json::to_value(value)
-        .map_err(|error| FileAttachmentRepositoryError::Serialize(error.to_string()))?;
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id, expires_at, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, 200, $7, $8, $9, $10, $11)
-        "#,
+    idempotency::store_success(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        resource_type,
+        &resource_id.to_string(),
+        value,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(method)
-    .bind(path)
-    .bind(response_body)
-    .bind(resource_type)
-    .bind(resource_id.to_string())
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    Ok(())
+    .map_err(Into::into)
 }
 
 fn request_hash<T: Serialize>(value: &T) -> Result<String, FileAttachmentRepositoryError> {
-    serde_json::to_vec(value)
-        .map(|bytes| hex::encode(Sha256::digest(bytes)))
-        .map_err(|error| FileAttachmentRepositoryError::Serialize(error.to_string()))
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 pub fn hash_token(token: &str) -> String {
