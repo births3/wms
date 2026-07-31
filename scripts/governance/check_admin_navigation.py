@@ -23,7 +23,19 @@ from pathlib import Path
 _THIS = Path(__file__).resolve()
 REPO_ROOT = _THIS.parent.parent.parent
 APP_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "App.tsx"
+ADMIN_VIEW_TS = REPO_ROOT / "apps" / "web-admin" / "src" / "app-shell" / "admin-view.ts"
+MASTER_DATA_TYPES_TS = (
+    REPO_ROOT
+    / "apps"
+    / "web-admin"
+    / "src"
+    / "features"
+    / "master-data"
+    / "master-data-queries"
+    / "types.ts"
+)
 ADMIN_VIEW_RENDERER_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "app-shell" / "AdminViewRenderer.tsx"
+ADMIN_MENU_DEV_MOCK_TS = REPO_ROOT / "apps" / "web-admin" / "dev-mocks" / "admin-menu-dev-mock.ts"
 PAGE_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "pages" / "master-data" / "M1MasterDataPage.tsx"
 QUERY_TS = (
     REPO_ROOT
@@ -67,6 +79,10 @@ REQUIRED_DASHBOARD_BACK_MARKERS = (
     'onBack={() => navigateTo("dashboard")}',
 )
 
+TYPE_UNION_RE = re.compile(r"(?:export\s+)?type\s+([A-Za-z0-9_]+)\s*=\s*(.*?);", re.DOTALL)
+VIEW_CONDITION_RE = re.compile(r'\bview\s*===\s*"([^"]+)"')
+DEV_MENU_PAGE_RE = re.compile(r'\["([^"]+)",\s*"[^"]+",\s*"[^"]+"\]')
+
 REQUIRED_NAV_ITEMS = (
     ("m1-products", "M1 商品档案"),
     ("m1-business-partners", "M1 客商档案"),
@@ -92,6 +108,64 @@ def rel(path: Path) -> str:
 def read_source(path: Path) -> str:
     """读取治理约定中的源码文件，缺失时返回空串让门禁给出业务缺口。"""
     return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def type_union_literals(source: str, type_name: str) -> set[str]:
+    match = next((match for match in TYPE_UNION_RE.finditer(source) if match.group(1) == type_name), None)
+    return set(re.findall(r'"([^"]+)"', match.group(2))) if match else set()
+
+
+def scan_view_contract(
+    app_text: str,
+    admin_view_text: str,
+    master_data_types_text: str,
+    renderer_text: str,
+    dev_mock_text: str,
+) -> list[Issue]:
+    """校验本地 view、菜单、开发种子和 renderer 的集合一致性，不复制服务端权限表。"""
+    expected = type_union_literals(admin_view_text, "AdminView") | type_union_literals(
+        master_data_types_text, "MasterDataViewId"
+    )
+    menu_start = app_text.find("const menuSections")
+    menu_end = app_text.find("const MENU_EXPANDED_STORAGE_KEY", menu_start)
+    menu_source = app_text[menu_start:menu_end] if menu_start >= 0 and menu_end > menu_start else ""
+    menu_views = [match.group(1) for match in re.finditer(r'\{\s*id:\s*"([^"]+)"', menu_source)]
+
+    tree_start = app_text.find("const defaultMenuTree")
+    tree_end = app_text.find("const adminMenuIconByKey", tree_start)
+    tree_source = app_text[tree_start:tree_end] if tree_start >= 0 and tree_end > tree_start else ""
+    tree_views = re.findall(r'menuItem\("([^"]+)"\)', tree_source)
+
+    renderer_views = set(VIEW_CONDITION_RE.findall(renderer_text))
+    # dashboard is intentionally rendered by App.tsx's explicit fallback, not renderAdminView.
+    if "dashboard" in expected:
+        renderer_views.add("dashboard")
+
+    seed_start = dev_mock_text.find("function devAdminMenuSeed")
+    seed_end = dev_mock_text.find("function devStandardAdminMenuButtons", seed_start)
+    seed_source = dev_mock_text[seed_start:seed_end] if seed_start >= 0 and seed_end > seed_start else ""
+    dev_views = DEV_MENU_PAGE_RE.findall(seed_source)
+
+    actual_sources = {
+        "menuSections": set(menu_views),
+        "defaultMenuTree": set(tree_views),
+        "renderer": renderer_views,
+        "dev menu seed": set(dev_views),
+    }
+    issues: list[Issue] = []
+    for source_name, actual in actual_sources.items():
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        if missing:
+            issues.append(Issue(rel(APP_TSX), f"{source_name} 缺少 AdminView: {', '.join(missing)}"))
+        if extra:
+            issues.append(Issue(rel(APP_TSX), f"{source_name} 包含未登记 AdminView: {', '.join(extra)}"))
+
+    for source_name, values in (("menuSections", menu_views), ("defaultMenuTree", tree_views), ("dev menu seed", dev_views)):
+        duplicates = sorted({value for value in values if values.count(value) > 1})
+        if duplicates:
+            issues.append(Issue(rel(APP_TSX), f"{source_name} 重复登记 AdminView: {', '.join(duplicates)}"))
+    return issues
 
 
 def scan_menu_id_collisions(migrations_dir: Path, repair_file: Path) -> list[Issue]:
@@ -143,6 +217,15 @@ def scan() -> list[Issue]:
     for path in (PAGE_TSX, QUERY_TS):
         if not path.exists():
             issues.append(Issue(rel(path), "缺少基础档案管理端页面或查询层文件"))
+    issues.extend(
+        scan_view_contract(
+            text,
+            read_source(ADMIN_VIEW_TS),
+            read_source(MASTER_DATA_TYPES_TS),
+            route_text,
+            read_source(ADMIN_MENU_DEV_MOCK_TS),
+        )
+    )
     issues.extend(scan_menu_id_collisions(MIGRATIONS_DIR, MENU_ID_COLLISION_REPAIR))
     return issues
 

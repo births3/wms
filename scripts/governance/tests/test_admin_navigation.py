@@ -27,3 +27,30 @@ def test_admin_navigation_rejects_new_literal_menu_id_collision(tmp_path):
     assert node_id in issues[0].message
     assert "platform.first" in issues[0].message
     assert "platform.second" in issues[0].message
+
+
+def test_admin_navigation_view_contract_matches_all_sources():
+    issues = check.scan_view_contract(
+        check.APP_TSX.read_text(encoding="utf-8"),
+        check.ADMIN_VIEW_TS.read_text(encoding="utf-8"),
+        check.MASTER_DATA_TYPES_TS.read_text(encoding="utf-8"),
+        check.ADMIN_VIEW_RENDERER_TSX.read_text(encoding="utf-8"),
+        check.ADMIN_MENU_DEV_MOCK_TS.read_text(encoding="utf-8"),
+    )
+
+    assert issues == []
+
+
+def test_admin_navigation_view_contract_rejects_missing_renderer_view():
+    renderer = check.ADMIN_VIEW_RENDERER_TSX.read_text(encoding="utf-8")
+    renderer = renderer.replace('if (view === "h5-express") return <H5ExpressPage />;', "")
+
+    issues = check.scan_view_contract(
+        check.APP_TSX.read_text(encoding="utf-8"),
+        check.ADMIN_VIEW_TS.read_text(encoding="utf-8"),
+        check.MASTER_DATA_TYPES_TS.read_text(encoding="utf-8"),
+        renderer,
+        check.ADMIN_MENU_DEV_MOCK_TS.read_text(encoding="utf-8"),
+    )
+
+    assert any("renderer" in issue.message and "h5-express" in issue.message for issue in issues)
