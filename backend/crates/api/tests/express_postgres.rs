@@ -167,19 +167,36 @@ async fn express_carrier_rule_waybill_cancel_writes_audit_and_replays(pool: PgPo
     )
     .expect("waybill body should parse");
 
-    for _ in 0..2 {
-        let response = app
-            .clone()
-            .oneshot(post(
-                &format!("/api/v1/express/waybills/{}/cancel", waybill.waybill_no),
-                &token,
-                "express-cancel-1",
-                json!({"reason": "客户取消"}),
-            ))
-            .await
-            .expect("cancel request should complete");
-        assert_eq!(response.status(), StatusCode::OK);
-    }
+    let response = app
+        .clone()
+        .oneshot(post(
+            &format!("/api/v1/express/waybills/{}/cancel", waybill.waybill_no),
+            &token,
+            "express-cancel-1",
+            json!({"reason": "客户取消"}),
+        ))
+        .await
+        .expect("cancel request should complete");
+    assert_eq!(response.status(), StatusCode::OK);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("express-cancel-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = app
+        .clone()
+        .oneshot(post(
+            &format!("/api/v1/express/waybills/{}/cancel", waybill.waybill_no),
+            &token,
+            "express-cancel-1",
+            json!({"reason": "客户取消"}),
+        ))
+        .await
+        .expect("metadata conflict request should complete");
+    assert_eq!(metadata_conflict.status(), StatusCode::CONFLICT);
 
     let counts: (i64, i64, i64, i64) = sqlx::query_as(
         r#"

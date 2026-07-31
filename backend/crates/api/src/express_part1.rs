@@ -8,7 +8,6 @@ use axum::{
 use chrono::{DateTime, Duration, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -21,6 +20,7 @@ use wms_domain::{
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::{AuthContext, AuthError},
+    idempotency,
 };
 
 const DEFAULT_LIMIT: u32 = 100;
@@ -47,6 +47,18 @@ enum ExpressError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<crate::idempotency::IdempotencyError> for ExpressError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 impl From<AuthError> for ExpressError {
@@ -257,10 +269,19 @@ async fn upsert_carrier_handler(
     validate_carrier(&req)?;
     let now = Utc::now();
     let request_hash = json_request_hash(&req)?;
+    let path = "/api/v1/express/carriers";
     let mut tx = state.pool.begin().await.map_err(map_db_error)?;
     lock_idempotency_key(&mut tx, ctx.owner_id, &idempotency_key).await?;
-    if let Some(replay) =
-        replay_idempotency(&mut tx, ctx.owner_id, &idempotency_key, &request_hash, now).await?
+    if let Some(replay) = replay_idempotency(
+        &mut tx,
+        ctx.owner_id,
+        &idempotency_key,
+        &request_hash,
+        "POST",
+        path,
+        now,
+    )
+    .await?
     {
         return Ok(Json(replay));
     }
@@ -314,7 +335,7 @@ async fn upsert_carrier_handler(
         &idempotency_key,
         &request_hash,
         "POST",
-        "/api/v1/express/carriers",
+        path,
         "express_carrier",
         carrier.carrier_code.clone(),
         &carrier,
@@ -379,10 +400,19 @@ async fn upsert_routing_rule_handler(
     validate_rule(&req)?;
     let now = Utc::now();
     let request_hash = json_request_hash(&req)?;
+    let path = "/api/v1/express/routing-rules";
     let mut tx = state.pool.begin().await.map_err(map_db_error)?;
     lock_idempotency_key(&mut tx, ctx.owner_id, &idempotency_key).await?;
-    if let Some(replay) =
-        replay_idempotency(&mut tx, ctx.owner_id, &idempotency_key, &request_hash, now).await?
+    if let Some(replay) = replay_idempotency(
+        &mut tx,
+        ctx.owner_id,
+        &idempotency_key,
+        &request_hash,
+        "POST",
+        path,
+        now,
+    )
+    .await?
     {
         return Ok(Json(replay));
     }
@@ -436,7 +466,7 @@ async fn upsert_routing_rule_handler(
         &idempotency_key,
         &request_hash,
         "POST",
-        "/api/v1/express/routing-rules",
+        path,
         "express_routing_rule",
         rule.rule_code.clone(),
         &rule,
@@ -459,10 +489,19 @@ async fn create_waybill_handler(
     validate_waybill(&req)?;
     let now = Utc::now();
     let request_hash = json_request_hash(&req)?;
+    let path = "/api/v1/express/waybills";
     let mut tx = state.pool.begin().await.map_err(map_db_error)?;
     lock_idempotency_key(&mut tx, ctx.owner_id, &idempotency_key).await?;
-    if let Some(replay) =
-        replay_idempotency(&mut tx, ctx.owner_id, &idempotency_key, &request_hash, now).await?
+    if let Some(replay) = replay_idempotency(
+        &mut tx,
+        ctx.owner_id,
+        &idempotency_key,
+        &request_hash,
+        "POST",
+        path,
+        now,
+    )
+    .await?
     {
         return Ok(Json(replay));
     }
@@ -567,7 +606,7 @@ async fn create_waybill_handler(
         &idempotency_key,
         &request_hash,
         "POST",
-        "/api/v1/express/waybills",
+        path,
         "express_waybill",
         waybill.waybill_no.clone(),
         &waybill,
