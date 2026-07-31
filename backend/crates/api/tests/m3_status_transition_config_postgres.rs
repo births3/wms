@@ -87,6 +87,34 @@ async fn status_transition_config_is_owner_scoped_idempotent_and_audited(pool: P
     assert_eq!(first.value.approval_sources, vec!["owner-source"]);
     assert_eq!(first.value.owner_id, Some(owner_a));
 
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'POST', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_a)
+    .bind("m3-status-transition-config-001")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repository
+        .upsert(
+            &ctx(owner_a),
+            STATUS_QUALIFIED,
+            STATUS_QUARANTINED,
+            UpsertInventoryStatusTransitionRequest {
+                owner_id: Some(owner_a),
+                approval_sources: vec![" owner-source ".to_string(), "owner-source".to_string()],
+                enabled: true,
+            },
+            now,
+            "m3-status-transition-config-001",
+        )
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(
+        metadata_conflict,
+        InventoryStatusConfigError::IdempotencyConflict
+    );
+
     let owner_a_rules = repository
         .list_effective(&ctx(owner_a))
         .await
