@@ -19,7 +19,7 @@ type IdempotencyCache = Arc<Mutex<HashMap<String, IdempotencyRecord>>>;
 pub struct H8ErpConnectorAppState {
     pub repository: Arc<dyn H8ErpConnectorRepository>,
     pub audit_pool: Option<PgPool>,
-    /// AC15：无 DB 时本地幂等缓存；有 pool 时优先写 `idempotency_request`
+    /// AC15：无 DB 时本地幂等缓存；有 pool 时优先写数据库幂等表
     pub(crate) idempotency: IdempotencyCache,
 }
 
