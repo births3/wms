@@ -1,3 +1,4 @@
+// @governance: skip-page-size - API Key 生命周期与认证/限流事务共用仓储边界，幂等迁移不拆行为链。
 use chrono::{DateTime, Duration, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
@@ -10,6 +11,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event, append_event_in_tx, AuditDiff, AuditWriteRequest},
+    idempotency,
     operation_context::OperationContext as AuthContext,
 };
 
@@ -76,11 +78,19 @@ impl ApiKeyRepository {
         key_id: Uuid,
         secret: &str,
     ) -> Result<ApiKey, ApiKeyRepositoryError> {
+        let path = "/api/v1/auth/api-keys";
         let mut tx = self.pool.begin().await.map_err(db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(response) =
-            replay_idempotency::<ApiKey>(&mut tx, ctx.owner_id, idempotency_key, request_hash, now)
-                .await?
+        if let Some(response) = replay_idempotency::<ApiKey>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            request_hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             tx.commit().await.map_err(db_error)?;
             return Ok(response);
@@ -121,7 +131,7 @@ impl ApiKeyRepository {
             &stored,
             now,
             "POST",
-            "/api/v1/auth/api-keys",
+            path,
             "api_key",
             key_id,
         )
@@ -152,6 +162,7 @@ impl ApiKeyRepository {
         new_key_id: Uuid,
         secret: &str,
     ) -> Result<ApiKeyRotationResponse, ApiKeyRepositoryError> {
+        let path = format!("/api/v1/auth/api-keys/{key_id}/rotate");
         let mut tx = self.pool.begin().await.map_err(db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(response) = replay_idempotency::<ApiKeyRotationResponse>(
@@ -159,6 +170,8 @@ impl ApiKeyRepository {
             ctx.owner_id,
             idempotency_key,
             request_hash,
+            "POST",
+            &path,
             now,
         )
         .await?
@@ -226,7 +239,7 @@ impl ApiKeyRepository {
             &response,
             now,
             "POST",
-            &format!("/api/v1/auth/api-keys/{key_id}/rotate"),
+            &path,
             "api_key",
             new_key_id,
         )
@@ -262,11 +275,19 @@ impl ApiKeyRepository {
         idempotency_key: &str,
         request_hash: &str,
     ) -> Result<ApiKey, ApiKeyRepositoryError> {
+        let path = format!("/api/v1/auth/api-keys/{key_id}/revoke");
         let mut tx = self.pool.begin().await.map_err(db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(response) =
-            replay_idempotency::<ApiKey>(&mut tx, ctx.owner_id, idempotency_key, request_hash, now)
-                .await?
+        if let Some(response) = replay_idempotency::<ApiKey>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            request_hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await?
         {
             tx.commit().await.map_err(db_error)?;
             return Ok(response);
@@ -298,7 +319,7 @@ impl ApiKeyRepository {
             &response,
             now,
             "POST",
-            &format!("/api/v1/auth/api-keys/{key_id}/revoke"),
+            &path,
             "api_key",
             key_id,
         )
@@ -573,6 +594,18 @@ pub enum ApiKeyRepositoryError {
     ResponsibleUser,
 }
 
+impl From<crate::idempotency::IdempotencyError> for ApiKeyRepositoryError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
+}
+
 #[derive(Clone, Debug, FromRow)]
 struct ApiKeyRow {
     id: Uuid,
@@ -683,13 +716,9 @@ async fn lock_idempotency_key(
     owner_id: Uuid,
     key: &str,
 ) -> Result<(), ApiKeyRepositoryError> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))")
-        .bind(owner_id.to_string())
-        .bind(key)
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, "api-key", owner_id, key)
         .await
-        .map_err(db_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 async fn replay_idempotency<T: DeserializeOwned>(
@@ -697,28 +726,13 @@ async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     key: &str,
     request_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, ApiKeyRepositoryError> {
-    let row: Option<(String, serde_json::Value, DateTime<Utc>)> = sqlx::query_as("SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2 FOR UPDATE")
-        .bind(owner_id).bind(key).fetch_optional(&mut **tx).await.map_err(db_error)?;
-    let Some((stored_hash, body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2")
-            .bind(owner_id)
-            .bind(key)
-            .execute(&mut **tx)
-            .await
-            .map_err(db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(ApiKeyRepositoryError::IdempotencyConflict);
-    }
-    serde_json::from_value(body)
-        .map(Some)
-        .map_err(|error| ApiKeyRepositoryError::Serialize(error.to_string()))
+    idempotency::replay(tx, owner_id, key, request_hash, method, path, now)
+        .await
+        .map_err(Into::into)
 }
 
 async fn store_idempotency<T: Serialize>(
@@ -733,11 +747,20 @@ async fn store_idempotency<T: Serialize>(
     resource_type: &str,
     resource_id: Uuid,
 ) -> Result<(), ApiKeyRepositoryError> {
-    let body = serde_json::to_value(response).map_err(serialize_error)?;
-    sqlx::query("INSERT INTO idempotency_request(id, owner_id, idempotency_key, request_hash, method, path, status_code, response_body, resource_type, resource_id, expires_at, created_at) VALUES($1,$2,$3,$4,$5,$6,200,$7,$8,$9,$10,$11)")
-        .bind(Uuid::new_v4()).bind(owner_id).bind(key).bind(request_hash).bind(method).bind(path).bind(body).bind(resource_type).bind(resource_id.to_string()).bind(now + Duration::hours(24)).bind(now)
-        .execute(&mut **tx).await.map_err(db_error)?;
-    Ok(())
+    idempotency::store_success(
+        tx,
+        owner_id,
+        key,
+        request_hash,
+        method,
+        path,
+        resource_type,
+        &resource_id.to_string(),
+        response,
+        now,
+    )
+    .await
+    .map_err(Into::into)
 }
 
 async fn append_context_audit(

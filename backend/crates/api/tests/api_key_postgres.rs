@@ -162,7 +162,7 @@ async fn api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit(
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
                 .header("Idempotency-Key", "create-1")
-                .body(Body::from(body))
+                .body(Body::from(body.clone()))
                 .expect("request should build"),
         )
         .await
@@ -173,6 +173,28 @@ async fn api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit(
         replayed.secret.is_none(),
         "idempotent replay must not redisplay secret"
     );
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("create-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = app(pool.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/api-keys")
+                .header("authorization", format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .header("Idempotency-Key", "create-1")
+                .body(Body::from(body))
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should respond");
+    assert_eq!(metadata_conflict.status(), StatusCode::CONFLICT);
 
     let listed: ApiKeyListResponse = json_body(
         app(pool.clone())
