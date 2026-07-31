@@ -1,6 +1,6 @@
-use chrono::{DateTime, Duration, Utc};
+// @governance: skip-page-size - 预约状态、审计和幂等保持同一事务边界，迁移不拆行为链。
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -10,6 +10,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
+    idempotency,
     operation_context::OperationContext as AuthContext,
 };
 
@@ -33,6 +34,18 @@ pub enum DockAppointmentRepositoryError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<crate::idempotency::IdempotencyError> for DockAppointmentRepositoryError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -125,6 +138,7 @@ impl PgDockAppointmentRepository {
         validate_request(&req)?;
         validate_window(req.window_start_at, req.window_end_at, now)?;
         let request_hash = request_hash(&serde_json::json!({ "request": &req }))?;
+        let path = "/api/v1/dock-appointments";
 
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
@@ -133,6 +147,8 @@ impl PgDockAppointmentRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            path,
             now,
         )
         .await?
@@ -193,9 +209,9 @@ impl PgDockAppointmentRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            "/api/v1/dock-appointments",
+            path,
             "dock_appointment",
-            appointment.id.to_string(),
+            &appointment.id.to_string(),
             &appointment,
             now,
         )
@@ -217,6 +233,7 @@ impl PgDockAppointmentRepository {
         validate_update_request(&req)?;
         validate_window(req.window_start_at, req.window_end_at, now)?;
         let request_hash = request_hash(&serde_json::json!({ "id": id, "request": &req }))?;
+        let path = format!("/api/v1/dock-appointments/{id}");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(replay) = replay_idempotency::<DockAppointment>(
@@ -224,6 +241,8 @@ impl PgDockAppointmentRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PATCH",
+            &path,
             now,
         )
         .await?
@@ -309,9 +328,9 @@ impl PgDockAppointmentRepository {
             idempotency_key,
             &request_hash,
             "PATCH",
-            &format!("/api/v1/dock-appointments/{id}"),
+            &path,
             "dock_appointment",
-            appointment.id.to_string(),
+            &appointment.id.to_string(),
             &appointment,
             now,
         )
@@ -330,6 +349,7 @@ impl PgDockAppointmentRepository {
         mut audit: AuditWriteRequest,
     ) -> Result<DockAppointment, DockAppointmentRepositoryError> {
         let request_hash = request_hash(&serde_json::json!({ "id": id, "request": &req }))?;
+        let path = format!("/api/v1/dock-appointments/{id}/cancel");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(replay) = replay_idempotency::<DockAppointment>(
@@ -337,6 +357,8 @@ impl PgDockAppointmentRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            &path,
             now,
         )
         .await?
@@ -381,9 +403,9 @@ impl PgDockAppointmentRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            &format!("/api/v1/dock-appointments/{id}/cancel"),
+            &path,
             "dock_appointment",
-            appointment.id.to_string(),
+            &appointment.id.to_string(),
             &appointment,
             now,
         )
@@ -403,6 +425,7 @@ impl PgDockAppointmentRepository {
     ) -> Result<DockAppointment, DockAppointmentRepositoryError> {
         validate_arrival_request(&req)?;
         let request_hash = request_hash(&serde_json::json!({ "id": id, "request": &req }))?;
+        let path = format!("/api/v1/dock-appointments/{id}/arrive");
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(replay) = replay_idempotency::<DockAppointment>(
@@ -410,6 +433,8 @@ impl PgDockAppointmentRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            &path,
             now,
         )
         .await?
@@ -439,9 +464,9 @@ impl PgDockAppointmentRepository {
                 idempotency_key,
                 &request_hash,
                 "POST",
-                &format!("/api/v1/dock-appointments/{id}/arrive"),
+                &path,
                 "dock_appointment",
-                id.to_string(),
+                &id.to_string(),
                 &DockAppointment::from(old.clone()),
                 now,
             )
@@ -494,9 +519,9 @@ impl PgDockAppointmentRepository {
             idempotency_key,
             &request_hash,
             "POST",
-            &format!("/api/v1/dock-appointments/{id}/arrive"),
+            &path,
             "dock_appointment",
-            id.to_string(),
+            &id.to_string(),
             &appointment,
             now,
         )
@@ -666,34 +691,21 @@ async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     idempotency_key: &str,
     request_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, DockAppointmentRepositoryError> {
-    let row: Option<(String, serde_json::Value, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 FOR UPDATE",
+    idempotency::replay(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        now,
     )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    let Some((stored_hash, response_body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(DockAppointmentRepositoryError::IdempotencyConflict);
-    }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| DockAppointmentRepositoryError::Serialize(error.to_string()))
+    .map_err(Into::into)
 }
 
 async fn lock_idempotency_key(
@@ -701,12 +713,9 @@ async fn lock_idempotency_key(
     owner_id: Uuid,
     idempotency_key: &str,
 ) -> Result<(), DockAppointmentRepositoryError> {
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(idempotency_lock_id(owner_id, idempotency_key))
-        .fetch_one(&mut **tx)
+    idempotency::lock_key(tx, "dock-appointment", owner_id, idempotency_key)
         .await
-        .map_err(map_db_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -718,50 +727,28 @@ async fn store_idempotency_success<T: Serialize>(
     method: &str,
     path: &str,
     resource_type: &str,
-    resource_id: String,
+    resource_id: &str,
     response: &T,
     now: DateTime<Utc>,
 ) -> Result<(), DockAppointmentRepositoryError> {
-    let response_body = serde_json::to_value(response)
-        .map_err(|error| DockAppointmentRepositoryError::Serialize(error.to_string()))?;
-    sqlx::query(
-        "INSERT INTO idempotency_request (id, owner_id, idempotency_key, request_hash, method, path, status_code, response_body, resource_type, resource_id, expires_at, created_at) VALUES ($1,$2,$3,$4,$5,$6,200,$7,$8,$9,$10,$11)",
+    idempotency::store_success(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        resource_type,
+        resource_id,
+        response,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(method)
-    .bind(path)
-    .bind(response_body)
-    .bind(resource_type)
-    .bind(resource_id)
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    Ok(())
+    .map_err(Into::into)
 }
 
 fn request_hash(value: &serde_json::Value) -> Result<String, DockAppointmentRepositoryError> {
-    let mut hasher = Sha256::new();
-    hasher.update(
-        serde_json::to_vec(value)
-            .map_err(|error| DockAppointmentRepositoryError::Serialize(error.to_string()))?,
-    );
-    Ok(hex::encode(hasher.finalize()))
-}
-
-fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
-    let mut hasher = Sha256::new();
-    hasher.update(owner_id.as_bytes());
-    hasher.update([0]);
-    hasher.update(idempotency_key.as_bytes());
-    let digest = hasher.finalize();
-    let mut bytes = [0_u8; 8];
-    bytes.copy_from_slice(&digest[..8]);
-    i64::from_be_bytes(bytes)
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 impl From<DockAppointmentRow> for DockAppointment {

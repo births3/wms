@@ -469,6 +469,26 @@ async fn idempotency_replay_and_conflict(pool: PgPool) {
         .expect("replay should return original");
     assert_eq!(first.id, second.id);
 
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("dock-app-replay")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    assert!(matches!(
+        repo.create_with_audit(
+            &actor,
+            req.clone(),
+            at(8),
+            "dock-app-replay",
+            audit(&actor, &Uuid::new_v4()),
+        )
+        .await,
+        Err(DockAppointmentRepositoryError::IdempotencyConflict)
+    ));
+
     let mut req2 = req;
     req2.appointment_no = "APP-5002".to_string();
     assert!(matches!(
