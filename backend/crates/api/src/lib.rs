@@ -59,6 +59,7 @@ pub mod h8_erp_connectors;
 pub mod h8_erp_interface_tables;
 pub mod h8_erp_messages;
 pub mod h8_inbound;
+mod idempotency;
 pub mod inbound;
 pub mod inventory;
 pub mod inventory_expiry_job;

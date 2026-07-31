@@ -176,6 +176,7 @@ nav:
     - ADR-0041 H9 打印编排细化: adr/0041-print-orchestration-refinement.md
     - ADR-0042 药检单客户平台: adr/0042-drug-inspection-customer-portal.md
     - ADR-0043 直接生产前端开发: adr/0043-direct-production-frontend-workflow.md
+    - ADR-0044 PostgreSQL 幂等权威存储: adr/0044-postgresql-idempotency-authority.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md
@@ -219,6 +220,7 @@ nav:
     - M2 入库模块整体审查 (2026-07-18): reviews/m2-overall-review-2026-07-18.md
     - M3 库存模块整体审查 (2026-07-18): reviews/m3-overall-review-2026-07-18.md
     - 延期故事快速闭环审计 (2026-07-15): reviews/deferred-story-closure-audit-2026-07-15.md
+    - Redis 必要性评估任务: reviews/redis-necessity-assessment-task-2026-07-31.md
     - 全项目治理真实缺口修复计划: reviews/governance-remediation-plan-2026-07-11.md
     - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md
     - 软件设计审计 (12 维度): reviews/software-design-audit-2026-05-18.md

@@ -1,6 +1,6 @@
 # ADR-0018：弹性工程（幂等 / 重试 / 限流 / 熔断 / 降级 / 死信）
 
-- 状态：Accepted
+- 状态：Accepted（HTTP 幂等存储局部由 ADR-0044 取代）
 - 决策日期：2026-05-18
 - 决策人：项目主人
 - 关联：ADR-0006 L11 / ADR-0010 / ADR-0011 / ADR-0012 / coding-standards §3.3 / technical-specs §H8 / usability-baseline §2.5 / clarifications #36 / pattern-extraction §5.2 缺口 #1
@@ -23,7 +23,7 @@
 
 | 来源 | 约束 | 本 ADR 角色 |
 |------|------|------------|
-| coding-standards §3.3 | 幂等键规范（Idempotency-Key + Redis/PG + TTL 24h + 前端自动附加） | 继承，不修改 |
+| coding-standards §3.3 | 幂等键规范（Idempotency-Key + PostgreSQL + TTL 24h + 前端自动附加） | 由 ADR-0044 局部取代存储选型 |
 | ADR-0006 L11 | 写操作必须有幂等性测试（testcontainers + 重放断言） | 继承 |
 | technical-specs §H8 | ERP 防腐层重试（3 次指数退避 / 档案补录 5 次 / 死信 / 降级） | 继承，本 ADR 泛化为全局策略 |
 | usability-baseline §2.5 | 限流违规告警 ≤ 1 分钟 | 继承 |
@@ -41,7 +41,7 @@
 
 | 场景 | 幂等键来源 | 存储 | TTL |
 |------|-----------|------|-----|
-| 前端写操作 | 客户端 UUID v4（TanStack Query 自动附加） | Redis → PG fallback | 24h |
+| 前端写操作 | 客户端 UUID v4（TanStack Query 自动附加） | PostgreSQL `idempotency_request` | 24h |
 | 模块间事件消费 | `event_id`（H2-005 事件总线自带） | PG `processed_events` 表 | 7d |
 | ERP 回调 | 外部 `request_id` 或 `Idempotency-Key` | Redis | 24h |
 | 定时任务 | `task_type + scheduled_at` 组合键 | PG | 任务周期 × 2 |
@@ -217,8 +217,8 @@ CREATE TABLE dead_letter_queue (
 
 ### 负面
 
-- **Redis 强依赖**：限流 + 幂等 + 熔断状态都依赖 Redis
-- **应对**：Redis 不可用时降级到 PG（D2 级别）；Wave 1 末补 infra/cache-strategy.md
+- **Redis 依赖边界**：HTTP 幂等结果回放已由 ADR-0044 明确使用 PostgreSQL；限流和多实例熔断状态仍按本 ADR 的部署方案单独评估
+- **应对**：HTTP 幂等直接使用 PostgreSQL；其他缓存用途不可用时按 D2 降级到 PG，是否引入共享 Redis 需以实际多实例容量证据为准
 
 ### 风险
 

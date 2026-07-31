@@ -693,9 +693,12 @@ Header: Idempotency-Key: <client-generated-uuid>
 
 **规则**：
 - 客户端生成 `Idempotency-Key`（UUID v4）
-- 后端用 Redis / PG 存 key → response 映射，TTL 24h
+- 后端统一使用 PostgreSQL `idempotency_request` 保存 key → response 映射，TTL 24h；实现必须复用 `wms-api` 共享幂等模块
 - 相同 key 重复请求 → 返回首次响应，不重复执行
+- 同 key 但 request hash、HTTP method 或 path 不同 → 返回幂等冲突，不执行业务写入
 - 前端 TanStack Query mutation 自动附加 key
+
+Redis 不参与 HTTP 幂等结果回放；鉴权撤销等其他 Redis 用途按各自 ADR 处理。网络重试和人工重试必须复用原 key，不能生成新 key。
 
 ### 3.4 时间与时区
 

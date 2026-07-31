@@ -70,7 +70,8 @@
 | [ADR-0041](0041-print-orchestration-refinement.md) | H9 打印编排细化与 ADR-0039 局部取代 | Accepted | 三键归集硬边界、渲染/外部 PDF 来源、必需项失败和安全备用 Agent 状态路径 |
 | [ADR-0042](0042-drug-inspection-customer-portal.md) | 药检单独立客户平台与客户分发副本 | Accepted | 独立查询库、地址范围、事件投影、短期下载、批量导出、图章和图像处理边界 |
 | [ADR-0043](0043-direct-production-frontend-workflow.md) | 直接生产前端开发与开发 Mock 走查 | Accepted | 不再新增原型；新页面直接写入 `apps/*`，使用开发 Mock 完成业务确认 |
-| ADR-0044+ | 未分配 | 后续按需新建 |
+| [ADR-0044](0044-postgresql-idempotency-authority.md) | PostgreSQL 作为 HTTP 幂等权威存储 | Accepted | HTTP 幂等统一由 PostgreSQL `idempotency_request` 和共享实现承载；局部取代 ADR-0018 §1 的 Redis-first 文案 |
+| ADR-0045+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 

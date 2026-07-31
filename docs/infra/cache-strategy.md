@@ -14,17 +14,18 @@
 
 ## 2. 用途清单
 
+HTTP 幂等结果回放不属于 Redis 缓存用途：按 [ADR-0044](../adr/0044-postgresql-idempotency-authority.md) 统一写入 PostgreSQL `idempotency_request`，不做 Redis 双写。以下清单只列实际或待评估的 Redis 缓存用途。
+
 | # | 用途 | Key 模式 | TTL | 失效策略 | Wave |
 |---|------|---------|-----|---------|------|
-| 1 | 幂等键存储 | `idem:{idempotency_key}` | 24h | 自然过期 | 1 |
-| 2 | 限流计数器 | `rl:{dimension}:{id}:{window}` | 窗口期 | 自然过期 | 1 |
-| 3 | H1 JWT token 黑名单 | `token:bl:{jti}` | token 剩余有效期 | 自然过期 | 1 |
-| 4 | H1 权限码缓存 | `perm:{user_id}` | 5 min | 权限变更时主动删除 | 1 |
-| 5 | M-VR 双人策略矩阵 | `vr:matrix:{owner_id}` | 10 min | 矩阵变更时主动删除 | 3 |
-| 6 | M-PM 映射规则缓存 | `pm:rules:{owner_id}` | 10 min | 规则变更时主动删除 | 2 |
-| 7 | 熔断器状态 | `cb:{service}` | 无（手动管理） | 状态变更时覆写 | 1 |
-| 8 | Feature Flag | `ff:{flag_key}` | 60s | 配置变更时主动删除 | 1 |
-| 9 | 热点商品信息 | `product:{id}` | 5 min | 商品变更时主动删除 | 2 |
+| 1 | 限流计数器 | `rl:{dimension}:{id}:{window}` | 窗口期 | 自然过期 | 1 |
+| 2 | H1 JWT token 黑名单 | `token:bl:{jti}` | token 剩余有效期 | 自然过期 | 1 |
+| 3 | H1 权限码缓存 | `perm:{user_id}` | 5 min | 权限变更时主动删除 | 1 |
+| 4 | M-VR 双人策略矩阵 | `vr:matrix:{owner_id}` | 10 min | 矩阵变更时主动删除 | 3 |
+| 5 | M-PM 映射规则缓存 | `pm:rules:{owner_id}` | 10 min | 规则变更时主动删除 | 2 |
+| 6 | 熔断器状态 | `cb:{service}` | 无（手动管理） | 状态变更时覆写 | 1 |
+| 7 | Feature Flag | `ff:{flag_key}` | 60s | 配置变更时主动删除 | 1 |
+| 8 | 热点商品信息 | `product:{id}` | 5 min | 商品变更时主动删除 | 2 |
 
 ---
 
@@ -75,3 +76,4 @@
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-05-18 | v1 | 初版：Redis 用途清单 9 项 + Cache Aside 失效策略 + 4 项防护 + 约束 |
+| 2026-07-31 | v1.1 | HTTP 幂等结果回放移至 PostgreSQL，Redis 清单保留 8 项 |

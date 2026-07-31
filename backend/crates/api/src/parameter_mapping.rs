@@ -7,7 +7,7 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
@@ -19,6 +19,7 @@ use wms_domain::{
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::{AuthContext, AuthError},
+    idempotency,
 };
 
 const EXECUTE_PERMISSION: &str = "mpm.execute";
@@ -128,22 +129,16 @@ pub(crate) async fn map_parameter(
     key: &str,
 ) -> Result<MapParameterResponse, ParameterMappingHandlerError> {
     validate_request(req)?;
-    let request_hash = format!(
-        "{:x}",
-        Sha256::digest(
-            serde_json::to_vec(req)
-                .map_err(|error| ParameterMappingHandlerError::Persistence(error.to_string()))?
-        )
-    );
+    let request_hash = idempotency::request_hash(req).map_err(map_idempotency_error)?;
+    let now = Utc::now();
     let mut tx = state.pool.begin().await.map_err(db_error)?;
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))")
-        .bind(ctx.owner_id.to_string())
-        .bind(key)
-        .execute(&mut *tx)
+    idempotency::lock_key(&mut tx, "wms-idempotency", ctx.owner_id, key)
         .await
-        .map_err(db_error)?;
+        .map_err(map_idempotency_error)?;
 
-    if let Some(response) = replay_idempotent(&mut tx, ctx.owner_id, key, &request_hash).await? {
+    if let Some(response) =
+        replay_idempotent(&mut tx, ctx.owner_id, key, &request_hash, now).await?
+    {
         tx.commit().await.map_err(db_error)?;
         return Ok(response);
     }
@@ -185,6 +180,7 @@ pub(crate) async fn map_parameter(
         &request_hash,
         &resource_id,
         &response,
+        now,
     )
     .await?;
     tx.commit().await.map_err(db_error)?;
@@ -403,33 +399,11 @@ async fn replay_idempotent(
     owner_id: Uuid,
     key: &str,
     request_hash: &str,
+    now: chrono::DateTime<Utc>,
 ) -> Result<Option<MapParameterResponse>, ParameterMappingHandlerError> {
-    let row: Option<(String, Value, chrono::DateTime<Utc>)> = sqlx::query_as(
-        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2 FOR UPDATE",
-    )
-    .bind(owner_id)
-    .bind(key)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(db_error)?;
-    let Some((stored_hash, response, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= Utc::now() {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2")
-            .bind(owner_id)
-            .bind(key)
-            .execute(&mut **tx)
-            .await
-            .map_err(db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(ParameterMappingHandlerError::IdempotencyConflict);
-    }
-    serde_json::from_value(response)
-        .map(Some)
-        .map_err(|error| ParameterMappingHandlerError::Persistence(error.to_string()))
+    idempotency::replay(tx, owner_id, key, request_hash, "POST", MAP_PATH, now)
+        .await
+        .map_err(map_idempotency_error)
 }
 
 async fn store_idempotent(
@@ -439,31 +413,34 @@ async fn store_idempotent(
     request_hash: &str,
     resource_id: &str,
     response: &MapParameterResponse,
+    now: chrono::DateTime<Utc>,
 ) -> Result<(), ParameterMappingHandlerError> {
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path, status_code,
-            response_body, resource_type, resource_id, expires_at, created_at
-        ) VALUES ($1,$2,$3,$4,'POST',$5,200,$6,'parameter_mapping',$7,$8,$9)
-        "#,
+    idempotency::store_success(
+        tx,
+        owner_id,
+        key,
+        request_hash,
+        "POST",
+        MAP_PATH,
+        "parameter_mapping",
+        resource_id,
+        response,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(key)
-    .bind(request_hash)
-    .bind(MAP_PATH)
-    .bind(
-        serde_json::to_value(response)
-            .map_err(|error| ParameterMappingHandlerError::Persistence(error.to_string()))?,
-    )
-    .bind(resource_id)
-    .bind(Utc::now() + Duration::hours(24))
-    .bind(Utc::now())
-    .execute(&mut **tx)
     .await
-    .map_err(db_error)?;
-    Ok(())
+    .map_err(map_idempotency_error)
+}
+
+fn map_idempotency_error(error: idempotency::IdempotencyError) -> ParameterMappingHandlerError {
+    match error {
+        idempotency::IdempotencyError::Conflict => {
+            ParameterMappingHandlerError::IdempotencyConflict
+        }
+        idempotency::IdempotencyError::Database(error) => db_error(error),
+        idempotency::IdempotencyError::Serialize(error) => {
+            ParameterMappingHandlerError::Persistence(error)
+        }
+    }
 }
 
 fn db_error(error: sqlx::Error) -> ParameterMappingHandlerError {
