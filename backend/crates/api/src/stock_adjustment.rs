@@ -46,6 +46,18 @@ pub enum StockAdjustmentError {
     Serialize(String),
 }
 
+impl From<crate::idempotency::IdempotencyError> for StockAdjustmentError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct IdempotentStockAdjustmentMutation {
     pub value: StockLossOrder,
@@ -125,9 +137,10 @@ impl PgStockAdjustmentRepository {
     ) -> Result<IdempotentStockAdjustmentMutation, StockAdjustmentError> {
         validate_create_request(&request)?;
         let hash = request_hash(&serde_json::json!({"action":"create_loss","request":request}))?;
+        let path = "/api/v1/stock-adjustments/loss-orders";
         lock_idempotency_key(tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) =
-            replay_idempotency(tx, ctx.owner_id, idempotency_key, &hash, now).await?
+            replay_idempotency(tx, ctx.owner_id, idempotency_key, &hash, "POST", path, now).await?
         {
             return Ok(IdempotentStockAdjustmentMutation {
                 value,
@@ -177,7 +190,7 @@ impl PgStockAdjustmentRepository {
                     idempotency_key,
                     &hash,
                     "POST",
-                    "/api/v1/stock-adjustments/loss-orders",
+                    path,
                     &order.id.to_string(),
                     &order,
                     now,
@@ -285,7 +298,7 @@ impl PgStockAdjustmentRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/stock-adjustments/loss-orders",
+            path,
             &order.id.to_string(),
             &order,
             now,
@@ -316,10 +329,19 @@ impl PgStockAdjustmentRepository {
             "quality_liaison_id":quality_liaison_id,
             "approved":approved
         }))?;
+        let path = "/api/v1/stock-adjustments/loss-orders/{id}/quality-approval";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentStockAdjustmentMutation {
                 value,
@@ -367,7 +389,7 @@ impl PgStockAdjustmentRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/stock-adjustments/loss-orders/{id}/quality-approval",
+            path,
             &order.id.to_string(),
             &order,
             now,
@@ -388,10 +410,19 @@ impl PgStockAdjustmentRepository {
         idempotency_key: &str,
     ) -> Result<IdempotentStockAdjustmentMutation, StockAdjustmentError> {
         let hash = request_hash(&serde_json::json!({"action":"start_loss","order_id":order_id}))?;
+        let path = "/api/v1/stock-adjustments/loss-orders/{id}/start";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentStockAdjustmentMutation {
                 value,
@@ -431,7 +462,7 @@ impl PgStockAdjustmentRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/stock-adjustments/loss-orders/{id}/start",
+            path,
             &order.id.to_string(),
             &order,
             now,
@@ -457,10 +488,19 @@ impl PgStockAdjustmentRepository {
             "order_id":order_id,
             "second_operator_id":second_operator_id
         }))?;
+        let path = "/api/v1/stock-adjustments/loss-orders/{id}/execute";
         let mut tx = self.pool.begin().await.map_err(map_database_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentStockAdjustmentMutation {
                 value,
@@ -608,7 +648,7 @@ impl PgStockAdjustmentRepository {
             idempotency_key,
             &hash,
             "POST",
-            "/api/v1/stock-adjustments/loss-orders/{id}/execute",
+            path,
             &order.id.to_string(),
             &order,
             now,

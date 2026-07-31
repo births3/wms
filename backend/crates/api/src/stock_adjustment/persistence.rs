@@ -1,6 +1,5 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
-use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -9,6 +8,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
+    idempotency,
     operation_context::OperationContext as AuthContext,
 };
 
@@ -186,18 +186,9 @@ pub(super) async fn lock_idempotency_key(
     owner_id: Uuid,
     key: &str,
 ) -> Result<(), StockAdjustmentError> {
-    let digest = Sha256::digest(format!("msa-stock-adjustment:{owner_id}:{key}").as_bytes());
-    let lock_id = i64::from_be_bytes(
-        digest[..8]
-            .try_into()
-            .map_err(|error| StockAdjustmentError::Serialize(format!("{error:?}")))?,
-    );
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(lock_id)
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, "stock-adjustment", owner_id, key)
         .await
-        .map_err(map_database_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 pub(super) async fn replay_idempotency<T: DeserializeOwned>(
@@ -205,34 +196,13 @@ pub(super) async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     key: &str,
     expected_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, StockAdjustmentError> {
-    let row: Option<(String, serde_json::Value, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 FOR UPDATE",
-    )
-    .bind(owner_id)
-    .bind(key)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(map_database_error)?;
-    let Some((stored_hash, body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_database_error)?;
-        return Ok(None);
-    }
-    if stored_hash != expected_hash {
-        return Err(StockAdjustmentError::IdempotencyConflict);
-    }
-    serde_json::from_value(body)
-        .map(Some)
-        .map_err(|error| StockAdjustmentError::Serialize(error.to_string()))
+    idempotency::replay(tx, owner_id, key, expected_hash, method, path, now)
+        .await
+        .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -247,34 +217,24 @@ pub(super) async fn store_idempotency_success<T: Serialize>(
     order: &T,
     now: DateTime<Utc>,
 ) -> Result<(), StockAdjustmentError> {
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path, status_code,
-            response_body, resource_type, resource_id, expires_at, created_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,200,$7,'stock_adjustment_order',$8,$9,$10)
-        "#,
+    idempotency::store_success(
+        tx,
+        owner_id,
+        key,
+        hash,
+        method,
+        path,
+        "stock_adjustment_order",
+        resource_id,
+        order,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(key)
-    .bind(hash)
-    .bind(method)
-    .bind(path)
-    .bind(json_value(order)?)
-    .bind(resource_id)
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_database_error)?;
-    Ok(())
+    .map_err(Into::into)
 }
 
 pub(super) fn request_hash<T: Serialize>(value: &T) -> Result<String, StockAdjustmentError> {
-    let encoded = serde_json::to_vec(value)
-        .map_err(|error| StockAdjustmentError::Serialize(error.to_string()))?;
-    Ok(hex::encode(Sha256::digest(encoded)))
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 pub(super) fn json_value<T: Serialize>(

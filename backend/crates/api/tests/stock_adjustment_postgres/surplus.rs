@@ -24,11 +24,24 @@ async fn manual_surplus_is_numbered_executed_atomically_audited_and_idempotent(p
         .await
         .expect("manual surplus should be created");
     let replay = repository
-        .create_surplus_order(&ctx, request, now, "sa-surplus-create-1")
+        .create_surplus_order(&ctx, request.clone(), now, "sa-surplus-create-1")
         .await
         .expect("same surplus create request should replay");
     assert_eq!(created.value.id, replay.value.id);
     assert!(replay.replayed);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("sa-surplus-create-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repository
+        .create_surplus_order(&ctx, request, now, "sa-surplus-create-1")
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(metadata_conflict, StockAdjustmentError::IdempotencyConflict);
     assert!(created.value.order_no.starts_with("BY"));
     assert_eq!(created.value.status.as_str(), "pending_execution");
 
