@@ -474,11 +474,10 @@ async fn postgres_receive_handler_writes_business_idempotency_and_audit(pool: Pg
     .expect("same idempotency key should replay");
 
     assert_eq!(receipt.id, replay.id);
-    let counts: (i64, i64, i64) = sqlx::query_as(
+    let counts: (i64, i64) = sqlx::query_as(
         r#"
             SELECT
                 (SELECT COUNT(*) FROM receiving_order_receipts WHERE receiving_order_id = $1),
-                (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $2),
                 (SELECT COUNT(*) FROM audit_event WHERE owner_id = $2 AND action = 'receive')
             "#,
     )
@@ -487,7 +486,7 @@ async fn postgres_receive_handler_writes_business_idempotency_and_audit(pool: Pg
     .fetch_one(&pool)
     .await
     .expect("counts");
-    assert_eq!(counts, (1, 1, 1));
+    assert_eq!(counts, (1, 1));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

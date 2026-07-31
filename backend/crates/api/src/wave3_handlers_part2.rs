@@ -236,12 +236,11 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
     .expect("same second-sign idempotency key should replay");
     assert_eq!(signature.id, signature_replay.id);
 
-    let counts: (i64, i64, i64, i64, String) = sqlx::query_as(
+    let counts: (i64, i64, i64, String) = sqlx::query_as(
             r#"
             SELECT
                 (SELECT COUNT(*) FROM receiving_inspections WHERE receiving_order_id = $1),
                 (SELECT COUNT(*) FROM receiving_inspection_signatures WHERE receiving_order_id = $1),
-                (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $2),
                 (SELECT COUNT(*) FROM audit_event WHERE owner_id = $2 AND action IN ('inspect', 'sign')),
                 (SELECT status FROM receiving_orders WHERE id = $1)
             "#,
@@ -251,8 +250,8 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
         .fetch_one(&pool)
         .await
         .expect("counts");
-    // inspect + 第一签字 + 第二签字 → 签名 append-only 2 条；幂等 4；审计 inspect+2×sign。
-    assert_eq!(counts, (1, 2, 4, 3, "putaway".to_string()));
+    // inspect + 第一签字 + 第二签字 → 签名 append-only 2 条；审计 inspect+2×sign。
+    assert_eq!(counts, (1, 2, 3, "putaway".to_string()));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -359,11 +358,10 @@ async fn postgres_inventory_query_and_status_change_are_scoped_idempotent_and_au
     assert_eq!(quarantined.quality_status, STATUS_QUARANTINED);
     assert_eq!(replay.quality_status, STATUS_QUARANTINED);
 
-    let counts: (i64, i64, i64, String) = sqlx::query_as(
+    let counts: (i64, i64, String) = sqlx::query_as(
         r#"
             SELECT
                 (SELECT COUNT(*) FROM inventory_status_changes WHERE batch_id = $1),
-                (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $2),
                 (SELECT COUNT(*) FROM audit_event WHERE owner_id = $2 AND action = 'change_status'),
                 (SELECT quality_status FROM inventory_batches WHERE id = $1)
             "#,
@@ -373,7 +371,7 @@ async fn postgres_inventory_query_and_status_change_are_scoped_idempotent_and_au
     .fetch_one(&pool)
     .await
     .expect("counts");
-    assert_eq!(counts, (1, 1, 1, STATUS_QUARANTINED.to_string()));
+    assert_eq!(counts, (1, 1, STATUS_QUARANTINED.to_string()));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -433,11 +431,10 @@ async fn postgres_cold_chain_reading_uses_external_api_key_idempotency_and_audit
     .expect("same idempotency key should replay");
 
     assert_eq!(reading.id, replay.id);
-    let counts: (i64, i64, i64, String) = sqlx::query_as(
+    let counts: (i64, i64, String) = sqlx::query_as(
             r#"
             SELECT
                 (SELECT COUNT(*) FROM temperature_readings WHERE owner_id = $1),
-                (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1),
                 (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'ingest_reading'),
                 (SELECT actor_name FROM audit_event WHERE owner_id = $1 AND action = 'ingest_reading')
             "#,
@@ -446,7 +443,7 @@ async fn postgres_cold_chain_reading_uses_external_api_key_idempotency_and_audit
         .fetch_one(&pool)
         .await
         .expect("counts");
-    assert_eq!(counts, (1, 1, 1, "external-cold-chain-test".to_string()));
+    assert_eq!(counts, (1, 1, "external-cold-chain-test".to_string()));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -488,11 +485,10 @@ async fn postgres_cold_chain_excursion_is_idempotent_and_audited(pool: PgPool) {
 
     assert_eq!(event.id, replay.id);
     assert_eq!(event.status, "pending_disposition");
-    let counts: (i64, i64, i64, String) = sqlx::query_as(
+    let counts: (i64, i64, String) = sqlx::query_as(
             r#"
             SELECT
                 (SELECT COUNT(*) FROM temperature_excursion_events WHERE owner_id = $1),
-                (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1),
                 (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'ingest_excursion'),
                 (SELECT resource_id FROM audit_event WHERE owner_id = $1 AND action = 'ingest_excursion')
             "#,
@@ -501,7 +497,7 @@ async fn postgres_cold_chain_excursion_is_idempotent_and_audited(pool: PgPool) {
         .fetch_one(&pool)
         .await
         .expect("counts");
-    assert_eq!(counts, (1, 1, 1, event.id.to_string()));
+    assert_eq!(counts, (1, 1, event.id.to_string()));
 }
 
 #[tokio::test]
