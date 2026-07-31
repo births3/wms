@@ -76,10 +76,23 @@ async fn dock_create_and_list_respect_warehouse_owner_boundary(pool: PgPool) {
         .expect("dock should be created");
     assert_eq!(first.warehouse_id, first_warehouse);
     let replay = repo
-        .create_dock(&actor, create_request, at(9), "dock-create-1")
+        .create_dock(&actor, create_request.clone(), at(9), "dock-create-1")
         .await
         .expect("same create should replay");
     assert_eq!(replay.id, first.id);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("dock-create-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repo
+        .create_dock(&actor, create_request, at(9), "dock-create-1")
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(metadata_conflict, DockRepositoryError::IdempotencyConflict);
     assert!(matches!(
         repo.create_dock(
             &actor,
