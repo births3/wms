@@ -53,6 +53,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            &format!("/api/v1/master-data/customers/{customer_id}/addresses"),
             now,
         )
         .await?
@@ -130,6 +132,10 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PATCH",
+            &format!(
+                "/api/v1/master-data/customers/{customer_id}/addresses/{address_id}"
+            ),
             now,
         )
         .await?

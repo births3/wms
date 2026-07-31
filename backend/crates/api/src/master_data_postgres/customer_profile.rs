@@ -49,6 +49,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PATCH",
+            &format!("/api/v1/master-data/customers/{customer_id}/profile"),
             now,
         )
         .await?

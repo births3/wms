@@ -1,10 +1,9 @@
 // @governance: skip-page-size - 拆分文件仍包含同一事务族，当前优先保持批量写、审计和幂等的原子边界。
 use std::collections::HashMap;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
@@ -314,6 +313,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            "/api/v1/master-data/products",
             now,
         )
         .await?
@@ -481,6 +482,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            "/api/v1/master-data/products/batch-sync",
             now,
         )
         .await?
@@ -658,6 +661,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            "/api/v1/master-data/suppliers",
             now,
         )
         .await?
@@ -740,6 +745,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            "/api/v1/master-data/customers",
             now,
         )
         .await?
@@ -851,7 +858,16 @@ impl PgMasterDataReadRepository {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+            replay_idempotency(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &request_hash,
+                "POST",
+                "/api/v1/master-data/locations/batch-create",
+                now,
+            )
+            .await?
         {
             return Ok(value);
         }

@@ -1,3 +1,4 @@
+// @governance: skip-page-size - M1 仓储拆分文件共享幂等事务边界，当前仅收敛存储实现，不拆业务行为链。
 impl PgMasterDataReadRepository {
     pub async fn get_product(
         &self,
@@ -66,6 +67,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PATCH",
+            &format!("/api/v1/master-data/products/{id}"),
             now,
         )
         .await?
@@ -230,6 +233,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PATCH",
+            &format!("/api/v1/master-data/suppliers/{id}"),
             now,
         )
         .await?
@@ -290,6 +295,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PATCH",
+            &format!("/api/v1/master-data/customers/{id}"),
             now,
         )
         .await?
@@ -350,6 +357,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            "/api/v1/master-data/warehouses",
             now,
         )
         .await?
@@ -408,6 +417,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "PATCH",
+            &format!("/api/v1/master-data/warehouses/{id}"),
             now,
         )
         .await?
@@ -472,7 +483,15 @@ impl PgMasterDataReadRepository {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) =
-            replay_idempotency::<Location>(&mut tx, ctx.owner_id, idempotency_key, &hash, now)
+            replay_idempotency::<Location>(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &hash,
+                "POST",
+                "/api/v1/master-data/locations",
+                now,
+            )
                 .await?
         {
             tx.commit().await.map_err(map_db_error)?;
@@ -537,7 +556,15 @@ impl PgMasterDataReadRepository {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) =
-            replay_idempotency::<Location>(&mut tx, ctx.owner_id, idempotency_key, &hash, now)
+            replay_idempotency::<Location>(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &hash,
+                "PATCH",
+                &format!("/api/v1/master-data/locations/{id}"),
+                now,
+            )
                 .await?
         {
             tx.commit().await.map_err(map_db_error)?;
@@ -656,7 +683,16 @@ impl PgMasterDataReadRepository {
         }))?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+            replay_idempotency(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &hash,
+                "POST",
+                "/api/v1/master-data/warehouse-zones",
+                now,
+            )
+            .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);
@@ -735,7 +771,16 @@ impl PgMasterDataReadRepository {
         }))?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
         if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &hash, now).await?
+            replay_idempotency(
+                &mut tx,
+                ctx.owner_id,
+                idempotency_key,
+                &hash,
+                "PATCH",
+                &format!("/api/v1/master-data/warehouse-zones/{id}"),
+                now,
+            )
+            .await?
         {
             tx.commit().await.map_err(map_db_error)?;
             return Ok(value);

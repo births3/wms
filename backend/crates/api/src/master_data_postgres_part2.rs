@@ -1,4 +1,18 @@
 // @governance: skip-page-size - 拆分文件仍包含同一事务族，当前优先保持商品、包装与映射溯源的原子边界。
+use crate::idempotency;
+
+impl From<crate::idempotency::IdempotencyError> for MasterDataError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
+}
+
 impl PgMasterDataReadRepository {
     pub async fn batch_create_customers(
         &self,
@@ -18,6 +32,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            "/api/v1/master-data/customers/batch-sync",
             now,
         )
         .await?
@@ -106,6 +122,8 @@ impl PgMasterDataReadRepository {
             ctx.owner_id,
             idempotency_key,
             &request_hash,
+            "POST",
+            "/api/v1/master-data/suppliers/batch-sync",
             now,
         )
         .await?
@@ -363,39 +381,21 @@ async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     idempotency_key: &str,
     request_hash: &str,
+    method: &str,
+    path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, MasterDataError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        r#"
-        SELECT request_hash, response_body, expires_at
-          FROM idempotency_request
-         WHERE owner_id = $1 AND idempotency_key = $2
-         FOR UPDATE
-        "#,
+    idempotency::replay(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        now,
     )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    let Some((stored_hash, response_body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(MasterDataError::IdempotencyConflict);
-    }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| MasterDataError::Serialize(error.to_string()))
+    .map_err(Into::into)
 }
 
 async fn lock_idempotency_key(
@@ -403,12 +403,9 @@ async fn lock_idempotency_key(
     owner_id: Uuid,
     idempotency_key: &str,
 ) -> Result<(), MasterDataError> {
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(idempotency_lock_id(owner_id, idempotency_key))
-        .fetch_one(&mut **tx)
+    idempotency::lock_key(tx, "master-data", owner_id, idempotency_key)
         .await
-        .map_err(map_db_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 async fn store_idempotency_success<T: Serialize>(
@@ -423,32 +420,20 @@ async fn store_idempotency_success<T: Serialize>(
     resource_type: &str,
     resource_id: &str,
 ) -> Result<(), MasterDataError> {
-    let response_body = serde_json::to_value(response)
-        .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id, expires_at, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, 200, $7, $8, $9, $10, $11)
-        "#,
+    idempotency::store_success(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        resource_type,
+        resource_id,
+        response,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(method)
-    .bind(path)
-    .bind(response_body)
-    .bind(resource_type)
-    .bind(resource_id)
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    Ok(())
+    .map_err(Into::into)
 }
 
 async fn append_master_data_audit<T: Serialize>(
@@ -646,22 +631,7 @@ async fn disable_warehouse_children(
 }
 
 fn request_hash(value: &Value) -> Result<String, MasterDataError> {
-    let text = serde_json::to_string(value)
-        .map_err(|error| MasterDataError::Serialize(error.to_string()))?;
-    let mut hasher = Sha256::new();
-    hasher.update(text.as_bytes());
-    Ok(hex::encode(hasher.finalize()))
-}
-
-fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
-    let mut hasher = Sha256::new();
-    hasher.update(owner_id.as_bytes());
-    hasher.update([0]);
-    hasher.update(idempotency_key.as_bytes());
-    let digest = hasher.finalize();
-    let mut bytes = [0_u8; 8];
-    bytes.copy_from_slice(&digest[..8]);
-    i64::from_be_bytes(bytes)
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 impl From<ProductRow> for Product {

@@ -87,6 +87,35 @@ async fn customer_batch_sync_is_atomic_owner_scoped_idempotent_and_routed(pool: 
         created.iter().map(|row| row.id).collect::<Vec<_>>()
     );
 
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("customer-batch-key-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = repo
+        .batch_create_customers(
+            &owner,
+            vec![request("C-BATCH-001"), request("C-BATCH-002")],
+            Utc::now(),
+            "customer-batch-key-1",
+        )
+        .await;
+    assert!(matches!(
+        metadata_conflict,
+        Err(MasterDataError::IdempotencyConflict)
+    ));
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'POST', path = '/api/v1/master-data/customers/batch-sync' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("customer-batch-key-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be restored for the hash regression check");
+
     let conflict = repo
         .batch_create_customers(
             &owner,
