@@ -46,7 +46,16 @@ pub(super) async fn create_user(
         .map_err(|_| RoleError::PasswordHash)?;
     let mut tx = state.pool.begin().await?;
     lock_key(&mut tx, ctx.owner_id, &key).await?;
-    if let Some(response) = replay(&mut tx, ctx.owner_id, &key, &hash).await? {
+    if let Some(response) = replay(
+        &mut tx,
+        ctx.owner_id,
+        &key,
+        &hash,
+        "POST",
+        "/api/v1/auth/users",
+    )
+    .await?
+    {
         tx.commit().await?;
         return Ok(Json(response));
     }

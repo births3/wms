@@ -8,15 +8,15 @@ use axum::{
     routing::{get, put},
     Json, Router,
 };
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     auth::{AuthContext, AuthRevocationStore},
+    idempotency,
 };
 
 mod errors;
@@ -31,6 +31,16 @@ pub use crate::role_management_models::{
 };
 
 pub const ROLE_MANAGE_PERMISSION: &str = "h1.roles.manage";
+
+impl From<crate::idempotency::IdempotencyError> for RoleError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(_) => Self::Database,
+            crate::idempotency::IdempotencyError::Serialize(_) => Self::Serialize,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct RoleManagementState {
@@ -165,7 +175,16 @@ async fn create_role(
     let mut tx = state.pool.begin().await?;
     lock_key(&mut tx, ctx.owner_id, &key).await?;
     let hash = request_hash(&req)?;
-    if let Some(response) = replay(&mut tx, ctx.owner_id, &key, &hash).await? {
+    if let Some(response) = replay(
+        &mut tx,
+        ctx.owner_id,
+        &key,
+        &hash,
+        "POST",
+        "/api/v1/auth/roles",
+    )
+    .await?
+    {
         tx.commit().await?;
         return Ok(Json(response));
     }
@@ -207,7 +226,16 @@ async fn update_role(
     let hash = request_hash(&req)?;
     let mut tx = state.pool.begin().await?;
     lock_key(&mut tx, ctx.owner_id, &key).await?;
-    if let Some(response) = replay(&mut tx, ctx.owner_id, &key, &hash).await? {
+    if let Some(response) = replay(
+        &mut tx,
+        ctx.owner_id,
+        &key,
+        &hash,
+        "PUT",
+        &format!("/api/v1/auth/roles/{role_id}"),
+    )
+    .await?
+    {
         tx.commit().await?;
         return Ok(Json(response));
     }
@@ -246,7 +274,16 @@ async fn delete_role(
     let hash = request_hash(&(role_id, "delete"))?;
     let mut tx = state.pool.begin().await?;
     lock_key(&mut tx, ctx.owner_id, &key).await?;
-    if let Some(response) = replay(&mut tx, ctx.owner_id, &key, &hash).await? {
+    if let Some(response) = replay(
+        &mut tx,
+        ctx.owner_id,
+        &key,
+        &hash,
+        "DELETE",
+        &format!("/api/v1/auth/roles/{role_id}"),
+    )
+    .await?
+    {
         tx.commit().await?;
         return Ok(Json(response));
     }
@@ -297,7 +334,16 @@ async fn replace_role_permissions(
     let hash = request_hash(&req)?;
     let mut tx = state.pool.begin().await?;
     lock_key(&mut tx, ctx.owner_id, &key).await?;
-    if let Some(response) = replay(&mut tx, ctx.owner_id, &key, &hash).await? {
+    if let Some(response) = replay(
+        &mut tx,
+        ctx.owner_id,
+        &key,
+        &hash,
+        "PUT",
+        &format!("/api/v1/auth/roles/{role_id}/permissions"),
+    )
+    .await?
+    {
         tx.commit().await?;
         return Ok(Json(response));
     }
@@ -388,7 +434,16 @@ async fn batch_assign_roles(
     let hash = request_hash(&req)?;
     let mut tx = state.pool.begin().await?;
     lock_key(&mut tx, ctx.owner_id, &key).await?;
-    if let Some(response) = replay(&mut tx, ctx.owner_id, &key, &hash).await? {
+    if let Some(response) = replay(
+        &mut tx,
+        ctx.owner_id,
+        &key,
+        &hash,
+        "PUT",
+        "/api/v1/auth/user-roles/batch",
+    )
+    .await?
+    {
         tx.commit().await?;
         return Ok(Json(response));
     }
@@ -619,45 +674,28 @@ fn idempotency_key(headers: &HeaderMap) -> Result<String, RoleError> {
         .ok_or(RoleError::MissingIdempotency)
 }
 fn request_hash<T: Serialize>(req: &T) -> Result<String, RoleError> {
-    Ok(format!(
-        "{:x}",
-        Sha256::digest(serde_json::to_vec(req).map_err(|_| RoleError::Serialize)?)
-    ))
+    idempotency::request_hash(req).map_err(Into::into)
 }
 async fn lock_key(
     tx: &mut Transaction<'_, Postgres>,
     owner: Uuid,
     key: &str,
 ) -> Result<(), RoleError> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))")
-        .bind(owner.to_string())
-        .bind(key)
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
+    idempotency::lock_key(tx, "role-management", owner, key)
+        .await
+        .map_err(Into::into)
 }
 async fn replay<T: DeserializeOwned>(
     tx: &mut Transaction<'_, Postgres>,
     owner: Uuid,
     key: &str,
     hash: &str,
+    method: &str,
+    path: &str,
 ) -> Result<Option<T>, RoleError> {
-    let row:Option<(String,serde_json::Value,DateTime<Utc>)>=sqlx::query_as("SELECT request_hash,response_body,expires_at FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2 FOR UPDATE").bind(owner).bind(key).fetch_optional(&mut **tx).await?;
-    match row {
-        None => Ok(None),
-        Some((stored, _, _)) if stored != hash => Err(RoleError::IdempotencyConflict),
-        Some((_, _, expires)) if expires <= Utc::now() => {
-            sqlx::query("DELETE FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2")
-                .bind(owner)
-                .bind(key)
-                .execute(&mut **tx)
-                .await?;
-            Ok(None)
-        }
-        Some((_, body, _)) => serde_json::from_value(body)
-            .map(Some)
-            .map_err(|_| RoleError::Serialize),
-    }
+    idempotency::replay(tx, owner, key, hash, method, path, Utc::now())
+        .await
+        .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -672,7 +710,6 @@ async fn finish<T: Serialize>(
     response: &T,
     action: &str,
 ) -> Result<(), RoleError> {
-    let body = serde_json::to_value(response).map_err(|_| RoleError::Serialize)?;
     let resource_type = if action.contains("user_roles") {
         "auth_user_roles"
     } else if action.starts_with("auth.user.") {
@@ -680,8 +717,21 @@ async fn finish<T: Serialize>(
     } else {
         "auth_role"
     };
-    sqlx::query("INSERT INTO idempotency_request(id,owner_id,idempotency_key,request_hash,method,path,status_code,response_body,resource_type,resource_id,expires_at) VALUES($1,$2,$3,$4,$5,$6,200,$7,$8,$9,$10)")
-        .bind(Uuid::new_v4()).bind(ctx.owner_id).bind(key).bind(hash).bind(method).bind(path).bind(&body).bind(resource_type).bind(resource_id.to_string()).bind(Utc::now()+Duration::hours(24)).execute(&mut **tx).await?;
+    idempotency::store_success(
+        tx,
+        ctx.owner_id,
+        key,
+        hash,
+        method,
+        path,
+        resource_type,
+        &resource_id.to_string(),
+        response,
+        Utc::now(),
+    )
+    .await
+    .map_err(RoleError::from)?;
+    let body = serde_json::to_value(response).map_err(|_| RoleError::Serialize)?;
     append_event_in_tx(
         tx,
         &AuditWriteRequest::from_auth_context(

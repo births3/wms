@@ -179,6 +179,34 @@ async fn role_writes_are_tenant_safe_atomic_idempotent_audited_and_revoke_tokens
         .await
         .expect("replay response");
     assert_eq!(replay.status(), StatusCode::OK);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner)
+    .bind("create-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/auth/roles".into(),
+            &token,
+            Some("create-1"),
+            serde_json::json!({"role_code":"checker","role_name":"复核岗","data_scope":"warehouse","parent_role_id":null}),
+        ))
+        .await
+        .expect("metadata conflict response");
+    assert_eq!(metadata_conflict.status(), StatusCode::CONFLICT);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'POST', path = '/api/v1/auth/roles' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner)
+    .bind("create-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be restored");
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
             "SELECT count(*) FROM auth_roles WHERE owner_id=$1 AND role_code='checker'"
