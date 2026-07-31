@@ -246,10 +246,153 @@ def check_deferred_story(story: dict[str, Any]) -> list[Issue]:
         return []
     if not isinstance(types, list) or not types or not all(isinstance(item, str) for item in types):
         return [Issue(story_id, "types", "types 必须是非空字符串数组")]
-    return [
+    issues = [
         Issue(story_id, "types", f"未知故事类型: {story_type}")
         for story_type in sorted(set(types) - set(STORY_TYPE_LAYERS))
     ]
+    issues.extend(check_e2e_checks(story, verified=False))
+    return issues
+
+
+def _package_scripts(repo_root: Path) -> dict[str, str]:
+    package = repo_root / "apps" / "web-admin" / "package.json"
+    if not package.is_file():
+        return {}
+    payload = json.loads(package.read_text(encoding="utf-8"))
+    scripts = payload.get("scripts", {})
+    return scripts if isinstance(scripts, dict) else {}
+
+
+def _playwright_config_path(command: str, *, repo_root: Path) -> Path | None:
+    match = re.search(r"--config(?:=|\s+)([^\s]+)", command)
+    if not match:
+        return None
+    config = match.group(1).strip("'\"")
+    if "prototypes" in command:
+        return repo_root / "prototypes" / config
+    return repo_root / config
+
+
+def _real_playwright_spec(config_path: Path, *, repo_root: Path) -> Path | None:
+    if not config_path.is_file():
+        return None
+    config_text = config_path.read_text(encoding="utf-8")
+    match = re.search(r"(web-admin-[A-Za-z0-9-]+-real)\\?\.spec", config_text)
+    if match:
+        return repo_root / "prototypes" / "e2e" / f"{match.group(1)}.spec.ts"
+    stem = config_path.name.removeprefix("playwright-").removesuffix("-config.ts")
+    if stem.endswith("-real"):
+        return repo_root / "prototypes" / "e2e" / f"{stem}.spec.ts"
+    return None
+
+
+def _is_real_e2e(command: str, config_path: Path | None) -> bool:
+    config_name = config_path.name if config_path else ""
+    return "-real" in command.lower() or "-real" in config_name.lower()
+
+
+def _is_dev_e2e(command: str, script: str = "") -> bool:
+    text = f"{command} {script}"
+    return bool(
+        re.search(r"test:e2e:[^\s]*dev\b", text)
+        or re.search(r"playwright-[^\s]*-dev-config", text)
+        or re.search(r"WMS_WEB_ADMIN_DEV_MOCK\s*[:=]\s*[\"']?1\b", text)
+    )
+
+
+def _check_screenshot_mapping(story: dict[str, Any], *, repo_root: Path, has_real_e2e: bool) -> list[Issue]:
+    if not has_real_e2e or not story.get("frontend_pages"):
+        return []
+    story_id = str(story.get("id", "<missing>"))
+    records = story.get("e2e_screenshots")
+    evidence_refs = story.get("evidence_refs", [])
+    if not isinstance(evidence_refs, list):
+        evidence_refs = []
+    if not isinstance(records, list) or not records:
+        if any(isinstance(ref, str) and ref.endswith(".png") for ref in evidence_refs):
+            return []
+        return [Issue(story_id, "evidence", "真实 E2E 故事必须登记 e2e_screenshots 或 PNG evidence_refs")]
+    issues: list[Issue] = []
+    has_real_record = False
+    for record in records:
+        if not isinstance(record, dict):
+            issues.append(Issue(story_id, "evidence", "e2e_screenshots 每项必须是对象"))
+            continue
+        page = record.get("page")
+        spec = record.get("spec")
+        screenshot = record.get("screenshot")
+        if not isinstance(page, str) or page not in story.get("frontend_pages", []):
+            issues.append(Issue(story_id, "evidence", f"e2e_screenshots.page 未覆盖 frontend_pages: {page}"))
+        if not isinstance(spec, str) or not spec.endswith(".spec.ts"):
+            issues.append(Issue(story_id, "evidence", "e2e_screenshots.spec 必须是 Playwright .spec.ts"))
+        else:
+            has_real_record = has_real_record or spec.endswith("-real.spec.ts")
+        if isinstance(spec, str) and spec.endswith(".spec.ts") and not (repo_root / spec).is_file():
+            issues.append(Issue(story_id, "evidence", f"截图 spec 不存在: {spec}"))
+        if not isinstance(screenshot, str) or not screenshot.startswith("artifacts/screenshot-portal/real-web/") or not screenshot.endswith(".png"):
+            issues.append(Issue(story_id, "evidence", "e2e_screenshots.screenshot 必须是 real-web PNG 路径"))
+        for value in (spec, screenshot):
+            if isinstance(value, str) and value not in evidence_refs:
+                issues.append(Issue(story_id, "evidence", f"截图证据未进入 evidence_refs: {value}"))
+    if not has_real_record:
+        issues.append(Issue(story_id, "evidence", "真实 E2E 故事的 e2e_screenshots 必须至少包含一条 *-real.spec.ts"))
+    return issues
+
+
+def check_e2e_checks(
+    story: dict[str, Any], *, repo_root: Path = REPO_ROOT, verified: bool = False
+) -> list[Issue]:
+    """检查 E2E 命令可解析到现有脚本/config，且 dev mock 不能单独支撑 verified。"""
+    checks = story.get("e2e_checks")
+    if checks is None:
+        return []
+    story_id = str(story.get("id", "<missing>"))
+    if not isinstance(checks, list) or not all(isinstance(item, str) for item in checks):
+        return [Issue(story_id, "evidence", "e2e_checks 必须是字符串数组")]
+    scripts = _package_scripts(repo_root)
+    issues: list[Issue] = []
+    has_real_e2e = False
+    has_dev_e2e = False
+    for command in checks:
+        script_match = re.search(r"pnpm\s+--dir\s+apps/web-admin\s+run\s+(test:e2e:[^\s]+)", command)
+        script = ""
+        config_path: Path | None = None
+        if script_match:
+            script_name = script_match.group(1)
+            script = scripts.get(script_name, "")
+            if not script:
+                issues.append(Issue(story_id, "evidence", f"e2e_checks package script 不存在: {script_name}"))
+            config_path = _playwright_config_path(script, repo_root=repo_root)
+            if config_path is None or not config_path.is_file():
+                issues.append(Issue(story_id, "evidence", f"package script 未解析到现有 Playwright config: {script_name}"))
+        elif "playwright test" in command:
+            config_path = _playwright_config_path(command, repo_root=repo_root)
+            if config_path is None or not config_path.is_file():
+                issues.append(Issue(story_id, "evidence", "Playwright 命令未解析到现有 config"))
+        elif re.search(r"\bjust\s+[^\s]+", command):
+            target = re.search(r"\bjust\s+([^\s]+)", command).group(1)
+            just_text = (repo_root / "justfile").read_text(encoding="utf-8") if (repo_root / "justfile").is_file() else ""
+            if not re.search(rf"(?m)^{re.escape(target)}\s*:", just_text):
+                issues.append(Issue(story_id, "evidence", f"just 目标不存在: {target}"))
+        elif re.search(r"\bnode\s+([^\s]+)", command):
+            target = re.search(r"\bnode\s+([^\s]+)", command).group(1).strip("'\"")
+            if not (repo_root / target).is_file():
+                issues.append(Issue(story_id, "evidence", f"node 检查文件不存在: {target}"))
+
+        if _is_real_e2e(command, config_path):
+            has_real_e2e = True
+            if config_path and config_path.is_file():
+                spec_path = _real_playwright_spec(config_path, repo_root=repo_root)
+                if spec_path is None or not spec_path.is_file():
+                    issues.append(Issue(story_id, "evidence", f"real Playwright config 未找到 *-real.spec.ts: {config_path.name}"))
+                elif re.search(r"\b(?:page|context)\.route\s*\(", spec_path.read_text(encoding="utf-8")):
+                    issues.append(Issue(story_id, "evidence", f"real spec 禁止业务路由拦截: {rel(spec_path)}"))
+        if _is_dev_e2e(command, script):
+            has_dev_e2e = True
+    if verified and has_dev_e2e and not has_real_e2e:
+        issues.append(Issue(story_id, "evidence", "verified 故事不能只用 shell-dev/dev mock 作为真实 E2E 证据"))
+    issues.extend(_check_screenshot_mapping(story, repo_root=repo_root, has_real_e2e=has_real_e2e))
+    return issues
 
 
 def check_story(story: dict[str, Any], *, story_files: set[str], openapi_paths: set[str]) -> list[Issue]:
@@ -317,6 +460,8 @@ def check_story(story: dict[str, Any], *, story_files: set[str], openapi_paths: 
         operation = f"{method.upper()} {path}"
         if openapi_paths and operation not in openapi_paths:
             issues.append(Issue(story_id, "api", f"OpenAPI 缺少 operation: {operation}"))
+
+    issues.extend(check_e2e_checks(story, verified=True))
 
     navigation_checks = story.get("navigation_checks")
     if navigation_checks is None:

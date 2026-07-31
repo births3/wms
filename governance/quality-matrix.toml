@@ -153,10 +153,17 @@ types = ["write", "config_rule", "frontend_interaction"]
 frontend_pages = ["m1-system-dictionary"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 e2e_checks = ["just web-admin-m1-real-e2e"]
+e2e_screenshots = [
+  { page = "m1-system-dictionary", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-system-dictionary/dictionary.png" },
+]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
   "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
   "PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
+]
+evidence_refs = [
+  "prototypes/e2e/web-admin-m1-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-system-dictionary/dictionary.png",
 ]
 
 [stories.dimensions]
@@ -1055,7 +1062,7 @@ frontend = "多货主隔离为 AuthContext、数据库 owner_id 和业务查询�
 required_layers = ["L1", "L2", "L3", "L8", "L9"]
 covered_layers = ["L1", "L2", "L3", "L8", "L9"]
 
-[[stories]]
+[[deferred_stories]]
 id = "US-H1-007"
 title = "PC 管理端三层菜单管理"
 module = "H1"
@@ -1075,24 +1082,9 @@ e2e_checks = [
   "pnpm --dir apps/web-admin run test:e2e:shell-dev",
   "node apps/web-admin/self-checks/app-shell-layout-self-check.mjs",
 ]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L11"]
+reason = "当前仅有 dev mock 导航与布局 self-check，无法证明真实菜单草稿、发布、回滚和权限过滤链路。"
+owner = "H1 菜单能力负责人"
+resume_when = "补齐真实 PostgreSQL/API 菜单发布回滚 E2E 和权限过滤截图后重新验收。"
 
 [[stories]]
 id = "US-H2-001"
@@ -1125,7 +1117,7 @@ api = "当前切片提供后端共享写入 helper，由业务接口调用，不
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L10", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L10", "L11"]
 
-[[stories]]
+[[deferred_stories]]
 id = "US-H2-002"
 title = "审计追踪查询（后端分页查询切片）"
 module = "H2"
@@ -1138,24 +1130,9 @@ api_paths = [
 e2e_checks = [
   "pnpm --dir apps/web-admin run test:e2e:shell-dev",
 ]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
-covered_layers = ["L1", "L2", "L3", "L7", "L8", "L9"]
+reason = "审计 API 与页面已有实现，但现有浏览器证据仅为 shell-dev 固定文本，缺少真实 PostgreSQL 查询回读与截图。"
+owner = "H2 审计能力负责人"
+resume_when = "补齐真实审计事件查询、分页/筛选和权限边界 E2E 后重新验收。"
 
 [[stories]]
 id = "US-H2-003"
@@ -1389,7 +1366,7 @@ database = "H3 不新增业务表；限流/熔断审计复用 H2 audit_event app
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
 
-[[stories]]
+[[deferred_stories]]
 id = "US-H3-004"
 title = "API 文档可访问性"
 module = "H3"
@@ -1412,30 +1389,11 @@ evidence_refs = [
   "docs/api/curl-examples.md",
   "docs/api/openapi-changelog.md",
 ]
+reason = "文档路由和 API 契约已有静态/后端检查，但浏览器证据仍是 shell-dev 导航，未证明真实运行模式下页面可访问。"
+owner = "H3 API 契约负责人"
+resume_when = "补齐真实 API 文档页面启动、访问和环境模式截图后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "not_applicable"
-security = "verified"
-audit = "not_applicable"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.not_applicable_reasons]
-database = "API 文档访问不新增业务表。"
-audit = "Spec 变更通过 Git 与 OpenAPI changelog 追踪；文档访问日志由 Web 服务器或网关记录，不写业务审计表。"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
-covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-H4-001"
 title = "通知配置"
 module = "H4"
@@ -1450,26 +1408,11 @@ e2e_checks = [
   "pnpm --dir apps/web-admin run test:e2e:h4-dev",
   "node apps/web-admin/self-checks/h4-wechat-notify-slice-self-check.mjs",
 ]
+reason = "通知配置页面和数据库切片已有，但 h4-dev 只覆盖 dev mock 固定交互，缺少真实运行时、密钥保护和外部通知回执证据。"
+owner = "H4 通知能力负责人"
+resume_when = "补齐真实 PostgreSQL 配置回读、敏感字段保护和企业微信 dev/staging 回执联调后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-H4-004"
 title = "通知发送记录查询"
 module = "H4"
@@ -1484,191 +1427,129 @@ e2e_checks = [
   "pnpm --dir apps/web-admin run test:e2e:h4-dev",
   "node apps/web-admin/self-checks/h4-wechat-notify-slice-self-check.mjs",
 ]
+reason = "通知记录页面仍以 h4-dev 导航证据为主，未覆盖真实分页、重发状态变化、权限边界和外部回执。"
+owner = "H4 通知能力负责人"
+resume_when = "补齐真实记录查询/重发 PostgreSQL E2E 与企业微信回执证据后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-H5-001"
 title = "快递商配置"
 module = "H5"
 story_file = "docs/domain/user-stories-h5-express.md"
 types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
 frontend_pages = ["h5-express"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h5-real"]
 api_paths = [
   "GET /api/v1/express/carriers",
   "POST /api/v1/express/carriers",
 ]
-e2e_checks = [
-  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+e2e_screenshots = [
+  { page = "h5-express", spec = "prototypes/e2e/web-admin-h5-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h5-express/US-H5-001-carrier-saved.png" },
 ]
+evidence_refs = [
+  "prototypes/playwright-web-admin-h5-real-config.ts",
+  "prototypes/e2e/web-admin-h5-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h5-express/US-H5-001-carrier-saved.png",
+]
+reason = "真实 WMS API、PostgreSQL、权限和审计配置切片已补；承运商 dev/staging 凭据与外部 HTTP 回执尚未取得，不能把本地配置写入标记为完整故事。"
+owner = "H5 快递模块负责人"
+resume_when = "取得承运商测试凭据并完成外部下单/回执联调后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-H5-002"
 title = "快递选择规则配置"
 module = "H5"
 story_file = "docs/domain/user-stories-h5-express.md"
 types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
 frontend_pages = ["h5-express"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h5-real"]
 api_paths = [
   "GET /api/v1/express/routing-rules",
   "POST /api/v1/express/routing-rules",
 ]
-e2e_checks = [
-  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+e2e_screenshots = [
+  { page = "h5-express", spec = "prototypes/e2e/web-admin-h5-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h5-express/US-H5-002-rule-saved.png" },
 ]
+evidence_refs = [
+  "prototypes/playwright-web-admin-h5-real-config.ts",
+  "prototypes/e2e/web-admin-h5-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h5-express/US-H5-002-rule-saved.png",
+]
+reason = "真实规则配置 API、PostgreSQL、权限和审计切片已覆盖；TMS 协作、承运商选择和 dev/staging 外部路由证据尚未完成。"
+owner = "H5 快递模块负责人"
+resume_when = "取得 TMS 可用/不可用路由证据和承运商测试环境后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-H5-003"
 title = "快递单打印"
 module = "H5"
 story_file = "docs/domain/user-stories-h5-express.md"
-types = ["write", "frontend_interaction", "api_change", "audit_compliance"]
+types = ["write", "frontend_interaction", "api_change", "audit_compliance", "pda_runtime", "hardware_runtime", "offline_sync"]
 frontend_pages = ["h5-express", "h9-print-templates"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h5-real"]
 api_paths = [
   "POST /api/v1/packing/jobs/{id}/waybill",
   "POST /api/v1/express/waybills",
 ]
-e2e_checks = [
-  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+e2e_screenshots = [
+  { page = "h5-express", spec = "prototypes/e2e/web-admin-h5-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h5-express/US-H5-003-waybill-print-preview.png" },
 ]
+evidence_refs = [
+  "prototypes/playwright-web-admin-h5-real-config.ts",
+  "prototypes/e2e/web-admin-h5-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h5-express/US-H5-003-waybill-print-preview.png",
+]
+reason = "真实运单和浏览器面单预览截图已覆盖；PDA、蓝牙/网络打印机、离线补打、H9/Print Agent 和物理打印回执不能由本地 Playwright 抵扣。"
+owner = "H5/H9 打印能力负责人"
+resume_when = "具备真实 PDA、打印设备和 H9/Print Agent 联调环境后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-H5-004"
 title = "快递推送下单"
 module = "H5"
 story_file = "docs/domain/user-stories-h5-express.md"
-types = ["write", "integration", "runtime_guard", "frontend_interaction", "audit_compliance"]
+types = ["write", "integration", "runtime_guard", "frontend_interaction", "audit_compliance", "external_runtime"]
 frontend_pages = ["h5-express"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h5-real"]
 api_paths = [
   "POST /api/v1/express/waybills",
   "POST /api/v1/express/waybills/{waybill_no}/cancel",
 ]
-e2e_checks = [
-  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+e2e_screenshots = [
+  { page = "h5-express", spec = "prototypes/e2e/web-admin-h5-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h5-express/US-H5-004-waybill-cancelled.png" },
 ]
+evidence_refs = [
+  "prototypes/playwright-web-admin-h5-real-config.ts",
+  "prototypes/e2e/web-admin-h5-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h5-express/US-H5-004-waybill-pushed.png",
+  "artifacts/screenshot-portal/real-web/h5-express/US-H5-004-waybill-cancelled.png",
+]
+reason = "真实 WMS 下单、取消、幂等落库和审计切片已覆盖；外部承运商 API 成功/失败/重试和通知回执尚未完成。"
+owner = "H5 快递模块负责人"
+resume_when = "接通承运商 dev/staging API，完成成功、可重试失败、永久失败和外部回执验收后重新验收。"
 
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "verified"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-covered_layers = ["L1", "L2", "L3", "L4", "L5", "L7", "L8", "L9", "L10", "L11"]
-
-[[stories]]
+[[deferred_stories]]
 id = "US-H5-005"
 title = "快递轨迹查询"
 module = "H5"
 story_file = "docs/domain/user-stories-h5-express.md"
-types = ["read_only", "integration", "frontend_interaction", "api_change"]
+types = ["read_only", "integration", "frontend_interaction", "api_change", "audit_compliance", "external_runtime"]
 frontend_pages = ["h5-express"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:h5-real"]
 api_paths = [
   "GET /api/v1/express/waybills/{waybill_no}/tracking",
 ]
-e2e_checks = [
-  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
+e2e_screenshots = [
+  { page = "h5-express", spec = "prototypes/e2e/web-admin-h5-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h5-express/US-H5-005-tracking.png" },
 ]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "not_applicable"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.not_applicable_reasons]
-audit = "H5 轨迹查询为只读缓存读取；快递下单和配置写入分别在 US-H5-001、US-H5-002、US-H5-004 写入 H2 审计。"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
-covered_layers = ["L1", "L2", "L3", "L4", "L7", "L8", "L9", "L10"]
+evidence_refs = [
+  "prototypes/playwright-web-admin-h5-real-config.ts",
+  "prototypes/e2e/web-admin-h5-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h5-express/US-H5-005-tracking.png",
+]
+reason = "真实 PostgreSQL 轨迹缓存事件和页面回读已覆盖；承运商真实轨迹、签收回写和异常通知外部证据尚未完成。"
+owner = "H5 快递模块负责人"
+resume_when = "取得承运商轨迹测试凭据并完成签收/异常回写与通知联调后重新验收。"
 
 [[stories]]
 id = "US-H6-001"
@@ -2429,13 +2310,20 @@ types = ["write", "inventory_change", "frontend_interaction", "critical_path", "
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png" },
+]
 api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/receive",
 ]
 reason = "PC 数量闭环、GSP 现场字段、cool/冷冻/冷藏温区按储存条件校验与超温备注已有；但稳定性报告附件未强制、收货节点 M-VR 双人策略、追溯码/LPN、PDA 扫码离线重放及真机证据未闭环。"
 owner = "M2 入库模块负责人"
 resume_when = "强制超温稳定性报告附件（H-FILE），完成收货节点双人策略、追溯码/LPN、PDA 离线冲突链及真机验收后重新执行完整故事验收。"
-evidence_refs = ["docs/reviews/m2-overall-review-2026-07-18.md"]
+evidence_refs = [
+  "docs/reviews/m2-overall-review-2026-07-18.md",
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
+]
 
 [[stories]]
 id = "US-M2-008"
@@ -2446,7 +2334,14 @@ types = ["read_only", "frontend_interaction"]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
+e2e_screenshots = [
+  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving-dashboard-detail.png" },
+]
 api_paths = ["GET /api/v1/inbound/receiving-dashboard"]
+evidence_refs = [
+  "prototypes/e2e/web-admin-m2-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m2-inbound/receiving-dashboard-detail.png",
+]
 
 [stories.dimensions]
 requirement = "verified"

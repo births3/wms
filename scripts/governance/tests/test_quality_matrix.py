@@ -349,3 +349,71 @@ def test_verified_story_requires_module_evidence_profile(tmp_path):
         }
     }
     assert check_evidence_profiles(matrix, stories, repo_root=tmp_path) == []
+
+
+def test_quality_matrix_real_e2e_resolves_package_script_config_and_spec(tmp_path):
+    from check_quality_matrix import check_e2e_checks
+
+    (tmp_path / "apps/web-admin").mkdir(parents=True)
+    (tmp_path / "prototypes/e2e").mkdir(parents=True)
+    (tmp_path / "apps/web-admin/package.json").write_text(
+        '{"scripts":{"test:e2e:h5-real":"pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h5-real-config.ts"}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "prototypes/playwright-web-admin-h5-real-config.ts").write_text(
+        'testMatch: /web-admin-h5-real\\.spec\\.ts/', encoding="utf-8"
+    )
+    (tmp_path / "prototypes/e2e/web-admin-h5-real.spec.ts").write_text(
+        'test("real", async ({ page }) => page.goto("/"));', encoding="utf-8"
+    )
+
+    story = {
+        "id": "US-H5-001",
+        "frontend_pages": ["h5-express"],
+        "e2e_checks": ["pnpm --dir apps/web-admin run test:e2e:h5-real"],
+        "e2e_screenshots": [
+            {
+                "page": "h5-express",
+                "spec": "prototypes/e2e/web-admin-h5-real.spec.ts",
+                "screenshot": "artifacts/screenshot-portal/real-web/h5-express/carrier.png",
+            }
+        ],
+        "evidence_refs": [
+            "prototypes/e2e/web-admin-h5-real.spec.ts",
+            "artifacts/screenshot-portal/real-web/h5-express/carrier.png",
+        ],
+    }
+    assert check_e2e_checks(story, repo_root=tmp_path, verified=True) == []
+
+
+def test_quality_matrix_rejects_verified_shell_dev_only_e2e(tmp_path):
+    from check_quality_matrix import check_e2e_checks, Issue
+
+    (tmp_path / "apps/web-admin").mkdir(parents=True)
+    (tmp_path / "prototypes").mkdir()
+    (tmp_path / "apps/web-admin/package.json").write_text(
+        '{"scripts":{"test:e2e:shell-dev":"pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-dev-config.ts"}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "prototypes/playwright-web-admin-dev-config.ts").write_text(
+        'env: { WMS_WEB_ADMIN_DEV_MOCK: "1" }', encoding="utf-8"
+    )
+
+    issues = check_e2e_checks(
+        {"id": "US-H1-007", "e2e_checks": ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]},
+        repo_root=tmp_path,
+        verified=True,
+    )
+    assert Issue("US-H1-007", "evidence", "verified 故事不能只用 shell-dev/dev mock 作为真实 E2E 证据") in issues
+
+
+def test_quality_matrix_rejects_missing_e2e_package_script(tmp_path):
+    from check_quality_matrix import check_e2e_checks, Issue
+
+    (tmp_path / "apps/web-admin").mkdir(parents=True)
+    (tmp_path / "apps/web-admin/package.json").write_text('{"scripts":{}}', encoding="utf-8")
+    issues = check_e2e_checks(
+        {"id": "US-H5-001", "e2e_checks": ["pnpm --dir apps/web-admin run test:e2e:missing"]},
+        repo_root=tmp_path,
+    )
+    assert Issue("US-H5-001", "evidence", "e2e_checks package script 不存在: test:e2e:missing") in issues

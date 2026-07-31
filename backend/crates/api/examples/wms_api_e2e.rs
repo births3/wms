@@ -33,6 +33,7 @@ use wms_api::{
     drug_inspection_portal_bridge::spawn_drug_inspection_portal_bridge,
     drug_inspection_stamp_handlers::{drug_inspection_stamp_router, DrugInspectionStampAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
+    express::{express_router, ExpressAppState},
     feature_flags::FeatureFlagRegistry,
     file_attachment::FileAttachmentService,
     file_attachment_handlers::{file_attachment_router, FileAttachmentAppState},
@@ -234,6 +235,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             revocation_store.clone(),
         )))
         .merge(wave3_router(Wave3AppState::with_postgres(pool.clone())))
+        .merge(express_router(ExpressAppState::with_postgres(pool.clone())))
         .merge(postgres_outbound(pool.clone()))
         .merge(wave5_router(Wave5AppState::with_postgres(pool.clone())))
         .layer(from_fn_with_state(
