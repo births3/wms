@@ -1,14 +1,6 @@
-import type {
-  QueryPanelRangeValue,
-  QueryPanelValue,
-  StatusKey,
-} from "@wms/ui";
+import type { QueryPanelValue, StatusKey } from "@wms/ui";
 
-import { queryRange, queryString, queryStringArray } from "@/lib/query-value";
-import {
-  purchaseReturnApprovalSourceLabel,
-  purchaseReturnDocumentTypeLabel,
-} from "./M4OutboundPageParts";
+import { queryString } from "@/lib/query-value";
 import type { OutboundOrder, OutboundWave, PurchaseReturnOrder } from "./M4OutboundDetailDialog";
 
 export type M4OutboundMode = "orders" | "waves" | "review" | "returns";
@@ -62,7 +54,9 @@ export function statusOptions(mode: M4OutboundMode) {
     ? ["draft", "released", "inventory_locked", "cancelled"]
     : mode === "returns"
       ? ["pending_approval", "approved", "picking", "reviewed", "shipped", "cancelled"]
-      : ["pending_validation", "validation_exception", "confirmed", "inventory_locked", "reviewed", "shipped"];
+      : mode === "review"
+        ? ["picked", "picked_short", "reviewed", "reviewed_short", "shipped"]
+        : ["pending_validation", "validation_exception", "confirmed", "inventory_locked", "reviewed", "shipped"];
   return keys.map((key) => [key, outboundStatusLabels[key] ?? key]);
 }
 
@@ -75,70 +69,29 @@ export function statusKey(status: string | null | undefined): StatusKey {
 }
 
 export function defaultM4OutboundQueryValue(): QueryPanelValue {
-  return { keyword: "", statusFilter: [], businessDate: { from: "", to: "" } };
+  return { keyword: "", statusFilter: "" };
 }
 
 export function normalizeM4OutboundQueryValue(value: QueryPanelValue): QueryPanelValue {
   return {
     keyword: queryString(value.keyword),
-    statusFilter: queryStringArray(value.statusFilter),
-    businessDate: queryRange(value.businessDate),
+    statusFilter: queryString(value.statusFilter),
   };
 }
 
-export function filterOrders(orders: OutboundOrder[], query: QueryPanelValue, mode: M4OutboundMode) {
+export function filterOrders(orders: OutboundOrder[], _query: QueryPanelValue, mode: M4OutboundMode) {
   const allowed = mode === "review"
     ? new Set(["picked", "picked_short", "reviewed", "reviewed_short", "shipped"])
     : null;
-  const keyword = queryString(query.keyword);
-  const statuses = new Set(queryStringArray(query.statusFilter));
-  const businessDate = queryRange(query.businessDate);
-  return orders.filter((order) => {
-    const lines = order.lines ?? [];
-    const searchable = [order.wms_order_no, order.erp_order_no ?? "", order.customer_id, order.status ?? "", ...lines.flatMap((line) => [line.product_code, line.batch_no])].join(" ").toLowerCase();
-    return (!allowed || allowed.has(order.status)) && matches(searchable, keyword) && matchesStatus(order.status, statuses) && dateInRange(order.required_ship_at, businessDate);
-  });
+  return allowed ? orders.filter((order) => allowed.has(order.status)) : orders;
 }
 
-export function filterWaves(waves: OutboundWave[], query: QueryPanelValue) {
-  const keyword = queryString(query.keyword);
-  const statuses = new Set(queryStringArray(query.statusFilter));
-  const businessDate = queryRange(query.businessDate);
-  return waves.filter((wave) => matches(`${wave.wave_no} ${wave.status}`.toLowerCase(), keyword) && matchesStatus(wave.status, statuses) && dateInRange(wave.created_at, businessDate));
+export function filterWaves(waves: OutboundWave[], _query: QueryPanelValue) {
+  return waves;
 }
 
-export function filterReturns(returns: PurchaseReturnOrder[], query: QueryPanelValue) {
-  const keyword = queryString(query.keyword);
-  const statuses = new Set(queryStringArray(query.statusFilter));
-  const businessDate = queryRange(query.businessDate);
-  return returns.filter((item) => matches(
-    [
-      item.return_no,
-      item.document_type,
-      purchaseReturnDocumentTypeLabel(item.document_type),
-      item.source_purchase_order_no,
-      item.supplier_name,
-      item.reason,
-      item.product_code,
-      item.approval_source,
-      purchaseReturnApprovalSourceLabel(item.approval_source),
-    ].join(" ").toLowerCase(),
-    keyword,
-  ) && matchesStatus(item.status, statuses) && dateInRange(item.created_at, businessDate));
-}
-
-function matches(searchable: string, keyword: string) {
-  const normalized = keyword.trim().toLowerCase();
-  return !normalized || searchable.includes(normalized);
-}
-
-function matchesStatus(status: string, statuses: Set<string>) {
-  return statuses.size === 0 || statuses.has(status);
+export function filterReturns(returns: PurchaseReturnOrder[], _query: QueryPanelValue) {
+  return returns;
 }
 
 export { queryValueFromUnknown } from "@/lib/query-value";
-
-function dateInRange(value: string | null | undefined, range: QueryPanelRangeValue) {
-  const date = value?.slice(0, 10) ?? "";
-  return (!range.from || date >= range.from) && (!range.to || date <= range.to);
-}

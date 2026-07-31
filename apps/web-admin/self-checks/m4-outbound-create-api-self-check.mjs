@@ -12,12 +12,18 @@ const devMockCore = readFileSync(resolve(root, "dev-mocks/web-admin-dev-mock-cor
 const devMock = readFileSync(resolve(root, "dev-mocks/outbound-dev-mock.ts"), "utf8");
 
 assert.doesNotMatch(page, /待接真实 API 后拆 feature hooks/, "M4 页面豁免理由必须反映新建接口已接入");
+assert.match(page, /key:\s*"statusFilter", label:\s*"状态", type:\s*"select"/, "M4 状态查询必须与单值服务端 status 契约一致");
+assert.doesNotMatch(page, /businessDate|商品 \/ 批号 \/ 客商/, "M4 查询面板不得展示未接服务端的日期/商品/批号/客商条件");
+assert.match(page, /当前窗口可能未完整，请收窄条件/, "M4 返回 limit 窗口时必须提示结果可能不完整");
 assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/orders"/, "M4 必须提供真实创建出库单 API 客户端");
 assert.match(queries, /api\.GET\("\/api\/v1\/outbound\/orders"/, "M4 出库订单列表必须读取真实 API");
+assert.match(queries, /queryKey:\s*\[\.\.\.outboundOrdersQueryKey, query\]/, "M4 出库订单 query key 必须包含已应用服务端条件");
+assert.match(queries, /params:\s*\{\s*query\s*:\s*query\s*\}/, "M4 出库列表必须把已应用条件传给 API");
 assert.match(queries, /api\.GET\("\/api\/v1\/outbound\/orders\/\{id\}"/, "M4 出库订单详情必须读取真实 API");
 assert.match(queries, /api\.GET\("\/api\/v1\/outbound\/orders\/\{id\}\/review"/, "M4 复核弹窗必须读取真实复核明细 API");
 assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/orders\/\{id\}\/review"/, "M4 复核必须调用真实提交 API");
 assert.match(queries, /api\.GET\("\/api\/v1\/outbound\/waves"/, "M4 波次列表必须读取真实 API");
+assert.match(queries, /queryKey:\s*\[\.\.\.outboundWavesQueryKey, query\]/, "M4 波次 query key 必须包含已应用服务端条件");
 assert.match(queries, /api\.GET\("\/api\/v1\/outbound\/waves\/\{wave_id\}"/, "M4 波次详情必须读取真实 API");
 assert.match(queries, /useCreateOutboundOrderMutation/, "M4 必须提供创建出库单 mutation");
 assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/waves"/, "M4 波次必须提供真实创建 API 客户端");
@@ -85,6 +91,7 @@ assert.match(devMock, /order_ids/, "M4 dev mock 波次接口必须保留订单�
 
 // --- 采购退货接入真实 API ---
 assert.match(queries, /api\.GET\("\/api\/v1\/outbound\/purchase-returns"/, "M4 采购退货列表必须读取真实 API");
+assert.match(queries, /queryKey:\s*\[\.\.\.purchaseReturnsQueryKey, query\]/, "M4 采购退货 query key 必须包含已应用服务端条件");
 assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns"/, "M4 必须提供真实创建采购退货单 API 客户端");
 assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns\/\{id\}\/approve"/, "M4 采购退货审批必须调用真实 API");
 assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/purchase-returns\/\{id\}\/reject"/, "M4 采购退货驳回必须调用真实 API");

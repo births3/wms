@@ -278,6 +278,40 @@ async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool
         .expect("limit should apply");
     assert_eq!(limited.len(), 1);
 
+    for index in 0..49 {
+        create_read_order(
+            &pool,
+            &repo,
+            &owner_ctx,
+            &format!("WMS-R-READ-FILLER-{index:03}"),
+            &format!("ERP-R-READ-FILLER-{index:03}"),
+            now,
+        )
+        .await;
+    }
+    let target = create_read_order(
+        &pool,
+        &repo,
+        &owner_ctx,
+        "WMS-R-READ-TARGET",
+        "ERP-R-READ-TARGET",
+        now,
+    )
+    .await;
+    let default_window = repo
+        .list_outbound_orders(&owner_ctx, None, None, None)
+        .await
+        .expect("default list should be bounded");
+    assert_eq!(default_window.len(), 50);
+    assert!(default_window.iter().all(|order| order.id != target.id));
+
+    let targeted = repo
+        .list_outbound_orders(&owner_ctx, Some("confirmed"), Some("TARGET"), Some(50))
+        .await
+        .expect("q, status, and limit should find a record outside the default window");
+    assert_eq!(targeted.len(), 1);
+    assert_eq!(targeted[0].id, target.id);
+
     let detail = repo
         .get_outbound_order(&owner_ctx, first.id)
         .await

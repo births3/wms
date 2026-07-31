@@ -50,7 +50,7 @@ def test_page_query_suggestion_for_m4_outbound_page():
     assert suggestion["required"] is True
     assert suggestion["source"] == "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx"
     assert suggestion["core"] == ["keyword", "statusFilter"]
-    assert suggestion["more"] == ["businessDate"]
+    assert suggestion["more"] == []
 
 
 def test_page_query_suggestion_for_h9_print_template_page():

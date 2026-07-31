@@ -156,7 +156,7 @@ def suggest_page_config(page_id: str, title: str) -> dict[str, Any]:
             "fieldConstant": "m4OutboundQueryFields",
             "coreConstant": "m4OutboundCoreQueryFieldKeys",
             "core": ["keyword", "statusFilter"],
-            "more": ["businessDate"],
+            "more": [],
         }
     if page_id.startswith("h9-"):
         return {

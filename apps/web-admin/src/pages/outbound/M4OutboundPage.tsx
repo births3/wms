@@ -50,6 +50,7 @@ import {
   useShipOutboundOrderMutation,
   useShipPurchaseReturnMutation,
   useVoidRequestOutboundOrderMutation,
+  OUTBOUND_LIST_LIMIT,
   type CreateOutboundWaveRequest,
 } from "@/features/outbound/outbound-queries";
 import { useCurrentUserQuery } from "@/features/auth/auth-queries";
@@ -67,9 +68,9 @@ import {
   filterReturns,
   filterWaves,
   normalizeM4OutboundQueryValue,
-  outboundStatusLabels,
   queryValueFromUnknown,
   pageMeta,
+  statusOptions,
   type M4OutboundMode,
 } from "./m4-outbound-page-model";
 import {
@@ -104,12 +105,9 @@ interface M4OutboundPageProps {
   onBack: () => void;
 }
 
-const m4OutboundStatusOptions = Object.entries(outboundStatusLabels).map(([value, label]) => ({ value, label }));
-
 const m4OutboundQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "单号 / 商品 / 批号 / 客商" },
-  { key: "statusFilter", label: "状态", type: "multiSelect", options: m4OutboundStatusOptions },
-  { key: "businessDate", label: "业务日期", type: "dateRange" },
+  { key: "keyword", label: "关键字", type: "text" },
+  { key: "statusFilter", label: "状态", type: "select" },
 ];
 const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
 
@@ -120,6 +118,18 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const [returns, setReturns] = React.useState<PurchaseReturnOrder[]>([]);
   const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
     usePageQueryState<QueryPanelValue>(defaultM4OutboundQueryValue, normalizeM4OutboundQueryValue);
+  const normalizedQuery = normalizeM4OutboundQueryValue(appliedQuery);
+  const listQuery = React.useMemo(
+    () => ({
+      q: typeof normalizedQuery.keyword === "string" && normalizedQuery.keyword.trim() ? normalizedQuery.keyword.trim() : undefined,
+      status: typeof normalizedQuery.statusFilter === "string" && normalizedQuery.statusFilter.trim() ? normalizedQuery.statusFilter.trim() : undefined,
+      limit: OUTBOUND_LIST_LIMIT,
+    }),
+    [normalizedQuery.keyword, normalizedQuery.statusFilter],
+  );
+  const ordersListQuery = mode === "orders" || mode === "review" ? listQuery : { limit: OUTBOUND_LIST_LIMIT };
+  const wavesListQuery = mode === "waves" ? listQuery : { limit: OUTBOUND_LIST_LIMIT };
+  const returnsListQuery = mode === "returns" ? listQuery : { limit: OUTBOUND_LIST_LIMIT };
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const {
     open: detailOpen,
@@ -148,9 +158,9 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   const [purchaseReturnForm, setPurchaseReturnForm] =
     React.useState<PurchaseReturnCreateForm>(emptyPurchaseReturnForm);
   const [shipForm, setShipForm] = React.useState<OutboundShipForm>(defaultOutboundShipForm);
-  const ordersQuery = useOutboundOrdersQuery(mode === "orders" || mode === "waves" || mode === "review");
-  const wavesQuery = useOutboundWavesQuery(mode === "waves");
-  const returnsQuery = usePurchaseReturnsQuery(mode === "returns");
+  const ordersQuery = useOutboundOrdersQuery(ordersListQuery, mode === "orders" || mode === "waves" || mode === "review");
+  const wavesQuery = useOutboundWavesQuery(wavesListQuery, mode === "waves");
+  const returnsQuery = usePurchaseReturnsQuery(returnsListQuery, mode === "returns");
   const createOutboundOrderMutation = useCreateOutboundOrderMutation();
   const createOutboundWaveMutation = useCreateOutboundWaveMutation();
   const releaseOutboundWaveMutation = useReleaseOutboundWaveMutation();
@@ -271,17 +281,26 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   }, [returnsQuery.data, returnsQuery.error, returnsQuery.isPending]);
 
   const meta = pageMeta(mode);
-  const normalizedQuery = normalizeM4OutboundQueryValue(appliedQuery);
-  const filteredOrders = filterOrders(orders, normalizedQuery, mode);
-  const filteredWaves = filterWaves(waves, normalizedQuery);
-  const filteredReturns = filterReturns(returns, normalizedQuery);
+  const filteredOrders = filterOrders(ordersQuery.data ?? [], normalizedQuery, mode);
+  const filteredWaves = filterWaves(wavesQuery.data ?? [], normalizedQuery);
+  const filteredReturns = filterReturns(returnsQuery.data ?? [], normalizedQuery);
   const selectedOrder = filteredOrders.find((item) => item.id === selectedId) ?? null;
   const selectedWave = filteredWaves.find((item) => item.id === selectedId) ?? null;
   const selectedReturn = filteredReturns.find((item) => item.id === selectedId) ?? null;
   const querySummaryItems = React.useMemo(
-    () => buildQueryPanelSummaryItems(m4OutboundQueryFields, appliedQuery),
-    [appliedQuery],
+    () => buildQueryPanelSummaryItems(
+      m4OutboundQueryFields.map((field) => field.key === "statusFilter"
+        ? { ...field, options: statusOptions(mode).map(([value, label]) => ({ value, label })) }
+        : field),
+      appliedQuery,
+    ),
+    [appliedQuery, mode],
   );
+  const listWindowLimited = (mode === "orders" || mode === "review")
+    ? (ordersQuery.data?.length ?? 0) >= OUTBOUND_LIST_LIMIT
+    : mode === "waves"
+      ? (wavesQuery.data?.length ?? 0) >= OUTBOUND_LIST_LIMIT
+      : (returnsQuery.data?.length ?? 0) >= OUTBOUND_LIST_LIMIT;
   const createActionKind = meta.createAction;
   const gridRefreshAction: DataGridRefreshAction = {
     label: "刷新",
@@ -613,6 +632,9 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
       <QueryPanel
         fields={m4OutboundQueryFields}
+        fieldOptions={{
+          statusFilter: statusOptions(mode).map(([value, label]) => ({ value, label })),
+        }}
         defaultVisibleFieldKeys={m4OutboundCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={(next) => setDraftQuery(normalizeM4OutboundQueryValue(next))}
@@ -625,6 +647,12 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
           setSelectedId(null);
         }}
       />
+
+      {listWindowLimited && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+          当前窗口可能未完整，请收窄条件
+        </div>
+      )}
 
       {mode === "waves" ? (
         <DataGrid

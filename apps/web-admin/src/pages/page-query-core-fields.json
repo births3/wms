@@ -475,7 +475,7 @@
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
       "core": ["keyword", "statusFilter"],
-      "more": ["businessDate"]
+      "more": []
     },
     {
       "id": "m4-waves",
@@ -485,7 +485,7 @@
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
       "core": ["keyword", "statusFilter"],
-      "more": ["businessDate"]
+      "more": []
     },
     {
       "id": "m4-review",
@@ -495,7 +495,7 @@
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
       "core": ["keyword", "statusFilter"],
-      "more": ["businessDate"]
+      "more": []
     },
     {
       "id": "m4-returns",
@@ -505,7 +505,7 @@
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
       "core": ["keyword", "statusFilter"],
-      "more": ["businessDate"]
+      "more": []
     }
   ]
 }

@@ -17,13 +17,22 @@ export type RejectPurchaseReturnRequest = components["schemas"]["RejectPurchaseR
 export const outboundOrdersQueryKey = ["outbound", "orders"] as const;
 export const outboundWavesQueryKey = ["outbound", "waves"] as const;
 export const purchaseReturnsQueryKey = ["outbound", "purchase-returns"] as const;
+export const OUTBOUND_LIST_LIMIT = 50;
 
-export function useOutboundOrdersQuery(enabled = true) {
+export interface OutboundListQuery {
+  q?: string;
+  status?: string;
+  limit?: number;
+}
+
+export function useOutboundOrdersQuery(query: OutboundListQuery = {}, enabled = true) {
   return useQuery<OutboundOrder[], ApiError>({
-    queryKey: outboundOrdersQueryKey,
+    queryKey: [...outboundOrdersQueryKey, query],
     enabled,
     queryFn: async () => {
-      const result = await api.GET("/api/v1/outbound/orders");
+      const result = await api.GET("/api/v1/outbound/orders", {
+        params: { query: query },
+      });
       if (!result.data) throw new ApiError(result.error, "读取出库订单失败", result.response.status);
       return result.data.data;
     },
@@ -213,12 +222,14 @@ export function useCancelOutboundWaveMutation() {
   });
 }
 
-export function useOutboundWavesQuery(enabled = true) {
+export function useOutboundWavesQuery(query: OutboundListQuery = {}, enabled = true) {
   return useQuery<OutboundWave[], ApiError>({
-    queryKey: outboundWavesQueryKey,
+    queryKey: [...outboundWavesQueryKey, query],
     enabled,
     queryFn: async () => {
-      const result = await api.GET("/api/v1/outbound/waves");
+      const result = await api.GET("/api/v1/outbound/waves", {
+        params: { query: query },
+      });
       if (!result.data) throw new ApiError(result.error, "读取出库波次失败", result.response.status);
       return result.data.data;
     },
@@ -239,12 +250,14 @@ export function useOutboundWaveQuery(waveId: string | null) {
   });
 }
 
-export function usePurchaseReturnsQuery(enabled = true) {
+export function usePurchaseReturnsQuery(query: OutboundListQuery = {}, enabled = true) {
   return useQuery<PurchaseReturnOrder[], ApiError>({
-    queryKey: purchaseReturnsQueryKey,
+    queryKey: [...purchaseReturnsQueryKey, query],
     enabled,
     queryFn: async () => {
-      const result = await api.GET("/api/v1/outbound/purchase-returns");
+      const result = await api.GET("/api/v1/outbound/purchase-returns", {
+        params: { query: query },
+      });
       if (!result.data) throw new ApiError(result.error, "读取采购退货单失败", result.response.status);
       return result.data.data;
     },

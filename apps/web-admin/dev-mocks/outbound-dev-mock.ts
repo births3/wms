@@ -22,13 +22,55 @@ const purchaseReturnTransitions: Record<string, [from: string, to: string]> = {
   ship: ["reviewed", "shipped"],
 };
 
+type OutboundListQuery = { q: string; status: string; limit: number };
+
+function outboundListQuery(req: IncomingMessage): OutboundListQuery {
+  const url = new URL(req.url ?? "/", "http://wms-dev-mock.local");
+  const rawLimit = Number(url.searchParams.get("limit"));
+  return {
+    q: (url.searchParams.get("q") ?? "").trim().toLowerCase(),
+    status: (url.searchParams.get("status") ?? "").trim(),
+    limit: Number.isFinite(rawLimit) ? Math.min(200, Math.max(1, Math.trunc(rawLimit))) : 50,
+  };
+}
+
+function listOutboundRows(
+  rows: Record<string, unknown>[],
+  query: OutboundListQuery,
+  searchable: (row: Record<string, unknown>) => string,
+) {
+  return rows
+    .filter((row) => {
+      const status = typeof row.status === "string" ? row.status : "";
+      return (!query.status || status === query.status)
+        && (!query.q || searchable(row).toLowerCase().includes(query.q));
+    })
+    .slice(0, query.limit);
+}
+
+function sendOutboundList(
+  res: ServerResponse,
+  rows: Record<string, unknown>[],
+  query: OutboundListQuery,
+  searchable: (row: Record<string, unknown>) => string,
+) {
+  const data = listOutboundRows(rows, query, searchable);
+  sendJson(res, 200, { data, page: { count: data.length, next_cursor: null } });
+}
+
 export async function handleOutboundDevMock(
   req: IncomingMessage,
   res: ServerResponse,
   pathname: string,
 ): Promise<boolean> {
   if (req.method === "GET" && pathname === "/api/v1/outbound/purchase-returns") {
-    sendJson(res, 200, { data: purchaseReturns, page: { count: purchaseReturns.length, next_cursor: null } });
+    const query = outboundListQuery(req);
+    sendOutboundList(
+      res,
+      purchaseReturns,
+      query,
+      (row) => [row.return_no, row.source_purchase_order_no, row.supplier_name].filter((value) => typeof value === "string").join(" "),
+    );
     return true;
   }
 
@@ -105,7 +147,8 @@ export async function handleOutboundDevMock(
   }
 
   if (req.method === "GET" && pathname === "/api/v1/outbound/waves") {
-    sendJson(res, 200, { data: outboundWaves, page: { count: outboundWaves.length, next_cursor: null } });
+    const query = outboundListQuery(req);
+    sendOutboundList(res, outboundWaves, query, (row) => typeof row.wave_no === "string" ? row.wave_no : "");
     return true;
   }
 
@@ -121,7 +164,8 @@ export async function handleOutboundDevMock(
   }
 
   if (req.method === "GET" && pathname === "/api/v1/outbound/orders") {
-    sendJson(res, 200, { data: outboundOrders, page: { count: outboundOrders.length, next_cursor: null } });
+    const query = outboundListQuery(req);
+    sendOutboundList(res, outboundOrders, query, (row) => [row.wms_order_no, row.erp_order_no].filter((value) => typeof value === "string").join(" "));
     return true;
   }
 
