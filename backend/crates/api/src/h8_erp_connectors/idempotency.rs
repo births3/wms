@@ -3,7 +3,6 @@
 use axum::http::{HeaderMap, StatusCode};
 use serde::Serialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use wms_domain::{
     api_key_scopes_cover_messages, required_inbound_scopes, H8ErpConnector, H8ErpConnectorError,
@@ -11,7 +10,7 @@ use wms_domain::{
 
 use super::error::{H8ErpConnectorHandlerError, H8ErpConnectorRepoError};
 use super::state::H8ErpConnectorAppState;
-use crate::sync::lock_recover;
+use crate::{idempotency, sync::lock_recover};
 
 #[derive(Clone, Debug)]
 pub struct H8IdempotencyWrite {
@@ -63,10 +62,7 @@ pub(crate) fn idempotency_key(headers: &HeaderMap) -> Result<String, H8ErpConnec
 }
 
 pub(crate) fn request_hash(payload: &impl Serialize) -> Result<String, H8ErpConnectorHandlerError> {
-    let bytes = serde_json::to_vec(payload).map_err(|e| {
-        H8ErpConnectorHandlerError::Repo(H8ErpConnectorRepoError::Db(e.to_string()))
-    })?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    idempotency::request_hash(payload).map_err(map_idempotency_error)
 }
 
 pub(crate) fn cache_key(owner_id: Uuid, key: &str) -> String {
@@ -80,21 +76,9 @@ pub(crate) async fn load_idempotent_response(
     hash: &str,
 ) -> Result<Option<(StatusCode, Value)>, H8ErpConnectorHandlerError> {
     if let Some(pool) = &state.audit_pool {
-        let row: Option<(String, i32, Value)> = sqlx::query_as(
-            r#"
-            SELECT request_hash, status_code, response_body
-              FROM idempotency_request
-             WHERE owner_id = $1 AND idempotency_key = $2
-               AND expires_at > now()
-            "#,
-        )
-        .bind(owner_id)
-        .bind(key)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| {
-            H8ErpConnectorHandlerError::Repo(H8ErpConnectorRepoError::Db(e.to_string()))
-        })?;
+        let row = idempotency::load_response(pool, owner_id, key)
+            .await
+            .map_err(map_idempotency_error)?;
         if let Some((stored_hash, status_code, body)) = row {
             if stored_hash != hash {
                 return Err(H8ErpConnectorHandlerError::Repo(
@@ -119,6 +103,20 @@ pub(crate) async fn load_idempotent_response(
         )));
     }
     Ok(None)
+}
+
+fn map_idempotency_error(error: idempotency::IdempotencyError) -> H8ErpConnectorHandlerError {
+    match error {
+        idempotency::IdempotencyError::Conflict => H8ErpConnectorHandlerError::Repo(
+            H8ErpConnectorRepoError::Domain(H8ErpConnectorError::IdempotencyConflict),
+        ),
+        idempotency::IdempotencyError::Database(error) => {
+            H8ErpConnectorHandlerError::Repo(H8ErpConnectorRepoError::Db(error.to_string()))
+        }
+        idempotency::IdempotencyError::Serialize(error) => {
+            H8ErpConnectorHandlerError::Repo(H8ErpConnectorRepoError::Db(error))
+        }
+    }
 }
 
 pub(crate) fn cache_idempotent_response(

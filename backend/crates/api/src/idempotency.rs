@@ -4,7 +4,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::{Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 const IDEMPOTENCY_TTL: Duration = Duration::hours(24);
@@ -130,6 +130,36 @@ pub(crate) async fn store_success<T: Serialize>(
     response: &T,
     now: DateTime<Utc>,
 ) -> Result<(), IdempotencyError> {
+    store_success_with_status(
+        tx,
+        owner_id,
+        key,
+        request_hash,
+        method,
+        path,
+        200,
+        resource_type,
+        resource_id,
+        response,
+        now,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn store_success_with_status<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    method: &str,
+    path: &str,
+    status_code: i32,
+    resource_type: &str,
+    resource_id: &str,
+    response: &T,
+    now: DateTime<Utc>,
+) -> Result<(), IdempotencyError> {
     let response_body = serde_json::to_value(response)
         .map_err(|error| IdempotencyError::Serialize(error.to_string()))?;
     sqlx::query(
@@ -138,7 +168,7 @@ pub(crate) async fn store_success<T: Serialize>(
             id, owner_id, idempotency_key, request_hash, method, path,
             status_code, response_body, resource_type, resource_id, expires_at, created_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, 200, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         "#,
     )
     .bind(Uuid::new_v4())
@@ -147,6 +177,7 @@ pub(crate) async fn store_success<T: Serialize>(
     .bind(request_hash)
     .bind(method)
     .bind(path)
+    .bind(status_code)
     .bind(response_body)
     .bind(resource_type)
     .bind(resource_id)
@@ -156,4 +187,19 @@ pub(crate) async fn store_success<T: Serialize>(
     .await
     .map_err(IdempotencyError::Database)?;
     Ok(())
+}
+
+pub(crate) async fn load_response(
+    pool: &PgPool,
+    owner_id: Uuid,
+    key: &str,
+) -> Result<Option<(String, i32, Value)>, IdempotencyError> {
+    sqlx::query_as(
+        "SELECT request_hash, status_code, response_body FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 AND expires_at > now()",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_optional(pool)
+    .await
+    .map_err(IdempotencyError::Database)
 }

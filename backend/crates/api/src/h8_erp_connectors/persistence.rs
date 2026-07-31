@@ -1,6 +1,6 @@
 //! H8 ERP 连接 PostgreSQL 原子持久化边界。
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::Utc;
 use serde::de::DeserializeOwned;
 use sqlx::{PgPool, Postgres, Transaction};
 use wms_domain::{H8ErpConnector, H8ErpConnectorError, H8ErpConnectorTestResult};
@@ -9,7 +9,10 @@ use super::{
     error::H8ErpConnectorRepoError, idempotency::H8IdempotencyWrite,
     repository::H8ConnectorStatusTransition,
 };
-use crate::audit::{append_event_in_tx, AuditWriteRequest};
+use crate::{
+    audit::{append_event_in_tx, AuditWriteRequest},
+    idempotency,
+};
 
 pub(super) async fn insert(
     pool: &PgPool,
@@ -192,45 +195,20 @@ async fn replay_idempotency<T: DeserializeOwned>(
     tx: &mut Transaction<'_, Postgres>,
     request: &H8IdempotencyWrite,
 ) -> Result<Option<T>, H8ErpConnectorRepoError> {
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
-        .bind(format!(
-            "h8_erp_connector:{}:{}",
-            request.owner_id, request.key
-        ))
-        .execute(&mut **tx)
+    idempotency::lock_key(tx, "h8-erp-connector", request.owner_id, &request.key)
         .await
-        .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))?;
-    let row: Option<(String, serde_json::Value, DateTime<Utc>)> = sqlx::query_as(
-        r#"SELECT request_hash, response_body, expires_at
-             FROM idempotency_request
-            WHERE owner_id=$1 AND idempotency_key=$2
-            FOR UPDATE"#,
+        .map_err(map_idempotency_error)?;
+    idempotency::replay(
+        tx,
+        request.owner_id,
+        &request.key,
+        &request.request_hash,
+        &request.method,
+        &request.path,
+        Utc::now(),
     )
-    .bind(request.owner_id)
-    .bind(&request.key)
-    .fetch_optional(&mut **tx)
     .await
-    .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))?;
-    let Some((stored_hash, response, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= Utc::now() {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id=$1 AND idempotency_key=$2")
-            .bind(request.owner_id)
-            .bind(&request.key)
-            .execute(&mut **tx)
-            .await
-            .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))?;
-        return Ok(None);
-    }
-    if stored_hash != request.request_hash {
-        return Err(H8ErpConnectorRepoError::Domain(
-            H8ErpConnectorError::IdempotencyConflict,
-        ));
-    }
-    serde_json::from_value(response)
-        .map(Some)
-        .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))
+    .map_err(map_idempotency_error)
 }
 
 async fn store_idempotency(
@@ -238,29 +216,33 @@ async fn store_idempotency(
     request: &H8IdempotencyWrite,
 ) -> Result<(), H8ErpConnectorRepoError> {
     let now = Utc::now();
-    sqlx::query(
-        r#"INSERT INTO idempotency_request (
-               id, owner_id, idempotency_key, request_hash, method, path,
-               status_code, response_body, resource_type, resource_id, expires_at, created_at
-           ) VALUES (
-               $1,$2,$3,$4,$5,$6,$7,$8,'h8_erp_connector',$9,$10,$11
-           )"#,
+    idempotency::store_success_with_status(
+        tx,
+        request.owner_id,
+        &request.key,
+        &request.request_hash,
+        &request.method,
+        &request.path,
+        request.status_code,
+        "h8_erp_connector",
+        &request.resource_id,
+        &request.response_body,
+        now,
     )
-    .bind(uuid::Uuid::new_v4())
-    .bind(request.owner_id)
-    .bind(&request.key)
-    .bind(&request.request_hash)
-    .bind(&request.method)
-    .bind(&request.path)
-    .bind(request.status_code)
-    .bind(&request.response_body)
-    .bind(&request.resource_id)
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))?;
-    Ok(())
+    .map_err(map_idempotency_error)
+}
+
+fn map_idempotency_error(error: idempotency::IdempotencyError) -> H8ErpConnectorRepoError {
+    match error {
+        idempotency::IdempotencyError::Conflict => {
+            H8ErpConnectorRepoError::Domain(H8ErpConnectorError::IdempotencyConflict)
+        }
+        idempotency::IdempotencyError::Database(error) => {
+            H8ErpConnectorRepoError::Db(error.to_string())
+        }
+        idempotency::IdempotencyError::Serialize(error) => H8ErpConnectorRepoError::Db(error),
+    }
 }
 
 async fn insert_in_tx(
