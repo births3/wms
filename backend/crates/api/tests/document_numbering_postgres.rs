@@ -208,6 +208,29 @@ async fn document_number_rule_management_is_owner_scoped_idempotent_and_audited(
         .expect("same rule idempotency key should replay");
     assert_eq!(created.value.id, replay.value.id);
     assert!(replay.replayed);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/wrong-path' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("mcg-rule-upsert-1")
+    .execute(&pool)
+    .await
+    .expect("idempotency metadata should be mutable for the regression check");
+    let metadata_conflict = service
+        .upsert_rule(
+            &pool,
+            &auth,
+            "purchase-inbound-api",
+            rule_request(6),
+            now,
+            "mcg-rule-upsert-1",
+        )
+        .await
+        .expect_err("method and path changes must invalidate a replay");
+    assert_eq!(
+        metadata_conflict,
+        DocumentNumberingError::IdempotencyConflict
+    );
     let upserted_rows: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)::BIGINT FROM document_number_rules WHERE owner_id = $1 AND rule_code = 'purchase-inbound-api'",
     )

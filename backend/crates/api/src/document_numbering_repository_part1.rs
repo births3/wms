@@ -1,7 +1,6 @@
-use chrono::{DateTime, Datelike, Duration, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -9,6 +8,7 @@ use wms_domain::{DocumentNumberAllocation, PageMeta};
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
+    idempotency,
     operation_context::OperationContext as AuthContext,
 };
 
@@ -36,6 +36,18 @@ pub enum DocumentNumberingError {
     Audit(String),
     Database(String),
     Serialize(String),
+}
+
+impl From<crate::idempotency::IdempotencyError> for DocumentNumberingError {
+    fn from(error: crate::idempotency::IdempotencyError) -> Self {
+        match error {
+            crate::idempotency::IdempotencyError::Conflict => Self::IdempotencyConflict,
+            crate::idempotency::IdempotencyError::Database(error) => {
+                Self::Database(error.to_string())
+            }
+            crate::idempotency::IdempotencyError::Serialize(error) => Self::Serialize(error),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -199,10 +211,19 @@ impl PgDocumentNumberingService {
             "rule_code": rule_code,
             "request": &req,
         }))?;
+        let path = format!("/api/v1/code-generator/document-number-rules/{rule_code}");
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PUT",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -283,7 +304,7 @@ impl PgDocumentNumberingService {
             idempotency_key,
             &request_hash,
             "PUT",
-            &format!("/api/v1/code-generator/document-number-rules/{rule_code}"),
+            &path,
             &rule,
             "upsert_document_number_rule",
             now,
@@ -308,10 +329,20 @@ impl PgDocumentNumberingService {
             "rule_code": rule_code,
             "request": &req,
         }))?;
+        let path =
+            format!("/api/v1/code-generator/document-number-rules/{rule_code}/enabled");
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash, now).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PATCH",
+            &path,
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -343,7 +374,7 @@ impl PgDocumentNumberingService {
             idempotency_key,
             &request_hash,
             "PATCH",
-            &format!("/api/v1/code-generator/document-number-rules/{rule_code}/enabled"),
+            &path,
             &rule,
             "set_document_number_rule_enabled",
             now,

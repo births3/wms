@@ -3,12 +3,9 @@ async fn lock_idempotency_key(
     owner_id: Uuid,
     idempotency_key: &str,
 ) -> Result<(), DocumentNumberingError> {
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(idempotency_lock_id(owner_id, idempotency_key))
-        .fetch_one(&mut **tx)
+    idempotency::lock_key(tx, "document-numbering", owner_id, idempotency_key)
         .await
-        .map_err(map_db_error)?;
-    Ok(())
+        .map_err(Into::into)
 }
 
 fn document_number_request_hash(
@@ -21,21 +18,7 @@ fn document_number_request_hash(
 }
 
 fn json_request_hash(value: &Value) -> Result<String, DocumentNumberingError> {
-    let text = serde_json::to_string(value)
-        .map_err(|error| DocumentNumberingError::Serialize(error.to_string()))?;
-    let mut hasher = Sha256::new();
-    hasher.update(text.as_bytes());
-    Ok(hex::encode(hasher.finalize()))
-}
-
-fn idempotency_lock_id(owner_id: Uuid, idempotency_key: &str) -> i64 {
-    let mut hasher = Sha256::new();
-    hasher.update(owner_id.as_bytes());
-    hasher.update(idempotency_key.as_bytes());
-    let digest = hasher.finalize();
-    let mut bytes = [0_u8; 8];
-    bytes.copy_from_slice(&digest[..8]);
-    i64::from_be_bytes(bytes)
+    idempotency::request_hash(value).map_err(Into::into)
 }
 
 fn map_db_error(error: sqlx::Error) -> DocumentNumberingError {

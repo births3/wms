@@ -317,7 +317,7 @@ async fn finish_rule_mutation<T: Serialize>(
         .and_then(Value::as_str)
         .unwrap_or("document_number_rule")
         .to_string();
-    store_idempotency_success(
+    idempotency::store_success(
         &mut tx,
         ctx.owner_id,
         idempotency_key,
@@ -325,7 +325,7 @@ async fn finish_rule_mutation<T: Serialize>(
         method,
         path,
         "document_number_rule",
-        resource_id.clone(),
+        &resource_id,
         response,
         now,
     )
@@ -351,80 +351,21 @@ async fn replay_idempotency<T: DeserializeOwned>(
     owner_id: Uuid,
     idempotency_key: &str,
     request_hash: &str,
-    now: DateTime<Utc>,
-) -> Result<Option<T>, DocumentNumberingError> {
-    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
-        r#"
-        SELECT request_hash, response_body, expires_at
-          FROM idempotency_request
-         WHERE owner_id = $1 AND idempotency_key = $2
-         FOR UPDATE
-        "#,
-    )
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(map_db_error)?;
-    let Some((stored_hash, response_body, expires_at)) = row else {
-        return Ok(None);
-    };
-    if expires_at <= now {
-        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
-            .bind(owner_id)
-            .bind(idempotency_key)
-            .execute(&mut **tx)
-            .await
-            .map_err(map_db_error)?;
-        return Ok(None);
-    }
-    if stored_hash != request_hash {
-        return Err(DocumentNumberingError::IdempotencyConflict);
-    }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| DocumentNumberingError::Serialize(error.to_string()))
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn store_idempotency_success<T: Serialize>(
-    tx: &mut Transaction<'_, Postgres>,
-    owner_id: Uuid,
-    idempotency_key: &str,
-    request_hash: &str,
     method: &str,
     path: &str,
-    resource_type: &str,
-    resource_id: String,
-    response: &T,
     now: DateTime<Utc>,
-) -> Result<(), DocumentNumberingError> {
-    let response_body = serde_json::to_value(response)
-        .map_err(|error| DocumentNumberingError::Serialize(error.to_string()))?;
-    sqlx::query(
-        r#"
-        INSERT INTO idempotency_request (
-            id, owner_id, idempotency_key, request_hash, method, path,
-            status_code, response_body, resource_type, resource_id, expires_at, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, 200, $7, $8, $9, $10, $11)
-        "#,
+) -> Result<Option<T>, DocumentNumberingError> {
+    idempotency::replay(
+        tx,
+        owner_id,
+        idempotency_key,
+        request_hash,
+        method,
+        path,
+        now,
     )
-    .bind(Uuid::new_v4())
-    .bind(owner_id)
-    .bind(idempotency_key)
-    .bind(request_hash)
-    .bind(method)
-    .bind(path)
-    .bind(response_body)
-    .bind(resource_type)
-    .bind(resource_id)
-    .bind(now + Duration::hours(24))
-    .bind(now)
-    .execute(&mut **tx)
     .await
-    .map_err(map_db_error)?;
-    Ok(())
+    .map_err(Into::into)
 }
 
 fn counter_key(
