@@ -262,6 +262,25 @@ async fn admin_menu_draft_publish_batch_enable_rollback_is_idempotent_and_audite
         .expect("same idempotency key should replay");
     assert_eq!(created.value.id, replay.value.id);
     assert!(replay.replayed);
+    sqlx::query(
+        "UPDATE idempotency_request SET method = 'PATCH', path = '/api/v1/admin/menus/draft/nodes/other' WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("h1-menu-create-extra")
+    .execute(&pool)
+    .await
+    .expect("test should be able to alter the stored operation identity");
+    let operation_conflict = service
+        .create_node(
+            &pool,
+            &auth,
+            platform_extra_request(),
+            now,
+            "h1-menu-create-extra",
+        )
+        .await
+        .expect_err("same key with a different stored method/path must conflict");
+    assert_eq!(operation_conflict, AdminMenuError::IdempotencyConflict);
     let created_rows: i64 = sqlx::query_scalar(
         "SELECT COUNT(*)::BIGINT FROM admin_menu_draft_nodes WHERE code = 'platform.extra'",
     )

@@ -107,8 +107,16 @@ impl PgAdminMenuService {
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/admin/menus/draft/nodes",
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -182,8 +190,16 @@ impl PgAdminMenuService {
             json_request_hash(&serde_json::json!({ "node_id": node_id, "request": &req }))?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PATCH",
+            &format!("/api/v1/admin/menus/draft/nodes/{node_id}"),
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -269,8 +285,16 @@ impl PgAdminMenuService {
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/admin/menus/draft/batch-enable",
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -332,8 +356,16 @@ impl PgAdminMenuService {
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/admin/menus/publish",
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
@@ -389,8 +421,16 @@ impl PgAdminMenuService {
         let request_hash = json_request_hash(&req)?;
         let mut tx = pool.begin().await.map_err(map_db_error)?;
         lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(value) =
-            replay_idempotency(&mut tx, ctx.owner_id, idempotency_key, &request_hash).await?
+        if let Some(value) = replay_idempotency(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "POST",
+            "/api/v1/admin/menus/rollback",
+            now,
+        )
+        .await?
         {
             return Ok(IdempotentMutation {
                 value,
