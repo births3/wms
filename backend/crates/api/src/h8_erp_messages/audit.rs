@@ -10,7 +10,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event, AuditDiff, AuditError, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
     sync::lock_recover,
 };
 
@@ -184,7 +184,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::auth::AuthContext;
+    use crate::operation_context::OperationContext as AuthContext;
 
     #[tokio::test]
     async fn persistent_audit_failure_is_not_swallowed() {

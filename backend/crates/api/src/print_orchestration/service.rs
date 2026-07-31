@@ -12,8 +12,8 @@ use wms_domain::{
     RouteBindingListResponse, TestAggregationRuleRequest, TestPrintSuiteRequest,
 };
 
-use crate::auth::AuthContext;
 use crate::file_attachment::FileAttachmentService;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::{
     render_worker::CategoryPdfRenderer, repository::PgPrintOrchestrationRepository,

@@ -16,7 +16,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
     packing_station::{PackingStationError, PackingStationService},
     retail_chain::{RetailChainError, RetailChainService},
     tms_plus::{

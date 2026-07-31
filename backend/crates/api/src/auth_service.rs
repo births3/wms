@@ -10,10 +10,11 @@ use wms_domain::{
 use crate::{
     audit::AuditDiff,
     auth::{
-        build_access_claims, encode_access_token, AuthContext, AuthError, AuthRevocationStore,
+        build_access_claims, encode_access_token, AuthError, AuthRevocationStore,
         AuthRuntimePolicy, LogoutContext, ACCESS_TOKEN_TTL_SECONDS, JWT_SECRET_ENV,
     },
     auth_repository::{AuthRepository, AuthRepositoryError, LoginUser, SessionRevokeState},
+    operation_context::OperationContext,
 };
 
 #[derive(Clone)]
@@ -96,7 +97,10 @@ impl AuthService {
         })
     }
 
-    pub async fn current_user(&self, ctx: &AuthContext) -> Result<CurrentUser, AuthServiceError> {
+    pub async fn current_user(
+        &self,
+        ctx: &OperationContext,
+    ) -> Result<CurrentUser, AuthServiceError> {
         self.repository
             .current_user(ctx.user_id, ctx.owner_id)
             .await?
@@ -105,7 +109,7 @@ impl AuthService {
 
     pub async fn list_sessions(
         &self,
-        ctx: &AuthContext,
+        ctx: &OperationContext,
         user_id: Uuid,
     ) -> Result<AuthSessionListResponse, AuthServiceError> {
         let sessions = self
@@ -177,7 +181,7 @@ impl AuthService {
 
     pub async fn revoke_session(
         &self,
-        ctx: &AuthContext,
+        ctx: &OperationContext,
         session_id: &str,
         policy: &AuthRuntimePolicy,
     ) -> Result<AuthRevocationResponse, AuthServiceError> {
@@ -210,7 +214,7 @@ impl AuthService {
 
     pub async fn revoke_other_sessions(
         &self,
-        ctx: &AuthContext,
+        ctx: &OperationContext,
         policy: &AuthRuntimePolicy,
     ) -> Result<AuthSessionRevokeResponse, AuthServiceError> {
         let rows = self
@@ -238,7 +242,7 @@ impl AuthService {
 
     pub async fn change_password(
         &self,
-        ctx: &AuthContext,
+        ctx: &OperationContext,
         request: PasswordChangeRequest,
         policy: &AuthRuntimePolicy,
     ) -> Result<AuthSessionRevokeResponse, AuthServiceError> {
@@ -272,7 +276,7 @@ impl AuthService {
 
     pub async fn change_user_status(
         &self,
-        ctx: &AuthContext,
+        ctx: &OperationContext,
         user_id: Uuid,
         request: AuthUserStatusRequest,
         policy: &AuthRuntimePolicy,
@@ -307,7 +311,7 @@ impl AuthService {
 
     pub async fn kick_user(
         &self,
-        ctx: &AuthContext,
+        ctx: &OperationContext,
         user_id: Uuid,
         policy: &AuthRuntimePolicy,
     ) -> Result<AuthSessionRevokeResponse, AuthServiceError> {
@@ -324,7 +328,7 @@ impl AuthService {
 
     async fn invalidate_user_sessions(
         &self,
-        ctx: &AuthContext,
+        ctx: &OperationContext,
         user_id: Uuid,
         reason: &str,
         action: &str,

@@ -6,7 +6,7 @@ use wms_domain::{AlertInstanceListQuery, SendH4NotificationRequest};
 
 use crate::{
     audit::{append_event, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
     wechat_notify_service::{PgWechatNotifyService, WechatProvider},
 };
 

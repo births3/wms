@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool, Postgres, QueryBuilder, Transaction};
 use uuid::Uuid;
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::{
     AuditChainSeal, AuditError, AuditEventPage, AuditEventQuery, AuditEventQueryCursor,

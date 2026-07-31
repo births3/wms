@@ -8,7 +8,7 @@ use wms_domain::{
     ReviewDrugInspectionVersionRequest, UpdateDrugInspectionDraftRequest,
 };
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::{
     helpers::{lock_idempotency_key, replay_idempotency, request_hash, store_idempotency},

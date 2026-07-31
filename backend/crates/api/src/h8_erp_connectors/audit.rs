@@ -5,7 +5,7 @@ use wms_domain::H8ErpConnector;
 
 use crate::{
     audit::{AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
 };
 
 pub(crate) fn audit_request(

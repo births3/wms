@@ -17,7 +17,7 @@ use wms_domain::{
 };
 
 use crate::{
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
     wechat_notify_idempotency::{
         finish_mutation, json_request_hash, lock_idempotency_key, replay_idempotency,
     },

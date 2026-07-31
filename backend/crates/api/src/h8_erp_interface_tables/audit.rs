@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     audit::{append_event, AuditDiff, AuditError, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
     sync::lock_recover,
 };
 
@@ -52,7 +52,7 @@ async fn persist_query_audit(
 #[cfg(test)]
 mod tests {
     use super::persist_query_audit;
-    use crate::{audit::AuditWriteRequest, auth::AuthContext};
+    use crate::{audit::AuditWriteRequest, operation_context::OperationContext as AuthContext};
     use sqlx::postgres::PgPoolOptions;
     use std::time::Duration;
     use uuid::Uuid;

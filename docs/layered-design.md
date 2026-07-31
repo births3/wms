@@ -99,7 +99,7 @@ handler 只能做 5 件事：
 
 app service 是用例层，负责“这个用户动作如何完成”：
 
-- 权限已由 `AuthContext` 提供，但 service 必须继续使用 `ctx.owner_id` 做货主隔离。
+- 权限已由 runtime `AuthContext` 解析为 `OperationContext` 提供；service 必须继续使用 `ctx.owner_id` 做货主隔离。
 - 写操作在 service 层定义事务边界。
 - 写操作必须安排 H2 审计、L11 幂等、必要的领域事件。
 - service 只依赖 repository trait，不依赖 Axum 类型。
@@ -131,7 +131,8 @@ repository 负责“怎么存取”，不负责“该不该做”：
 auth_handlers.rs      # handler + 小型 service façade
 auth_repository.rs    # auth SQL 查询，达到拆分条件后新增
 auth_service.rs       # 登录、锁定、权限变更等用例编排，达到拆分条件后新增
-auth.rs               # JWT/AuthContext runtime contract
+operation_context.rs  # 传输无关的操作人、货主和仓库范围值对象
+auth.rs               # JWT/AuthContext runtime contract 与撤销适配
 ```
 
 过渡期允许“单个很小的只读查询”留在 handler 模块内；一旦模块继续扩展到用户管理、角色管理、踢下线、refresh/logout，必须拆出 service/repository。
@@ -141,6 +142,7 @@ auth.rs               # JWT/AuthContext runtime contract
 | 行为 | 放置 |
 |---|---|
 | JWT claim、AuthContext extractor、Redis 撤销检查 | `auth.rs` |
+| 已解析的操作人、货主和仓库范围上下文 | `operation_context.rs` |
 | `/api/v1/auth/login` HTTP handler | `auth_handlers.rs` |
 | 查用户、查角色、查权限 | `auth_repository.rs`，过渡期可在 `auth_handlers.rs` 私有函数 |
 | 密码 bcrypt 校验、失败计数、锁定策略 | `auth_service.rs`，过渡期可在 `auth_handlers.rs` 私有函数 |

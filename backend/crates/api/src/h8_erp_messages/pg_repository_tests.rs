@@ -13,8 +13,8 @@ use wms_domain::{
 };
 
 use crate::{
-    auth::AuthContext,
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
+    operation_context::OperationContext as AuthContext,
 };
 
 use super::{

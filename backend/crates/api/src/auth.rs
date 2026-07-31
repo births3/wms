@@ -19,6 +19,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 use wms_domain::ErrorResponse;
 
+pub use crate::operation_context::OperationContext;
+
 pub const ACCESS_TOKEN_TTL_SECONDS: i64 = 60 * 60;
 pub const JWT_SECRET_ENV: &str = "WMS_JWT_SECRET";
 pub const REDIS_PERMISSIONS_CHANGED_AT_TTL_SECONDS: u64 = ACCESS_TOKEN_TTL_SECONDS as u64 * 2;
@@ -36,16 +38,8 @@ pub struct Claims {
     pub exp: i64,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AuthContext {
-    pub user_id: Uuid,
-    pub owner_id: Uuid,
-    pub actor_name: String,
-    pub permissions: Vec<String>,
-    pub jti: String,
-    /// 外部 API Key 绑定的仓库范围；JWT 会话为 None。
-    pub warehouse_scope: Option<Uuid>,
-}
+/// 运行时鉴权上下文的兼容名称；值对象定义在 `operation_context`。
+pub type AuthContext = OperationContext;
 
 /// 登出专用上下文：验签但不检查撤销状态，保证重复登出仍然幂等。
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -8,8 +8,8 @@ use wms_domain::{DeliveryNoteGroup, ManualDeliveryNoteCutoffRequest};
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
     document_numbering::{GenerateDocumentNumberRequest, PgDocumentNumberingService},
+    operation_context::OperationContext as AuthContext,
 };
 
 use super::aggregation_rule::{partition_orders_by_rule_in_tx, resolve_rule_application_in_tx};

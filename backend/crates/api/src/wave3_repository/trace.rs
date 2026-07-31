@@ -7,7 +7,7 @@ use wms_domain::{
 };
 
 use super::{map_inventory_batch, InventoryBatchRow, PgWave3Repository, Wave3RepositoryError};
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 #[derive(Clone, FromRow)]
 struct InventoryMovementRow {

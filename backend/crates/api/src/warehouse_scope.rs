@@ -3,7 +3,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 pub(crate) async fn load_user_warehouse_scopes(
     pool: &PgPool,

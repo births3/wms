@@ -4,7 +4,7 @@ use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::DrugInspectionReportVersion;
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::{
     helpers::store_idempotency,

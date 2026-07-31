@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
 };
 
 #[derive(Clone, Debug)]

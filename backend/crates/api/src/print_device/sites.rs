@@ -8,7 +8,7 @@ use wms_domain::{
     PrintSiteListResponse, PrintSiteOwnerMapping, PrintSiteOwnerMappingListResponse,
 };
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::support::*;
 use super::{

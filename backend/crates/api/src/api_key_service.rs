@@ -12,7 +12,7 @@ use crate::{
     api_key_repository::{
         ApiKeyAuthPolicy, ApiKeyContext, ApiKeyListQuery, ApiKeyRepository, ApiKeyRepositoryError,
     },
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
 };
 
 pub const API_KEY_MANAGE_PERMISSION: &str = "h1.api_keys.manage";

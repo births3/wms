@@ -8,7 +8,7 @@ use super::{ConfigCenterAppState, ConfigCenterHandlerError};
 impl ConfigCenterAppState {
     pub(super) async fn persist_feature_flags(
         &self,
-        ctx: &crate::auth::AuthContext,
+        ctx: &crate::operation_context::OperationContext,
         action: &str,
         flags: &[FeatureFlagConfig],
     ) -> Result<(), ConfigCenterHandlerError> {

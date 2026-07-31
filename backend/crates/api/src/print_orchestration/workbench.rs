@@ -6,7 +6,7 @@ use wms_domain::{
     DeliveryNoteGroupListResponse,
 };
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::{
     repository::{map_db_error, PgPrintOrchestrationRepository},

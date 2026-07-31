@@ -6,8 +6,8 @@ use wms_domain::{StockLossReason, SubmitAlertDefinitionChangeRequest};
 use crate::{
     alert_definition_repository::{apply_approved_change_in_tx, AlertDefinitionRepositoryError},
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
     inventory::STATUS_QUARANTINED,
+    operation_context::OperationContext as AuthContext,
     stock_adjustment::quality_liaison::{
         create_approved_stock_loss_order_in_tx, ApprovedStockLossRequest,
     },

@@ -7,7 +7,7 @@ use wms_domain::{AuthSession, CurrentUser};
 
 use crate::{
     audit::{append_event, append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext,
 };
 
 #[derive(Clone)]
@@ -154,7 +154,7 @@ impl AuthRepository {
 
     pub async fn password_hash(
         &self,
-        actor: &AuthContext,
+        actor: &OperationContext,
     ) -> Result<Option<String>, AuthRepositoryError> {
         sqlx::query_scalar(
             "SELECT u.password_hash FROM auth_users u JOIN auth_user_owner_bindings b ON b.user_id=u.id AND b.owner_id=$1 AND b.is_active WHERE u.id=$2",
@@ -168,7 +168,7 @@ impl AuthRepository {
 
     pub async fn change_password(
         &self,
-        actor: &AuthContext,
+        actor: &OperationContext,
         new_password_hash: &str,
         changed_at: DateTime<Utc>,
     ) -> Result<bool, AuthRepositoryError> {
@@ -225,7 +225,7 @@ impl AuthRepository {
 
     pub async fn change_user_status(
         &self,
-        actor: &AuthContext,
+        actor: &OperationContext,
         user_id: Uuid,
         status: &str,
         changed_at: DateTime<Utc>,
@@ -381,7 +381,7 @@ impl AuthRepository {
 
     pub async fn revoke_session(
         &self,
-        actor: &AuthContext,
+        actor: &OperationContext,
         user_id: Uuid,
         session_id: &str,
         reason: &str,
@@ -452,7 +452,7 @@ impl AuthRepository {
 
     pub async fn revoke_active_sessions(
         &self,
-        actor: &AuthContext,
+        actor: &OperationContext,
         user_id: Uuid,
         except_session_id: Option<&str>,
         reason: &str,
@@ -509,7 +509,7 @@ impl AuthRepository {
 
     pub async fn append_auth_event(
         &self,
-        actor: &AuthContext,
+        actor: &OperationContext,
         action: &str,
         resource_type: &str,
         resource_id: &str,

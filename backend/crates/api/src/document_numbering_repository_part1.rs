@@ -9,7 +9,7 @@ use wms_domain::{DocumentNumberAllocation, PageMeta};
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
 };
 
 pub const DEFAULT_DOCUMENT_NUMBER_ALLOCATION_LIMIT: u32 = 50;

@@ -68,6 +68,7 @@ pub mod master_data;
 pub mod master_data_handlers;
 pub mod master_data_postgres;
 mod openapi_contract;
+pub mod operation_context;
 pub mod outbound;
 pub mod packing_station;
 pub mod parameter_mapping;

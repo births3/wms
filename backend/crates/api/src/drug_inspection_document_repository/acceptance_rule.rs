@@ -5,7 +5,7 @@ use wms_domain::{DrugInspectionRequirementRule, UpsertDrugInspectionRequirementR
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
 };
 
 use super::{

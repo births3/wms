@@ -12,7 +12,7 @@ Tier：T2（< 10s）
 
 规则（Wave 1 最小版）：
 - domain 层不得引用 api / infra / axum / sqlx
-- api 层允许引用 domain
+- api service/repository 层不得反向引用 runtime `auth::AuthContext`
 """
 from __future__ import annotations
 
@@ -36,6 +36,43 @@ FORBIDDEN_DOMAIN_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("infra", re.compile(r"\binfra::")),
     ("axum", re.compile(r"\baxum::")),
     ("sqlx", re.compile(r"\bsqlx::")),
+)
+
+SERVICE_REPOSITORY_FILE_MARKERS = (
+    "_service.rs",
+    "_repository.rs",
+    "_repository_",
+    "/repository/",
+    "persistence.rs",
+    "idempotency.rs",
+    "db.rs",
+    "models.rs",
+    "workflow.rs",
+    "report.rs",
+    "report_audit.rs",
+    "report_helpers.rs",
+    "stamp.rs",
+    "upstream_delivery.rs",
+    "delivery.rs",
+    "print_data.rs",
+    "support.rs",
+    "sites.rs",
+    "leases.rs",
+    "printers.rs",
+    "trace.rs",
+    "inventory_count.rs",
+)
+
+FORBIDDEN_SERVICE_REPOSITORY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "runtime_auth_context",
+        re.compile(
+            r"(?:crate|self|super)::auth::AuthContext"
+            r"|(?:crate|self|super)::auth::\{[^}]*\bAuthContext\b"
+            r"|\bauth::AuthContext"
+            r"|\bauth::\{[^}]*\bAuthContext\b"
+        ),
+    ),
 )
 
 
@@ -71,6 +108,33 @@ def find_domain_dependency_issues(text: str, *, path: str) -> list[Issue]:
     return issues
 
 
+def is_service_repository_file(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    if "/bin/" in normalized or "handlers" in Path(normalized).name:
+        return False
+    return any(marker in normalized for marker in SERVICE_REPOSITORY_FILE_MARKERS)
+
+
+def find_service_repository_dependency_issues(text: str, *, path: str) -> list[Issue]:
+    """检查 service/repository 是否直接依赖 runtime auth 上下文。"""
+    if not is_service_repository_file(path):
+        return []
+
+    issues: list[Issue] = []
+    code = "\n".join(line.split("//", 1)[0] for line in text.splitlines())
+    for kind, pattern in FORBIDDEN_SERVICE_REPOSITORY_PATTERNS:
+        for match in pattern.finditer(code):
+            lineno = code.count("\n", 0, match.start()) + 1
+            line = code.splitlines()[lineno - 1].strip()
+            issues.append(Issue(
+                path=path,
+                line=lineno,
+                kind=kind,
+                detail=f"service/repository 层不得引用 runtime auth 上下文: {line}",
+            ))
+    return issues
+
+
 def scan_layer_dependencies(domain_src: Path = DOMAIN_SRC, api_src: Path = API_SRC) -> tuple[list[Issue], dict[str, int]]:
     issues: list[Issue] = []
     stats = {
@@ -87,7 +151,11 @@ def scan_layer_dependencies(domain_src: Path = DOMAIN_SRC, api_src: Path = API_S
 
     for rust_file in iter_rust_files(api_src):
         stats["api_files"] += 1
-        rust_file.read_text(encoding="utf-8")
+        text = rust_file.read_text(encoding="utf-8")
+        issues.extend(find_service_repository_dependency_issues(
+            text,
+            path=str(rust_file.relative_to(REPO_ROOT)),
+        ))
 
     return issues, stats
 
@@ -118,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         if ok:
             print("  ✓ domain 层未发现 api / infra / axum / sqlx 引用")
+            print("  ✓ api service/repository 层未发现 runtime auth 上下文反向依赖")
         else:
             print(f"  ✘ 发现 {len(issues)} 处分层违规:")
             for issue in issues:

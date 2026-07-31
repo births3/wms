@@ -7,7 +7,7 @@ use wms_domain::{
 
 use crate::{
     alert_definition_repository::{AlertDefinitionRepositoryError, PgAlertDefinitionRepository},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
     quality_liaison::{PgQualityLiaisonRepository, QualityLiaisonError},
 };
 

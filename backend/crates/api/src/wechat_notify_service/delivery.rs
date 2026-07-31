@@ -4,7 +4,7 @@ use uuid::Uuid;
 use wms_domain::{H4NotificationRecord, SendH4NotificationRequest};
 
 use crate::{
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
     wechat_notify_idempotency::{
         append_mutation_audit, finish_mutation, json_request_hash, lock_idempotency_key,
         replay_idempotency, update_idempotency_response,

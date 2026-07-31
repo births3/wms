@@ -10,7 +10,7 @@ use wms_domain::{
     UpdatePrinterTrayRequest,
 };
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::support::*;
 use super::{

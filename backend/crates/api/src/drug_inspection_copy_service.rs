@@ -12,7 +12,6 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
     drug_inspection_copy_processor::{
         generate_customer_pdf, DrugInspectionCopyError, StampPlacement, MDI_COPY_SOFT_LIMIT_BYTES,
     },
@@ -21,6 +20,7 @@ use crate::{
         helpers::{lock_idempotency_key, replay_idempotency, request_hash, store_idempotency},
         DrugInspectionDocumentRepositoryError,
     },
+    operation_context::OperationContext as AuthContext,
 };
 
 #[derive(Clone)]

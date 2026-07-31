@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 pub const AUDIT_SEAL_BATCH_SIZE: i64 = 10_000;
 pub const DEFAULT_AUDIT_EVENT_QUERY_LIMIT: u32 = 100;

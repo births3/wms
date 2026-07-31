@@ -25,8 +25,8 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
     inventory::STATUS_QUALIFIED,
+    operation_context::OperationContext as AuthContext,
 };
 
 mod abc;

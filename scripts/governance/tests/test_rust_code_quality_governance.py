@@ -30,6 +30,40 @@ def test_layer_dependency_detects_forbidden_refs():
     assert [issue.kind for issue in issues] == ["api", "axum", "sqlx", "infra"]
 
 
+def test_layer_dependency_detects_runtime_auth_in_service_repository():
+    """service/repository 不得直接导入 runtime auth 上下文。"""
+    from check_layer_dependency import find_service_repository_dependency_issues
+
+    issues = find_service_repository_dependency_issues(
+        "use crate::auth::AuthContext;",
+        path="backend/crates/api/src/example_repository.rs",
+    )
+
+    assert [issue.kind for issue in issues] == ["runtime_auth_context"]
+
+
+def test_layer_dependency_allows_auth_context_at_handler_boundary():
+    from check_layer_dependency import find_service_repository_dependency_issues
+
+    issues = find_service_repository_dependency_issues(
+        "use crate::auth::AuthContext;",
+        path="backend/crates/api/src/example_handlers.rs",
+    )
+
+    assert issues == []
+
+
+def test_layer_dependency_detects_multiline_runtime_auth_import():
+    from check_layer_dependency import find_service_repository_dependency_issues
+
+    issues = find_service_repository_dependency_issues(
+        "use crate::{\n    auth::{AuthContext},\n};",
+        path="backend/crates/api/src/example_service.rs",
+    )
+
+    assert [issue.kind for issue in issues] == ["runtime_auth_context"]
+
+
 def test_unsafe_and_unwrap_ignores_comments_and_test_shortcuts():
     """注释中的关键字不误报，测试代码允许 unwrap/expect/panic。"""
     from check_unsafe_and_unwrap import find_unsafe_unwrap_issues

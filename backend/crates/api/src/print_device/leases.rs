@@ -8,7 +8,7 @@ use wms_domain::{
     validate_release_device_lease, DeviceLease, DeviceLeaseListResponse, ReleaseDeviceLeaseRequest,
 };
 
-use crate::auth::AuthContext;
+use crate::operation_context::OperationContext as AuthContext;
 
 use super::support::*;
 use super::{

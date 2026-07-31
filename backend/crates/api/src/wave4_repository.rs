@@ -20,10 +20,10 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
     document_numbering::{GenerateDocumentNumberRequest, PgDocumentNumberingService},
     h2_lifecycle::publish_event_in_tx,
     inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
+    operation_context::OperationContext as AuthContext,
     outbound::{
         all_lines_reviewed_for_ship, short_pick_qty, status_after_pick, status_after_review,
         OUTBOUND_STATUS_CONFIRMED, OUTBOUND_STATUS_IN_WAVE, OUTBOUND_STATUS_PENDING_VALIDATION,

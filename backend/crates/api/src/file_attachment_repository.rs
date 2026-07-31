@@ -11,7 +11,7 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
 };
 
 const UPLOAD_TTL_MINUTES: i64 = 5;

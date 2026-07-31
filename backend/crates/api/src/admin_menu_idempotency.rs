@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     admin_menu_model::{map_db_error, AdminMenuError},
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
-    auth::AuthContext,
+    operation_context::OperationContext as AuthContext,
 };
 
 pub(crate) async fn finish_mutation<T: Serialize>(
