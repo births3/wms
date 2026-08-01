@@ -12,22 +12,10 @@ Agent 必须分别验收。
 
 ## 前置输入
 
-必须在现场注入真实 staging 的已签发令牌和已准备的组套实例，不把令牌、订单数据或 URL
-提交到仓库：
-
-```bash
-export WMS_H9_SMOKE_AUTHORIZATION='Bearer <staging-token>'
-export WMS_H9_SMOKE_PRINT_URL='/api/v1/print-orchestration/suite-instances/<instance-id>/category-pdfs/prepare'
-export WMS_H9_SMOKE_CORE_URL='/api/v1/inventory/batches'
-# 可选：若准备接口不是标准的 /prepare 后缀，显式提供同一实例的查询 URL
-export WMS_H9_SMOKE_LIST_URL='/api/v1/print-orchestration/suite-instances/<instance-id>/category-pdfs'
-```
-
-`WMS_H9_SMOKE_AUTHORIZATION` 至少需要非打印核心查询权限和
-`h9.print_pdf.prepare`；两个 URL 变量可以填以 `/` 开头的隔离 API 路径，也可以填现场可达的
-完整 URL。`WMS_H9_SMOKE_PRINT_URL` 必须指向现场已播种、源单据就绪且使用 `rendered` 分类的
-真实实例，禁止填占位 URL。未设置 `WMS_H9_SMOKE_LIST_URL` 时，脚本从准备 URL 去掉
-`/prepare` 得到分类 PDF 查询 URL。
+无需注入 staging 令牌、订单或实例 URL。脚本使用隔离 PostgreSQL、随机 JWT 和
+`WMS_E2E_SEED=1` 启动 `wms-api-e2e`，通过真实 API 创建打印组套、截单并解析组套实例；
+不会连接或修改默认 staging 项目。可选的 `WMS_H9_SMOKE_CORE_URL` 仅用于替换非打印核心
+接口路径，默认是 `/api/v1/inventory/batches`。
 
 ## 执行
 
@@ -37,7 +25,8 @@ just h9-render-worker-compose-smoke
 
 脚本会生成一次性数据库/JWT/H-FILE/Worker 凭据、随机宿主端口和临时 Compose override，
 使用唯一的 `COMPOSE_PROJECT_NAME` 启动隔离项目。退出时始终执行 `docker compose down -v`
-并删除临时凭据；不会触碰默认 staging 项目或持久卷。
+并删除临时凭据；不会触碰默认 staging 项目或持久卷。API 镜像同时包含仅供该隔离烟测使用的
+`wms-api-e2e` 入口，种子数据和实例均随一次性卷销毁。
 
 ## 验收断言
 
@@ -54,6 +43,6 @@ just h9-render-worker-compose-smoke
    不改变实例/输出身份；再次查询列表确认 `preparation_status=completed` 且输出均为
    `processing_status=ready`。
 
-脚本自身的 Compose 配置必须使用非空测试配置；真实证据还应保存项目名、端口、API/Worker
-健康检查、失败响应码、恢复重试响应和清理日志。未实际执行该脚本时，不得把 AR-09 标记为
-真实 staging 通过。
+脚本自身的 Compose 配置必须使用非空测试配置；证据应保存项目名、端口、API/Worker
+健康检查、失败响应码、恢复重试响应和清理日志。该隔离烟测通过只证明 Render Worker 与核心
+API 的 Compose 解耦；仍不得把它写成真实 staging、Print Agent 或物理打印机 S4 通过。

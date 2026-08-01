@@ -138,6 +138,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     let app = Router::new()
         .route("/api/v1/healthz", get(healthz))
+        .route("/healthz", get(healthz))
+        .route("/readyz", get(healthz))
         .merge(auth_router(AuthAppState::new(pool.clone())))
         .merge(api_key_router(ApiKeyManagementState::new(pool.clone())))
         .merge(admin_menu_router(AdminMenuAppState::with_postgres(

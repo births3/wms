@@ -7,6 +7,7 @@ COMPOSE = Path("deploy/docker-compose.staging.yml")
 SMOKE = Path("scripts/h9_render_worker_compose_smoke.sh")
 JUSTFILE = Path("justfile")
 RUNBOOK = Path("docs/runbooks/h9-render-worker-compose-smoke.md")
+DOCKERFILE = Path("backend/Dockerfile.wms-api")
 
 
 def test_staging_api_does_not_wait_for_render_worker_health():
@@ -24,6 +25,9 @@ def test_compose_smoke_isolated_and_fail_closed():
     smoke = SMOKE.read_text(encoding="utf-8")
     for token in (
         "COMPOSE_PROJECT_NAME",
+        "--env-file",
+        "compose_env_file",
+        '-p \"$COMPOSE_PROJECT_NAME\"',
         "docker compose",
         "h9-render-worker-staging",
         "H9_CATEGORY_PDF_RENDER_FAILED",
@@ -41,6 +45,21 @@ def test_compose_smoke_checks_persisted_failure_and_recovery_state():
     for token in ("list_url", "preparation_status", "processing_status", '"failed"', '"completed"'):
         assert token in smoke
     assert "持久化失败状态" in runbook
+
+
+def test_compose_smoke_bootstraps_an_isolated_h9_fixture():
+    smoke = SMOKE.read_text(encoding="utf-8")
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    for token in (
+        "wms-api-e2e",
+        "WMS_E2E_SEED=1",
+        "/delivery-note-groups/manual-cutoff",
+        "h9.print_orchestration.write",
+        "00000000-0000-0000-0000-000000009611",
+    ):
+        assert token in smoke or token in dockerfile
+    assert "WMS_H9_SMOKE_AUTHORIZATION" not in smoke
+    assert "WMS_H9_SMOKE_PRINT_URL" not in smoke
 
 
 def test_smoke_entrypoint_and_runbook_are_registered():

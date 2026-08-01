@@ -7,11 +7,13 @@ COPY backend/migrations ./backend/migrations
 
 WORKDIR /app/backend
 RUN cargo build --release --bin wms-api && \
+    cargo build --release --example wms_api_e2e && \
     cargo build --release --bin wms-db-migrate && \
     cargo build --release --bin wms-deploy-audit && \
     cargo build --release --bin wms-audit-baseline-load && \
     cargo build --release --bin audit-maintenance && \
     cp /app/backend/target/release/wms-api /tmp/wms-api && \
+    cp /app/backend/target/release/examples/wms_api_e2e /tmp/wms-api-e2e && \
     cp /app/backend/target/release/wms-db-migrate /tmp/wms-db-migrate && \
     cp /app/backend/target/release/wms-deploy-audit /tmp/wms-deploy-audit && \
     cp /app/backend/target/release/wms-audit-baseline-load /tmp/wms-audit-baseline-load && \
@@ -25,6 +27,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY --from=builder /tmp/wms-api /app/wms-api
+COPY --from=builder /tmp/wms-api-e2e /app/wms-api-e2e
 COPY --from=builder /tmp/wms-db-migrate /app/wms-db-migrate
 COPY --from=builder /tmp/wms-deploy-audit /app/wms-deploy-audit
 COPY --from=builder /tmp/wms-audit-baseline-load /app/wms-audit-baseline-load
