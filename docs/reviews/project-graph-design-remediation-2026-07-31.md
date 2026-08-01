@@ -578,27 +578,27 @@ H1/H2/H3 不在本任务顺带新增业务 E2E。
 
 **验收标准**
 
-- [ ] 新增 package script `test:e2e:h5-real`、real config 和 `*-real.spec.ts`，连接真实 WMS API
+- [x] 新增 package script `test:e2e:h5-real`、real config 和 `*-real.spec.ts`，连接真实 WMS API
       和一次性 PostgreSQL；该命令当前不存在，是本任务交付物。
-- [ ] US-H5-001～005 分别建立“验收标准 -> test block -> screenshot”映射：快递商配置、
+- [x] US-H5-001～005 分别建立“验收标准 -> test block -> screenshot”映射：快递商配置、
       选择规则、面单打印、下单/取消和轨迹查询不能互相冒充覆盖。
-- [ ] 逐故事复核 `types`、required layers 和 `not_applicable`：US-H5-003 不得漏
+- [x] 逐故事复核 `types`、required layers 和 `not_applicable`：US-H5-003 不得漏
       `pda_runtime/hardware_runtime/offline_sync`，US-H5-004/005 不得漏 `external_runtime`；
       US-H5-005 含签收状态写入和审计，不得标成纯只读或 audit 不适用。
-- [ ] spec 不使用 Playwright 业务路由拦截、dev mock 或页面内存状态冒充后端。
-- [ ] 测试数据创建与回收自动化，重复运行不污染共享数据库。
-- [ ] 每个已标记完成的 H5 页面有 page/spec/screenshot 映射和真实页面 PNG。
-- [ ] 质量矩阵只在对应故事全部必需维度有真实证据后保留 `[[stories]]` 和 verified；
+- [x] spec 不使用 Playwright 业务路由拦截、dev mock 或页面内存状态冒充后端。
+- [x] 测试数据创建与回收自动化，重复运行不污染共享数据库。
+- [x] 每个已标记完成的 H5 页面有 page/spec/screenshot 映射和真实页面 PNG。
+- [x] 质量矩阵只在对应故事全部必需维度有真实证据后保留 `[[stories]]` 和 verified；
       未完整覆盖的故事移回 `[[deferred_stories]]`，填写 `reason/owner/resume_when`。
-- [ ] 外部承运商 dev/staging、PDA、Print Agent 或物理打印机证据不能由本地 Playwright 抵扣，
+- [x] 外部承运商 dev/staging、PDA、Print Agent 或物理打印机证据不能由本地 Playwright 抵扣，
       对应故事保持 deferred/blocked。
-- [ ] 盘点所有 verified 且使用 `shell-dev`/dev mock 的故事；除 H5 外，US-H1-007、
+- [x] 盘点所有 verified 且使用 `shell-dev`/dev mock 的故事；除 H5 外，US-H1-007、
       US-H2-002、US-H3-004、US-H4-001/004 只能改用已有合格证据，或移入
       `[[deferred_stories]]` 并填写 `reason/owner/resume_when`，不得伪造新证据。
-- [ ] 全局扩展 `check_quality_matrix.py`：校验 `e2e_checks` 命令存在、真实 spec 使用
+- [x] 全局扩展 `check_quality_matrix.py`：校验 `e2e_checks` 命令存在、真实 spec 使用
       `*-real.spec.ts`、截图映射存在，并拒绝 `shell-dev` 或 `WMS_WEB_ADMIN_DEV_MOCK=1`
       满足真实 evidence；检查必须解析 package script -> Playwright config，不能只匹配矩阵文本。
-- [ ] 质量矩阵检查增加正反 fixture，不为历史假证据建立 baseline；一个共享 config 可以复用，
+- [x] 质量矩阵检查增加正反 fixture，不为历史假证据建立 baseline；一个共享 config 可以复用，
       但五个 H5 故事必须分别判定。
 
 **最小验证**
