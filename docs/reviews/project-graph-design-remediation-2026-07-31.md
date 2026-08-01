@@ -792,7 +792,7 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_traceability.py 
 
 ```bash
 # 本任务新增后必须可运行：
-python3 scripts/governance/check_knowledge_graph_traceability.py --domain --json
+python3 scripts/governance/check_knowledge_graph_traceability.py --domain h2-audit --json
 ```
 
 **停止条件**
