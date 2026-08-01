@@ -369,8 +369,9 @@ export function App() {
   }, []);
 
   React.useEffect(() => {
+    if (menuState.kind !== "ready") return;
     if (safeView !== view) closeOtherTabs("dashboard");
-  }, [closeOtherTabs, safeView, view]);
+  }, [closeOtherTabs, menuState.kind, safeView, view]);
 
   React.useEffect(() => {
     if (hasSession && currentUserQuery.isError) {
