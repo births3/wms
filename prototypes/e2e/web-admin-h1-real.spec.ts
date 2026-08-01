@@ -4,6 +4,26 @@ import path from "node:path";
 
 const roleArtifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/h1-role-permission");
 const sessionArtifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/h1-session");
+const menuArtifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/h1-menu");
+
+test("H1 已发布菜单使用真实 API 保持顺序并覆盖工作台", async ({ page }) => {
+  fs.mkdirSync(menuArtifactsDir, { recursive: true });
+  await login(page);
+  const navigation = page.getByRole("navigation");
+  await expect(navigation.getByRole("button", { name: "运营总览" })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: /H1 角色权限/ })).toBeVisible();
+  await page.screenshot({ path: path.join(menuArtifactsDir, "published-menu.png"), fullPage: false });
+});
+
+test("H1 低权限或无可用菜单时 fail-closed 到工作台", async ({ page }) => {
+  fs.mkdirSync(menuArtifactsDir, { recursive: true });
+  await loginAs(page, "m3-quality-approver");
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "当前菜单不可用" })).toBeVisible();
+  await expect(page.getByRole("navigation").getByRole("button", { name: /M4 出库订单管理/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "重新加载菜单" }).last()).toBeVisible();
+  await page.screenshot({ path: path.join(menuArtifactsDir, "low-privilege-fail-closed.png"), fullPage: false });
+});
 
 test("H1 角色权限管理使用真实 API 完成读写闭环", async ({ page }) => {
   fs.mkdirSync(roleArtifactsDir, { recursive: true });
@@ -102,9 +122,13 @@ test("H1 登录会话使用真实 API 完成设备失效和截图验证", async 
 });
 
 async function login(page: import("@playwright/test").Page) {
+  await loginAs(page, "admin");
+}
+
+async function loginAs(page: import("@playwright/test").Page, username: string) {
   await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
-  await page.getByLabel("登录账号").fill("admin");
+  await page.getByLabel("登录账号").fill(username);
   await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();

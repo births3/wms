@@ -8,6 +8,7 @@ const appShell = readFileSync(resolve(__dirname, "../src/App.tsx"), "utf8");
 const adminView = readFileSync(resolve(__dirname, "../src/app-shell/admin-view.ts"), "utf8");
 const adminSidebarMenu = readFileSync(resolve(__dirname, "../src/app-shell/AdminSidebarMenu.tsx"), "utf8");
 const adminMenuPage = readFileSync(resolve(__dirname, "../src/pages/admin-menu/H1AdminMenuPage.tsx"), "utf8");
+const menuDesign = readFileSync(resolve(__dirname, "../../../docs/h1-menu-management-design.md"), "utf8");
 const workspaceTabsPath = resolve(__dirname, "../../../packages/ui/src/business/WorkspaceTabs/WorkspaceTabs.tsx");
 const componentRegistry = readFileSync(resolve(__dirname, "../../../docs/prototypes/component-registry.md"), "utf8");
 const menuPages = [
@@ -28,17 +29,14 @@ assert.match(appShell, /WORKSPACE_TABS_STORAGE_KEY/, "工作台多页签必须�
 assert.match(appShell, /readWorkspaceTabs/, "工作台多页签刷新后应从 localStorage 恢复");
 assert.match(appShell, /writeWorkspaceTabs/, "工作台多页签变更后应写入 localStorage");
 assert.match(appShell, /openTabs\.map/, "工作台多页签应按已打开页签 keep-alive 渲染页面");
-assert.match(appShell, /hidden=\{tab\.view !== view\}/, "非激活页签应隐藏但不卸载");
+assert.match(appShell, /hidden=\{tab\.view !== (?:view|safeView)\}/, "非激活页签应隐藏但不卸载");
 assert.match(appShell, /lg:grid-rows-\[3\.5rem_1fr\]/, "桌面端应有顶部导航栏和下方工作区两行布局");
 assert.match(appShell, /lg:col-span-2/, "顶部导航栏应横跨左侧菜单和主内容区");
 assert.match(appShell, /<WorkspaceTabs\b[\s\S]*tabs=\{openTabs\.map/, "WorkspaceTabs 应融入顶部导航栏并消费 openTabs");
 assert.match(appShell, /<Warehouse className="size-5"/, "顶部导航栏左侧应显示系统 Logo");
 assert.match(appShell, /currentUser\.display_name/, "顶部导航栏右侧应显示用户信息");
 assert.match(appShell, /menuKeysForActiveView/, "菜单切换页面时应自动展开当前路径");
-assert.doesNotMatch(appShell, /label:\s*"平台能力"/, "基础能力下不能回退为单一平台能力分组");
-for (const hGroup of ["H1 权限租户", "H2 审计能力", "H3 契约能力", "H4 企业微信", "H5 快递能力", "H9 打印能力"]) {
-  assert.match(appShell, new RegExp(`label:\\s*"${hGroup}"`), `基础能力应按 ${hGroup} 独立成二级菜单`);
-}
+assert.match(appShell, /const dashboardMenuTree/, "故障回退只能保留独立 Dashboard 菜单树");
 assert.doesNotMatch(adminSidebarMenu, /\|\|\s*hasActive/, "当前页面所在菜单不能用 hasActive 强制展开，否则用户无法折叠");
 const iconMap = appShell.match(/const adminMenuIconByKey:[^{]+\{([\s\S]*?)\n\};/)?.[1] ?? "";
 for (const iconKey of ["ArrowUpCircle", "BellRing", "Database", "Inbox", "Settings", "Stamp"]) {
@@ -60,6 +58,14 @@ assert.doesNotMatch(workspaceTabs, /tab\.subtitle &&/, "WorkspaceTabs 页签不�
 assert.match(workspaceTabs, /onContextMenu/, "WorkspaceTabs 应支持右键菜单");
 assert.match(workspaceTabs, /关闭其他/, "WorkspaceTabs 右键菜单应支持关闭其他");
 assert.match(componentRegistry, /\*\*WorkspaceTabs\*\*/, "WorkspaceTabs 必须登记到组件注册表");
+assert.match(appShell, /publishedMenuQuery\.isError/, "菜单请求失败必须进入显式故障状态");
+assert.match(appShell, /publishedMenuQuery\.refetch/, "菜单故障状态必须提供重试入口");
+assert.match(appShell, /dashboardMenuTree/, "菜单故障回退只能保留 Dashboard");
+assert.match(appShell, /MenuUnavailablePanel/, "菜单故障必须显示不可用状态而不是继续渲染旧页面");
+assert.doesNotMatch(appShell, /return defaultMenuTree/, "菜单 API 失败或空树时不能回退完整本地菜单");
+assert.doesNotMatch(appShell, /value:\s*(?:12|5|8|3)\b/, "Dashboard 不能展示硬编码业务数量");
+assert.match(appShell, /未接入|不可用/, "Dashboard KPI 必须显式标记未接入或不可用");
+assert.match(menuDesign, /fail-closed|仅显示 Dashboard|只显示 Dashboard/, "菜单设计文档必须记录 fail-closed 回退决策");
 
 for (const relativePath of menuPages) {
   const source = readFileSync(resolve(__dirname, relativePath), "utf8");

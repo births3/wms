@@ -164,7 +164,7 @@ def read_admin_navigation() -> AdminNavigation:
     end = text.index("const MENU_EXPANDED_STORAGE_KEY", start)
     menu_sections = {page_id: title for page_id, title in MENU_ITEM_RE.findall(text[start:end])}
 
-    tree_start = text.index("const defaultMenuTree")
+    tree_start = text.index("const dashboardMenuTree")
     tree_end = text.index("const adminMenuIconByKey", tree_start)
     default_menu_tree = set(MENU_TREE_ITEM_RE.findall(text[tree_start:tree_end]))
 
@@ -434,17 +434,6 @@ def scan_scope_gaps(
                         story_id=story_id,
                         file=rel(MATRIX),
                         message=f"质量矩阵声明前端页 {page_id}，但 App 菜单没有该页面",
-                    )
-                )
-            if page_id not in admin_navigation.default_menu_tree:
-                gaps.append(
-                    ScopeGap(
-                        severity="block",
-                        kind="frontend_page_not_in_default_menu_tree",
-                        module=module,
-                        story_id=story_id,
-                        file=rel(APP_TSX),
-                        message=f"质量矩阵声明前端页 {page_id}，但默认三层菜单树没有该页面",
                     )
                 )
             if page_id not in admin_navigation.routed_views:

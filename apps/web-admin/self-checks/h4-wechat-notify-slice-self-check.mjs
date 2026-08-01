@@ -19,7 +19,7 @@ const h4Pages = [
 
 for (const page of h4Pages) {
   assert.match(appShell, new RegExp(`\\{ id: "${page.id}", title: "${page.title}"`), `${page.id} 必须进入 menuSections`);
-  assert.match(appShell, new RegExp(`menuItem\\("${page.id}"\\)`), `${page.id} 必须进入 defaultMenuTree`);
+  assert.match(appShell, new RegExp(`\\{ id: "${page.id}", title: "${page.title}"`), `${page.id} 必须保留本地 view 元数据`);
   assert.match(viewRenderer, new RegExp(`if \\(view === "${page.id}"\\) return "${page.mode}"`), `${page.id} 必须映射到 H4 页面 mode`);
   assert.match(adminMenuDevMock, new RegExp(`\\["${page.id}", "${page.title}"`), `${page.id} 必须进入 admin-menu dev mock 已发布菜单`);
   assert.ok(queryConfig.pages.some((item) => item.id === page.id), `${page.id} 必须进入页面查询配置`);

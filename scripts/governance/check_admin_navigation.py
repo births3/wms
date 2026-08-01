@@ -131,7 +131,7 @@ def scan_view_contract(
     menu_source = app_text[menu_start:menu_end] if menu_start >= 0 and menu_end > menu_start else ""
     menu_views = [match.group(1) for match in re.finditer(r'\{\s*id:\s*"([^"]+)"', menu_source)]
 
-    tree_start = app_text.find("const defaultMenuTree")
+    tree_start = app_text.find("const dashboardMenuTree")
     tree_end = app_text.find("const adminMenuIconByKey", tree_start)
     tree_source = app_text[tree_start:tree_end] if tree_start >= 0 and tree_end > tree_start else ""
     tree_views = re.findall(r'menuItem\("([^"]+)"\)', tree_source)
@@ -148,20 +148,21 @@ def scan_view_contract(
 
     actual_sources = {
         "menuSections": set(menu_views),
-        "defaultMenuTree": set(tree_views),
+        "dashboardMenuTree": set(tree_views),
         "renderer": renderer_views,
         "dev menu seed": set(dev_views),
     }
     source_files = {
         "menuSections": APP_TSX,
-        "defaultMenuTree": APP_TSX,
+        "dashboardMenuTree": APP_TSX,
         "renderer": ADMIN_VIEW_RENDERER_TSX,
         "dev menu seed": ADMIN_MENU_DEV_MOCK_TS,
     }
     issues: list[Issue] = []
     for source_name, actual in actual_sources.items():
-        missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
+        expected_views = {"dashboard"} if source_name == "dashboardMenuTree" else expected
+        missing = sorted(expected_views - actual)
+        extra = sorted(actual - expected_views)
         if missing:
             issues.append(Issue(rel(source_files[source_name]), f"{source_name} 缺少 AdminView: {', '.join(missing)}"))
         if extra:

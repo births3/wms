@@ -41,39 +41,35 @@ import {
 } from "@/app-shell/AdminSidebarMenu";
 import { renderAdminView } from "@/app-shell/AdminViewRenderer";
 import type { AdminView } from "@/app-shell/admin-view";
-import { usePublishedAdminMenuQuery } from "@/features/admin-menu/admin-menu-queries";
+import { usePublishedAdminMenuQuery, type AdminMenuNode } from "@/features/admin-menu/admin-menu-queries";
 import { useCurrentUserQuery, useLogout, type CurrentUser } from "@/features/auth/auth-queries";
 import { clearAuthSession, hasActiveAuthSession } from "@/lib/auth-session";
 import { LoginPage } from "@/pages/auth/LoginPage";
 
-/** 作业 KPI 示例数据（尚未接入真实待办接口，勿当作生产统计） */
+/** 作业 KPI 占位卡片，真实待办接口接入前不得伪造业务数量。 */
 const operationKpis = [
   {
     id: "pending-receiving",
     label: "待收货",
-    value: 12,
-    hint: "示例 · 入库单待收货",
+    hint: "待办接口未接入",
     icon: PackageCheck,
   },
   {
     id: "pending-inspecting",
     label: "待验收",
-    value: 5,
-    hint: "示例 · 收货后待验收",
+    hint: "待办接口未接入",
     icon: CheckCircle2,
   },
   {
     id: "pending-putaway",
     label: "待上架",
-    value: 8,
-    hint: "示例 · 验收后待上架",
+    hint: "待办接口未接入",
     icon: Layers,
   },
   {
     id: "pending-review",
     label: "待复核",
-    value: 3,
-    hint: "示例 · 出库复核 / 审批",
+    hint: "待办接口未接入",
     icon: History,
   },
 ] as const;
@@ -173,43 +169,8 @@ const menuItemById = new Map<AdminView, SidebarMenuItem<AdminView>>(
   menuSections.flatMap((section) => section.items).flatMap((item): Array<[AdminView, SidebarMenuItem<AdminView>]> => item.id ? [[item.id, item]] : []),
 );
 
-const defaultMenuTree: SidebarMenuTreeSection<AdminView>[] = [
+const dashboardMenuTree: SidebarMenuTreeSection<AdminView>[] = [
   { label: "工作台", groups: [{ label: "工作台概览", items: [menuItem("dashboard")] }] },
-  {
-    label: "基础档案",
-    groups: [
-      { label: "主数据", items: [menuItem("m1-products"), menuItem("m1-business-partners")] },
-      { label: "仓储资料", items: [menuItem("m1-warehouses"), menuItem("m1-zones"), menuItem("m1-locations"), menuItem("dock-management")] },
-      { label: "系统配置", items: [menuItem("m1-system-dictionary"), menuItem("m1-feature-flags")] },
-    ],
-  },
-  {
-    label: "入库业务",
-    groups: [
-      { label: "入库作业", items: [menuItem("m2-receiving"), menuItem("m2-inspecting"), menuItem("m2-putaway"), menuItem("m2-putaway-strategy")] },
-      { label: "入库资料", items: [menuItem("m2-inbound-documents"), menuItem("m-di-review"), menuItem("m-di-platforms"), menuItem("m-di-stamp")] },
-    ],
-  },
-  {
-    label: "出库业务",
-    groups: [{ label: "出库作业", items: [menuItem("m4-orders"), menuItem("m4-waves"), menuItem("m4-review"), menuItem("m4-returns")] }],
-  },
-  { label: "库内业务", groups: [{ label: "库存管理", items: [menuItem("m3-batches"), menuItem("m3-location-history"), menuItem("m3-status-config"), menuItem("m3-counts"), menuItem("m3-maintenance"), menuItem("m3-relocations"), menuItem("mrc-reconciliation"), menuItem("mte-task-dispatch"), menuItem("mte-task-groups"), menuItem("mte-task-types")] }] },
-  { label: "增值业务", groups: [{ label: "增值作业", items: [menuItem("m9-billing-rules"), menuItem("m10-route-plans")] }] },
-  {
-    label: "基础能力",
-    groups: [
-      { label: "H1 权限租户", items: [menuItem("h1-menu-management"), menuItem("h1-role-permission"), menuItem("h1-session-management"), menuItem("h1-api-keys")] },
-      { label: "H2 审计能力", items: [menuItem("h2-audit-trail")] },
-      { label: "H3 契约能力", items: [menuItem("h3-api-contract")] },
-      { label: "H4 企业微信", items: [menuItem("h4-wechat-settings"), menuItem("h4-notify-configs"), menuItem("h4-notify-records")] },
-      { label: "H-AL 告警能力", items: [menuItem("hal-alert-dashboard"), menuItem("hal-alert-definitions"), menuItem("hal-alert-escalations")] },
-      { label: "H5 快递能力", items: [menuItem("h5-express")] },
-      { label: "H8 集成中心", items: [menuItem("h8-erp-connectors"), menuItem("h8-erp-messages"), menuItem("h8-erp-interface-tables")] },
-      { label: "H9 打印能力", items: [menuItem("h9-delivery-note-aggregation"), menuItem("h9-print-devices"), menuItem("h9-print-templates")] },
-      { label: "M-CG 编码能力", items: [menuItem("mcg-numbering")] },
-    ],
-  },
 ];
 
 const adminMenuIconByKey: Record<string, LucideIcon> = {
@@ -236,6 +197,44 @@ const adminMenuIconByKey: Record<string, LucideIcon> = {
   Users,
   Warehouse,
 };
+
+type PublishedMenuState =
+  | { kind: "loading"; tree: SidebarMenuTreeSection<AdminView>[]; message: string }
+  | { kind: "unavailable"; tree: SidebarMenuTreeSection<AdminView>[]; message: string }
+  | { kind: "ready"; tree: SidebarMenuTreeSection<AdminView>[]; allowedViews: Set<AdminView> };
+
+function resolvePublishedMenuState({
+  isPending,
+  isError,
+  publishedTree,
+}: {
+  isPending: boolean;
+  isError: boolean;
+  publishedTree: AdminMenuNode[] | undefined;
+}): PublishedMenuState {
+  if (isPending) return { kind: "loading", tree: dashboardMenuTree, message: "正在加载已发布菜单" };
+  if (isError) return { kind: "unavailable", tree: dashboardMenuTree, message: "已发布菜单读取失败，请重试" };
+  if (!publishedTree?.length) return { kind: "unavailable", tree: dashboardMenuTree, message: "当前用户没有可用菜单" };
+
+  const tree = menuTreeFromAdminNodes({ nodes: publishedTree, isView: isAdminView, iconByKey: adminMenuIconByKey });
+  const allowedViews = viewsInMenuTree(tree);
+  if (tree.length === 0 || !allowedViews.has("dashboard")) {
+    return { kind: "unavailable", tree: dashboardMenuTree, message: "已发布菜单为空或缺少工作台入口" };
+  }
+  return { kind: "ready", tree, allowedViews };
+}
+
+function viewsInMenuTree(tree: SidebarMenuTreeSection<AdminView>[]) {
+  const views = new Set<AdminView>();
+  for (const section of tree) {
+    for (const group of section.groups) {
+      for (const item of group.items) {
+        if (item.id) views.add(item.id);
+      }
+    }
+  }
+  return views;
+}
 
 interface AdminWorkspaceTab {
   view: AdminView;
@@ -350,8 +349,22 @@ export function App() {
   const [sessionVersion, setSessionVersion] = React.useState(0);
   const hasSession = React.useMemo(() => hasActiveAuthSession(), [sessionVersion]);
   const currentUserQuery = useCurrentUserQuery(hasSession);
+  const publishedMenuQuery = usePublishedAdminMenuQuery(hasSession);
   const view = workspaceState.view;
   const openTabs = workspaceState.openTabs;
+  const menuState = React.useMemo(
+    () => resolvePublishedMenuState({
+      isPending: publishedMenuQuery.isPending,
+      isError: publishedMenuQuery.isError,
+      publishedTree: publishedMenuQuery.data?.data,
+    }),
+    [publishedMenuQuery.data?.data, publishedMenuQuery.isError, publishedMenuQuery.isPending],
+  );
+  const viewAvailable = menuState.kind === "ready" ? menuState.allowedViews.has(view) : view === "dashboard";
+  const safeView = viewAvailable ? view : "dashboard";
+  const visibleOpenTabs = menuState.kind === "ready"
+    ? openTabs.filter((tab) => menuState.allowedViews.has(tab.view))
+    : [workspaceTabForView("dashboard")];
 
   React.useEffect(() => {
     writeWorkspaceTabs(workspaceState);
@@ -381,6 +394,10 @@ export function App() {
   const closeOtherTabs = React.useCallback((targetView: AdminView) => {
     setWorkspaceState((state) => closeOtherWorkspaceTabs(state, targetView));
   }, []);
+
+  React.useEffect(() => {
+    if (safeView !== view) closeOtherTabs("dashboard");
+  }, [closeOtherTabs, safeView, view]);
 
   React.useEffect(() => {
     if (hasSession && currentUserQuery.isError) {
@@ -414,19 +431,22 @@ export function App() {
   return (
     <AppShell
       currentUser={currentUserQuery.data}
-      activeView={view}
-      openTabs={openTabs}
+      activeView={safeView}
+      openTabs={visibleOpenTabs}
+      menuState={menuState}
+      onRetryMenu={() => void publishedMenuQuery.refetch()}
       onNavigate={navigateTo}
       onCloseTab={closeTab}
       onCloseOtherTabs={closeOtherTabs}
       onLogout={handleLogout}
     >
-      {openTabs.map((tab) => (
-        <div key={tab.view} hidden={tab.view !== view}>
+      {menuState.kind === "ready" ? visibleOpenTabs.map((tab) => (
+        <div key={tab.view} hidden={tab.view !== safeView}>
           <React.Suspense fallback={<PageLoading />}>
             {renderAdminView(tab.view, currentUserQuery.data, navigateTo) ?? (
               <Dashboard
                 currentUser={currentUserQuery.data}
+                availableViews={menuState.allowedViews}
                 onOpenM2Inbound={() => navigateTo("m2-receiving")}
                 onOpenM4Outbound={() => navigateTo("m4-orders")}
                 onOpenM3Batches={() => navigateTo("m3-batches")}
@@ -435,7 +455,14 @@ export function App() {
             )}
           </React.Suspense>
         </div>
-      ))}
+      )) : (
+        <MenuUnavailablePanel
+          currentUser={currentUserQuery.data}
+          message={menuState.message}
+          loading={menuState.kind === "loading"}
+          onRetry={() => void publishedMenuQuery.refetch()}
+        />
+      )}
     </AppShell>
   );
 }
@@ -464,6 +491,8 @@ function AppShell({
   currentUser,
   activeView,
   openTabs,
+  menuState,
+  onRetryMenu,
   onNavigate,
   onCloseTab,
   onCloseOtherTabs,
@@ -473,6 +502,8 @@ function AppShell({
   currentUser: CurrentUser;
   activeView: AdminView;
   openTabs: AdminWorkspaceTab[];
+  menuState: PublishedMenuState;
+  onRetryMenu: () => void;
   onNavigate: (view: AdminView) => void;
   onCloseTab: (view: AdminView) => void;
   onCloseOtherTabs: (view: AdminView) => void;
@@ -485,13 +516,7 @@ function AppShell({
   const [expandedMenuKeys, setExpandedMenuKeys] = React.useState<string[]>(readExpandedMenuKeys);
   const expandedForActiveViewRef = React.useRef<AdminView | null>(null);
   const sidebarRef = React.useRef<HTMLElement | null>(null);
-  const publishedMenuQuery = usePublishedAdminMenuQuery(true);
-  const menuTree = React.useMemo(() => {
-    const publishedTree = publishedMenuQuery.data?.data;
-    if (!publishedTree?.length) return defaultMenuTree;
-    const parsed = menuTreeFromAdminNodes({ nodes: publishedTree, isView: isAdminView, iconByKey: adminMenuIconByKey });
-    return parsed.length > 0 ? parsed : defaultMenuTree;
-  }, [publishedMenuQuery.data?.data]);
+  const menuTree = menuState.tree;
   const closeMenuFilter = React.useCallback(() => {
     setMenuFilter("");
     setMenuFilterOpen(false);
@@ -637,6 +662,15 @@ function AppShell({
       <aside ref={sidebarRef} className="hidden border-r bg-background lg:sticky lg:top-14 lg:flex lg:h-[calc(100vh-3.5rem)] lg:flex-col">
 
         <nav className={cn("flex-1 overflow-y-auto py-4", sidebarCollapsed ? "space-y-2 px-2" : "space-y-5 px-3")}>
+          {menuState.kind !== "ready" && !sidebarCollapsed ? (
+            <div className="space-y-2 rounded-md border border-amber-300/70 bg-amber-50 p-3 text-xs text-amber-950" role="status">
+              <p>{menuState.message}</p>
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={onRetryMenu}>
+                <RefreshCw className="size-3.5" aria-hidden />
+                重新加载菜单
+              </Button>
+            </div>
+          ) : null}
           {!sidebarCollapsed && menuFilterOpen ? (
             <div className="space-y-2">
               <label className="relative block">
@@ -733,8 +767,39 @@ function menuKeysForActiveView(sections: SidebarMenuTreeSection<AdminView>[], ac
   return [];
 }
 
+function MenuUnavailablePanel({
+  currentUser,
+  message,
+  loading,
+  onRetry,
+}: {
+  currentUser: CurrentUser;
+  message: string;
+  loading: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
+      <PageHeader title="运营总览" subtitle={`货主 ${currentUser.owner_code} · 菜单权限状态`} />
+      <Card className="rounded-lg shadow-sm">
+        <CardContent className="flex max-w-2xl flex-col gap-4 p-6" role={loading ? "status" : "alert"}>
+          <div>
+            <h2 className="text-lg font-semibold tracking-normal">当前菜单不可用</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{message}。为避免展示未授权页面，当前仅保留工作台。</p>
+          </div>
+          <Button type="button" variant="outline" className="w-fit" onClick={onRetry} disabled={loading}>
+            <RefreshCw className={cn("size-4", loading && "animate-spin")} aria-hidden />
+            {loading ? "加载菜单中" : "重新加载菜单"}
+          </Button>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 interface DashboardProps {
   currentUser: CurrentUser;
+  availableViews: ReadonlySet<AdminView>;
   onOpenM2Inbound: () => void;
   onOpenM4Outbound: () => void;
   onOpenM3Batches: () => void;
@@ -743,6 +808,7 @@ interface DashboardProps {
 
 function Dashboard({
   currentUser,
+  availableViews,
   onOpenM2Inbound,
   onOpenM4Outbound,
   onOpenM3Batches,
@@ -752,7 +818,7 @@ function Dashboard({
     <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
       <PageHeader
         title="运营总览"
-        subtitle={`货主 ${currentUser.owner_code} · 下方 KPI 为示例数据，后续可接真实待办`}
+        subtitle={`货主 ${currentUser.owner_code} · 实时待办接口未接入`}
       />
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
@@ -785,7 +851,7 @@ function Dashboard({
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{item.label}</p>
-                    <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{item.value}</p>
+                    <p className="mt-1 text-lg font-semibold tracking-tight">未接入</p>
                   </div>
                 </CardContent>
               </Card>
@@ -807,22 +873,11 @@ function Dashboard({
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button type="button" onClick={onOpenM2Inbound}>
-                <PackageCheck className="size-4" aria-hidden />
-                M2 收货管理
-              </Button>
-              <Button type="button" variant="outline" onClick={onOpenM4Outbound}>
-                <ClipboardList className="size-4" aria-hidden />
-                M4 出库订单
-              </Button>
-              <Button type="button" variant="outline" onClick={onOpenM3Batches}>
-                <Layers className="size-4" aria-hidden />
-                M3 批号管理
-              </Button>
-              <Button type="button" variant="outline" onClick={onOpenH2Audit}>
-                <History className="size-4" aria-hidden />
-                H2 审计
-              </Button>
+              {availableViews.has("m2-receiving") ? <Button type="button" onClick={onOpenM2Inbound}><PackageCheck className="size-4" aria-hidden />M2 收货管理</Button> : null}
+              {availableViews.has("m4-orders") ? <Button type="button" variant="outline" onClick={onOpenM4Outbound}><ClipboardList className="size-4" aria-hidden />M4 出库订单</Button> : null}
+              {availableViews.has("m3-batches") ? <Button type="button" variant="outline" onClick={onOpenM3Batches}><Layers className="size-4" aria-hidden />M3 批号管理</Button> : null}
+              {availableViews.has("h2-audit-trail") ? <Button type="button" variant="outline" onClick={onOpenH2Audit}><History className="size-4" aria-hidden />H2 审计</Button> : null}
+              {availableViews.size === 1 ? <span className="text-sm text-muted-foreground">当前用户没有可用快捷入口</span> : null}
             </div>
           </div>
         </CardContent>
