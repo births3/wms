@@ -1333,7 +1333,7 @@ wave-1-ready:
     @echo "  ── pytest 治理脚本测试 ──"
     @python3 -m pytest scripts/governance/tests/ -q 2>&1 | tail -3
     @echo "  ── Wave 1 应当新增的治理脚本 ──"
-    @echo "    [ ] check_layer_dependency.py        — Rust 层级依赖（domain ⊥ infra）"
+    @echo "    [ ] check_layer_dependency.py        — 前后端层级依赖（domain ⊥ infra；app shell → page → feature → api-client）"
     @echo "    [ ] check_unsafe_and_unwrap.py       — Rust unsafe / 生产路径 unwrap 检查"
     @echo "    [ ] check_handler_test_coverage.py   — handler 测试覆盖（baseline）"
     @echo "  注：以上脚本必须在 Wave 1 第一周补齐；当前为占位（在 task_check.py --strict 下会失败）"

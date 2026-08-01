@@ -40,6 +40,19 @@ def test_governance_consistency_compares_declared_gate_patterns():
     assert "docs/domain/user-stories-*.md" in gate_specs["check_business_rules_registry"].patterns
 
 
+def test_governance_consistency_merges_split_module_patterns():
+    """同一脚本分模块登记时，文档解析不能丢掉前一行触发范围。"""
+    from check_governance_consistency import parse_doc_rule_specs
+
+    patterns = parse_doc_rule_specs()["check_layer_dependency"].patterns
+    assert patterns == {
+        "backend/crates/**",
+        "apps/web-admin/src/**",
+        "apps/customer-portal/src/**",
+        "packages/**",
+    }
+
+
 def test_governance_checks_t2_includes_openapi_full_entrypoint():
     """T2 全量入口必须覆盖 OpenAPI 同步链路，不能只依赖 diff gate。"""
     from governance_checks import expand_tier_scripts

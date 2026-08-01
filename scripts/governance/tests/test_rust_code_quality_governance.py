@@ -64,6 +64,59 @@ def test_layer_dependency_detects_multiline_runtime_auth_import():
     assert [issue.kind for issue in issues] == ["runtime_auth_context"]
 
 
+def test_layer_dependency_detects_frontend_feature_to_page_import():
+    """feature 不能反向依赖 page，避免 UI 层倒灌查询层。"""
+    from check_layer_dependency import find_frontend_dependency_issues
+
+    issues = find_frontend_dependency_issues(
+        'import { LoginPage } from "@/pages/auth/LoginPage";',
+        path="apps/web-admin/src/features/auth/auth-queries.ts",
+    )
+
+    assert [issue.kind for issue in issues] == ["frontend_dependency_direction"]
+
+
+def test_layer_dependency_detects_frontend_library_to_feature_import():
+    """lib 不能依赖 feature，避免基础工具层反向依赖业务查询。"""
+    from check_layer_dependency import find_frontend_dependency_issues
+
+    issues = find_frontend_dependency_issues(
+        'import { useAuth } from "@/features/auth/auth-queries";',
+        path="apps/web-admin/src/lib/api.ts",
+    )
+
+    assert [issue.kind for issue in issues] == ["frontend_dependency_direction"]
+
+
+def test_layer_dependency_allows_app_shell_to_page_and_type_only_page_edges():
+    from check_layer_dependency import find_frontend_dependency_issues
+
+    assert find_frontend_dependency_issues(
+        'const Page = lazy(() => import("@/pages/dashboard/DashboardPage"));',
+        path="apps/web-admin/src/app-shell/AdminViewRenderer.tsx",
+    ) == []
+    assert find_frontend_dependency_issues(
+        'import type { components } from "@wms/api-client";',
+        path="apps/web-admin/src/pages/outbound/m4-outbound-page-model.ts",
+    ) == []
+    assert find_frontend_dependency_issues(
+        'import { listOrders } from "./api";',
+        path="apps/customer-portal/src/OrdersPage.tsx",
+    ) == []
+
+
+def test_layer_dependency_detects_ui_to_api_client_import():
+    """共享 UI 包不能依赖应用传输客户端。"""
+    from check_layer_dependency import find_frontend_dependency_issues
+
+    issues = find_frontend_dependency_issues(
+        'import { createApiClient } from "@wms/api-client";',
+        path="packages/ui/src/business/BadWidget.tsx",
+    )
+
+    assert [issue.kind for issue in issues] == ["frontend_dependency_direction"]
+
+
 def test_unsafe_and_unwrap_ignores_comments_and_test_shortcuts():
     """注释中的关键字不误报，测试代码允许 unwrap/expect/panic。"""
     from check_unsafe_and_unwrap import find_unsafe_unwrap_issues

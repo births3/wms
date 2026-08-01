@@ -857,8 +857,13 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
 - [ ] 表中所有任务的本轮范围均已验收；Waiver 必须有批准引用和到期时间，External pending
       必须保持 blocked 并记录 owner/resume condition，二者都不能伪装成 pass。
 - [ ] 没有用 baseline、dev mock、静态字符串检查或图谱推断代替安全/GSP/真实运行证据。
-- [ ] 后端依赖方向与 `bin/runtime -> handler -> service -> domain/repository` 一致。
-- [ ] 前端依赖方向与 `app shell -> page -> feature -> api-client` 一致。
+- [x] 后端依赖方向与 `bin/runtime -> handler -> service -> domain/repository` 一致：
+      `check_layer_dependency.py --json` 扫描 domain 35 个文件、api 349 个文件，未发现 domain
+      反向引用或 service/repository runtime auth 反向依赖；运行时/handler 仍位于 API 边界。
+- [x] 前端依赖方向与 `app shell -> page -> feature -> api-client` 一致：同一门禁扫描
+      管理端、客户门户和 `packages/*/src` 共 277 个 TypeScript 文件，未发现 feature/lib 反向
+      引用 page/app-shell、共享 UI 依赖 api-client 等违规；页面的生成类型仅允许 type-only
+      导入，真实请求仍由 feature 或客户门户 API adapter 进入 `@wms/api-client`/OpenAPI。
 - [x] M4 查询、状态转换、库存扣减、审计、outbox 和幂等有真实 PostgreSQL 行为证据：
       当前 `wave4_postgres` 13/13、`h6_wave4_state_contract_postgres` 1/1、
       `shared_idempotency_postgres` 2/2 通过；M4 Playwright 重跑的环境阻塞单独记录在 AR-03。
@@ -880,3 +885,4 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
 | R2 | 每项验收是否二值、可运行、没有未经确认的业务默认值 | 通过：待确认、blocked 和分支关闭条件已拆开 |
 | R3 | 与现有治理计划、分层规范、质量矩阵和 ADR 是否冲突或重复 | 通过：已移出 Wave 6，并明确唯一父状态源 |
 | R4 | 文档链接、空白字符、T1 治理和最终独立复审 | 通过：三路复审无 blocker/high，T1 59/59 |
+| R5 | 前后端依赖方向是否有可运行的反向依赖门禁，且不把类型导入误判为运行时依赖 | 通过：`check_layer_dependency.py --json` 后端 384 个文件、前端 277 个文件，issues=0；正反 fixture 25/25 通过 |

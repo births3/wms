@@ -225,7 +225,13 @@ def parse_doc_rule_specs() -> dict[str, RuleSpec]:
         patterns_cell = m.group(4)
         patterns = set(PATTERN_RE.findall(patterns_cell))
         for sm in SCRIPT_RE.finditer(scripts_cell):
-            scripts[sm.group(1)] = RuleSpec(tier=tier, patterns=patterns)
+            script = sm.group(1)
+            existing = scripts.get(script)
+            if existing is None:
+                scripts[script] = RuleSpec(tier=tier, patterns=set(patterns))
+            else:
+                # 同一检查可按模块拆成多行；合并触发范围，避免后一行覆盖前一行。
+                existing.patterns.update(patterns)
     return scripts
 
 

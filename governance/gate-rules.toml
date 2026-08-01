@@ -769,6 +769,21 @@ match = "backend/crates/**"
 checks = ["check_layer_dependency", "check_unsafe_and_unwrap"]
 tier = "T2"
 
+[[rules]]
+match = "apps/web-admin/src/**"
+checks = ["check_layer_dependency"]
+tier = "T2"
+
+[[rules]]
+match = "apps/customer-portal/src/**"
+checks = ["check_layer_dependency"]
+tier = "T2"
+
+[[rules]]
+match = "packages/**"
+checks = ["check_layer_dependency"]
+tier = "T2"
+
 # Wave 1 启用：handler 测试覆盖（baseline 起步）
 [[rules]]
 match = "backend/crates/api/src/**"

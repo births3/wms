@@ -470,6 +470,7 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 | Wave | 必须新增的治理脚本 | 注册到 | 对应 gate-rules 规则 |
 |------|-----------------|------|------------------|
 | Wave 1 | `check_layer_dependency.py`（Rust 分层）/ `check_unsafe_and_unwrap.py` | T2 | `backend/crates/**` |
+| Wave 1 | `check_layer_dependency.py`（Web 前端分层） | T2 | `apps/web-admin/src/**`、`apps/customer-portal/src/**`、`packages/**` |
 | Wave 1 | `check_handler_test_coverage.py`（baseline 起步）| T2 | `backend/crates/api/src/**` |
 | Wave 1 | `check_backend_module_fragments.py`（AR-11 数字/共享 include 基线） | T2 | `backend/crates/api/src/**` + `governance/backend-module-fragments-baseline.toml` |
 | Wave 1 | `check_field_coding_standards.py`（字段命名/类型/加密/审计）| T1 | `docs/compliance/gsp-field-traceability.md` + `docs/domain/user-stories-*.md` |
