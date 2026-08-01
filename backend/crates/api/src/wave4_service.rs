@@ -37,6 +37,16 @@ where
         now: DateTime<Utc>,
         idempotency_key: &str,
     ) -> Result<IdempotentMutation<OutboundOrder>, Wave4RepositoryError> {
+        crate::outbound_state_rules::validate_outbound_transition(
+            "reviewed",
+            "shipped",
+            "handover_confirmed",
+        )
+        .map_err(|_| Wave4RepositoryError::InvalidStateTransition {
+            from: "reviewed".to_string(),
+            to: "shipped".to_string(),
+            approval_source: "handover_confirmed".to_string(),
+        })?;
         let audit = AuditWriteRequest::from_auth_context(
             ctx,
             "ship_outbound_order",

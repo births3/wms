@@ -13,10 +13,10 @@
 
 | 指标 | 数量 |
 |---|---:|
-| 故事总数 | 188 |
-| 已完成（已验证） | 51 |
+| 故事总数 | 189 |
+| 已完成（已验证） | 52 |
 | 未完成 / 延期 | 137 |
-| 完成率 | 27.1% |
+| 完成率 | 27.5% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -35,7 +35,7 @@
 | H3 | 3 | 1 | 4 |
 | H4 | 0 | 4 | 4 |
 | H5 | 0 | 5 | 5 |
-| H6 | 1 | 0 | 1 |
+| H6 | 2 | 0 | 2 |
 | H8 | 1 | 3 | 4 |
 | H9 | 9 | 6 | 15 |
 | M1 | 2 | 9 | 11 |
@@ -88,6 +88,7 @@
 | US-H3-002 前端 TS 类型生成 | H3 | S1 |
 | US-H3-003 API 限流与熔断 | H3 | S3 |
 | US-H6-001 状态机定义注册与转换校验 | H6 | S1 |
+| US-H6-002 M4 出库状态执行切片 | H6 | S3 |
 | US-H9-001 打印模板类型字典 | H9 | S2 |
 | US-H9-002 字段库生成与字段元数据维护 | H9 | S2 |
 | US-H9-003 模板设计与版本管理 | H9 | S2 |
@@ -286,6 +287,7 @@
 | US-H3-002 前端 TS 类型生成 | H3 | S1 | api_change | L2、L9 | - | - | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:not_applicable<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H3-003 API 限流与熔断 | H3 | S3 | api_change、runtime_guard、config_rule、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | - | GET /api/v1/resilience/status<br>GET /metrics | requirement:verified<br>fields:verified<br>frontend:not_applicable<br>api:verified<br>backend:verified<br>database:not_applicable<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H6-001 状态机定义注册与转换校验 | H6 | S1 | read_only、api_change、config_rule | L1、L2、L3、L4、L8、L9 | - | GET /api/v1/state-machines<br>GET /api/v1/state-machines/{machine_code}<br>GET /api/v1/state-machines/{machine_code}/transition-validation | requirement:verified<br>fields:verified<br>frontend:not_applicable<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-H6-002 M4 出库状态执行切片 | H6 | S3 | write、integration、audit_compliance | L1、L2、L3、L4、L5、L8、L9、L10、L11 | - | - | requirement:verified<br>fields:not_applicable<br>frontend:not_applicable<br>api:not_applicable<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-001 打印模板类型字典 | H9 | S2 | write、config_rule、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | m1-system-dictionary、h9-print-templates | GET /api/v1/system-dictionaries/{dict_code}/items<br>PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}<br>PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-002 字段库生成与字段元数据维护 | H9 | S2 | write、config_rule、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | h9-print-templates | GET /api/v1/print-templates/field-libraries<br>POST /api/v1/print-templates/field-libraries/drafts<br>GET /api/v1/print-templates/field-libraries/{version_id}/fields<br>PATCH /api/v1/print-templates/field-libraries/{version_id}/fields/{field_id}<br>POST /api/v1/print-templates/field-libraries/{version_id}/publish | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-003 模板设计与版本管理 | H9 | S2 | write、config_rule、frontend_interaction、api_change | L1、L2、L3、L4、L5、L7、L8、L9、L11 | h9-print-templates | GET /api/v1/print-templates/templates<br>POST /api/v1/print-templates/templates<br>GET /api/v1/print-templates/templates/{template_id}/versions<br>POST /api/v1/print-templates/templates/{template_id}/versions/{version_id}/publish<br>PATCH /api/v1/print-templates/templates/{template_id}/enabled<br>GET /api/v1/print-templates/field-libraries/{version_id}/fields | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |

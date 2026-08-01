@@ -14,6 +14,7 @@ use wms_domain::{
 };
 
 use crate::auth::{AuthContext, AuthError};
+use crate::outbound_state_rules::{OUTBOUND_STATES, OUTBOUND_TRANSITIONS};
 
 const READ_PERMISSION: &str = "h6.state_machine.read";
 
@@ -273,70 +274,28 @@ fn outbound_order_definition() -> StateMachineDefinition {
         machine_name: "M4 出库订单".to_string(),
         business_module: "M4".to_string(),
         version: "2026-07-26".to_string(),
-        states: vec![
-            state("pending_validation", "待校验", true, false),
-            state("validation_exception", "校验异常", false, false),
-            state("confirmed", "已确认", false, false),
-            state("void_requested", "作废申请中", false, false),
-            state("in_wave", "已入波次", false, false),
-            state("inventory_locked", "库存锁定", false, false),
-            state("reviewed", "已复核", false, false),
-            state("shipped", "已发货", false, false),
-            state("signed", "已签收", false, true),
-            state("cancelled", "已作废", false, true),
-            state("cancelled_rollback", "已作废_回退", false, true),
-        ],
-        transitions: vec![
-            transition(
-                "pending_validation",
-                "confirmed",
-                "validation_passed",
-                "校验通过",
-            ),
-            transition(
-                "pending_validation",
-                "validation_exception",
-                "validation_failed",
-                "校验不通过",
-            ),
-            transition(
-                "validation_exception",
-                "pending_validation",
-                "manual_fix",
-                "人工修改",
-            ),
-            transition("confirmed", "in_wave", "wave_assigned", "进入波次"),
-            transition("confirmed", "cancelled", "cancel_approved", "审批作废"),
-            transition(
-                "pending_validation",
-                "void_requested",
-                "void_requested",
-                "作废申请",
-            ),
-            transition(
-                "validation_exception",
-                "void_requested",
-                "void_requested",
-                "作废申请",
-            ),
-            transition("confirmed", "void_requested", "void_requested", "作废申请"),
-            transition("void_requested", "cancelled", "cancel_approved", "审批作废"),
-            transition("in_wave", "inventory_locked", "start_picking", "开始拣选"),
-            transition(
-                "in_wave",
-                "cancelled_rollback",
-                "force_cancel_before_picking",
-                "强制作废",
-            ),
-            transition(
-                "inventory_locked",
-                "reviewed",
-                "review_completed",
-                "复核完成",
-            ),
-            transition("reviewed", "shipped", "handover_confirmed", "发货交接"),
-            transition("shipped", "signed", "customer_signed", "客户签收"),
-        ],
+        states: OUTBOUND_STATES
+            .iter()
+            .map(|definition_state| {
+                state(
+                    definition_state.code,
+                    definition_state.label,
+                    definition_state.is_initial,
+                    definition_state.is_terminal,
+                )
+            })
+            .collect(),
+        transitions: OUTBOUND_TRANSITIONS
+            .iter()
+            .map(|definition_transition| {
+                transition(
+                    definition_transition.from_state,
+                    definition_transition.to_state,
+                    definition_transition.event_code,
+                    definition_transition.label,
+                )
+            })
+            .collect(),
     }
 }
 
@@ -504,8 +463,33 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(outbound_states.contains(&"validation_exception"));
         assert!(outbound_states.contains(&"in_wave"));
+        assert!(outbound_states.contains(&"picked"));
+        assert!(outbound_states.contains(&"picked_short"));
+        assert!(outbound_states.contains(&"reviewed_short"));
         assert!(!outbound_states.contains(&"validation_error"));
         assert!(!outbound_states.contains(&"waved"));
+
+        for (from_state, to_state, event_code) in [
+            ("in_wave", "picked", "pick_completed"),
+            ("in_wave", "picked_short", "short_pick_recorded"),
+            ("picked_short", "picked", "short_pick_replenished"),
+            ("picked", "reviewed", "review_completed"),
+            ("picked_short", "reviewed_short", "review_completed"),
+            ("reviewed", "shipped", "handover_confirmed"),
+        ] {
+            let validation = validate_transition(
+                &outbound,
+                ValidateTransitionQuery {
+                    from_state: from_state.to_string(),
+                    to_state: to_state.to_string(),
+                    event_code: Some(event_code.to_string()),
+                },
+            );
+            assert!(
+                validation.allowed,
+                "{from_state} -> {to_state} should be allowed"
+            );
+        }
     }
 
     #[test]

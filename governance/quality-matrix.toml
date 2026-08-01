@@ -1587,6 +1587,61 @@ required_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
 covered_layers = ["L1", "L2", "L3", "L4", "L8", "L9"]
 
 [[stories]]
+id = "US-H6-002"
+title = "M4 出库状态执行切片"
+module = "H6"
+story_file = "docs/domain/user-stories-h6-state-machine.md"
+types = ["write", "integration", "audit_compliance"]
+frontend_pages = []
+api_paths = []
+database_objects = [
+  "outbound_orders",
+  "outbound_order_lines",
+  "audit_event",
+  "idempotency_request",
+  "shipment_confirm_erp_feedback_outbox",
+]
+test_checks = [
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib outbound_state_rules",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h6_wave4_state_contract_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres -- --test-threads=1",
+]
+evidence_refs = [
+  "docs/domain/user-stories-h6-state-machine.md",
+  "backend/crates/api/src/state_machine.rs",
+  "backend/crates/api/src/outbound_state_rules.rs",
+  "backend/crates/api/src/wave4_repository_part1.rs",
+  "backend/crates/api/src/wave4_repository_part2.rs",
+  "backend/crates/api/src/wave4_service.rs",
+  "backend/crates/api/tests/h6_wave4_state_contract_postgres.rs",
+  "backend/crates/api/tests/wave4_postgres/review.rs",
+  "backend/crates/api/tests/wave4_postgres/rollback.rs",
+]
+
+[stories.dimensions]
+requirement = "verified"
+fields = "not_applicable"
+frontend = "not_applicable"
+api = "not_applicable"
+backend = "verified"
+database = "verified"
+security = "verified"
+audit = "verified"
+tests = "verified"
+evidence = "verified"
+docs = "verified"
+governance = "verified"
+
+[stories.not_applicable_reasons]
+fields = "本切片复用现有订单状态和审计字段，不新增数据库字段。"
+frontend = "本切片复用既有 M4 页面/API，不新增页面或浏览器交互。"
+api = "本切片不新增端点，复用既有拣货、复核和发货接口。"
+
+[stories.tests]
+required_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+covered_layers = ["L1", "L2", "L3", "L4", "L5", "L8", "L9", "L10", "L11"]
+
+[[stories]]
 id = "US-H9-001"
 title = "打印模板类型字典"
 module = "H9"

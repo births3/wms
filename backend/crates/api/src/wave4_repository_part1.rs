@@ -446,6 +446,20 @@ impl PgWave4Repository {
         let mut updated = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
         let next_status = status_after_pick(&updated.lines);
         let short_pick = updated.lines.iter().any(|line| line.short_pick_qty > 0);
+        let event_code = crate::outbound_state_rules::pick_transition_event(
+            &order.status,
+            next_status,
+        );
+        crate::outbound_state_rules::validate_outbound_transition(
+            &order.status,
+            next_status,
+            event_code,
+        )
+        .map_err(|_| Wave4RepositoryError::InvalidStateTransition {
+            from: order.status.clone(),
+            to: next_status.to_string(),
+            approval_source: event_code.to_string(),
+        })?;
         sqlx::query(
             r#"
             UPDATE outbound_orders
@@ -557,6 +571,16 @@ impl PgWave4Repository {
 
         let mut updated = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
         let next_status = status_after_review(&updated.lines);
+        crate::outbound_state_rules::validate_outbound_transition(
+            &order_row.status,
+            next_status,
+            "review_completed",
+        )
+        .map_err(|_| Wave4RepositoryError::InvalidStateTransition {
+            from: order_row.status.clone(),
+            to: next_status.to_string(),
+            approval_source: "review_completed".to_string(),
+        })?;
         sqlx::query(
             r#"
             UPDATE outbound_orders

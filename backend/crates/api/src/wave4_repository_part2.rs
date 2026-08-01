@@ -37,6 +37,16 @@ pub async fn ship_outbound_order(
         let order = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
         all_lines_reviewed_for_ship(&order.lines)
             .map_err(|_| Wave4RepositoryError::ShortPickNotReplenished)?;
+        crate::outbound_state_rules::validate_outbound_transition(
+            &order_row.status,
+            OUTBOUND_STATUS_SHIPPED,
+            "handover_confirmed",
+        )
+        .map_err(|_| Wave4RepositoryError::InvalidStateTransition {
+            from: order_row.status.clone(),
+            to: OUTBOUND_STATUS_SHIPPED.to_string(),
+            approval_source: "handover_confirmed".to_string(),
+        })?;
         let cold_chain =
             outbound_order_requires_cold_chain(&mut tx, ctx.owner_id, order_id).await?;
         validate_ship_outbound_request(&req, cold_chain)
