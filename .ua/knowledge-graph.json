@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-01T17:35:37.389865Z",
-    "gitCommitHash": "8bb57d942cad69234fe26ef7537d8f39dcb5cb34"
+    "analyzedAt": "2026-08-01T23:58:15.501Z",
+    "gitCommitHash": "198b50df786d9fa52d8c935457a2413a3cb4f4d7"
   },
   "nodes": [
     {
@@ -108859,19 +108859,19 @@
       "languageNotes": "Review 文档记录 WMS 设计、治理、用户故事和验收证据的审查结论与缺口闭环。"
     },
     {
-      "id": "file:docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "type": "file",
+      "id": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "type": "document",
       "name": "project-graph-design-remediation-2026-07-31.md",
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "summary": "定义全项目知识图谱设计问题整改任务、批次依赖、执行回写和验收标准。",
+      "summary": "记录 2026-07-31 全项目知识图谱设计问题整改计划，将经源码、契约、测试、部署配置或 ADR 复核的问题拆分为 AR、KG 和 REDIS 任务，并明确依赖、状态与唯一关闭关系。文档为每项任务提供验收标准、最小验证命令和 Review Loop，强调 Wave 6 后排期边界、真实运行证据以及图谱可追溯性与新鲜度治理。",
       "tags": [
-        "markdown",
-        "review",
-        "knowledge-graph",
-        "remediation"
+        "documentation",
+        "architecture-remediation",
+        "acceptance-criteria",
+        "review-loop",
+        "knowledge-graph"
       ],
-      "complexity": "complex",
-      "languageNotes": "Review 文档记录 WMS 设计、治理、用户故事和验收证据的审查结论与缺口闭环。"
+      "complexity": "complex"
     },
     {
       "id": "file:docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
@@ -460303,7 +460303,7 @@
         "file:docs/reviews/m2-overall-review-2026-07-18.md",
         "file:docs/reviews/m3-overall-review-2026-07-18.md",
         "file:docs/reviews/pattern-extraction-2026-05-18.md",
-        "file:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
         "file:docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
         "file:docs/reviews/software-design-audit-2026-05-18.md",
         "file:docs/reviews/us-h9-001-acceptance-2026-07-26.md",
