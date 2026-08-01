@@ -17,6 +17,7 @@ services:
       timeout: 5s
       retries: 10
 
+  # REDIS-01：鉴权撤销替代任务完成前保留现有 staging 硬依赖；不新增其他 Redis 用途。
   redis-staging:
     image: redis:7
     command: ["redis-server", "--appendonly", "yes"]

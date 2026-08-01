@@ -4,6 +4,10 @@
 失败或抖动时的 WMS API 运行处置。策略由 [ADR-0046](../adr/0046-high-risk-write-revocation-fail-closed.md)
 锁定。
 
+当前 API 启动和 H1 真实 E2E 仍依赖 `WMS_REDIS_URL`。REDIS-01 的“不新增 Redis”结论不等于
+本手册已经切换到 PostgreSQL；在独立鉴权替代任务、容量/安全验收和 successor ADR 完成前，
+不得删除 Redis 服务、启动依赖或本处置矩阵。
+
 ## 1. 响应矩阵
 
 | 请求 | Redis 正常且未撤销 | Redis 正常且已撤销 | Redis 不可用 | 恢复后的下一请求 |

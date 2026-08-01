@@ -320,6 +320,7 @@ async fn list_items(
 - 明确 §5 不再保留 v0.1 的"权限变更需等 access 过期"表述；正常路径以 §2.1.1 `permissions_changed_at` + `AUTH-009` 为准
 - 明确 Redis 故障不是登录全停，而是按 §2.3.1 fail-open，接受最长 access TTL（1h）窗口并触发 P1 告警
 - 与 `docs/domain/user-stories-h1-auth-tenant.md` 对齐：Access Token 1h、Refresh Token 24h、Wave 1 使用 `AuthContext.owner_id` 过滤，PostgreSQL RLS 延后评估
+- REDIS-01 仅确认不新增 Redis 用途；在鉴权撤销的 PostgreSQL 替代实现、容量/安全验收和 successor ADR 生效前，本 ADR 的 Redis 撤销模型保持不变。
 
 ### v0.2 — 2026-05-24（review 后修风险 1+2）
 

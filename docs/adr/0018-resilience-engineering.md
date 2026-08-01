@@ -219,6 +219,7 @@ CREATE TABLE dead_letter_queue (
 
 - **Redis 依赖边界**：HTTP 幂等结果回放已由 ADR-0044 明确使用 PostgreSQL；限流和多实例熔断状态仍按本 ADR 的部署方案单独评估
 - **应对**：HTTP 幂等直接使用 PostgreSQL；其他缓存用途不可用时按 D2 降级到 PG，是否引入共享 Redis 需以实际多实例容量证据为准
+- **REDIS-01 边界**：项目主人已确认不新增 Redis 用途；该方向不删除当前 H1 鉴权撤销依赖。鉴权替代、容量/安全证据和 successor ADR 完成前，本 ADR 的现行 Redis 方案与 staging 拓扑继续有效。
 
 ### 风险
 

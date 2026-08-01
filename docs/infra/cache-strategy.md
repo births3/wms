@@ -1,20 +1,30 @@
 # 缓存策略
 
 > 定位：基础设施层文档
-> 关联：模式提炼报告 §5.2 缺口 #5（29 次提及）；ADR-0001（Redis）；ADR-0013（配置）；ADR-0018（幂等键/限流/熔断状态存储）
+> 关联：模式提炼报告 §5.2 缺口 #5（29 次提及）；ADR-0001（Redis）；ADR-0013（配置）；ADR-0018（幂等键/限流/熔断状态存储）；[REDIS-01 评估](../reviews/redis-necessity-assessment-task-2026-07-31.md)
 > 文档层级：L2 规范
 
 ---
 
 ## 1. 选型
 
-**Redis 7+**（ADR-0001 已选定）。单实例（小型）/ Sentinel（中型）/ Cluster（大型）按 ADR-0016 部署矩阵选。
+当前运行时仍保留 **Redis 7+**（ADR-0001 已选定）作为 H1 鉴权撤销的硬依赖；单实例（小型）/
+Sentinel（中型）/ Cluster（大型）按 ADR-0016 部署矩阵选。REDIS-01 已确认不新增 Redis
+用途，但在鉴权撤销的 PostgreSQL 替代实现、容量/安全证据和 successor ADR 完成前，不删除现有
+依赖或修改 staging 拓扑。
 
 ---
 
 ## 2. 用途清单
 
 HTTP 幂等结果回放不属于 Redis 缓存用途：按 [ADR-0044](../adr/0044-postgresql-idempotency-authority.md) 统一写入 PostgreSQL `idempotency_request`，不做 Redis 双写。以下清单只列实际或待评估的 Redis 缓存用途。
+
+### 2.1 REDIS-01 事实边界
+
+- 当前实际运行时 Redis 用途：H1 token 黑名单与权限变更失效检查，以及 M-VR 双人策略的可选缓存。
+- PostgreSQL 是幂等结果回放的唯一权威；新增幂等、outbox 或 API Key 限流路径不得先接入 Redis。
+- M-VR、M-PM、Feature Flag、热点商品和熔断等条目只有在真实多实例容量证据支持后，才能另立任务决定是否使用共享 Redis。
+- `WMS_REDIS_URL`、staging Redis 服务和鉴权撤销装配在独立替代任务完成前保持现状；本规范不授权删除或改写它们。
 
 | # | 用途 | Key 模式 | TTL | 失效策略 | Wave |
 |---|------|---------|-----|---------|------|
@@ -77,3 +87,4 @@ HTTP 幂等结果回放不属于 Redis 缓存用途：按 [ADR-0044](../adr/0044
 |------|------|------|
 | 2026-05-18 | v1 | 初版：Redis 用途清单 9 项 + Cache Aside 失效策略 + 4 项防护 + 约束 |
 | 2026-07-31 | v1.1 | HTTP 幂等结果回放移至 PostgreSQL，Redis 清单保留 8 项 |
+| 2026-08-01 | v1.2 | 记录 REDIS-01：不新增 Redis 用途，鉴权撤销替代完成前保留现有硬依赖 |
