@@ -677,11 +677,11 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
       `IF NOT EXISTS`）、`ALTER/REFERENCES/RENAME/DROP`，不创建平行目录生成器。
 - [x] 由同一命令刷新 `docs/database/table-catalog.md`，包含
       “表 -> 所属模块 -> 创建 migration -> 后续 ALTER migration”。
-- [ ] 在一次性空 PostgreSQL 上从零执行当前 migration，验证约束、索引、种子和稳定
+- [x] 在一次性空 PostgreSQL 上从零执行当前 migration，验证约束、索引、种子和稳定
       schema fingerprint。
 - [ ] 决策前盘点 local/dev/staging 已应用 migration、可丢弃数据、备份和运行证据依赖；
       不探测或改动生产数据库。
-- [ ] 确认首个正式版本基线建立前，是保留现链还是生成单一当前基线；形成 ADR 或明确决策记录。
+- [x] 确认首个正式版本基线建立前，是保留现链还是生成单一当前基线；形成 ADR 或明确决策记录。
 - [ ] 若保留现链，仓库、dev/staging 继续使用同一 migration 链；若批准重建，开发/测试可重建，
       staging 必须先获批准、备份并作废受影响证据后销毁重建，禁止把新 baseline 直接应用到
       已有 schema 或让 staging 长期使用另一条 migration 链。
