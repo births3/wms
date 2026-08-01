@@ -859,7 +859,9 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
 - [ ] 没有用 baseline、dev mock、静态字符串检查或图谱推断代替安全/GSP/真实运行证据。
 - [ ] 后端依赖方向与 `bin/runtime -> handler -> service -> domain/repository` 一致。
 - [ ] 前端依赖方向与 `app shell -> page -> feature -> api-client` 一致。
-- [ ] M4 查询、状态转换、库存扣减、审计、outbox 和幂等有真实 PostgreSQL 行为证据。
+- [x] M4 查询、状态转换、库存扣减、审计、outbox 和幂等有真实 PostgreSQL 行为证据：
+      当前 `wave4_postgres` 13/13、`h6_wave4_state_contract_postgres` 1/1、
+      `shared_idempotency_postgres` 2/2 通过；M4 Playwright 重跑的环境阻塞单独记录在 AR-03。
 - [x] H5 不再存在虚假 verified：`just web-admin-h5-real-e2e` 当前真实 HTTP/PostgreSQL
       Playwright 5/5 通过，临时 `_e2e` 库自动回收，页面级截图已登记；外部承运商、PDA、
       Print Agent/硬件缺口保持 deferred/blocked（AR-10）。
