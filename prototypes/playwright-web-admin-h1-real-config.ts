@@ -21,7 +21,7 @@ function bindAddr(url: string) {
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /web-admin-(h1-(real|api-key-real)|di-real|te-real)\.spec\.ts/,
+  testMatch: /web-admin-h1-(real|api-key-real)\.spec\.ts/,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

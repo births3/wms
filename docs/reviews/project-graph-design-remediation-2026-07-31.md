@@ -123,7 +123,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-05 | 已完成 | 采用“共享纯规则 + M4 事务执行”（用户确认 A），正常/短拣/非法跳转链路已接入（`cf352ee`）。 |
 | AR-06 | 已完成 | PostgreSQL-only、直接访问 baseline=0，补充同键并发真实 PostgreSQL 证据（`567fb98`）。 |
 | AR-07 | 已完成 | 客户平台真实 E2E 使用自动回收的 `_e2e` 数据库，4/4 通过。 |
-| AR-08A | 本地菜单闭环完成，H1 完整真实证据待补 | 采用 fail-closed 菜单回退（用户确认 A）；集合检查、构建和菜单聚焦的 H1 真实场景通过（`79d2688`、`3be857f`）；完整配置的角色/会话/API Key 写入因 Redis 鉴权环境缺失按 ADR-0046 返回 503，不能关闭完整真实证据。 |
+| AR-08A | 已完成 | 采用 fail-closed 菜单回退（用户确认 A）；真实 H1 Playwright 已覆盖发布菜单、低权限/无可用菜单、角色权限、会话和 API Key，5/5 通过并生成真实截图；同时修正 H1 配置误收集 M-DI/M-TE 用例的问题（本轮提交）。 |
 | AR-08B | 已完成 | M4 模型/组件循环已消除，构建与真实 E2E 通过（`2149b85`）。 |
 | AR-09 | 实现/服务级验证完成，隔离 Compose smoke 待运行环境 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`）。`ea93dfe` 补齐了 `wms-api-e2e` 隔离种子、JWT、组套创建/截单和唯一项目清理，脚本不再要求现场 staging token 或占位实例 URL。2026-08-01 首次借助 sudo 包装 Docker 时，外部包装清除了 `COMPOSE_PROJECT_NAME`，导致清理命中默认 staging；该次未完成 smoke，脚本随后改为临时 env 文件并显式 `-p`，正常调用不再依赖环境变量传递。修正后的实跑在拉取缺失的 MinIO 镜像前失败：Docker 代理 `192.168.124.5:7890` 不可达；因此 worker 健康、真实 HTTP 失败码和恢复重试仍未取得运行证据，AR-09 不关闭。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
@@ -477,7 +477,10 @@ pnpm --dir apps/customer-portal run gen:schema
 - [x] 服务端成功返回菜单时，前端不使用本地结构覆盖其顺序、启用状态或权限结果。
 - [x] 没有真实聚合接口前，Dashboard 显示未接入/不可用状态，不展示硬编码业务数量；
       不为删除示例数据顺带建设 Dashboard 平台。
-- [ ] 真实 H1 Playwright 覆盖正常发布菜单、低权限用户和无可用菜单场景；dev mock 只作接线补充。
+- [x] 真实 H1 Playwright 覆盖正常发布菜单、低权限用户和无可用菜单场景；`pnpm --dir
+      apps/web-admin run test:e2e:h1-real` 在隔离临时 PostgreSQL 与一次性 Redis 上 5/5
+      通过；截图位于 `artifacts/screenshot-portal/real-web/h1-menu/`、
+      `h1-role-permission/`、`h1-session/`。
 
 **最小验证**
 
