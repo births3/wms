@@ -130,7 +130,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-11 | 技术闭环完成，范围确认待补 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）；门禁精确范围尚未单独记录项目主人确认。owner：项目主人；恢复条件：确认 A（仅新增生产数字/共享片段）或 B（所有生产 `include!`）后，再回写验收项。 |
 | AR-12 | 环境漂移已确认，备份/运行证据待补 | 只读盘点确认 local/test 为 32 条、dev-h2 为 4 条、staging 为 5 条 migration，均落后于仓库当前 114 条；目录当前为 193 张静态表，目录生成链、空库测试、“首版前保留现链”ADR 和备份/可丢弃/证据依赖盘点已完成（`9a97537`、`83419d4`、`5a6c7fc`）；实际备份、同链迁移和运行证据仍需现场材料。owner：部署/发布负责人；恢复条件：完成迁移前备份与审批，按 ADR-0045 补齐 dev/staging 同一 migration 链并重采集运行证据。 |
 | KG-01A | validator 与 schema/更新命令已闭环，官方图谱产物待补 | 用户已确认采用 A（上游 Understand-Anything 生成器）；validator 现在校验 `traceability` schema `1.0` 与固定 canonical ID scheme；运行手册已记录官方 `/understand --full --language zh --auto-update` 入口和刷新后门禁；仍需由官方 Understand 刷新 `.ua`。 owner：图谱维护负责人；恢复条件：按已确认 A 方案运行官方 Understand，单独提交 `.ua`，并通过 traceability/freshness 门禁。 |
-| KG-01B | blocked | 等待既有 G2 的 module manifest 补齐，不猜测业务域拓扑。 owner：架构/域模型负责人；恢复条件：完成 G2 module manifest，基于 manifest、依赖文档和实际调用重建 H1/H2/H3 横向关系，并通过 domain validator 与 Dashboard 抽查。 |
+| KG-01B | blocked | 等待既有 G2 的 module manifest 补齐，不猜测业务域拓扑。另发现 G2 范围不一致：`check_bounded_contexts.py`/ADR-0012 以 24 个 BC 为目标，而 `architecture-dependencies.md` §1 还列出 H-INT/H-FILE/H-APV/H-SCH 等新增能力，G2 文字又写“29 个模块”；不能在范围未统一前批量生成 manifest。 owner：架构/域模型负责人；恢复条件：项目主人确认 manifest 清单范围，完成 G2 module manifest，基于 manifest、依赖文档和实际调用重建 H1/H2/H3 横向关系，并通过 domain validator 与 Dashboard 抽查。 |
 | KG-02 | B 方案与规则闭环完成，图谱产物待补 | B 方案（源提交 + 输入指纹）已实现并有正反测试（`9a95416`）；当前 `.ua/meta.json` 仍是旧字段，需官方刷新。 owner：图谱维护负责人；恢复条件：先提交输入变更，再按 B 方案运行官方 Understand，单独提交 `.ua`，并通过 freshness 门禁。 |
 | REDIS-01 | 决策方向完成，后续迁移 blocked | 已确认不新增 Redis；鉴权替代、性能/多实例和 successor ADR 另立任务，当前不删除 Redis（`d1109a3`）。 |
 
