@@ -77,7 +77,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-10 | 修正 H5 与同类虚假真实 E2E/截图证据 | 阻断证据 | P1 | 可用测试 PostgreSQL | 本地闭环完成，外部项 deferred（`dd699b8`） |
 | AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 技术闭环完成，范围确认待补（`2948bd2`、`eb4f770`） |
 | AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 本地闭环完成，运行证据待补（`9a97537`、`83419d4`） |
-| KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | 实现归属确认；ALTER 关系等待 AR-12 | validator 闭环完成，实现归属与图谱产物待补（`53d4a36`、`867c2ff`） |
+| KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | schema/更新命令确认；ALTER 关系等待 AR-12 | validator 闭环完成，schema/更新命令与图谱产物待补（`53d4a36`、`867c2ff`） |
 | KG-01B | 修正业务域拓扑 | 中 | P1 | 既有计划 G2 完成 | 阻塞 |
 | KG-02 | 确认并修正图谱新鲜度语义 | 中高 | P2 | 新鲜度方案确认 | B 方案与规则闭环完成，官方图谱刷新待补（`9a95416`） |
 | REDIS-01 | 评估 Redis 是否仍是必要基础设施 | 中高 | P2 | 无；不得先改运行时 | 决策方向完成，后续迁移 blocked（`d1109a3`） |
@@ -129,7 +129,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | 技术闭环完成，范围确认待补 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）；门禁精确范围尚未单独记录项目主人确认。 |
 | AR-12 | 本地闭环完成，运行证据待补 | 目录生成链、空库 migration 测试和“首版前保留现链”ADR 已完成（`9a97537`、`83419d4`）；dev/staging 应用、备份和运行证据仍需现场材料。 |
-| KG-01A | validator 闭环完成，实现归属与图谱产物待补 | 确定性追踪 validator、迁移关系和四条稳定链通过（`53d4a36`、`867c2ff`）；实现归属尚未单独确认，需官方 Understand 刷新 `.ua`。 |
+| KG-01A | validator 闭环完成，schema/更新命令与图谱产物待补 | 用户已确认采用 A（上游 Understand-Anything 生成器）；确定性追踪 validator、迁移关系和四条稳定链通过（`53d4a36`、`867c2ff`）；仍需记录 schema/更新命令并由官方 Understand 刷新 `.ua`。 |
 | KG-01B | blocked | 等待既有 G2 的 module manifest 补齐，不猜测业务域拓扑。 |
 | KG-02 | B 方案与规则闭环完成，图谱产物待补 | B 方案（源提交 + 输入指纹）已实现并有正反测试（`9a95416`）；当前 `.ua/meta.json` 仍是旧字段，需官方刷新。 |
 | REDIS-01 | 决策方向完成，后续迁移 blocked | 已确认不新增 Redis；鉴权替代、性能/多实例和 successor ADR 另立任务，当前不删除 Redis（`d1109a3`）。 |
@@ -716,8 +716,9 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 
 **验收标准**
 
-- [ ] 确认实现归属、schema 版本和更新命令；新增 `knowledge-graph.traceability` T2 规则、
-      validator 和正反 fixture。
+- [x] 确认实现归属采用 A：改进 Understand-Anything 上游生成器（用户确认：KG-01A=A）。
+- [x] 新增 `knowledge-graph.traceability` T2 规则、validator 和正反 fixture。
+- [ ] 记录 schema 版本和官方更新命令，并用该命令刷新 `.ua` 图谱产物。
 - [x] 只从 Rust/TS/Python import、OpenAPI、SQL migration、质量矩阵、RTM、Markdown 链接、
       Compose/Kubernetes 生成边；每条边保留来源定位，无法确定的关系保持未关联。
 - [x] 支持 `operation -> handler -> service/repository -> table`、
@@ -773,7 +774,8 @@ G2 未完成时保持 blocked，不把 KG-01A 完成写成业务域拓扑完成�
 
 **验收标准**
 
-- [ ] 项目主人确认 A 或 B。选择 B 时，先提交输入变化，再生成并单独提交 `.ua`。
+- [x] 项目主人确认选择 B（用户确认：KG-02=B）。
+- [ ] 按 B 方案先提交输入变化，再用官方命令生成并单独提交 `.ua`。
 - [x] B 的新鲜度要求 source commit 为当前提交或其祖先，且其后没有 `.ua/` 之外的分析输入
       变化；仅“提交是祖先”不能判绿。
 - [x] `.ua` schema、`AGENTS.md`、图谱运行手册、hook 和新鲜度正反测试同步；旧字段不做兼容双读。
