@@ -86,6 +86,22 @@ successor ADR 完成。** 缺少真实 PostgreSQL/多实例性能基准时，不
 
 参考：[PostgreSQL advisory locks](https://www.postgresql.org/docs/current/view-pg-locks.html)、[PostgreSQL LISTEN/NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html)。
 
+## 3.2 2026-08-01 本地 PostgreSQL 行为证据
+
+以下命令均在一次性测试数据库上通过：鉴权会话 `4/4`、双人策略 `5/5`、共享幂等 `2/2`。
+其中共享幂等包含同键并发回放；双人策略覆盖 PostgreSQL-only 构造、规则解析、双人确认、审计和幂等。
+鉴权测试证明会话撤销和租户隔离行为，但当前仍使用 `AuthRevocationStore` 测试替身，不能替代
+PostgreSQL jti/session 替代实现、p99/多实例容量和 Redis 故障恢复基准，因此验收中的代表链证据继续保持 blocked。
+
+```bash
+cargo test --manifest-path backend/Cargo.toml -p wms-api \
+  --test auth_session_postgres -- --test-threads=1
+cargo test --manifest-path backend/Cargo.toml -p wms-api \
+  --test dual_person_policy_postgres -- --test-threads=1
+cargo test --manifest-path backend/Cargo.toml -p wms-api \
+  --test shared_idempotency_postgres -- --test-threads=1
+```
+
 ## 4. 验收标准
 
 - [x] 每个 Redis 引用都能追溯到源码/依赖/配置/ADR，并有用途、owner、读写语义和故障行为。
