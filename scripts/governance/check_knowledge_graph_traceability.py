@@ -94,6 +94,13 @@ def _valid_confidence(value: Any) -> bool:
     )
 
 
+def _is_migration_path(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.replace("\\", "/")
+    return "/migrations/" in f"/{normalized}" and normalized.endswith(".sql")
+
+
 def _stable_chain(graph: dict[str, Any], domain: str) -> dict[str, Any]:
     spec = DOMAIN_SPECS[domain]
     nodes = graph.get("nodes", [])
@@ -271,6 +278,33 @@ def validate_graph(path: Path | str, domain: str | None = None) -> dict[str, Any
         if not relation_types.get(relation):
             warnings.append(f"relation family absent: {relation}")
 
+    migration_node_ids = {
+        node.get("id")
+        for node in nodes
+        if isinstance(node, dict)
+        and node.get("type") == "table"
+        and _is_migration_path(node.get("filePath"))
+    }
+    migration_edges = [
+        edge
+        for edge in edges
+        if isinstance(edge, dict)
+        and edge.get("type") == "migrates"
+        and _is_migration_path(
+            edge.get("sourceSpan", {}).get("filePath")
+            if isinstance(edge.get("sourceSpan"), dict)
+            else None
+        )
+        and (
+            edge.get("source") in migration_node_ids
+            or edge.get("target") in migration_node_ids
+        )
+    ]
+    if migration_node_ids and not migration_edges:
+        issues.append(
+            "migration table nodes require traceable migrates edges sourced from SQL migrations"
+        )
+
     selected_domains = [domain] if domain else list(DOMAIN_SPECS)
     stable_chains: dict[str, dict[str, Any]] = {}
     for selected in selected_domains:
@@ -294,6 +328,10 @@ def validate_graph(path: Path | str, domain: str | None = None) -> dict[str, Any
             "unresolvedEdgeCount": unresolved,
             "sourceSpanEdgeCount": traceability.get("sourceSpanEdgeCount"),
             "confidenceEdgeCount": traceability.get("confidenceEdgeCount"),
+        },
+        "migrationTraceability": {
+            "migrationNodeCount": len(migration_node_ids - {None}),
+            "migrationEdgeCount": len(migration_edges),
         },
         "stableChains": stable_chains,
         "issues": issues,
