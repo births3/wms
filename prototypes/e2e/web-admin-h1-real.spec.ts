@@ -11,6 +11,7 @@ test("H1 已发布菜单使用真实 API 保持顺序并覆盖工作台", async 
   await login(page);
   const navigation = page.getByRole("navigation");
   await expect(navigation.getByRole("button", { name: "运营总览" })).toBeVisible();
+  await expandH1Menu(page);
   await expect(navigation.getByRole("button", { name: /H1 角色权限/ })).toBeVisible();
   await page.screenshot({ path: path.join(menuArtifactsDir, "published-menu.png"), fullPage: false });
 });
@@ -134,14 +135,19 @@ async function loginAs(page: import("@playwright/test").Page, username: string) 
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 }
 
+async function expandH1Menu(page: import("@playwright/test").Page) {
+  const navigation = page.getByRole("navigation");
+  const section = navigation.getByRole("button", { name: "基础能力", exact: true });
+  if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
+  const group = navigation.getByRole("button", { name: "H1 权限租户", exact: true });
+  if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+}
+
 async function openRolePage(page: import("@playwright/test").Page) {
   const navigation = page.getByRole("navigation");
   const target = navigation.getByRole("button", { name: /H1 角色权限/ });
   if (!(await target.isVisible())) {
-    const section = navigation.getByRole("button", { name: "基础能力", exact: true });
-    if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
-    const group = navigation.getByRole("button", { name: "H1 权限租户", exact: true });
-    if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+    await expandH1Menu(page);
   }
   await target.click();
 }
@@ -150,10 +156,7 @@ async function openSessionPage(page: import("@playwright/test").Page) {
   const navigation = page.getByRole("navigation");
   const target = navigation.getByRole("button", { name: /H1 登录会话/ });
   if (!(await target.isVisible())) {
-    const section = navigation.getByRole("button", { name: "基础能力", exact: true });
-    if ((await section.getAttribute("aria-expanded")) !== "true") await section.click();
-    const group = navigation.getByRole("button", { name: "H1 权限租户", exact: true });
-    if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+    await expandH1Menu(page);
   }
   await target.click();
 }
