@@ -196,14 +196,14 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 
 **验收标准**
 
-- [ ] 新上下文只包含用例真正需要的操作人、货主、权限/仓库范围，不依赖 Axum、Redis、HTTP 或环境变量。
-- [ ] service 和 repository 不再导入包含 Axum/Redis 的 `crate::auth`。
-- [ ] service 可以消费已解析的权限和仓库范围；repository 只接收 `owner_id`、已解析 warehouse IDs
+- [x] 新上下文只包含用例真正需要的操作人、货主、权限/仓库范围，不依赖 Axum、Redis、HTTP 或环境变量。
+- [x] service 和 repository 不再导入包含 Axum/Redis 的 `crate::auth`。
+- [x] service 可以消费已解析的权限和仓库范围；repository 只接收 `owner_id`、已解析 warehouse IDs
       或聚焦查询条件，不解释权限码。
-- [ ] JWT 验签、撤销存储、extractor 和 HTTP 错误映射仍留在 runtime/adapter 边界。
-- [ ] 货主隔离和审计 actor 语义不变，并有纯上下文单元测试。
-- [ ] 扩展 `check_layer_dependency.py`，用最小 fixture 证明 service/repository 反向依赖会失败。
-- [ ] 保持 ADR-0024 的鉴权语义不变，在 `layered-design.md` 和相关设计文档补充
+- [x] JWT 验签、撤销存储、extractor 和 HTTP 错误映射仍留在 runtime/adapter 边界。
+- [x] 货主隔离和审计 actor 语义不变，并有纯上下文单元测试。
+- [x] 扩展 `check_layer_dependency.py`，用最小 fixture 证明 service/repository 反向依赖会失败。
+- [x] 保持 ADR-0024 的鉴权语义不变，在 `layered-design.md` 和相关设计文档补充
       `AuthContext -> OperationContext` 转换边界；若需要改变 ADR-0024 已锁定决策，则另走替代 ADR。
 
 **最小验证**
