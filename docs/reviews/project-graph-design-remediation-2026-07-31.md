@@ -75,7 +75,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-08B | 消除 M4 模型与组件循环依赖 | 中高 | P1 | AR-03 可独立先做 | 已完成（代码、自检、构建与 M4 真实 E2E 通过，`2149b85`） |
 | AR-09 | 解除 Render Worker 对核心 API 启动的硬阻塞 | 高 | P1+P2 | 部署行为确认 | 外部证据待补（`de7160f`） |
 | AR-10 | 修正 H5 与同类虚假真实 E2E/截图证据 | 阻断证据 | P1 | 可用测试 PostgreSQL | 本地闭环完成，外部项 deferred（`dd699b8`） |
-| AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 已完成（`2948bd2`、`eb4f770`） |
+| AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 技术闭环完成，范围确认待补（`2948bd2`、`eb4f770`） |
 | AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 本地闭环完成，运行证据待补（`9a97537`、`83419d4`） |
 | KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | 实现归属确认；ALTER 关系等待 AR-12 | validator 闭环完成，图谱产物待刷新（`53d4a36`、`867c2ff`） |
 | KG-01B | 修正业务域拓扑 | 中 | P1 | 既有计划 G2 完成 | 阻塞 |
@@ -127,7 +127,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-08B | 已完成 | M4 模型/组件循环已消除，构建与真实 E2E 通过（`2149b85`）。 |
 | AR-09 | 外部证据待补 | API/打印解耦、失败状态持久化烟测已提交（`de7160f`）；真实 staging Compose 仍需 Docker daemon、staging token 和已准备实例。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
-| AR-11 | 已完成 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）。 |
+| AR-11 | 技术闭环完成，范围确认待补 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）；门禁精确范围尚未单独记录项目主人确认。 |
 | AR-12 | 本地闭环完成，运行证据待补 | 目录生成链、空库 migration 测试和“首版前保留现链”ADR 已完成（`9a97537`、`83419d4`）；dev/staging 应用、备份和运行证据仍需现场材料。 |
 | KG-01A | validator 闭环完成，图谱产物待刷新 | 确定性追踪 validator、迁移关系和四条稳定链通过（`53d4a36`、`867c2ff`）；需官方 Understand 刷新 `.ua`。 |
 | KG-01B | blocked | 等待既有 G2 的 module manifest 补齐，不猜测业务域拓扑。 |
@@ -631,14 +631,14 @@ Wave3、Wave4 和主数据 repository 使用共享作用域的数字 `part*.rs` 
 **验收标准**
 
 - [ ] 项目主人确认门禁精确范围，不把所有生产 `include!` 一刀切。
-- [ ] 新增 `backend.no-new-numeric-include-fragment` 规则，登记 source、适用路径、T2/context、
-      baseline 和正反 fixture，并接入现有治理调度。
-- [ ] checker 只阻止 baseline 之外新增加的数字/共享作用域分片；历史项可见且只能下降。
-- [ ] `document_numbering_repository` 按业务语义建立私有模块，不再依赖 part1/part2/part3
-      共享父作用域。
-- [ ] 模块仅暴露调用方需要的最小 `pub(crate)` API，不靠父模块共享全部私有符号。
-- [ ] 模块拆分不改变业务行为，相关 PostgreSQL 集成测试保持通过。
-- [ ] 其余历史分片留在 baseline，后续每个聚合使用独立任务和提交收缩，不夹带功能变更。
+- [x] 新增 `backend.no-new-numeric-include-fragment` 规则，登记 source、适用路径、T2/context、
+  baseline 和正反 fixture，并接入现有治理调度。
+- [x] checker 只阻止 baseline 之外新增加的数字/共享作用域分片；历史项可见且只能下降。
+- [x] `document_numbering_repository` 按业务语义建立私有模块，不再依赖 part1/part2/part3
+  共享父作用域。
+- [x] 模块仅暴露调用方需要的最小 `pub(crate)` API，不靠父模块共享全部私有符号。
+- [x] 模块拆分不改变业务行为，相关 PostgreSQL 集成测试保持通过。
+- [x] 其余历史分片留在 baseline，后续每个聚合使用独立任务和提交收缩，不夹带功能变更。
 
 **最小验证**
 
