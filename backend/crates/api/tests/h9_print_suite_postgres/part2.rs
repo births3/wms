@@ -298,10 +298,11 @@ async fn seed_scope(pool: &PgPool) -> Scope {
     .await
     .expect("address should insert");
     sqlx::query(
-        "INSERT INTO document_number_rules (id, owner_id, document_type, rule_code, rule_name, template, reset_policy, sequence_width, enabled, effective_from) VALUES ($1, $2, 'print_document_category:delivery_note', 'h9-suite-008', '随货同行单号', 'SHTX-{OWNER}-{YYYY}{MM}{DD}-{SEQ}', 'daily', 4, TRUE, '2026-07-01T00:00:00Z')",
+        "INSERT INTO document_number_rules (id, owner_id, document_type, rule_code, rule_name, template, reset_policy, sequence_width, enabled, effective_from) VALUES ($1, $2, 'print_document_category:delivery_note', 'h9-suite-008', '随货同行单号', 'SHTX-{OWNER}-{YYYY}{MM}{DD}-{SEQ}', 'daily', 4, TRUE, $3)",
     )
     .bind(Uuid::new_v4())
     .bind(owner_id)
+    .bind(test_day_start())
     .execute(pool)
     .await
     .expect("numbering rule should insert");
@@ -445,7 +446,7 @@ async fn seed_order(
          )
          VALUES (
             $1, $2, 'sales_outbound', $3, $3, $4, $5, $6, $7, $8,
-            'confirmed', '2026-07-27T08:00:00Z'
+            'confirmed', $9
          )",
     )
     .bind(order_id)
@@ -463,17 +464,19 @@ async fn seed_order(
         "contact_name": "组套测试人",
         "contact_phone": "13800000008"
     }))
+    .bind(test_day_start() + Duration::hours(8))
     .execute(pool)
     .await
     .expect("order should insert");
     sqlx::query(
-        "INSERT INTO h9_outbound_route_snapshots (outbound_order_id, owner_id, warehouse_id, customer_id, delivery_address_id, route_code, frozen_at) VALUES ($1, $2, $3, $4, $5, 'LINE-H9-008', '2026-07-27T08:00:00Z')",
+        "INSERT INTO h9_outbound_route_snapshots (outbound_order_id, owner_id, warehouse_id, customer_id, delivery_address_id, route_code, frozen_at) VALUES ($1, $2, $3, $4, $5, 'LINE-H9-008', $6)",
     )
     .bind(order_id)
     .bind(scope.owner_id)
     .bind(scope.warehouse_id)
     .bind(scope.customer_id)
     .bind(scope.address_id)
+    .bind(test_day_start() + Duration::hours(8))
     .execute(pool)
     .await
     .expect("route snapshot should insert");

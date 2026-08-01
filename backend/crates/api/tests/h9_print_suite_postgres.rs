@@ -1,4 +1,4 @@
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -25,9 +25,14 @@ fn ctx(owner_id: Uuid) -> AuthContext {
 }
 
 fn test_now() -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(2026, 7, 27, 10, 0, 0)
+    test_day_start() + Duration::hours(10)
+}
+
+fn test_day_start() -> DateTime<Utc> {
+    let now = Utc::now();
+    Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
         .single()
-        .expect("valid test time")
+        .expect("valid current test date")
 }
 
 struct Scope {
@@ -97,10 +102,7 @@ fn suite_request(
         customer_id,
         delivery_address_id,
         route_code,
-        effective_from: Utc
-            .with_ymd_and_hms(2026, 7, 1, 0, 0, 0)
-            .single()
-            .expect("valid effective from"),
+        effective_from: test_day_start(),
         effective_to: None,
         items,
     }
