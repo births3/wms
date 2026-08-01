@@ -860,8 +860,9 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
 - [ ] 后端依赖方向与 `bin/runtime -> handler -> service -> domain/repository` 一致。
 - [ ] 前端依赖方向与 `app shell -> page -> feature -> api-client` 一致。
 - [ ] M4 查询、状态转换、库存扣减、审计、outbox 和幂等有真实 PostgreSQL 行为证据。
-- [ ] H5 不再存在虚假 verified：本地可覆盖切片有真实 HTTP/PostgreSQL Playwright 和页面级
-      截图；外部承运商、PDA、Print Agent/硬件缺口保持 deferred/blocked。
+- [x] H5 不再存在虚假 verified：`just web-admin-h5-real-e2e` 当前真实 HTTP/PostgreSQL
+      Playwright 5/5 通过，临时 `_e2e` 库自动回收，页面级截图已登记；外部承运商、PDA、
+      Print Agent/硬件缺口保持 deferred/blocked（AR-10）。
 - [ ] Render Worker 故障不阻塞核心 API 启动，且打印路径仍受控失败。
 - [ ] 图谱能追踪代表性的 API、数据表、测试、文档和部署链，并公开尚未解析的关系。
 - [ ] `git diff --check`、`just gov-t1` 及所有任务定向检查均为退出码 `0`。
