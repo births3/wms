@@ -51,6 +51,13 @@
 | Wave 6 状态 | `just wave-6-status` |
 | Wave 6 预检 | `just wave-6-evidence-preflight` |
 
+## 项目图谱
+
+- 图谱数据统一放在 `.ua/`：架构图 `.ua/knowledge-graph.json`，业务域图 `.ua/domain-graph.json`，新鲜度元数据 `.ua/meta.json`。
+- 建图或更新调用 `understand-anything:understand`，业务流程视角调用 `understand-anything:understand-domain`，变更影响调用 `understand-anything:understand-diff`，可视化调用 `understand-anything:understand-dashboard`。
+- 使用图谱回答前运行 `python3 scripts/governance/check_knowledge_graph_freshness.py --json`：`sourceCommitHash` 可为当前 `HEAD` 或其祖先，但其后不得有 `.ua/` 之外的输入变化，且 `inputFingerprint` 必须匹配；旧 `gitCommitHash` 不兼容读取。存在未提交业务改动时，图谱只代表已分析基线，先做 diff 分析或更新图谱。
+- 详细的视角、更新触发器、Git 规则和使用边界见 [docs/agent-knowledge-graph.md](docs/agent-knowledge-graph.md)。
+
 ## 验证要求
 
 - 每次改文件后，至少运行 `just gov-t1` 并报告退出码。
@@ -113,6 +120,7 @@
 12. [docs/concept-audit.md](docs/concept-audit.md) — 概念审计报告
 13. [docs/domain/clarifications.md](docs/domain/clarifications.md) — 业务澄清记录
 14. [docs/glossary.md](docs/glossary.md) — 术语表
+15. [docs/agent-knowledge-graph.md](docs/agent-knowledge-graph.md) — 动态项目图谱、业务域图和变更影响图的使用规则
 
 ## 模块规则
 
