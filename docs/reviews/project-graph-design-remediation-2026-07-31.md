@@ -40,7 +40,7 @@
 
 另有一项已直接失败的基线：
 `python3 scripts/governance/generate_table_catalog.py --check --json` 曾返回退出码 `1`；
-AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需补空库基线与迁移决策证据。
+AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续仍需补空库基线与迁移决策证据。
 
 ### 2.1 已复核证据锚点
 
@@ -668,7 +668,7 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 “首版前只维护当前基线”的方向存在张力，但尚未证实部署故障。现有
 `generate_table_catalog.py --check --json` 已返回退出码 `1`：生成器识别 173 张表，而签入目录
 仍是旧结果，必须修复现有产物而不是再建第二份清单。2026-07-31 首切片已扩展生成器识别无
-`IF NOT EXISTS` 的建表、ALTER/REFERENCES/RENAME/DROP 事件，并刷新目录为 194 张表；空库
+`IF NOT EXISTS` 的建表、ALTER/REFERENCES/RENAME/DROP 事件，并刷新目录为 193 张静态表；空库
 基线、所有权决策和稳定 fingerprint 仍待补证。
 
 **最小范围**
