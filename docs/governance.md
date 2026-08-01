@@ -481,6 +481,7 @@ Wave 1 起，涉及一线操作或复杂业务流程的前端页面采用"前端
 | Wave 4-6 | `report_wave6_pre_release.py`（L7 / runtime evidence） | T4 | （CI 全量，非 diff 触发）|
 | Wave 4 | `check_observability.py`（L10 可观测）| T4 | （CI 全量，非 diff 触发）|
 | Wave 5 | `check_changelog_freshness.py` | T1 | `*.md`（变更前必跑）|
+| Wave 6 | `check_knowledge_graph_traceability.py`（KG-01A） | T2 | `.ua/knowledge-graph.json` + `docs/agent-knowledge-graph.md` + `scripts/governance/check_knowledge_graph_traceability.py` |
 
 > **事实之源约定**：本表与 `governance/gate-rules.toml` 中的占位规则**必须保持一致**；以本表为权威源，gate-rules.toml 仅作为脚本侧实现承接。`task_check.py --strict` 模式（当前为 Wave 1+ 准备中）会强制检查未实现脚本。
 

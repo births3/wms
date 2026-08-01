@@ -54,6 +54,7 @@ GOVERNANCE_SCRIPTS = [
     "check_governance_consistency.py",
     "check_commit_convention.py",
     "check_governance_coverage.py",
+    "check_knowledge_graph_traceability.py",
     "check_feature_flags.py",
     "check_changelog_freshness.py",
     "check_bounded_contexts.py",

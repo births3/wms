@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    {"id": "file:src/a.py", "type": "file", "name": "a.py", "filePath": "src/a.py", "summary": "A.", "tags": ["code"], "complexity": "simple"},
+    {"id": "file:src/a.py", "type": "file", "name": "a-copy.py", "filePath": "src/a.py", "summary": "Duplicate.", "tags": ["code"], "complexity": "simple"},
+    {"id": "src/b.py", "type": "file", "name": "b.py", "filePath": "src/b.py", "summary": "Bare identifier.", "tags": ["code"], "complexity": "simple"}
+  ],
+  "edges": [
+    {"source": "file:src/a.py", "target": "file:src/missing.py", "type": "imports", "direction": "forward", "weight": 0.7, "sourceSpan": {"filePath": ""}, "confidence": 2}
+  ],
+  "traceability": {"schemaVersion": "1.0", "canonicalIdScheme": "<type>:<relative-path>[:symbol]", "resolvedEdgeCount": 4, "unresolvedEdgeCount": 0, "sourceSpanEdgeCount": 1, "confidenceEdgeCount": 1}
+}

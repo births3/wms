@@ -722,6 +722,30 @@ tier = "T1"
 # 占位规则（未来 Wave 启用，当前对应脚本不存在 → task_check 会跳过）
 # ============================================================
 
+[[rules]]
+match = ".ua/knowledge-graph.json"
+checks = ["check_knowledge_graph_traceability"]
+tier = "T2"
+contexts = ["local", "pr", "main", "release", "runtime"]
+rule_ids = ["GOV-KNOWLEDGE-GRAPH-TRACEABILITY"]
+source = "docs/reviews/project-graph-design-remediation-2026-07-31.md#KG-01A"
+
+[[rules]]
+match = "docs/agent-knowledge-graph.md"
+checks = ["check_knowledge_graph_traceability"]
+tier = "T2"
+contexts = ["local", "pr", "main", "release", "runtime"]
+rule_ids = ["GOV-KNOWLEDGE-GRAPH-TRACEABILITY"]
+source = "docs/reviews/project-graph-design-remediation-2026-07-31.md#KG-01A"
+
+[[rules]]
+match = "scripts/governance/check_knowledge_graph_traceability.py"
+checks = ["check_knowledge_graph_traceability"]
+tier = "T2"
+contexts = ["local", "pr", "main", "release", "runtime"]
+rule_ids = ["GOV-KNOWLEDGE-GRAPH-TRACEABILITY"]
+source = "docs/reviews/project-graph-design-remediation-2026-07-31.md#KG-01A"
+
 # AR-11：禁止新增无语义边界的数字/共享 include 片段；历史基线只能收缩
 [[rules]]
 match = "backend/crates/api/src/**"

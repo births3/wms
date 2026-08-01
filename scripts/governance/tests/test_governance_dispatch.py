@@ -50,6 +50,13 @@ def test_governance_checks_t2_includes_openapi_full_entrypoint():
     assert "check_openapi_contract.py" in scripts
 
 
+def test_governance_checks_t2_includes_knowledge_graph_traceability():
+    """T2 全量入口必须校验图谱关系的来源与稳定链。"""
+    from governance_checks import expand_tier_scripts
+
+    assert "check_knowledge_graph_traceability.py" in expand_tier_scripts("T2")
+
+
 def test_governance_checks_t1_includes_changelog_freshness():
     """T1 全量入口必须覆盖已实现的 CHANGELOG 同步治理。"""
     from governance_checks import expand_tier_scripts
