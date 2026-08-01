@@ -7,5 +7,5 @@
   "edges": [
     {"source": "file:src/a.py", "target": "file:src/missing.py", "type": "imports", "direction": "forward", "weight": 0.7, "sourceSpan": {"filePath": ""}, "confidence": 2}
   ],
-  "traceability": {"schemaVersion": "1.0", "canonicalIdScheme": "<type>:<relative-path>[:symbol]", "resolvedEdgeCount": 4, "unresolvedEdgeCount": 0, "sourceSpanEdgeCount": 1, "confidenceEdgeCount": 1}
+  "traceability": {"schemaVersion": "0.9", "canonicalIdScheme": "legacy", "resolvedEdgeCount": 4, "unresolvedEdgeCount": 0, "sourceSpanEdgeCount": 1, "confidenceEdgeCount": 1}
 }

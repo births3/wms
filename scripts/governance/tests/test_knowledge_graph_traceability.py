@@ -34,6 +34,8 @@ def test_invalid_fixture_reports_each_traceability_failure():
     assert "sourceSpan" in messages
     assert "confidence" in messages
     assert "resolvedEdgeCount" in messages
+    assert "schemaVersion" in messages
+    assert "canonicalIdScheme" in messages
 
 
 def test_json_fixture_is_stable_and_has_no_unknown_top_level_data():

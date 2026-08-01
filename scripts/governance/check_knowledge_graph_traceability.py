@@ -15,6 +15,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GRAPH = REPO_ROOT / ".ua" / "knowledge-graph.json"
+TRACEABILITY_SCHEMA_VERSION = "1.0"
+CANONICAL_ID_SCHEME = "<type>:<relative-path>[:symbol]"
 KNOWN_TYPES = {
     "file", "function", "class", "module", "concept", "config", "document",
     "service", "table", "endpoint", "pipeline", "schema", "resource", "flow",
@@ -260,6 +262,16 @@ def validate_graph(path: Path | str, domain: str | None = None) -> dict[str, Any
     if not isinstance(traceability, dict):
         issues.append("missing graph.traceability")
         traceability = {}
+    if traceability.get("schemaVersion") != TRACEABILITY_SCHEMA_VERSION:
+        issues.append(
+            "traceability.schemaVersion must be "
+            f"{TRACEABILITY_SCHEMA_VERSION!r}"
+        )
+    if traceability.get("canonicalIdScheme") != CANONICAL_ID_SCHEME:
+        issues.append(
+            "traceability.canonicalIdScheme must be "
+            f"{CANONICAL_ID_SCHEME!r}"
+        )
     expected_counts = {
         "resolvedEdgeCount": valid_edges,
         "sourceSpanEdgeCount": source_span_count,

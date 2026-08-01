@@ -33,6 +33,31 @@
 
 这些视角共用图谱节点，不复制仓库事实。需要正式架构图或评审材料时，仍按 `wms-plantuml-docs` 将确认后的结论沉淀为 PlantUML 和说明文档。
 
+## 图谱 schema 与官方刷新命令
+
+结构图的顶层 `version` 固定为 `1.0.0`；`traceability` 使用 schema `1.0`，并固定
+`canonicalIdScheme` 为 `<type>:<relative-path>[:symbol]`。每条边必须保留合法的
+`sourceSpan.filePath`（相对仓库路径）和 `confidence`（`0..1`）；计数字段由 validator
+按实际边重新计算，不能手工填入统计值。
+
+官方更新入口是 Understand-Anything skill，而不是手工编辑 `.ua`：
+
+```text
+understand-anything:understand
+/understand --full --language zh --auto-update
+```
+
+运行前先确认 `.ua/.understandignore`，完成 skill 的确认门禁；运行后必须单独提交生成的
+`.ua/knowledge-graph.json`、`.ua/fingerprints.json`、`.ua/meta.json` 和相关配置，再执行：
+
+```bash
+python3 scripts/governance/check_knowledge_graph_traceability.py --json
+python3 scripts/governance/check_knowledge_graph_freshness.py --json
+```
+
+业务域图不由该结构图命令自动刷新；流程、术语或状态变化后另行调用
+`understand-anything:understand-domain`，并在同一套 schema/新鲜度门禁下验收。
+
 ## 建立与更新
 
 首次或需要重新校准全仓语义时，调用 `understand-anything:understand`，要求：
