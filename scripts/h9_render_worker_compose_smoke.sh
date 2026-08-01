@@ -33,6 +33,7 @@ db_secret_file="$smoke_dir/wms_staging_db_password.txt"
 override_file="$smoke_dir/compose.override.yml"
 render_request="$smoke_dir/render-request.json"
 render_response="$smoke_dir/render-response.json"
+list_response="$smoke_dir/list-response.json"
 worker_headers="$smoke_dir/worker-headers.txt"
 worker_pdf="$smoke_dir/worker.pdf"
 
@@ -101,6 +102,8 @@ resolve_api_target() {
 
 core_url="$(resolve_api_target "${WMS_H9_SMOKE_CORE_URL:-/api/v1/inventory/batches}")"
 print_url="$(resolve_api_target "$WMS_H9_SMOKE_PRINT_URL")"
+list_target="${WMS_H9_SMOKE_LIST_URL:-${WMS_H9_SMOKE_PRINT_URL%/prepare}}"
+list_url="$(resolve_api_target "$list_target")"
 curl -fsS -H "Authorization: $WMS_H9_SMOKE_AUTHORIZATION" "$core_url" >/dev/null
 
 idempotency_key="${WMS_H9_SMOKE_IDEMPOTENCY_KEY:-ar-09-compose-smoke-$(date +%s)}"
@@ -121,6 +124,19 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as handle:
     body = json.load(handle)
 assert body.get("code") == "H9_CATEGORY_PDF_RENDER_FAILED", body
+PY
+curl -fsS -o "$list_response" \
+  -H "Authorization: $WMS_H9_SMOKE_AUTHORIZATION" \
+  "$list_url"
+python3 - "$list_response" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    body = json.load(handle)
+assert body.get("preparation_status") == "failed", body
+assert body.get("data"), body
+assert all(item.get("processing_status") == "failed" for item in body["data"]), body
 PY
 
 "${compose[@]}" up -d --build h9-render-worker-staging
@@ -163,6 +179,19 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as handle:
     body = json.load(handle)
 assert body.get("status") == "completed", body
+PY
+curl -fsS -o "$list_response" \
+  -H "Authorization: $WMS_H9_SMOKE_AUTHORIZATION" \
+  "$list_url"
+python3 - "$list_response" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    body = json.load(handle)
+assert body.get("preparation_status") == "completed", body
+assert body.get("data"), body
+assert all(item.get("processing_status") == "ready" for item in body["data"]), body
 PY
 
 echo "AR-09 render-worker compose smoke passed (project=$COMPOSE_PROJECT_NAME)"

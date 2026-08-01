@@ -35,6 +35,14 @@ def test_compose_smoke_isolated_and_fail_closed():
         assert token in smoke
 
 
+def test_compose_smoke_checks_persisted_failure_and_recovery_state():
+    smoke = SMOKE.read_text(encoding="utf-8")
+    runbook = RUNBOOK.read_text(encoding="utf-8")
+    for token in ("list_url", "preparation_status", "processing_status", '"failed"', '"completed"'):
+        assert token in smoke
+    assert "持久化失败状态" in runbook
+
+
 def test_smoke_entrypoint_and_runbook_are_registered():
     justfile = JUSTFILE.read_text(encoding="utf-8")
     runbook = RUNBOOK.read_text(encoding="utf-8")
