@@ -125,7 +125,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-07 | 已完成 | 客户平台真实 E2E 使用自动回收的 `_e2e` 数据库，4/4 通过。 |
 | AR-08A | 本地菜单闭环完成，H1 完整真实证据待补 | 采用 fail-closed 菜单回退（用户确认 A）；集合检查、构建和菜单聚焦的 H1 真实场景通过（`79d2688`、`3be857f`）；完整配置的角色/会话/API Key 写入因 Redis 鉴权环境缺失按 ADR-0046 返回 503，不能关闭完整真实证据。 |
 | AR-08B | 已完成 | M4 模型/组件循环已消除，构建与真实 E2E 通过（`2149b85`）。 |
-| AR-09 | 实现/服务级验证完成，Compose smoke 待外部 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`）；真实 staging Compose 仍需 Docker daemon、staging token 和已准备实例。 |
+| AR-09 | 实现/服务级验证完成，Compose smoke 待外部 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`）。2026-08-01 只读复核发现：普通用户运行 smoke 无 Docker socket 权限；现有 dev/staging PostgreSQL 仅应用 4/5 条 migration，均没有 H9 实例表；现有 staging API 健康路由仍为旧镜像 404；运行容器和镜像列表没有 Render Worker。脚本还要求隔离新库中的已准备实例，因此当前缺少 staging token、可迁移到隔离库的 fixture 和可运行 worker，不能将失败/占位 URL 写成真实通过。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | 技术闭环完成，范围确认待补 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）；门禁精确范围尚未单独记录项目主人确认。 |
 | AR-12 | 环境漂移已确认，备份/运行证据待补 | 只读盘点确认 local/test 为 32 条、dev-h2 为 4 条、staging 为 5 条 migration，均落后于仓库当前 114 条；目录生成链、空库测试和“首版前保留现链”ADR 已完成（`9a97537`、`83419d4`）；备份、可丢弃数据和同链运行证据仍需现场材料。 |
