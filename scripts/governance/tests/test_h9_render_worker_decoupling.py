@@ -47,6 +47,21 @@ def test_compose_smoke_checks_persisted_failure_and_recovery_state():
     assert "持久化失败状态" in runbook
 
 
+def test_compose_smoke_persists_non_secret_evidence_after_cleanup():
+    smoke = SMOKE.read_text(encoding="utf-8")
+    runbook = RUNBOOK.read_text(encoding="utf-8")
+    for token in (
+        "WMS_H9_SMOKE_EVIDENCE_DIR",
+        "evidence.json",
+        "project_name",
+        "cleanup_exit_code",
+        '"secrets_included": False',
+        "AR-09 evidence written",
+    ):
+        assert token in smoke
+    assert "evidence manifest" in runbook
+
+
 def test_compose_smoke_bootstraps_an_isolated_h9_fixture():
     smoke = SMOKE.read_text(encoding="utf-8")
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")

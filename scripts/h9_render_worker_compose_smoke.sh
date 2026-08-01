@@ -29,6 +29,7 @@ smoke_dir="$(mktemp -d "${TMPDIR:-/tmp}/wms-h9-render-smoke.XXXXXX")"
 db_secret_file="$smoke_dir/wms_staging_db_password.txt"
 compose_env_file="$smoke_dir/compose.env"
 override_file="$smoke_dir/compose.override.yml"
+cleanup_log="$smoke_dir/cleanup.log"
 render_request="$smoke_dir/render-request.json"
 render_response="$smoke_dir/render-response.json"
 list_response="$smoke_dir/list-response.json"
@@ -53,6 +54,29 @@ export WMS_HFILE_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_u
 export WMS_HFILE_REGION="us-east-1"
 export WMS_H9_RENDER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export WMS_E2E_SEED=1
+
+evidence_root="${WMS_H9_SMOKE_EVIDENCE_DIR:-artifacts/h9-render-worker-compose-smoke}"
+if [[ "$evidence_root" = /* ]]; then
+  evidence_base="$evidence_root"
+else
+  evidence_base="$repo_root/$evidence_root"
+fi
+evidence_dir="$evidence_base/$COMPOSE_PROJECT_NAME"
+mkdir -p "$evidence_dir"
+
+api_healthz_status="not-run"
+api_readyz_status="not-run"
+core_status="not-run"
+print_response_status="not-run"
+worker_down_code="not-run"
+worker_down_list_status="not-run"
+worker_healthz_status="not-run"
+wrong_status="not-run"
+worker_render_status="not-run"
+recovered_status="not-run"
+recovered_list_status="not-run"
+cleanup_status="not-run"
+
 printf '%s' "$WMS_STAGING_DB_PASSWORD" >"$db_secret_file"
 cat >"$compose_env_file" <<EOF
 COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME
@@ -139,9 +163,101 @@ db_query() {
   "${compose[@]}" exec -T -e "PGPASSWORD=$WMS_STAGING_DB_PASSWORD" postgres-staging \
     psql -U wms_staging -d wms_staging -Atc "$1"
 }
+copy_evidence() {
+  local source="$1"
+  local target="$2"
+  if [[ -f "$source" ]]; then
+    cp "$source" "$evidence_dir/$target"
+  fi
+}
 cleanup() {
-  "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+  local exit_status="$?"
+  if "${compose[@]}" down -v --remove-orphans >"$cleanup_log" 2>&1; then
+    cleanup_status=0
+  else
+    cleanup_status=$?
+  fi
+  copy_evidence "$cleanup_log" cleanup.log
+  copy_evidence "$render_request" render-request.json
+  copy_evidence "$worker_headers" worker-headers.txt
+  copy_evidence "$worker_pdf" worker.pdf
+  copy_evidence "$render_response" recovered-response.json
+  copy_evidence "$list_response" recovered-list-response.json
+  python3 - "$evidence_dir/evidence.json" "$exit_status" "$cleanup_status" \
+    "$api_port" "$worker_port" "$minio_api_port" "$minio_console_port" \
+    "$api_healthz_status" "$api_readyz_status" "$core_status" \
+    "$print_response_status" "$worker_down_code" "$worker_down_list_status" \
+    "$worker_healthz_status" "$wrong_status" "$worker_render_status" \
+    "$recovered_status" "$recovered_list_status" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime, timezone
+
+(
+    output_path,
+    exit_status,
+    cleanup_status,
+    api_port,
+    worker_port,
+    minio_api_port,
+    minio_console_port,
+    api_healthz_status,
+    api_readyz_status,
+    core_status,
+    print_response_status,
+    worker_down_code,
+    worker_down_list_status,
+    worker_healthz_status,
+    wrong_status,
+    worker_render_status,
+    recovered_status,
+    recovered_list_status,
+) = sys.argv[1:]
+
+def as_int(value):
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+evidence = {
+    "schema_version": 1,
+    "captured_at": datetime.now(timezone.utc).isoformat(),
+    "project_name": os.environ["COMPOSE_PROJECT_NAME"],
+    "ports": {
+        "api": as_int(api_port),
+        "worker": as_int(worker_port),
+        "minio_api": as_int(minio_api_port),
+        "minio_console": as_int(minio_console_port),
+    },
+    "checks": {
+        "api_healthz": api_healthz_status,
+        "api_readyz": api_readyz_status,
+        "authenticated_core_api": core_status,
+        "worker_down_print_http": print_response_status,
+        "worker_down_print_code": worker_down_code,
+        "worker_down_persisted_status": worker_down_list_status,
+        "worker_healthz": worker_healthz_status,
+        "worker_wrong_token_http": wrong_status,
+        "worker_correct_token_http": worker_render_status,
+        "recovered_print_http": recovered_status,
+        "recovered_persisted_status": recovered_list_status,
+    },
+    "process": {
+        "smoke_exit_code": as_int(exit_status),
+        "cleanup_exit_code": as_int(cleanup_status),
+        "cleanup_command": "docker compose down -v --remove-orphans",
+    },
+    "secrets_included": False,
+}
+with open(output_path, "w", encoding="utf-8") as handle:
+    json.dump(evidence, handle, ensure_ascii=False, indent=2)
+    handle.write("\n")
+PY
+  printf 'AR-09 evidence written: %s\n' "$evidence_dir"
   rm -rf "$smoke_dir"
+  exit "$exit_status"
 }
 trap cleanup EXIT
 
@@ -163,6 +279,8 @@ wait_http() {
 api_base="http://127.0.0.1:${api_port}"
 wait_http "$api_base/healthz"
 wait_http "$api_base/readyz"
+api_healthz_status="$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/healthz")"
+api_readyz_status="$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/readyz")"
 
 resolve_api_target() {
   case "$1" in
@@ -173,7 +291,11 @@ resolve_api_target() {
 }
 
 core_url="$(resolve_api_target "${WMS_H9_SMOKE_CORE_URL:-/api/v1/inventory/batches}")"
-curl -fsS -H "Authorization: $auth_header" "$core_url" >/dev/null
+core_status="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: $auth_header" "$core_url")"
+[[ "$core_status" =~ ^2[0-9][0-9]$ ]] || {
+  echo "authenticated core API returned $core_status, expected 2xx" >&2
+  exit 1
+}
 
 template_version_id="$(db_query "SELECT id FROM print_template_versions WHERE template_type_code = 'delivery_note' AND status = 'published' ORDER BY created_at DESC LIMIT 1" | tr -d '\r\n')"
 test -n "$template_version_id"
@@ -319,6 +441,14 @@ with open(sys.argv[1], encoding="utf-8") as handle:
     body = json.load(handle)
 assert body.get("code") == "H9_CATEGORY_PDF_RENDER_FAILED", body
 PY
+worker_down_code="$(python3 - "$render_response" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle).get("code", "missing"))
+PY
+)"
+cp "$render_response" "$evidence_dir/worker-down-response.json"
 curl -fsS -o "$list_response" \
   -H "Authorization: $auth_header" \
   "$list_url"
@@ -332,9 +462,12 @@ assert body.get("preparation_status") == "failed", body
 assert body.get("data"), body
 assert all(item.get("processing_status") == "failed" for item in body["data"]), body
 PY
+worker_down_list_status=failed
+cp "$list_response" "$evidence_dir/worker-down-list-response.json"
 
 "${compose[@]}" up -d --build h9-render-worker-staging
 wait_http "http://127.0.0.1:${worker_port}/healthz"
+worker_healthz_status="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${worker_port}/healthz")"
 
 wrong_status="$(curl -sS -o /dev/null -w '%{http_code}' \
   -X POST \
@@ -347,12 +480,16 @@ wrong_status="$(curl -sS -o /dev/null -w '%{http_code}' \
   exit 1
 }
 
-curl -sS -D "$worker_headers" -o "$worker_pdf" \
+worker_render_status="$(curl -sS -D "$worker_headers" -o "$worker_pdf" -w '%{http_code}' \
   -X POST \
   -H "Authorization: Bearer $WMS_H9_RENDER_TOKEN" \
   -H 'Content-Type: application/json' \
   --data-binary "@$render_request" \
-  "http://127.0.0.1:${worker_port}/render"
+  "http://127.0.0.1:${worker_port}/render")"
+[[ "$worker_render_status" == "200" ]] || {
+  echo "correct render token returned $worker_render_status, expected 200" >&2
+  exit 1
+}
 grep -qi '^content-type: application/pdf' "$worker_headers"
 head -c 5 "$worker_pdf" | grep -q '^%PDF-'
 
@@ -374,6 +511,7 @@ with open(sys.argv[1], encoding="utf-8") as handle:
     body = json.load(handle)
 assert body.get("status") == "completed", body
 PY
+cp "$render_response" "$evidence_dir/recovered-response.json"
 curl -fsS -o "$list_response" \
   -H "Authorization: $auth_header" \
   "$list_url"
@@ -387,5 +525,7 @@ assert body.get("preparation_status") == "completed", body
 assert body.get("data"), body
 assert all(item.get("processing_status") == "ready" for item in body["data"]), body
 PY
+recovered_list_status=completed
+cp "$list_response" "$evidence_dir/recovered-list-response.json"
 
 echo "AR-09 render-worker compose smoke passed (project=$COMPOSE_PROJECT_NAME)"

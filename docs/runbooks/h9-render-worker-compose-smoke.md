@@ -28,6 +28,13 @@ just h9-render-worker-compose-smoke
 并删除临时凭据；不会触碰默认 staging 项目或持久卷。API 镜像同时包含仅供该隔离烟测使用的
 `wms-api-e2e` 入口，种子数据和实例均随一次性卷销毁。
 
+脚本默认把不含凭据的 evidence manifest 和响应副本写入
+`artifacts/h9-render-worker-compose-smoke/<COMPOSE_PROJECT_NAME>/`；可用
+`WMS_H9_SMOKE_EVIDENCE_DIR` 指定其他目录。manifest 记录项目名、四个宿主端口、API/Worker
+健康检查、鉴权核心接口、Worker 停止时的 HTTP/错误码、持久化失败状态、错误/正确令牌结果、
+恢复重试结果和 `down -v --remove-orphans` 清理退出码。数据库密码、JWT、H-FILE 密钥和
+Worker 令牌不会写入 evidence。
+
 ## 验收断言
 
 脚本按以下顺序失败即退出：
