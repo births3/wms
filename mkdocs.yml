@@ -177,6 +177,7 @@ nav:
     - ADR-0042 药检单客户平台: adr/0042-drug-inspection-customer-portal.md
     - ADR-0043 直接生产前端开发: adr/0043-direct-production-frontend-workflow.md
     - ADR-0044 PostgreSQL 幂等权威存储: adr/0044-postgresql-idempotency-authority.md
+    - ADR-0045 首版前保留 migration 链: adr/0045-pre-v1-migration-chain.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md
