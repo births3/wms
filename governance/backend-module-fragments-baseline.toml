@@ -1,5 +1,97 @@
 version = 1
-scope = "backend.no-new-numeric-include-fragment"
+scope = "backend.no-new-production-include"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_handlers.rs"
+include = "master_data_handlers/customer_addresses.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_handlers.rs"
+include = "master_data_handlers/customer_profile.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_postgres.rs"
+include = "master_data_postgres/customer_addresses.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_postgres.rs"
+include = "master_data_postgres/customer_profile.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_template.rs"
+include = "print_template_field_library.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_template.rs"
+include = "print_template_lifecycle.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_template.rs"
+include = "print_template_openapi_fields.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/print_template.rs"
+include = "print_template_printing.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/task_engine.rs"
+include = "task_engine/mappers.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/task_engine.rs"
+include = "task_engine/persistence.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/task_engine.rs"
+include = "task_engine/repository.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/task_engine.rs"
+include = "task_engine/transitions.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_drug_inspection.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave3_repository.rs"
+include = "wave3_repository_quality.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_handlers.rs"
+include = "wave4_handlers_actions.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_handlers.rs"
+include = "wave4_handlers_orders.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_handlers.rs"
+include = "wave4_handlers_returns.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_handlers.rs"
+include = "wave4_handlers_waves.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_actions.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_customer_portal.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_returns.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_shipment.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_waves.rs"
 
 [[fragments]]
 parent = "backend/crates/api/src/bin/wms_audit_baseline_load.rs"

@@ -127,7 +127,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-08B | 已完成 | M4 模型/组件循环已消除，构建与真实 E2E 通过（`2149b85`）。 |
 | AR-09 | 实现/服务级验证完成，隔离 Compose smoke 待运行环境 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`）。2026-08-01 定向复核继续通过：治理测试 6/6、worker 测试 2/2、Render Worker 单元测试 2/2、H9 PostgreSQL 测试 9/9；这些结果仍不替代真实 Compose。`ea93dfe` 补齐了 `wms-api-e2e` 隔离种子、JWT、组套创建/截单和唯一项目清理，脚本不再要求现场 staging token 或占位实例 URL。此前一次 sudo 包装清理了 `COMPOSE_PROJECT_NAME`，导致清理命中默认 staging；脚本已改为临时 env 文件并显式 `-p`。随后通过普通代理和清除客户端代理变量各重试一次，Docker daemon 仍使用不可达的 `192.168.124.5:7890`，缺失的 MinIO 镜像无法取得；因此 worker 健康、真实 HTTP 失败码和恢复重试仍未取得运行证据，AR-09 不关闭。本轮 review 已补齐默认 `artifacts/h9-render-worker-compose-smoke/<COMPOSE_PROJECT_NAME>/evidence.json` 及响应副本，记录非打印健康、失败码、恢复重试和清理退出码且不写入凭据；定向治理测试通过，但不能替代真实 Compose 证据。owner：部署/基础设施负责人；恢复条件：提供可用的 MinIO 与 `mc` 镜像或 registry 代理后，重新运行隔离 Compose smoke。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
-| AR-11 | 技术闭环完成，范围确认待补 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）；2026-08-01 checker 仍为 baseline/discovered `28/28`、新增违规 `0`，门禁精确范围尚未单独记录项目主人确认。owner：项目主人；恢复条件：确认 A（仅新增生产数字/共享片段）或 B（所有生产 `include!`）后，再回写验收项。 |
+| AR-11 | B 方案已确认，生产 include 基线已扩大 | 项目主人于 2026-08-01 确认 B：门禁覆盖 `backend/crates/api/src/**` 中全部生产 `include!`，测试模块排除，历史项进入 baseline 且只能收缩；checker 当前 baseline/discovered `51/51`、新增违规 `0`。`document_numbering_repository` 语义模块拆分仍保留为代表性迁移证据（`2948bd2`、`eb4f770`）。owner：项目主人；恢复条件：后续生产 include 只能通过正式 Rust `mod` 迁移，baseline 只能减少。 |
 | AR-12 | 环境漂移已确认，备份/运行证据待补 | 只读盘点确认 local/test 为 32 条、dev-h2 为 4 条、staging 为 5 条 migration，均落后于仓库当前 114 条；目录当前为 193 张静态表，目录生成链、空库测试、“首版前保留现链”ADR 和备份/可丢弃/证据依赖盘点已完成（`9a97537`、`83419d4`、`5a6c7fc`）。2026-08-01 目录检查与 3 个生成器测试通过；共享测试库仍会触发 `VersionMismatch(202606030001)`；随后 AR-03 在一次性当前 migration 空库 5/5 通过，只证明仓库链可重建，不替代 dev/staging 同链、备份审批和运行证据。owner：部署/发布负责人；恢复条件：完成迁移前备份与审批，按 ADR-0045 补齐 dev/staging 同一 migration 链并重采集运行证据。 |
 | KG-01A | validator 与 schema/更新命令已闭环，官方图谱产物待补 | 用户已确认采用 A（上游 Understand-Anything 生成器）；2026-08-01 traceability validator 仍为 10584 节点、15454/15454 有效边，四条稳定链通过；freshness 仍因 `.ua/meta.json` 使用旧 `gitCommitHash` 返回 invalid。提交后 Understand hook 的零 token 预检发现 245 个输入中 217 个结构变化，按规则停止并要求官方 `--full`，未手工改写 `.ua`。本轮尝试用已安装 Codex runner 执行官方全量流程，扫描门禁通过（1844 文件、109 批次、import map 1844/1844），首批仅落盘部分分析片段；随后官方 subagent API 出现 TLS/MCP 连接失败，未生成 assembled graph，也未推进 `.ua/meta.json`。运行手册已记录官方 `/understand --full --language zh --auto-update` 入口和刷新后门禁；仍需可用官方 runner 完成刷新。owner：图谱维护负责人；恢复条件：按已确认 A 方案运行官方 Understand，单独提交 `.ua`，并通过 traceability/freshness 门禁。 |
 | KG-01B | blocked | 等待既有 G2 的 module manifest 补齐，不猜测业务域拓扑。2026-08-01 非 strict checker 仍以 24 个 BC 为目标且只发现 1 个 manifest、23 个缺失；另发现 G2 范围不一致：`check_bounded_contexts.py`/ADR-0012 以 24 个 BC 为目标，而 `architecture-dependencies.md` §1 还列出 H-INT/H-FILE/H-APV/H-SCH 等新增能力，G2 文字又写“29 个模块”；不能在范围未统一前批量生成 manifest。 owner：架构/域模型负责人；恢复条件：项目主人确认 manifest 清单范围，完成 G2 module manifest，基于 manifest、依赖文档和实际调用重建 H1/H2/H3 横向关系，并通过 domain validator 与 Dashboard 抽查。 |
@@ -618,27 +618,29 @@ python3 scripts/governance/check_scope_gap_discovery.py --strict --module H5 --j
 python3 -m pytest scripts/governance/tests/test_quality_matrix.py -q
 ```
 
-### AR-11 阻止新增数字 `include!` 并改造一个代表聚合
+### AR-11 禁止新增生产 `include!` 并改造一个代表聚合
 
 **问题**
 
-Wave3、Wave4 和主数据 repository 使用共享作用域的数字 `part*.rs` 与 `include!`。它们降低了
-单文件行数，却没有得到 Rust 模块可见性、语义接口或编译期依赖边界。
+Wave3、Wave4、打印、任务引擎和主数据 repository 使用共享作用域的多个 `include!` 片段。它们降低了
+单文件行数，却没有得到 Rust 模块可见性、语义接口或编译期依赖边界。项目主人已确认将门禁扩大到
+API crate 全部生产 `include!`，以阻止继续新增同类结构债务。
 
 **最小范围**
 
 - 禁止一次性重拆 16 万行 API crate。
-- 门禁只约束生产代码中新增加的 `include!("*_part*.rs")` 数字/共享作用域分片，不禁止测试
-  fixture 或已经具有语义边界的 include。
+- 门禁扫描 `backend/crates/api/src/**` 中全部生产 `include!`；`#[cfg(test)]` 模块和测试专用源文件
+  不纳入生产范围。
+- 现有生产 include 全部登记进 baseline，baseline 只能收缩，禁止新增。
 - 门禁建立后，单独把 `document_numbering_repository` 作为首个代表聚合改为语义 `mod`；
   不与 AR-04、AR-05 或其他行为修改混提交。
 
 **验收标准**
 
-- [ ] 项目主人确认门禁精确范围，不把所有生产 `include!` 一刀切。
-- [x] 新增 `backend.no-new-numeric-include-fragment` 规则，登记 source、适用路径、T2/context、
+- [x] 项目主人确认 B：门禁覆盖全部生产 `include!`，测试模块排除。
+- [x] 新增 `backend.no-new-production-include` 规则，登记 source、适用路径、T2/context、
   baseline 和正反 fixture，并接入现有治理调度。
-- [x] checker 只阻止 baseline 之外新增加的数字/共享作用域分片；历史项可见且只能下降。
+- [x] checker 阻止 baseline 之外新增加的全部生产 include；历史项可见且只能下降。
 - [x] `document_numbering_repository` 按业务语义建立私有模块，不再依赖 part1/part2/part3
   共享父作用域。
 - [x] 模块仅暴露调用方需要的最小 `pub(crate)` API，不靠父模块共享全部私有符号。
@@ -657,7 +659,7 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 
 **停止条件**
 
-门禁范围未确认时不得把全部 `include!` 设为阻断项。
+项目主人已确认 B；不得把测试模块误计入生产基线，也不得通过新增 baseline 绕过生产 include 门禁。
 
 ### AR-12 复核首版前 migration 基线与表所有权
 

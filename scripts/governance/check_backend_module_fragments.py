@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""检查后端 Rust 新增的数字/共享 include 片段是否登记在历史基线。
+"""检查后端 Rust 生产 include 是否登记在历史基线。
 
 输入：backend/crates/api/src/**/*.rs、governance/backend-module-fragments-baseline.toml。
-输出：人类可读结果或 --json 结果，包含发现、基线、已消失和新增片段。
-退出码：0 通过；1 发现基线外片段；2 检查器自身错误。
+输出：人类可读结果或 --json 结果，包含发现、基线、已消失和新增生产 include。
+退出码：0 通过；1 发现基线外生产 include；2 检查器自身错误。
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import argparse
 import json
 import re
 import sys
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 try:
     import tomllib
@@ -24,8 +24,6 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = ROOT / "backend" / "crates" / "api" / "src"
 BASELINE_FILE = ROOT / "governance" / "backend-module-fragments-baseline.toml"
 INCLUDE_RE = re.compile(r'include!\s*\(\s*"([^"]+)"\s*\)')
-NUMERIC_FRAGMENT_RE = re.compile(r"(?:^|_)part\d+[a-z]?\.rs$")
-SHARED_FRAGMENT_RE = re.compile(r"(?:^|_)(?:helpers|support)\.rs$")
 
 
 def _relative(path: Path, root: Path = ROOT) -> str:
@@ -36,9 +34,15 @@ def _fragment_key(parent: str, include: str) -> str:
     return f"{parent}::{include}"
 
 
-def _is_governed_fragment(include: str) -> bool:
-    name = PurePosixPath(include).name
-    return bool(NUMERIC_FRAGMENT_RE.search(name) or SHARED_FRAGMENT_RE.search(name))
+def _is_test_file(path: Path) -> bool:
+    """Skip standalone test source files whose include is not production code."""
+    return (
+        any(part in {"test", "tests"} for part in path.parts)
+        or path.stem in {"test", "tests"}
+        or path.stem.startswith("test_")
+        or path.stem.endswith("_test")
+        or path.stem.endswith("_tests")
+    )
 
 
 def _test_module_ranges(text: str) -> list[tuple[int, int]]:
@@ -83,6 +87,8 @@ def discover_fragments(
 ) -> list[dict[str, str]]:
     fragments: list[dict[str, str]] = []
     for parent_path in sorted(source_root.rglob("*.rs")):
+        if _is_test_file(parent_path):
+            continue
         text = parent_path.read_text(encoding="utf-8", errors="ignore")
         test_ranges = _test_module_ranges(text)
         for line_number, line in enumerate(text.splitlines()):
@@ -90,15 +96,14 @@ def discover_fragments(
                 continue
             for match in INCLUDE_RE.finditer(line):
                 include = match.group(1)
-                if _is_governed_fragment(include):
-                    parent = _relative(parent_path, root)
-                    fragments.append(
-                        {
-                            "parent": parent,
-                            "include": include,
-                            "key": _fragment_key(parent, include),
-                        }
-                    )
+                parent = _relative(parent_path, root)
+                fragments.append(
+                    {
+                        "parent": parent,
+                        "include": include,
+                        "key": _fragment_key(parent, include),
+                    }
+                )
     return sorted(fragments, key=lambda item: item["key"])
 
 
@@ -134,9 +139,9 @@ def check(
         "resolved": resolved,
         "new_violations": new_violations,
         "message": (
-            "发现基线外的数字/共享 include 片段"
+            "发现基线外的生产 include"
             if new_violations
-            else "后端数字/共享 include 片段无新增"
+            else "后端生产 include 无新增"
         ),
     }
 

@@ -746,13 +746,13 @@ contexts = ["local", "pr", "main", "release", "runtime"]
 rule_ids = ["GOV-KNOWLEDGE-GRAPH-TRACEABILITY"]
 source = "docs/reviews/project-graph-design-remediation-2026-07-31.md#KG-01A"
 
-# AR-11：禁止新增无语义边界的数字/共享 include 片段；历史基线只能收缩
+# AR-11：禁止新增生产 include；历史基线只能收缩
 [[rules]]
 match = "backend/crates/api/src/**"
 checks = ["check_backend_module_fragments"]
 tier = "T2"
 contexts = ["local", "pr", "main", "release", "runtime"]
-rule_ids = ["GOV-BACKEND-NO-NUMERIC-INCLUDE"]
+rule_ids = ["GOV-BACKEND-NO-PRODUCTION-INCLUDE"]
 source = "docs/reviews/project-graph-design-remediation-2026-07-31.md#AR-11"
 
 [[rules]]
@@ -760,7 +760,7 @@ match = "governance/backend-module-fragments-baseline.toml"
 checks = ["check_backend_module_fragments"]
 tier = "T2"
 contexts = ["local", "pr", "main", "release", "runtime"]
-rule_ids = ["GOV-BACKEND-NO-NUMERIC-INCLUDE"]
+rule_ids = ["GOV-BACKEND-NO-PRODUCTION-INCLUDE"]
 source = "docs/reviews/project-graph-design-remediation-2026-07-31.md#AR-11"
 
 # Wave 1 启用：检查 Rust 后端层级依赖与 unsafe

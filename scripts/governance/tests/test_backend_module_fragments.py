@@ -25,7 +25,7 @@ def write_fixture(
     baseline_path.parent.mkdir(parents=True)
     baseline_path.write_text(
         "version = 1\n"
-        + "scope = \"backend.no-new-numeric-include-fragment\"\n"
+        + "scope = \"backend.no-new-production-include\"\n"
         + "\n".join(
             f'[[fragments]]\nparent = "{parent}"\ninclude = "{include}"'
             for parent, include in baseline
@@ -35,7 +35,7 @@ def write_fixture(
     return root, source, baseline_path
 
 
-def test_new_numeric_fragment_must_be_in_baseline(tmp_path: Path):
+def test_new_production_fragment_must_be_in_baseline(tmp_path: Path):
     root, source, baseline = write_fixture(
         tmp_path,
         {"repository.rs": 'include!("repository_part1.rs");'},
@@ -50,10 +50,10 @@ def test_new_numeric_fragment_must_be_in_baseline(tmp_path: Path):
     ]
 
 
-def test_shared_helper_fragment_is_also_baselined(tmp_path: Path):
+def test_new_semantic_fragment_is_also_baselined(tmp_path: Path):
     root, source, baseline = write_fixture(
         tmp_path,
-        {"repository.rs": 'include!("helpers.rs");'},
+        {"repository.rs": 'include!("domain/repository.rs");'},
         [],
     )
 
@@ -61,15 +61,14 @@ def test_shared_helper_fragment_is_also_baselined(tmp_path: Path):
 
     assert result["ok"] is False
     assert result["new_violations"] == [
-        "backend/crates/api/src/repository.rs::helpers.rs"
+        "backend/crates/api/src/repository.rs::domain/repository.rs"
     ]
 
 
-def test_semantic_module_and_test_only_fixture_are_ignored(tmp_path: Path):
+def test_test_only_fixture_is_ignored(tmp_path: Path):
     root, source, baseline = write_fixture(
         tmp_path,
         {
-            "repository.rs": 'include!("domain/repository.rs");',
             "tests.rs": '#[cfg(test)]\nmod tests { include!("tests_part1.rs"); }',
         },
         [],
