@@ -76,7 +76,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-09 | 解除 Render Worker 对核心 API 启动的硬阻塞 | 高 | P1+P2 | 部署行为确认 | 实现/服务级验证完成，Compose smoke 待外部（`de7160f`） |
 | AR-10 | 修正 H5 与同类虚假真实 E2E/截图证据 | 阻断证据 | P1 | 可用测试 PostgreSQL | 本地闭环完成，外部项 deferred（`dd699b8`） |
 | AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 技术闭环完成，范围确认待补（`2948bd2`、`eb4f770`） |
-| AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 本地闭环完成，运行证据待补（`9a97537`、`83419d4`） |
+| AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 环境漂移已确认，备份/运行证据待补（`9a97537`、`83419d4`） |
 | KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | schema/更新命令确认；ALTER 关系等待 AR-12 | validator 闭环完成，schema/更新命令与图谱产物待补（`53d4a36`、`867c2ff`） |
 | KG-01B | 修正业务域拓扑 | 中 | P1 | 既有计划 G2 完成 | 阻塞 |
 | KG-02 | 确认并修正图谱新鲜度语义 | 中高 | P2 | 新鲜度方案确认 | B 方案与规则闭环完成，官方图谱刷新待补（`9a95416`） |
@@ -128,7 +128,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-09 | 实现/服务级验证完成，Compose smoke 待外部 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`）；真实 staging Compose 仍需 Docker daemon、staging token 和已准备实例。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | 技术闭环完成，范围确认待补 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）；门禁精确范围尚未单独记录项目主人确认。 |
-| AR-12 | 本地闭环完成，运行证据待补 | 目录生成链、空库 migration 测试和“首版前保留现链”ADR 已完成（`9a97537`、`83419d4`）；dev/staging 应用、备份和运行证据仍需现场材料。 |
+| AR-12 | 环境漂移已确认，备份/运行证据待补 | 只读盘点确认 local/test 为 32 条、dev-h2 为 4 条、staging 为 5 条 migration，均落后于仓库当前 114 条；目录生成链、空库测试和“首版前保留现链”ADR 已完成（`9a97537`、`83419d4`）；备份、可丢弃数据和同链运行证据仍需现场材料。 |
 | KG-01A | validator 闭环完成，schema/更新命令与图谱产物待补 | 用户已确认采用 A（上游 Understand-Anything 生成器）；确定性追踪 validator、迁移关系和四条稳定链通过（`53d4a36`、`867c2ff`）；仍需记录 schema/更新命令并由官方 Understand 刷新 `.ua`。 |
 | KG-01B | blocked | 等待既有 G2 的 module manifest 补齐，不猜测业务域拓扑。 |
 | KG-02 | B 方案与规则闭环完成，图谱产物待补 | B 方案（源提交 + 输入指纹）已实现并有正反测试（`9a95416`）；当前 `.ua/meta.json` 仍是旧字段，需官方刷新。 |
@@ -673,6 +673,21 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 先修复现有 table catalog 生成链和可重建验证，再做 migration 基线决策；不直接压缩、
 删除或重写 migration 历史，不包含 ADR-0014 的 Oracle 数据迁移范围。
 
+**只读环境盘点（2026-08-01）**
+
+未探测或修改生产数据库；通过现有 local/test、dev-h2 和 staging PostgreSQL 只读查询
+`_sqlx_migrations` 与公开 schema 元数据，结果如下：
+
+| 环境 | 已应用 migration | 最新版本 | 静态表 | schema fingerprint |
+|---|---:|---|---:|---|
+| local/test（5434） | 32 | `202607120007` | 85 | `6c46f6cfc7c0740da1ac2df8b25c5738` |
+| dev-h2（15432） | 4 | `202606050001` | 35 | `8dd2904e8ff5389c00c60d5f2e724b4e` |
+| staging（Compose 内部 PostgreSQL） | 5 | `202606060001` | 42 | `05d6d1268e4405c58ae770a86b070c69` |
+| 仓库 migration 链 | 114 | `202607280001` | — | — |
+
+该结果证明 dev/staging 当前并未跟随仓库 migration 链；盘点不等同于备份、数据可丢弃或
+发布证据确认。
+
 **验收标准**
 
 - [x] 扩展现有 `generate_table_catalog.py` 和测试，识别 `CREATE TABLE`（含无
@@ -681,8 +696,8 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
       “表 -> 所属模块 -> 创建 migration -> 后续 ALTER migration”。
 - [x] 在一次性空 PostgreSQL 上从零执行当前 migration，验证约束、索引、种子和稳定
       schema fingerprint。
-- [ ] 决策前盘点 local/dev/staging 已应用 migration、可丢弃数据、备份和运行证据依赖；
-      不探测或改动生产数据库。
+- [x] 只读盘点 local/dev/staging 已应用 migration、当前 schema 和仓库链版本；不探测或改动生产数据库。
+- [ ] 完成可丢弃数据、备份和运行证据依赖盘点；上述环境漂移必须先按发布流程处理。
 - [x] 确认首个正式版本基线建立前，是保留现链还是生成单一当前基线；形成 ADR 或明确决策记录。
 - [ ] 若保留现链，仓库、dev/staging 继续使用同一 migration 链；若批准重建，开发/测试可重建，
       staging 必须先获批准、备份并作废受影响证据后销毁重建，禁止把新 baseline 直接应用到

@@ -37,9 +37,9 @@ schema、约束、索引和确定性种子数据；表目录由同一条 migrati
 | 环境 | 当前可验证事实 | 处理规则 |
 |---|---|---|
 | 仓库 | 114 个 migration，最新文件为 `202607280001_h_file_h9_category_pdfs.sql` | 作为唯一迁移链来源 |
-| local/test | `.env` 指向 `127.0.0.1:5434/wms_test`；现场 `_sqlx_migrations` 有 32 条，最新为 `202607120007` | 数据可丢弃；需要时从零重建 |
-| dev | 本仓库没有可提交的实时连接或应用历史；运行手册要求使用真实 dev DB 证据 | 发布前必须用环境证据核对 `_sqlx_migrations`，不能用 local 结果替代 |
-| staging | 现有 runbook 中的 38 张表结果是历史记录，不代表当前 schema | 部署前重新核对 migration、备份和证据；禁止未经批准销毁重建 |
+| local/test | 2026-08-01 只读查询：`_sqlx_migrations` 32 条，最新 `202607120007`，静态表 85，fingerprint `6c46f6cfc7c0740da1ac2df8b25c5738` | 数据可丢弃；需要时从零重建 |
+| dev | 2026-08-01 只读查询 dev-h2：`_sqlx_migrations` 4 条，最新 `202606050001`，静态表 35，fingerprint `8dd2904e8ff5389c00c60d5f2e724b4e` | 已确认落后仓库链；发布前按现场流程补齐，不用 local 结果替代 |
+| staging | 2026-08-01 只读查询 staging Compose PostgreSQL：`_sqlx_migrations` 5 条，最新 `202606060001`，静态表 42，fingerprint `05d6d1268e4405c58ae770a86b070c69` | 已确认落后仓库链；部署前重新核对 migration、备份和证据，禁止未经批准销毁重建 |
 | production | 本次不探测、不修改 | 由正式发布流程和 ADR-0016 管理 |
 
 ## 空库基线证据
@@ -50,7 +50,7 @@ schema、约束、索引和确定性种子数据；表目录由同一条 migrati
 - schema fingerprint `63fd1daab6ad7b04d1bea02b310e8ca7`；
 - 种子契约：126 个权限、11 个系统字典分类、46 个系统字典项。
 
-证据入口：
+证据入口（空库可重建基线）：
 
 ```bash
 python3 scripts/governance/generate_table_catalog.py --check --json
@@ -67,6 +67,8 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
   记录治理，而不是通过压缩历史隐藏。
 - 风险：dev/staging 的实时应用版本仍需在发布前补齐环境证据；证据缺失时不得宣称
   migration 已同步。
+- 当前 dev/staging 只读盘点显示它们尚未同步到仓库链；本次查询不替代备份、发布审批或
+  运行证据。
 
 ## 重新评估条件
 
