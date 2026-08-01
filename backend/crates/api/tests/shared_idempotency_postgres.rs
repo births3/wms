@@ -112,3 +112,59 @@ async fn shared_postgres_idempotency_replays_conflicts_and_expires(pool: PgPool)
         .expect("expired identity should run again");
     assert!(!rerun.replayed);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn shared_postgres_idempotency_serializes_same_key_concurrently(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, '共享幂等并发测试货主')",
+    )
+    .bind(owner_id)
+    .bind(format!("IDEM-CONCURRENT-{}", &owner_id.to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("owner should insert");
+
+    let repository = PgTaskTypeRepository::new(pool.clone());
+    let left_repository = repository.clone();
+    let right_repository = repository.clone();
+    let left_context = context(owner_id);
+    let right_context = left_context.clone();
+    let (left, right) = tokio::join!(
+        left_repository.upsert(
+            &left_context,
+            "shared_idempotency_concurrent",
+            request(),
+            Utc::now(),
+            "concurrent-key",
+        ),
+        right_repository.upsert(
+            &right_context,
+            "shared_idempotency_concurrent",
+            request(),
+            Utc::now(),
+            "concurrent-key",
+        ),
+    );
+    let left = left.expect("first concurrent mutation should persist");
+    let right = right.expect("second concurrent mutation should replay");
+
+    assert_ne!(left.replayed, right.replayed);
+    assert_eq!(left.value.id, right.value.id);
+    let task_type_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM task_types WHERE owner_id = $1 AND task_type_code = 'shared_idempotency_concurrent'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("concurrent mutation should create one task type");
+    assert_eq!(task_type_count, 1);
+    let idempotency_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'concurrent-key'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("concurrent mutation should persist one idempotency result");
+    assert_eq!(idempotency_count, 1);
+}
