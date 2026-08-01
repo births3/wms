@@ -128,7 +128,7 @@ AR-12 首切片已修复生成链并将目录刷新为 194 张表，后续仍需
 | AR-09 | 实现/服务级验证完成，Compose smoke 待外部 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`）。2026-08-01 只读复核发现：普通用户运行 smoke 无 Docker socket 权限；现有 dev/staging PostgreSQL 仅应用 4/5 条 migration，均没有 H9 实例表；现有 staging API 健康路由仍为旧镜像 404；运行容器和镜像列表没有 Render Worker。脚本还要求隔离新库中的已准备实例，因此当前缺少 staging token、可迁移到隔离库的 fixture 和可运行 worker，不能将失败/占位 URL 写成真实通过。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | 技术闭环完成，范围确认待补 | 新增数字 `include!` 门禁与单据编号语义模块拆分已通过（`2948bd2`、`eb4f770`）；门禁精确范围尚未单独记录项目主人确认。 |
-| AR-12 | 环境漂移已确认，备份/运行证据待补 | 只读盘点确认 local/test 为 32 条、dev-h2 为 4 条、staging 为 5 条 migration，均落后于仓库当前 114 条；目录生成链、空库测试和“首版前保留现链”ADR 已完成（`9a97537`、`83419d4`）；备份、可丢弃数据和同链运行证据仍需现场材料。 |
+| AR-12 | 环境漂移已确认，备份/运行证据待补 | 只读盘点确认 local/test 为 32 条、dev-h2 为 4 条、staging 为 5 条 migration，均落后于仓库当前 114 条；目录生成链、空库测试、“首版前保留现链”ADR 和备份/可丢弃/证据依赖盘点已完成（`9a97537`、`83419d4`）；实际备份、同链迁移和运行证据仍需现场材料。 |
 | KG-01A | validator 闭环完成，schema/更新命令与图谱产物待补 | 用户已确认采用 A（上游 Understand-Anything 生成器）；确定性追踪 validator、迁移关系和四条稳定链通过（`53d4a36`、`867c2ff`）；仍需记录 schema/更新命令并由官方 Understand 刷新 `.ua`。 |
 | KG-01B | blocked | 等待既有 G2 的 module manifest 补齐，不猜测业务域拓扑。 |
 | KG-02 | B 方案与规则闭环完成，图谱产物待补 | B 方案（源提交 + 输入指纹）已实现并有正反测试（`9a95416`）；当前 `.ua/meta.json` 仍是旧字段，需官方刷新。 |
@@ -688,6 +688,19 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 该结果证明 dev/staging 当前并未跟随仓库 migration 链；盘点不等同于备份、数据可丢弃或
 发布证据确认。
 
+**备份、可丢弃和证据依赖盘点（2026-08-01）**
+
+| 环境/资产 | 可丢弃边界 | 迁移前备份要求 | 运行证据影响 | 现场动作 |
+|---|---|---|---|---|
+| local/test（5434） | ADR-0045 允许按需从零重建；丢弃前仍需确认没有待保留本地数据 | 若保留数据，按 H10 重大变更前手动 `pg_dump`；从零重建不需要回填旧数据 | 不作为 dev/staging 发布证据 | 测试负责人确认是否可丢弃，必要时执行空库基线测试 |
+| dev-h2（Compose） | PostgreSQL/MinIO 使用 `postgres_dev_h2_data`、`minio_dev_h2_data`；仅在 dev 证据已封存或作废后可销毁 | 应用迁移前先做数据库备份并记录 checksum；不得以空库重建替代备份 | 现有 4 条 migration 和旧 API 运行证据需作废并重采集 | 部署负责人备份、批准卷重建或按现链补迁移，再重新采集 dev 证据 |
+| staging（Compose） | `postgres_staging_data`、`redis_staging_data`、`minio_staging_data` 默认不可丢弃；销毁必须先审批 | 按 H10 做迁移前全量备份、校验和恢复点记录 | 旧 schema/镜像与新链不一致，相关 staging 证据需重验 | 发布负责人完成备份、审批、补迁移和 smoke，再归档新证据 |
+| AR-09 隔离 smoke | 脚本生成的一次性卷由 `down -v` 清理，不承载正式业务数据 | 使用临时凭据，不要求正式库备份 | 只生成临时 smoke 记录，不能替代 staging 证据 | 先准备可迁移 H9 fixture、token 和 worker，再执行脚本 |
+
+盘点依据为 [H10 数据库备份与恢复](../infra/technical-specs.md)、
+`deploy/docker-compose.dev-h2.yml`、`deploy/docker-compose.staging.yml` 和 ADR-0045；
+本表不代表备份已执行，也不代表 dev/staging 已完成同链迁移。
+
 **验收标准**
 
 - [x] 扩展现有 `generate_table_catalog.py` 和测试，识别 `CREATE TABLE`（含无
@@ -697,7 +710,7 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 - [x] 在一次性空 PostgreSQL 上从零执行当前 migration，验证约束、索引、种子和稳定
       schema fingerprint。
 - [x] 只读盘点 local/dev/staging 已应用 migration、当前 schema 和仓库链版本；不探测或改动生产数据库。
-- [ ] 完成可丢弃数据、备份和运行证据依赖盘点；上述环境漂移必须先按发布流程处理。
+- [x] 完成可丢弃数据、备份和运行证据依赖盘点；上述环境漂移必须先按发布流程处理。
 - [x] 确认首个正式版本基线建立前，是保留现链还是生成单一当前基线；形成 ADR 或明确决策记录。
 - [ ] 若保留现链，仓库、dev/staging 继续使用同一 migration 链；若批准重建，开发/测试可重建，
       staging 必须先获批准、备份并作废受影响证据后销毁重建，禁止把新 baseline 直接应用到
