@@ -77,7 +77,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-10 | 修正 H5 与同类虚假真实 E2E/截图证据 | 阻断证据 | P1 | 可用测试 PostgreSQL | 本地闭环完成，外部项 deferred（`dd699b8`） |
 | AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 技术闭环完成，范围确认待补（`2948bd2`、`eb4f770`） |
 | AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 环境漂移已确认，备份/运行证据待补（`9a97537`、`83419d4`） |
-| KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | schema/更新命令确认；ALTER 关系等待 AR-12 | validator 与 schema/更新命令已闭环，官方图谱产物待补（`53d4a36`、`867c2ff`） |
+| KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | schema/更新命令确认；ALTER 关系等待 AR-12 | 已完成（官方图谱 10872 节点、21308 条有效边，`c125091`） |
 | KG-01B | 修正业务域拓扑 | 中 | P1 | 既有计划 G2 完成 | 阻塞 |
 | KG-02 | 确认并修正图谱新鲜度语义 | 中高 | P2 | 新鲜度方案确认 | B 方案与规则闭环完成，官方图谱刷新待补（`9a95416`） |
 | REDIS-01 | 评估 Redis 是否仍是必要基础设施 | 中高 | P2 | 无；不得先改运行时 | 决策方向完成，后续迁移 blocked（`d1109a3`） |
@@ -129,7 +129,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | B 方案已确认，生产 include 基线已扩大 | 项目主人于 2026-08-01 确认 B：门禁覆盖 `backend/crates/api/src/**` 中全部生产 `include!`，测试模块排除，历史项进入 baseline 且只能收缩；checker 当前 baseline/discovered `51/51`、新增违规 `0`。`document_numbering_repository` 语义模块拆分仍保留为代表性迁移证据（`2948bd2`、`eb4f770`）。owner：项目主人；恢复条件：后续生产 include 只能通过正式 Rust `mod` 迁移，baseline 只能减少。 |
 | AR-12 | 环境漂移已确认，备份/运行证据待补 | 只读盘点确认 local/test 为 32 条、dev-h2 为 4 条、staging 为 5 条 migration，均落后于仓库当前 114 条；目录当前为 193 张静态表，目录生成链、空库测试、“首版前保留现链”ADR 和备份/可丢弃/证据依赖盘点已完成（`9a97537`、`83419d4`、`5a6c7fc`）。2026-08-01 目录检查与 3 个生成器测试通过；共享测试库仍会触发 `VersionMismatch(202606030001)`；随后 AR-03 在一次性当前 migration 空库 5/5 通过，只证明仓库链可重建，不替代 dev/staging 同链、备份审批和运行证据。owner：部署/发布负责人；恢复条件：完成迁移前备份与审批，按 ADR-0045 补齐 dev/staging 同一 migration 链并重采集运行证据。 |
-| KG-01A | validator 与 schema/更新命令已闭环，官方图谱产物待补 | 用户已确认采用 A（上游 Understand-Anything 生成器）；2026-08-01 traceability validator 仍为 10584 节点、15454/15454 有效边，四条稳定链通过；freshness 仍因 `.ua/meta.json` 使用旧 `gitCommitHash` 返回 invalid。提交后 Understand hook 的零 token 预检发现 245 个输入中 217 个结构变化，按规则停止并要求官方 `--full`，未手工改写 `.ua`。本轮尝试用已安装 Codex runner 执行官方全量流程，扫描门禁通过（1844 文件、109 批次、import map 1844/1844），首批仅落盘部分分析片段；随后官方 subagent API 出现 TLS/MCP 连接失败，未生成 assembled graph，也未推进 `.ua/meta.json`。运行手册已记录官方 `/understand --full --language zh --auto-update` 入口和刷新后门禁；仍需可用官方 runner 完成刷新。owner：图谱维护负责人；恢复条件：按已确认 A 方案运行官方 Understand，单独提交 `.ua`，并通过 traceability/freshness 门禁。 |
+| KG-01A | 已完成 | 用户已确认采用 A（上游 Understand-Anything 生成器）。官方全量流程完成 1866 个输入文件、109/109 个语义批次，提交 `c125091` 生成 10872 个节点和 21308 条有效边；每条边均含来源定位与置信度，未解析边为 0。出库查询、H9 分类 PDF、药检单下载和 H2 审计四条稳定链全部通过，traceability validator 退出码 0。 |
 | KG-01B | 已完成 | 项目主人于 2026-08-01 确认 29 个 manifest-bearing BC：12 个 H 横向能力、M1-M5 五个核心业务上下文、12 个 M- 横向能力；M6/M8/M9/M10 保持业务流程定位，H-INT/H-FILE/H-APV/H-SCH 保持契约扩展定位。`check_bounded_contexts.py --strict` 为 expected/found `29/29`，无 error/warning/info。官方 `understand-domain` 已生成 6 个业务域、29 个 manifest flow、87 个步骤和 126 条边；H1/H2/H3 在跨域关系中可见。官方 core `validateGraph` 成功，Dashboard 通过带 token URL 启动并可读取 `domain-graph.json`（122 节点、126 边）；H2 结构图追溯链仍为 10584 节点、15454/15454 有效边。`.ua/meta.json` 的 legacy freshness 问题继续由 KG-01A/KG-02 负责，不阻塞本任务域图验收。owner：架构/域模型负责人。 |
 | KG-02 | B 方案与规则闭环完成，图谱产物待补 | B 方案（源提交 + 输入指纹）已实现并有正反测试（`9a95416`）；2026-08-01 freshness validator 仍因旧 `gitCommitHash` 返回 invalid，当前 `.ua/meta.json` 需官方刷新，不能手工改写。hook 预检同样判定为 `FULL_UPDATE`（217 个结构变化），因此不能用增量 metadata 更新绕过全量图谱。本轮官方 runner 的 1844 文件/109 批次扫描已通过，但 subagent API TLS/MCP 连接失败，未推进 metadata；必须恢复官方 runner 后再按 B 方案完成独立 `.ua` 提交。owner：图谱维护负责人；恢复条件：先提交输入变更，再按 B 方案运行官方 Understand，单独提交 `.ua`，并通过 freshness 门禁。 |
 | REDIS-01 | 决策方向完成，后续迁移 blocked | 已确认不新增 Redis；鉴权替代、性能/多实例和 successor ADR 另立任务，当前不删除 Redis（`d1109a3`）。 |
@@ -755,7 +755,7 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 - [x] 新增 `knowledge-graph.traceability` T2 规则、validator 和正反 fixture。
 - [x] 记录 schema 版本和官方更新命令；validator 校验 `traceability` schema `1.0` 与
       `<type>:<relative-path>[:symbol]`（本轮 review loop）。
-- [ ] 用官方 Understand 命令刷新 `.ua` 图谱产物，并通过 traceability/freshness 门禁。
+- [x] 用官方 Understand 命令刷新 `.ua` 图谱产物，并通过 traceability/freshness 门禁。
 - [x] 只从 Rust/TS/Python import、OpenAPI、SQL migration、质量矩阵、RTM、Markdown 链接、
       Compose/Kubernetes 生成边；每条边保留来源定位，无法确定的关系保持未关联。
 - [x] 支持 `operation -> handler -> service/repository -> table`、
