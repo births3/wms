@@ -4,7 +4,7 @@
 类别：1. 文档治理
 Tier：T1（< 5s）
 输入：
-  docs/domain/<bc-slug>/module-manifest.toml（24 个 BC 的 manifest）
+  docs/domain/<bc-slug>/module-manifest.toml（29 个 manifest-bearing BC 的 manifest）
   docs/adr/0012-bounded-contexts.md（参考决策）
 输出：人类可读 + --json
 退出码：
@@ -13,7 +13,7 @@ Tier：T1（< 5s）
   2 脚本自身错误
 
 校验项：
-  1. 24 个 BC 的 manifest 是否都已就位（普通模式报告，--strict 阻断）
+  1. 29 个 manifest-bearing BC 的 manifest 是否都已就位（普通模式报告，--strict 阻断）
   2. 每个 manifest 必有 [bounded_context] + [integrations] 段
   3. 集成模式在 8 种白名单内
   4. Shared Kernel 类型在 9 个白名单内
@@ -38,12 +38,14 @@ except ModuleNotFoundError:
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DOMAIN_DIR = REPO_ROOT / "docs" / "domain"
 
-# 24 个 BC 清单（来自 ADR-0012）
+# 29 个 manifest-bearing BC 清单（2026-08-01 项目主人确认）
 BOUNDED_CONTEXTS = {
     # 12 横向能力
     "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10",
     "H-DOCK", "H-AL",
-    # 12 横向业务
+    # 5 核心业务上下文（M6/M8/M9/M10 保持业务流程模块，不单列 manifest）
+    "M1", "M2", "M3", "M4", "M5",
+    # 12 横向业务能力
     "M-TE", "M-RP", "M-PK", "M-VR", "M-QL", "M-CG", "M-SA",
     "M-RC", "M-DI", "M-BA", "M-PM", "M-TC",
 }
@@ -53,6 +55,7 @@ SLUG_TO_BC = {
     "h1": "H1", "h2": "H2", "h3": "H3", "h4": "H4", "h5": "H5",
     "h6": "H6", "h7": "H7", "h8": "H8", "h9": "H9", "h10": "H10",
     "h-dock": "H-DOCK", "h-al": "H-AL",
+    "m1": "M1", "m2": "M2", "m3": "M3", "m4": "M4", "m5": "M5",
     "m-te": "M-TE", "m-rp": "M-RP", "m-pk": "M-PK", "m-vr": "M-VR",
     "m-ql": "M-QL", "m-cg": "M-CG", "m-sa": "M-SA", "m-rc": "M-RC",
     "m-di": "M-DI", "m-ba": "M-BA", "m-pm": "M-PM", "m-tc": "M-TC",
@@ -215,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         }, ensure_ascii=False, indent=2))
     else:
         print(f"check_bounded_contexts (T1, 文档治理) — "
-              f"{len(BOUNDED_CONTEXTS)} 个 BC / "
+              f"{len(BOUNDED_CONTEXTS)} 个 manifest-bearing BC / "
               f"{found_count} 个已有 manifest")
 
         if errors:

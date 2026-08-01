@@ -1,0 +1,40 @@
+# H-AL 告警引擎 manifest
+# 29 个正式 manifest-bearing BC 清单中的 H-AL。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "H-AL"
+name = "告警引擎"
+slug = "alert-engine"
+version = "v1.0"
+category = "horizontal-capability"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H4","H6"]
+external = []
+
+[wave]
+target = "Wave 2"
+parallel_track = "h_al"
+
+[stories]
+files = ["docs/domain/user-stories-h-alert.md"]
+count = 1
+
+[bounded_context]
+code = "H-AL"
+name = "告警引擎"
+language_model = ["Alert","EscalationRule","Severity"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H4" = "OHS"
+"H6" = "OHS"
+"M5" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]

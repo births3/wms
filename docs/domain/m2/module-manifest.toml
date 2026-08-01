@@ -1,0 +1,45 @@
+# M2 采购入库作业 manifest
+# 29 个正式 manifest-bearing BC 清单中的 M2。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "M2"
+name = "采购入库作业"
+slug = "inbound"
+version = "v1.0"
+category = "business"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3","H6","H8","M1","M-VR","M-TE"]
+external = []
+
+[wave]
+target = "Wave 2"
+parallel_track = "m2"
+
+[stories]
+files = ["docs/domain/user-stories-m2-inbound-asn.md","docs/domain/user-stories-m2-inbound-verify.md"]
+count = 2
+
+[bounded_context]
+code = "M2"
+name = "采购入库作业"
+language_model = ["ASN","ReceivingOrder","Putaway","Acceptance"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H6" = "OHS"
+"H8" = "OHS"
+"M-DI" = "OHS"
+"M-RC" = "OHS"
+"M-TE" = "OHS"
+"M-VR" = "OHS"
+"M1" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]

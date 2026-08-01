@@ -1,0 +1,37 @@
+# H10 数据库备份与恢复 manifest
+# 29 个正式 manifest-bearing BC 清单中的 H10。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "H10"
+name = "数据库备份与恢复"
+slug = "db-backup"
+version = "v1.0"
+category = "horizontal-capability"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2"]
+external = []
+
+[wave]
+target = "Wave 1"
+parallel_track = "h10"
+
+[stories]
+files = ["docs/infra/technical-specs.md"]
+count = 1
+
+[bounded_context]
+code = "H10"
+name = "数据库备份与恢复"
+language_model = ["Backup","Restore","Snapshot"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]

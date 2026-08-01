@@ -1,0 +1,49 @@
+# M3 库存与质量管控 manifest
+# 29 个正式 manifest-bearing BC 清单中的 M3。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "M3"
+name = "库存与质量管控"
+slug = "inventory"
+version = "v1.0"
+category = "business"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3","H6","M1","M-VR","M-TE","M-SA","M-BA"]
+external = []
+
+[wave]
+target = "Wave 2"
+parallel_track = "m3"
+
+[stories]
+files = ["docs/domain/user-stories-m3-inventory-operation.md","docs/domain/user-stories-m3-inventory-query.md"]
+count = 2
+
+[bounded_context]
+code = "M3"
+name = "库存与质量管控"
+language_model = ["Inventory","Batch","Expiry","Stocktake"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H6" = "OHS"
+"M-BA" = "OHS"
+"M-RC" = "OHS"
+"M-RP" = "OHS"
+"M-SA" = "OHS"
+"M-TC" = "OHS"
+"M-TE" = "OHS"
+"M-VR" = "OHS"
+"M1" = "OHS"
+"M4" = "OHS"
+"M5" = "OHS"
+
+[shared_kernel]
+provides = ["BatchNo"]
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode","ProductCode"]

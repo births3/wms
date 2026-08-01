@@ -99,8 +99,21 @@
 - `[fields]`：与字段词典关联的关键 canonical
 
 **实施 Wave**：
-- Wave 0 末期：补 29 个模块的 manifest（每个 ~30 行）+ 写治理脚本
+- Wave 0 末期：按 §1.5 的 29 个 manifest-bearing BC 补齐 manifest（每个约 30 行）+ 写治理脚本
 - Wave 1+：按 manifest 自动加载预置数据 + 启动顺序
+
+### 1.5 当前 manifest-bearing 清单（2026-08-01）
+
+项目主人确认当前执行数量为 29，具体清单固定为：
+
+- 横向能力 12 个：H1-H10、H-DOCK、H-AL；
+- 核心业务上下文 5 个：M1、M2、M3、M4、M5；
+- 横向业务能力 12 个：M-TE、M-RP、M-PK、M-VR、M-QL、M-CG、M-SA、M-RC、M-DI、M-BA、M-PM、M-TC。
+
+M6、M8、M9、M10 继续作为业务流程模块，通过上述上下文协作，不单列 manifest；M7、M11
+保持历史迁移/退出状态。H-INT、H-FILE、H-APV、H-SCH 是契约先行的横向扩展，暂不计入这
+29 个 manifest-bearing BC，仍由各自 ADR 与本表登记；升格时必须同步修订 ADR-0012、治理脚本
+和域图。
 
 ---
 
@@ -432,3 +445,4 @@ docs/architecture-dependencies.md（本文档，依赖唯一真相源）
 | 2026-05-29 | v3.4 | 横向能力 14 → 15：新增 H-APV 审批引擎（契约先行，引擎延后）；登记关联 ADR-0032；复核 27 命中→22 真审批编排模块 |
 | 2026-05-29 | v3.5 | 横向能力 15 → 16：新增 H-SCH 调度引擎（契约先行，引擎延后）；登记关联 ADR-0033；复核 25 命中→14 真定时调度模块；明确不接管 M-TE/H10 |
 | 2026-07-25 | v3.6 | H9 从模板能力扩展为打印组套与 Print Agent 编排；登记 ADR-0039/0040/0041 及 H6、H-FILE、M1、M-CG、M4 依赖 |
+| 2026-08-01 | v3.7 | 固化 29 个 manifest-bearing BC 清单，区分业务流程模块和契约扩展能力，供 KG-01B 域图重建使用 |

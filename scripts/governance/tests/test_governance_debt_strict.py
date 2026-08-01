@@ -15,6 +15,13 @@ def test_bounded_contexts_strict_blocks_missing_manifests(monkeypatch, capsys):
     assert check.main(["--strict", "--json"]) == 1
 
 
+def test_bounded_contexts_current_manifest_scope_is_29():
+    import check_bounded_contexts as check
+
+    assert len(check.BOUNDED_CONTEXTS) == 29
+    assert {"M1", "M2", "M3", "M4", "M5"} <= check.BOUNDED_CONTEXTS
+
+
 def test_multi_end_strict_blocks_unclassified_core_module(monkeypatch, capsys):
     import check_multi_end_consistency as check
 

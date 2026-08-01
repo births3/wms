@@ -1,0 +1,44 @@
+# H8 ERP 防腐层 manifest
+# 29 个正式 manifest-bearing BC 清单中的 H8。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "H8"
+name = "ERP 防腐层"
+slug = "erp-acl"
+version = "v1.0"
+category = "horizontal-capability"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3"]
+external = []
+
+[wave]
+target = "Wave 2"
+parallel_track = "h8"
+
+[stories]
+files = ["docs/domain/user-stories-h8-erp-integration.md"]
+count = 1
+
+[bounded_context]
+code = "H8"
+name = "ERP 防腐层"
+language_model = ["ErpDoc","SyncStatus","Mapping"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"M-DI" = "OHS"
+"M-PM" = "OHS"
+"M-RC" = "OHS"
+"M-TC" = "OHS"
+"M2" = "OHS"
+"M5" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]

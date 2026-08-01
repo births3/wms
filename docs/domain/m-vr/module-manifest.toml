@@ -1,0 +1,45 @@
+# M-VR 校验规则 manifest
+# 29 个正式 manifest-bearing BC 清单中的 M-VR。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "M-VR"
+name = "校验规则"
+slug = "validation-rules"
+version = "v1.0"
+category = "horizontal-business"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3","H6","M1","M2","M3","M4","M5","M-QL"]
+external = []
+
+[wave]
+target = "Wave 1"
+parallel_track = "m_vr"
+
+[stories]
+files = ["docs/domain/user-stories-mvr-validation-rules.md"]
+count = 1
+
+[bounded_context]
+code = "M-VR"
+name = "校验规则"
+language_model = ["ValidationRule","RuleSet","Violation"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H6" = "OHS"
+"M-QL" = "OHS"
+"M1" = "OHS"
+"M2" = "OHS"
+"M3" = "OHS"
+"M4" = "OHS"
+"M5" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]

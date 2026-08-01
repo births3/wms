@@ -11,7 +11,7 @@
 
 软件设计审计 §4 维度 3 识别 DDD 战略层完全空白：
 
-- 模块清单（H1-H10 + H-DOCK + H-AL + 12 M- 横向 + 5 M 业务 = **24 个上下文**）已是事实上的限界上下文
+- 初始模块清单（H1-H10 + H-DOCK + H-AL + 12 M- 横向 + 5 M 业务）已是事实上的限界上下文；历史文本将其误写为 24，实际 manifest 口径在 2026-08-01 修订为 29
 - 但**没有显式声明**：每个 BC 的责任、语言模型、与其他 BC 的集成模式
 - 8 种 DDD 集成模式（Customer-Supplier / Conformist / Anti-Corruption Layer / Open Host Service / Published Language / Shared Kernel / Partnership / Separate Ways）选用哪种没文档化
 
@@ -102,7 +102,7 @@
 | M-PM | 参数对照 | ERP 字段映射 |
 | M-TC | 追溯码 | GS1 + 监管上报 |
 
-**总计 24 个 BC**（10 H + 2 H 新 + 12 M-）。M 业务模块未列入 BC 是因为它们是**业务流程**而非**能力上下文**，由 BC 协作完成。
+**历史决策清单为 24 个 BC**（10 H + 2 H 新 + 12 M-）。M 业务模块未列入该历史清单是因为它们被视为**业务流程**而非**能力上下文**，由 BC 协作完成。2026-08-01 的 manifest 范围修订见下文，作为当前治理执行口径。
 
 ---
 
@@ -256,7 +256,7 @@ consumes = ["OwnerId", "TenantId", "ProductCode", "BatchNo", "OperatorId", "Trac
 
 ## 实施约束
 
-1. 所有 24 个 BC 必须在 Wave 0 末期补 module-manifest.toml 的 [bounded_context] + [integrations] 段
+1. 当前 29 个 manifest-bearing BC 必须补齐 module-manifest.toml 的 [bounded_context] + [integrations] 段；M6/M8/M9/M10 保持业务流程模块定位，不单列 manifest
 2. Shared Kernel 类型集合（9 个）固定，新增需 ADR
 3. 业务 BC 不允许定义与 Shared Kernel 同名的 type
 4. 跨 BC 调用必须经声明的集成模式（治理脚本校验）
@@ -267,13 +267,31 @@ consumes = ["OwnerId", "TenantId", "ProductCode", "BatchNo", "OperatorId", "Trac
 ## 治理脚本
 
 `scripts/governance/check_bounded_contexts.py`（T1 级）：
-- 扫描 24 个 BC 的 module-manifest.toml
+- 扫描当前 29 个 manifest-bearing BC 的 module-manifest.toml
 - 校验每个 BC 必有 [bounded_context] + [integrations] 段
 - 校验集成模式在 8 种白名单内
 - 校验 Shared Kernel 类型在 9 个白名单内
 - 校验跨 BC 依赖图的双向一致性（A 声明依赖 B 时，B 也应承认 A）
 
 ---
+
+### 2026-08-01 范围修订：29 个 manifest-bearing BC
+
+项目主人确认当前治理执行口径为 29 个正式 manifest。该数量不是“目录数量”，而是明确的
+manifest-bearing 边界：
+
+- 12 个横向能力：H1-H10、H-DOCK、H-AL；
+- 5 个核心业务上下文：M1、M2、M3、M4、M5；
+- 12 个横向业务能力：M-TE、M-RP、M-PK、M-VR、M-QL、M-CG、M-SA、M-RC、M-DI、M-BA、M-PM、M-TC。
+
+当前不单列 manifest 的对象必须在依赖或用户故事中作为流程/消费方被引用：
+
+- M6、M8、M9、M10：业务流程模块，由上述能力上下文协作完成；
+- M7、M11：已迁移或退出的历史编号，不生成新的 manifest；
+- H-INT、H-FILE、H-APV、H-SCH：契约先行的横向能力扩展，继续由各自 ADR 和架构依赖表管理，是否升格为 manifest-bearing BC 另行修订本 ADR。
+
+`scripts/governance/check_bounded_contexts.py` 与 `docs/domain/*/module-manifest.toml` 已按此 29 项清单执行；
+任何新增、移除或升格都必须同步修订本节、架构依赖表和治理脚本。
 
 ## 参考
 
@@ -286,3 +304,4 @@ consumes = ["OwnerId", "TenantId", "ProductCode", "BatchNo", "OperatorId", "Trac
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-05-18 | v1 | 初版：24 个 BC 声明 + 8 种集成模式 + Shared Kernel 9 类 + Context Map + 治理脚本约束 |
+| 2026-08-01 | v2 | 项目主人确认 29 个 manifest-bearing BC 的当前执行清单；明确业务流程模块与契约扩展能力的边界 |

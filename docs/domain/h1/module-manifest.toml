@@ -1,0 +1,63 @@
+# H1 权限与多租户 manifest
+# 29 个正式 manifest-bearing BC 清单中的 H1。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "H1"
+name = "权限与多租户"
+slug = "auth-tenant"
+version = "v1.0"
+category = "horizontal-capability"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = []
+external = []
+
+[wave]
+target = "Wave 1"
+parallel_track = "h1"
+
+[stories]
+files = ["docs/domain/user-stories-h1-auth-tenant.md"]
+count = 1
+
+[bounded_context]
+code = "H1"
+name = "权限与多租户"
+language_model = ["User","Role","Permission","Tenant","Owner"]
+
+[integrations]
+"H-AL" = "OHS"
+"H-DOCK" = "OHS"
+"H10" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H4" = "OHS"
+"H5" = "OHS"
+"H6" = "OHS"
+"H7" = "OHS"
+"H8" = "OHS"
+"H9" = "OHS"
+"M-BA" = "OHS"
+"M-CG" = "OHS"
+"M-DI" = "OHS"
+"M-PK" = "OHS"
+"M-PM" = "OHS"
+"M-QL" = "OHS"
+"M-RC" = "OHS"
+"M-RP" = "OHS"
+"M-SA" = "OHS"
+"M-TC" = "OHS"
+"M-TE" = "OHS"
+"M-VR" = "OHS"
+"M1" = "OHS"
+"M2" = "OHS"
+"M3" = "OHS"
+"M4" = "OHS"
+"M5" = "OHS"
+
+[shared_kernel]
+provides = ["OwnerId","TenantId"]
+consumes = ["TraceId","ErrorCode"]

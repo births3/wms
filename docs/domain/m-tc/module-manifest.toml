@@ -1,13 +1,9 @@
-# M-TC 追溯码模块 manifest（示例 / v3.1 引入）
+# M-TC 追溯码模块 manifest
 #
 # 借鉴 Odoo __manifest__.py 模式（参见 docs/adr/0008-borrow-from-odoo.md §4）。
-# 本文件是 wms 模块声明式依赖图的示例样板；正式落地由治理脚本
+# 本文件是 29 个 manifest-bearing BC 之一；正式落地由治理脚本
 # `check_module_dependencies.py`（Wave 0+ 待实现）扫描所有
 # `domain/<module>/module-manifest.toml` 自动构建依赖图。
-#
-# 当前 Wave 0：本文件作为格式参考，未与代码联动。
-# Wave 1+ 实施：每个模块的 domain crate 加同名 manifest，治理脚本校验
-#               依赖图与 docs/architecture-dependencies.md §1 一致。
 
 [module]
 code = "M-TC"
@@ -15,6 +11,7 @@ name = "追溯码模块"
 slug = "traceability-code"
 version = "v3.1"
 category = "horizontal-business"   # business | horizontal-business | horizontal-capability
+owner = "架构/域模型负责人"
 
 [depends]
 # 业务依赖：本模块启用前必须先装这些模块
@@ -75,6 +72,10 @@ M-CG = "OHS"                    # 通过 M-CG 取追溯码序号
 H1 = "OHS"                      # 通过 H1 鉴权
 H2 = "OHS"                      # 通过 H2 审计
 H4 = "OHS"                      # 通过 H4 上报失败时通知
+H3 = "OHS"                      # 通过 H3 发布跨端契约
+H8 = "ACL"                      # 通过 H8 隔离监管/ERP 外部模型
+M3 = "OHS"                      # 读取库存批次与追溯状态
+M-QL = "OHS"                    # 通过质量联系单处理异常/审批
 
 [shared_kernel]
 # 本 BC 不向外提供新的共享类型；消费 ADR-0012 §Shared Kernel 清单 9 类

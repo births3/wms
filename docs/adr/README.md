@@ -23,7 +23,7 @@
 | [ADR-0008](0008-borrow-from-odoo.md) | 借鉴 Odoo 的 9 个设计 | Accepted | mail.thread/stock.move/ir.sequence/manifest/GS1 + ir.rule/access.csv/TransientModel/state button；分散到 Wave 0-4 落地，约 2.5 个月增量 |
 | [ADR-0010](0010-error-codes.md) | 错误码体系与字典 | Accepted | 三段式 `<MODULE>_<CATEGORY>_<DETAIL>` + 4 级严重度 + 50 错误码字典 + check_error_codes.py 治理 |
 | [ADR-0011](0011-observability.md) | 可观测性方案 | Accepted | OpenTelemetry + Prometheus + Loki + Grafana 四件套 + KPI 命名约定 + SLO 告警 + check_observability.py 治理 |
-| [ADR-0012](0012-bounded-contexts.md) | 限界上下文与 Context Map | Accepted | 24 个 BC 显式声明 + 8 种 DDD 集成模式 + 9 类 Shared Kernel + check_bounded_contexts.py 治理 |
+| [ADR-0012](0012-bounded-contexts.md) | 限界上下文与 Context Map | Accepted | 历史 24 个 BC；当前 29 个 manifest-bearing BC + 8 种 DDD 集成模式 + 9 类 Shared Kernel + check_bounded_contexts.py 治理 |
 | [ADR-0013](0013-config-secrets.md) | 配置与 secrets 管理 | Accepted | 三层配置（编译/环境/运行时）+ Vault/k8s Secret + 90 天密钥轮换 + check_secrets.py 治理 |
 | [ADR-0014](0014-data-migration.md) | 数据迁移策略（legacy → wms）| Accepted | Debezium CDC + 双写 + 货主级灰度 + 4 维校验 + 30 分钟回滚 RTO |
 | [ADR-0015](0015-multi-end-rules.md) | 多端业务规则放置 | Accepted | A/B/C 三级规则分类 + OpenAPI schema 单一事实之源 + PDA 离线扩展 + check_multi_end_consistency.py 治理 |

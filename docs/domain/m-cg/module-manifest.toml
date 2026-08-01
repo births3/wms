@@ -1,0 +1,42 @@
+# M-CG 编码生成 manifest
+# 29 个正式 manifest-bearing BC 清单中的 M-CG。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "M-CG"
+name = "编码生成"
+slug = "code-generator"
+version = "v1.0"
+category = "horizontal-business"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3","H6","M1"]
+external = []
+
+[wave]
+target = "Wave 1"
+parallel_track = "m_cg"
+
+[stories]
+files = ["docs/domain/user-stories-mcg-code-generator.md"]
+count = 1
+
+[bounded_context]
+code = "M-CG"
+name = "编码生成"
+language_model = ["NumberRule","Sequence","DocumentNumber"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H6" = "OHS"
+"H9" = "OHS"
+"M-TC" = "OHS"
+"M1" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]
