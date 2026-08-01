@@ -4,7 +4,7 @@ use axum::{
     body::{to_bytes, Body},
     http::{header::AUTHORIZATION, Request, StatusCode},
 };
-use chrono::{TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -68,6 +68,15 @@ fn ctx(owner_id: Uuid) -> AuthContext {
     }
 }
 
+fn test_time(day_offset: i64, hour: u32) -> chrono::DateTime<Utc> {
+    let date = Utc::now().date_naive() + Duration::days(day_offset);
+    Utc.from_utc_datetime(
+        &date
+            .and_hms_opt(hour, 0, 0)
+            .expect("test hour should be valid"),
+    )
+}
+
 async fn seed_owner(pool: &PgPool, owner_id: Uuid, owner_code: &str) {
     sqlx::query(
         r#"
@@ -103,11 +112,7 @@ async fn seed_daily_rule(pool: &PgPool, owner_id: Uuid, document_type: &str, wid
     .bind(owner_id)
     .bind(document_type)
     .bind(width)
-    .bind(
-        Utc.with_ymd_and_hms(2026, 7, 1, 0, 0, 0)
-            .single()
-            .expect("valid time"),
-    )
+    .bind(test_time(0, 0))
     .bind(rule_code)
     .execute(pool)
     .await
@@ -149,11 +154,7 @@ fn rule_request(width: i32) -> UpsertDocumentNumberRuleRequest {
         reset_policy: "daily".to_string(),
         sequence_width: width,
         enabled: true,
-        effective_from: Some(
-            Utc.with_ymd_and_hms(2026, 7, 1, 0, 0, 0)
-                .single()
-                .expect("valid time"),
-        ),
+        effective_from: Some(test_time(0, 0)),
         effective_to: None,
     }
 }
@@ -179,10 +180,7 @@ async fn document_number_rule_management_is_owner_scoped_idempotent_and_audited(
     seed_owner(&pool, other_owner_id, "HZ006").await;
     let service = PgDocumentNumberingService::new();
     let auth = ctx(owner_id);
-    let now = Utc
-        .with_ymd_and_hms(2026, 7, 2, 9, 0, 0)
-        .single()
-        .expect("valid time");
+    let now = test_time(0, 9);
 
     let created = service
         .upsert_rule(
@@ -295,7 +293,7 @@ async fn document_number_rule_management_is_owner_scoped_idempotent_and_audited(
         .expect("number should generate with public-managed rule");
     assert_eq!(
         generated.value.generated_no,
-        "HZ005-purchase_inbound-260702-000001"
+        format!("HZ005-purchase_inbound-{}-000001", now.format("%y%m%d"))
     );
 
     let audit_count: i64 = sqlx::query_scalar(
@@ -318,10 +316,7 @@ async fn no_gap_generation_is_sequential_under_concurrency(pool: PgPool) {
     seed_owner(&pool, owner_id, "HZ001").await;
     seed_daily_rule(&pool, owner_id, DOCUMENT_TYPE_PURCHASE_INBOUND, 5).await;
     let service = PgDocumentNumberingService::new();
-    let now = Utc
-        .with_ymd_and_hms(2026, 7, 1, 10, 0, 0)
-        .single()
-        .expect("valid time");
+    let now = test_time(0, 10);
 
     let first_ctx = ctx(owner_id);
     let second_ctx = ctx(owner_id);
@@ -344,8 +339,8 @@ async fn no_gap_generation_is_sequential_under_concurrency(pool: PgPool) {
     assert_eq!(
         generated,
         vec![
-            "HZ001-purchase_inbound-20260701-00001",
-            "HZ001-purchase_inbound-20260701-00002",
+            format!("HZ001-purchase_inbound-{}-00001", now.format("%Y%m%d")),
+            format!("HZ001-purchase_inbound-{}-00002", now.format("%Y%m%d")),
         ]
     );
 }
@@ -356,10 +351,7 @@ async fn same_idempotency_key_replays_first_generated_number(pool: PgPool) {
     seed_owner(&pool, owner_id, "HZ002").await;
     seed_daily_rule(&pool, owner_id, DOCUMENT_TYPE_PURCHASE_INBOUND, 4).await;
     let service = PgDocumentNumberingService::new();
-    let now = Utc
-        .with_ymd_and_hms(2026, 7, 1, 11, 0, 0)
-        .single()
-        .expect("valid time");
+    let now = test_time(0, 11);
     let req = request("mcg-idem-1");
 
     let first = generate_and_commit(&pool, &service, &ctx(owner_id), req.clone(), now)
@@ -378,7 +370,7 @@ async fn same_idempotency_key_replays_first_generated_number(pool: PgPool) {
 
     assert_eq!(
         first.value.generated_no,
-        "HZ002-purchase_inbound-20260701-0001"
+        format!("HZ002-purchase_inbound-{}-0001", now.format("%Y%m%d"))
     );
     assert_eq!(replay.value.generated_no, first.value.generated_no);
     assert!(replay.replayed);
@@ -391,10 +383,7 @@ async fn transaction_rollback_does_not_advance_no_gap_counter(pool: PgPool) {
     seed_owner(&pool, owner_id, "HZ003").await;
     seed_daily_rule(&pool, owner_id, DOCUMENT_TYPE_PURCHASE_INBOUND, 3).await;
     let service = PgDocumentNumberingService::new();
-    let now = Utc
-        .with_ymd_and_hms(2026, 7, 1, 12, 0, 0)
-        .single()
-        .expect("valid time");
+    let now = test_time(0, 12);
 
     let mut tx = pool.begin().await.expect("transaction should begin");
     let generated_in_tx = service
@@ -403,7 +392,7 @@ async fn transaction_rollback_does_not_advance_no_gap_counter(pool: PgPool) {
         .expect("number should generate inside caller transaction");
     assert_eq!(
         generated_in_tx.value.generated_no,
-        "HZ003-purchase_inbound-20260701-001"
+        format!("HZ003-purchase_inbound-{}-001", now.format("%Y%m%d"))
     );
     tx.rollback().await.expect("rollback should succeed");
 
@@ -419,7 +408,7 @@ async fn transaction_rollback_does_not_advance_no_gap_counter(pool: PgPool) {
 
     assert_eq!(
         committed.value.generated_no,
-        "HZ003-purchase_inbound-20260701-001"
+        format!("HZ003-purchase_inbound-{}-001", now.format("%Y%m%d"))
     );
 }
 
@@ -428,10 +417,7 @@ async fn missing_document_number_rule_returns_rule_not_found(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     seed_owner(&pool, owner_id, "HZ004").await;
     let service = PgDocumentNumberingService::new();
-    let now = Utc
-        .with_ymd_and_hms(2026, 7, 1, 13, 0, 0)
-        .single()
-        .expect("valid time");
+    let now = test_time(0, 13);
 
     let error = generate_and_commit(
         &pool,
@@ -456,29 +442,17 @@ async fn allocation_list_route_filters_by_owner_document_type_date_and_limit(poo
     seed_daily_rule(&pool, owner_id, DOCUMENT_TYPE_SALES_RETURN, 4).await;
     seed_daily_rule(&pool, other_owner_id, DOCUMENT_TYPE_PURCHASE_INBOUND, 4).await;
     let service = PgDocumentNumberingService::new();
-    let july_first = Utc
-        .with_ymd_and_hms(2026, 7, 1, 9, 0, 0)
-        .single()
-        .expect("valid time");
-    let july_second_purchase = Utc
-        .with_ymd_and_hms(2026, 7, 2, 9, 0, 0)
-        .single()
-        .expect("valid time");
-    let july_second_sales_return = Utc
-        .with_ymd_and_hms(2026, 7, 2, 10, 0, 0)
-        .single()
-        .expect("valid time");
-    let other_owner_later = Utc
-        .with_ymd_and_hms(2026, 7, 2, 11, 0, 0)
-        .single()
-        .expect("valid time");
+    let today = test_time(0, 9);
+    let tomorrow = test_time(1, 9);
+    let tomorrow_sales_return = test_time(1, 10);
+    let other_owner_later = test_time(1, 11);
 
     generate_and_commit(
         &pool,
         &service,
         &ctx(owner_id),
         request_for(DOCUMENT_TYPE_PURCHASE_INBOUND, "mcg-list-old"),
-        july_first,
+        today,
     )
     .await
     .expect("old owner number should generate");
@@ -487,7 +461,7 @@ async fn allocation_list_route_filters_by_owner_document_type_date_and_limit(poo
         &service,
         &ctx(owner_id),
         request_for(DOCUMENT_TYPE_PURCHASE_INBOUND, "mcg-list-match"),
-        july_second_purchase,
+        tomorrow,
     )
     .await
     .expect("matching owner number should generate");
@@ -496,7 +470,7 @@ async fn allocation_list_route_filters_by_owner_document_type_date_and_limit(poo
         &service,
         &ctx(owner_id),
         request_for(DOCUMENT_TYPE_SALES_RETURN, "mcg-list-other-type"),
-        july_second_sales_return,
+        tomorrow_sales_return,
     )
     .await
     .expect("other document type should generate");
@@ -517,7 +491,11 @@ async fn allocation_list_route_filters_by_owner_document_type_date_and_limit(poo
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/api/v1/code-generator/document-number-allocations?document_type=purchase_inbound&from=2026-07-02T00:00:00Z&to=2026-07-02T23:59:59Z&limit=1")
+                .uri(format!(
+                    "/api/v1/code-generator/document-number-allocations?document_type=purchase_inbound&from={}T00:00:00Z&to={}T23:59:59Z&limit=1",
+                    tomorrow.format("%Y-%m-%d"),
+                    tomorrow.format("%Y-%m-%d")
+                ))
                 .header(AUTHORIZATION, format!("Bearer {token}"))
                 .body(Body::empty())
                 .expect("request should build"),
@@ -541,7 +519,7 @@ async fn allocation_list_route_filters_by_owner_document_type_date_and_limit(poo
     );
     assert_eq!(
         payload.data[0].generated_no,
-        "HZ005-purchase_inbound-20260702-0001"
+        format!("HZ005-purchase_inbound-{}-0001", tomorrow.format("%Y%m%d"))
     );
 }
 
