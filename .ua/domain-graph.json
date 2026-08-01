@@ -1,0 +1,2845 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "wms",
+    "languages": [
+      "Rust",
+      "TypeScript",
+      "JavaScript",
+      "SQL",
+      "Python",
+      "TOML",
+      "Markdown",
+      "Shell"
+    ],
+    "frameworks": [
+      "Axum",
+      "SQLx",
+      "PostgreSQL",
+      "React",
+      "Vite",
+      "React Native",
+      "TanStack Query"
+    ],
+    "description": "面向医药冷链与多货主场景的 GSP 合规企业级仓储管理系统，按 29 个 manifest-bearing 限界上下文编排仓储作业、质量追溯和横向治理能力。",
+    "analyzedAt": "2026-08-01T14:22:06.000Z",
+    "gitCommitHash": "e36a3b251997e8d686a73201c4b5d8896b0781b2"
+  },
+  "nodes": [
+    {
+      "id": "domain:identity-master-data",
+      "type": "domain",
+      "name": "身份权限与主数据",
+      "summary": "管理租户、用户、角色、菜单权限以及商品、客商、仓库和受控字典，为所有仓储流程提供可信主体与基础档案。该域同时约束货主隔离、权限发布和主数据变更边界。",
+      "tags": [
+        "h1",
+        "h3",
+        "identity",
+        "master-data",
+        "tenant"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "租户",
+          "用户",
+          "角色",
+          "菜单",
+          "商品",
+          "客商",
+          "仓库",
+          "系统字典"
+        ],
+        "businessRules": [
+          "所有业务访问受租户与货主作用域约束",
+          "菜单和权限变更采用草稿发布与版本控制",
+          "受控字典和主数据不得以自由文本绕过"
+        ],
+        "crossDomainInteractions": [
+          "向入库、库存和出库提供主体、货主、仓库及商品档案",
+          "向审计治理域提供权限与配置变更事件",
+          "H1 提供租户/货主权限，H3 发布主数据契约"
+        ]
+      }
+    },
+    {
+      "id": "domain:inbound-quality",
+      "type": "domain",
+      "name": "入库与质量验收",
+      "summary": "承接到货、收货、验收、批次控制、上架和药检文档处理，确保药品进入可用库存前满足质量要求。药检文档还可受控复制并交付客户门户。",
+      "tags": [
+        "inbound",
+        "quality",
+        "drug-inspection"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "到货通知",
+          "收货单",
+          "验收记录",
+          "批次",
+          "上架任务",
+          "药检报告",
+          "印章",
+          "客户副本"
+        ],
+        "businessRules": [
+          "验收、批次与上架按货主和仓库隔离",
+          "药检报告复核和盖章必须留痕",
+          "客户副本只交付已通过规则校验的文件"
+        ],
+        "crossDomainInteractions": [
+          "消费主数据域的商品、供应商和仓库档案",
+          "验收与上架结果进入库存质量域",
+          "药检交付事件进入集成与审计域"
+        ]
+      }
+    },
+    {
+      "id": "domain:inventory-cold-chain",
+      "type": "domain",
+      "name": "库存、批次与冷链质量",
+      "summary": "管理库存可用性、批次效期、召回、状态配置和冷链设备数据，维持药品在库期间的质量状态。所有查询与变更均受货主、仓库和审计边界约束。",
+      "tags": [
+        "inventory",
+        "batch",
+        "cold-chain"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "库存余额",
+          "库存状态",
+          "批次",
+          "效期任务",
+          "召回",
+          "温度记录",
+          "冷链设备"
+        ],
+        "businessRules": [
+          "不合格或锁定库存不得参与可用量",
+          "效期与召回动作必须可追溯",
+          "冷链异常和设备操作写入审计"
+        ],
+        "crossDomainInteractions": [
+          "接收入库域的验收上架结果",
+          "向出库域提供可用批次和质量状态",
+          "向审计治理域发布效期、召回和温控事件"
+        ]
+      }
+    },
+    {
+      "id": "domain:outbound-fulfillment",
+      "type": "domain",
+      "name": "出库与履约",
+      "summary": "从出库订单、波次和拣货开始，完成复核、包装、发运以及采购退货等逆向流程。流程使用可用库存并把交付结果发送给打印和外部集成。",
+      "tags": [
+        "outbound",
+        "fulfillment",
+        "returns"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "出库订单",
+          "波次",
+          "拣货任务",
+          "复核记录",
+          "包装任务",
+          "发运",
+          "采购退货"
+        ],
+        "businessRules": [
+          "出库动作必须遵循状态机和库存质量状态",
+          "复核与发运动作要求幂等和审计",
+          "退货按原单据和货主作用域处理"
+        ],
+        "crossDomainInteractions": [
+          "消费库存域的可用批次",
+          "调用集成域完成打印、快递与 ERP 回传",
+          "向审计治理域写入状态变更"
+        ]
+      }
+    },
+    {
+      "id": "domain:integration-print-transport",
+      "type": "domain",
+      "name": "集成、打印与运输协同",
+      "summary": "管理 ERP 连接器、打印模板与随货同行单、渲染服务、快递、TMS 路线和通知渠道，使仓储结果可靠地传递到外部系统与现场设备。",
+      "tags": [
+        "integration",
+        "printing",
+        "transport"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "ERP 连接器",
+          "打印模板",
+          "打印组套",
+          "随货同行单",
+          "渲染任务",
+          "运单",
+          "TMS 路线",
+          "通知记录"
+        ],
+        "businessRules": [
+          "外部写入必须幂等并保留原始状态",
+          "打印模板和设备使用受控版本",
+          "外部失败可重试且必须可审计"
+        ],
+        "crossDomainInteractions": [
+          "消费出库域的订单和发运结果",
+          "向入库域提供 ERP 单据",
+          "将集成和设备事件交给审计治理域"
+        ]
+      }
+    },
+    {
+      "id": "domain:audit-rules-operations",
+      "type": "domain",
+      "name": "审计、规则与运营治理",
+      "summary": "以 append-only 审计、配置中心、状态机、任务引擎、对账和计费能力约束跨模块变更，支持运营追溯与异常闭环。该域是所有核心作业的横向控制面。",
+      "tags": [
+        "audit",
+        "h2",
+        "h3",
+        "horizontal",
+        "operations",
+        "rules"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "审计日志",
+          "审计封存",
+          "配置项",
+          "状态机",
+          "仓库任务",
+          "对账批次",
+          "差异",
+          "计费规则"
+        ],
+        "businessRules": [
+          "审计事实只追加不可修改或删除",
+          "配置和状态迁移必须受控且可追溯",
+          "对账与计费写入使用幂等事务"
+        ],
+        "crossDomainInteractions": [
+          "接收其他业务域的状态和集成事件",
+          "向作业域提供规则、任务和配置",
+          "向运营与合规人员提供查询和导出",
+          "H2 提供 append-only 审计与事件，H3 提供跨端契约，H6 约束状态迁移"
+        ]
+      }
+    },
+    {
+      "id": "flow:auth-tenant",
+      "type": "flow",
+      "name": "H1 权限与多租户",
+      "summary": "H1 权限与多租户 以 User, Role, Permission, Tenant, Owner 为核心语言模型，落实 docs/domain/h1/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "auth-tenant",
+        "h1",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h1/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:auth-tenant:step-1",
+      "type": "step",
+      "name": "确认 User 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 User, Role, Permission, Tenant, Owner 的责任边界。",
+      "tags": [
+        "auth-tenant",
+        "h1",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h1/module-manifest.toml"
+    },
+    {
+      "id": "step:auth-tenant:step-2",
+      "type": "step",
+      "name": "执行 权限与多租户 核心职责",
+      "summary": "围绕 权限与多租户 处理 User, Role, Permission, Tenant, Owner，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "auth-tenant",
+        "h1",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h1/module-manifest.toml"
+    },
+    {
+      "id": "step:auth-tenant:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "auth-tenant",
+        "h1",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h1/module-manifest.toml"
+    },
+    {
+      "id": "flow:audit-trail",
+      "type": "flow",
+      "name": "H2 审计与事件总线",
+      "summary": "H2 审计与事件总线 以 AuditEntry, Event, Subscription, DLQ 为核心语言模型，落实 docs/domain/h2/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "audit-trail",
+        "h2",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h2/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:audit-trail:step-1",
+      "type": "step",
+      "name": "确认 AuditEntry 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 AuditEntry, Event, Subscription, DLQ 的责任边界。",
+      "tags": [
+        "audit-trail",
+        "h2",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h2/module-manifest.toml"
+    },
+    {
+      "id": "step:audit-trail:step-2",
+      "type": "step",
+      "name": "执行 审计与事件总线 核心职责",
+      "summary": "围绕 审计与事件总线 处理 AuditEntry, Event, Subscription, DLQ，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "audit-trail",
+        "h2",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h2/module-manifest.toml"
+    },
+    {
+      "id": "step:audit-trail:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "audit-trail",
+        "h2",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h2/module-manifest.toml"
+    },
+    {
+      "id": "flow:contract",
+      "type": "flow",
+      "name": "H3 跨端契约",
+      "summary": "H3 跨端契约 以 Schema, Endpoint, Version 为核心语言模型，落实 docs/domain/h3/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "contract",
+        "h3",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h3/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:contract:step-1",
+      "type": "step",
+      "name": "确认 Schema 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Schema, Endpoint, Version 的责任边界。",
+      "tags": [
+        "contract",
+        "h3",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h3/module-manifest.toml"
+    },
+    {
+      "id": "step:contract:step-2",
+      "type": "step",
+      "name": "执行 跨端契约 核心职责",
+      "summary": "围绕 跨端契约 处理 Schema, Endpoint, Version，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "contract",
+        "h3",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h3/module-manifest.toml"
+    },
+    {
+      "id": "step:contract:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "contract",
+        "h3",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h3/module-manifest.toml"
+    },
+    {
+      "id": "flow:wechat-notify",
+      "type": "flow",
+      "name": "H4 企业微信通知与审批通道",
+      "summary": "H4 企业微信通知与审批通道 以 Notification, Channel, Template 为核心语言模型，落实 docs/domain/h4/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "wechat-notify",
+        "h4",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h4/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:wechat-notify:step-1",
+      "type": "step",
+      "name": "确认 Notification 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Notification, Channel, Template 的责任边界。",
+      "tags": [
+        "wechat-notify",
+        "h4",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h4/module-manifest.toml"
+    },
+    {
+      "id": "step:wechat-notify:step-2",
+      "type": "step",
+      "name": "执行 企业微信通知与审批通道 核心职责",
+      "summary": "围绕 企业微信通知与审批通道 处理 Notification, Channel, Template，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "wechat-notify",
+        "h4",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h4/module-manifest.toml"
+    },
+    {
+      "id": "step:wechat-notify:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "wechat-notify",
+        "h4",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h4/module-manifest.toml"
+    },
+    {
+      "id": "flow:express",
+      "type": "flow",
+      "name": "H5 快递面单与运单",
+      "summary": "H5 快递面单与运单 以 Carrier, Waybill, DeliveryRoute 为核心语言模型，落实 docs/domain/h5/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "express",
+        "h5",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h5/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:express:step-1",
+      "type": "step",
+      "name": "确认 Carrier 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Carrier, Waybill, DeliveryRoute 的责任边界。",
+      "tags": [
+        "express",
+        "h5",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h5/module-manifest.toml"
+    },
+    {
+      "id": "step:express:step-2",
+      "type": "step",
+      "name": "执行 快递面单与运单 核心职责",
+      "summary": "围绕 快递面单与运单 处理 Carrier, Waybill, DeliveryRoute，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "express",
+        "h5",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h5/module-manifest.toml"
+    },
+    {
+      "id": "step:express:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "express",
+        "h5",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h5/module-manifest.toml"
+    },
+    {
+      "id": "flow:state-machine",
+      "type": "flow",
+      "name": "H6 状态机引擎",
+      "summary": "H6 状态机引擎 以 State, Transition, Trigger 为核心语言模型，落实 docs/domain/h6/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "state-machine",
+        "h6",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h6/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:state-machine:step-1",
+      "type": "step",
+      "name": "确认 State 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 State, Transition, Trigger 的责任边界。",
+      "tags": [
+        "state-machine",
+        "h6",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h6/module-manifest.toml"
+    },
+    {
+      "id": "step:state-machine:step-2",
+      "type": "step",
+      "name": "执行 状态机引擎 核心职责",
+      "summary": "围绕 状态机引擎 处理 State, Transition, Trigger，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "state-machine",
+        "h6",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h6/module-manifest.toml"
+    },
+    {
+      "id": "step:state-machine:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "state-machine",
+        "h6",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h6/module-manifest.toml"
+    },
+    {
+      "id": "flow:import-export",
+      "type": "flow",
+      "name": "H7 导入导出引擎",
+      "summary": "H7 导入导出引擎 以 ImportTask, ExportTask, Mapping 为核心语言模型，落实 docs/domain/h7/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "import-export",
+        "h7",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h7/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:import-export:step-1",
+      "type": "step",
+      "name": "确认 ImportTask 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 ImportTask, ExportTask, Mapping 的责任边界。",
+      "tags": [
+        "import-export",
+        "h7",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h7/module-manifest.toml"
+    },
+    {
+      "id": "step:import-export:step-2",
+      "type": "step",
+      "name": "执行 导入导出引擎 核心职责",
+      "summary": "围绕 导入导出引擎 处理 ImportTask, ExportTask, Mapping，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "import-export",
+        "h7",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h7/module-manifest.toml"
+    },
+    {
+      "id": "step:import-export:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "import-export",
+        "h7",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h7/module-manifest.toml"
+    },
+    {
+      "id": "flow:erp-acl",
+      "type": "flow",
+      "name": "H8 ERP 防腐层",
+      "summary": "H8 ERP 防腐层 以 ErpDoc, SyncStatus, Mapping 为核心语言模型，落实 docs/domain/h8/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "erp-acl",
+        "h8",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h8/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:erp-acl:step-1",
+      "type": "step",
+      "name": "确认 ErpDoc 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 ErpDoc, SyncStatus, Mapping 的责任边界。",
+      "tags": [
+        "erp-acl",
+        "h8",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h8/module-manifest.toml"
+    },
+    {
+      "id": "step:erp-acl:step-2",
+      "type": "step",
+      "name": "执行 ERP 防腐层 核心职责",
+      "summary": "围绕 ERP 防腐层 处理 ErpDoc, SyncStatus, Mapping，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "erp-acl",
+        "h8",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h8/module-manifest.toml"
+    },
+    {
+      "id": "step:erp-acl:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "erp-acl",
+        "h8",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h8/module-manifest.toml"
+    },
+    {
+      "id": "flow:print-template",
+      "type": "flow",
+      "name": "H9 打印模板与组套编排",
+      "summary": "H9 打印模板与组套编排 以 Template, PrintJob, RetryQueue, PrintAgent 为核心语言模型，落实 docs/domain/h9/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "print-template",
+        "h9",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h9/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:print-template:step-1",
+      "type": "step",
+      "name": "确认 Template 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Template, PrintJob, RetryQueue, PrintAgent 的责任边界。",
+      "tags": [
+        "print-template",
+        "h9",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h9/module-manifest.toml"
+    },
+    {
+      "id": "step:print-template:step-2",
+      "type": "step",
+      "name": "执行 打印模板与组套编排 核心职责",
+      "summary": "围绕 打印模板与组套编排 处理 Template, PrintJob, RetryQueue, PrintAgent，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "print-template",
+        "h9",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h9/module-manifest.toml"
+    },
+    {
+      "id": "step:print-template:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "print-template",
+        "h9",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h9/module-manifest.toml"
+    },
+    {
+      "id": "flow:db-backup",
+      "type": "flow",
+      "name": "H10 数据库备份与恢复",
+      "summary": "H10 数据库备份与恢复 以 Backup, Restore, Snapshot 为核心语言模型，落实 docs/domain/h10/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "db-backup",
+        "h10",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h10/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:db-backup:step-1",
+      "type": "step",
+      "name": "确认 Backup 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Backup, Restore, Snapshot 的责任边界。",
+      "tags": [
+        "db-backup",
+        "h10",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h10/module-manifest.toml"
+    },
+    {
+      "id": "step:db-backup:step-2",
+      "type": "step",
+      "name": "执行 数据库备份与恢复 核心职责",
+      "summary": "围绕 数据库备份与恢复 处理 Backup, Restore, Snapshot，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "db-backup",
+        "h10",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h10/module-manifest.toml"
+    },
+    {
+      "id": "step:db-backup:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "db-backup",
+        "h10",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h10/module-manifest.toml"
+    },
+    {
+      "id": "flow:dock-management",
+      "type": "flow",
+      "name": "H-DOCK 月台预约管理",
+      "summary": "H-DOCK 月台预约管理 以 Dock, Appointment, TimeWindow 为核心语言模型，落实 docs/domain/h-dock/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "dock-management",
+        "h-dock",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h-dock/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:dock-management:step-1",
+      "type": "step",
+      "name": "确认 Dock 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Dock, Appointment, TimeWindow 的责任边界。",
+      "tags": [
+        "dock-management",
+        "h-dock",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h-dock/module-manifest.toml"
+    },
+    {
+      "id": "step:dock-management:step-2",
+      "type": "step",
+      "name": "执行 月台预约管理 核心职责",
+      "summary": "围绕 月台预约管理 处理 Dock, Appointment, TimeWindow，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "dock-management",
+        "h-dock",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h-dock/module-manifest.toml"
+    },
+    {
+      "id": "step:dock-management:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "dock-management",
+        "h-dock",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h-dock/module-manifest.toml"
+    },
+    {
+      "id": "flow:alert-engine",
+      "type": "flow",
+      "name": "H-AL 告警引擎",
+      "summary": "H-AL 告警引擎 以 Alert, EscalationRule, Severity 为核心语言模型，落实 docs/domain/h-al/module-manifest.toml 声明的限界上下文责任。该 horizontal-capability BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "alert-engine",
+        "h-al",
+        "horizontal-capability",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/h-al/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:alert-engine:step-1",
+      "type": "step",
+      "name": "确认 Alert 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Alert, EscalationRule, Severity 的责任边界。",
+      "tags": [
+        "alert-engine",
+        "h-al",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h-al/module-manifest.toml"
+    },
+    {
+      "id": "step:alert-engine:step-2",
+      "type": "step",
+      "name": "执行 告警引擎 核心职责",
+      "summary": "围绕 告警引擎 处理 Alert, EscalationRule, Severity，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "alert-engine",
+        "h-al",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/h-al/module-manifest.toml"
+    },
+    {
+      "id": "step:alert-engine:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "alert-engine",
+        "h-al",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/h-al/module-manifest.toml"
+    },
+    {
+      "id": "flow:master-data",
+      "type": "flow",
+      "name": "M1 基础信息与资质档案",
+      "summary": "M1 基础信息与资质档案 以 Product, Warehouse, Location, Qualification 为核心语言模型，落实 docs/domain/m1/module-manifest.toml 声明的限界上下文责任。该 business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "master-data",
+        "m1",
+        "business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m1/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:master-data:step-1",
+      "type": "step",
+      "name": "确认 Product 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Product, Warehouse, Location, Qualification 的责任边界。",
+      "tags": [
+        "master-data",
+        "m1",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m1/module-manifest.toml"
+    },
+    {
+      "id": "step:master-data:step-2",
+      "type": "step",
+      "name": "执行 基础信息与资质档案 核心职责",
+      "summary": "围绕 基础信息与资质档案 处理 Product, Warehouse, Location, Qualification，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "master-data",
+        "m1",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m1/module-manifest.toml"
+    },
+    {
+      "id": "step:master-data:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "master-data",
+        "m1",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m1/module-manifest.toml"
+    },
+    {
+      "id": "flow:inbound",
+      "type": "flow",
+      "name": "M2 采购入库作业",
+      "summary": "M2 采购入库作业 以 ASN, ReceivingOrder, Putaway, Acceptance 为核心语言模型，落实 docs/domain/m2/module-manifest.toml 声明的限界上下文责任。该 business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "inbound",
+        "m2",
+        "business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m2/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:inbound:step-1",
+      "type": "step",
+      "name": "确认 ASN 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 ASN, ReceivingOrder, Putaway, Acceptance 的责任边界。",
+      "tags": [
+        "inbound",
+        "m2",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m2/module-manifest.toml"
+    },
+    {
+      "id": "step:inbound:step-2",
+      "type": "step",
+      "name": "执行 采购入库作业 核心职责",
+      "summary": "围绕 采购入库作业 处理 ASN, ReceivingOrder, Putaway, Acceptance，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "inbound",
+        "m2",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m2/module-manifest.toml"
+    },
+    {
+      "id": "step:inbound:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "inbound",
+        "m2",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m2/module-manifest.toml"
+    },
+    {
+      "id": "flow:inventory",
+      "type": "flow",
+      "name": "M3 库存与质量管控",
+      "summary": "M3 库存与质量管控 以 Inventory, Batch, Expiry, Stocktake 为核心语言模型，落实 docs/domain/m3/module-manifest.toml 声明的限界上下文责任。该 business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "inventory",
+        "m3",
+        "business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m3/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:inventory:step-1",
+      "type": "step",
+      "name": "确认 Inventory 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 Inventory, Batch, Expiry, Stocktake 的责任边界。",
+      "tags": [
+        "inventory",
+        "m3",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m3/module-manifest.toml"
+    },
+    {
+      "id": "step:inventory:step-2",
+      "type": "step",
+      "name": "执行 库存与质量管控 核心职责",
+      "summary": "围绕 库存与质量管控 处理 Inventory, Batch, Expiry, Stocktake，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "inventory",
+        "m3",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m3/module-manifest.toml"
+    },
+    {
+      "id": "step:inventory:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "inventory",
+        "m3",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m3/module-manifest.toml"
+    },
+    {
+      "id": "flow:outbound",
+      "type": "flow",
+      "name": "M4 销售出库作业",
+      "summary": "M4 销售出库作业 以 OutboundOrder, Wave, Pick, Review, Shipment 为核心语言模型，落实 docs/domain/m4/module-manifest.toml 声明的限界上下文责任。该 business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "outbound",
+        "m4",
+        "business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m4/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:outbound:step-1",
+      "type": "step",
+      "name": "确认 OutboundOrder 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 OutboundOrder, Wave, Pick, Review, Shipment 的责任边界。",
+      "tags": [
+        "outbound",
+        "m4",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m4/module-manifest.toml"
+    },
+    {
+      "id": "step:outbound:step-2",
+      "type": "step",
+      "name": "执行 销售出库作业 核心职责",
+      "summary": "围绕 销售出库作业 处理 OutboundOrder, Wave, Pick, Review, Shipment，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "outbound",
+        "m4",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m4/module-manifest.toml"
+    },
+    {
+      "id": "step:outbound:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "outbound",
+        "m4",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m4/module-manifest.toml"
+    },
+    {
+      "id": "flow:cold-chain",
+      "type": "flow",
+      "name": "M5 冷链数据集成",
+      "summary": "M5 冷链数据集成 以 TemperatureEvent, ColdChainDevice, Excursion 为核心语言模型，落实 docs/domain/m5/module-manifest.toml 声明的限界上下文责任。该 business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "cold-chain",
+        "m5",
+        "business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m5/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:cold-chain:step-1",
+      "type": "step",
+      "name": "确认 TemperatureEvent 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 TemperatureEvent, ColdChainDevice, Excursion 的责任边界。",
+      "tags": [
+        "cold-chain",
+        "m5",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m5/module-manifest.toml"
+    },
+    {
+      "id": "step:cold-chain:step-2",
+      "type": "step",
+      "name": "执行 冷链数据集成 核心职责",
+      "summary": "围绕 冷链数据集成 处理 TemperatureEvent, ColdChainDevice, Excursion，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "cold-chain",
+        "m5",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m5/module-manifest.toml"
+    },
+    {
+      "id": "step:cold-chain:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "cold-chain",
+        "m5",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m5/module-manifest.toml"
+    },
+    {
+      "id": "flow:batch-adjustment",
+      "type": "flow",
+      "name": "M-BA 批号调整",
+      "summary": "M-BA 批号调整 以 BatchAdjustment, Approval, Audit 为核心语言模型，落实 docs/domain/m-ba/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "batch-adjustment",
+        "m-ba",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-ba/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:batch-adjustment:step-1",
+      "type": "step",
+      "name": "确认 BatchAdjustment 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 BatchAdjustment, Approval, Audit 的责任边界。",
+      "tags": [
+        "batch-adjustment",
+        "m-ba",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-ba/module-manifest.toml"
+    },
+    {
+      "id": "step:batch-adjustment:step-2",
+      "type": "step",
+      "name": "执行 批号调整 核心职责",
+      "summary": "围绕 批号调整 处理 BatchAdjustment, Approval, Audit，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "batch-adjustment",
+        "m-ba",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-ba/module-manifest.toml"
+    },
+    {
+      "id": "step:batch-adjustment:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "batch-adjustment",
+        "m-ba",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-ba/module-manifest.toml"
+    },
+    {
+      "id": "flow:code-generator",
+      "type": "flow",
+      "name": "M-CG 编码生成",
+      "summary": "M-CG 编码生成 以 NumberRule, Sequence, DocumentNumber 为核心语言模型，落实 docs/domain/m-cg/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "code-generator",
+        "m-cg",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-cg/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:code-generator:step-1",
+      "type": "step",
+      "name": "确认 NumberRule 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 NumberRule, Sequence, DocumentNumber 的责任边界。",
+      "tags": [
+        "code-generator",
+        "m-cg",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-cg/module-manifest.toml"
+    },
+    {
+      "id": "step:code-generator:step-2",
+      "type": "step",
+      "name": "执行 编码生成 核心职责",
+      "summary": "围绕 编码生成 处理 NumberRule, Sequence, DocumentNumber，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "code-generator",
+        "m-cg",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-cg/module-manifest.toml"
+    },
+    {
+      "id": "step:code-generator:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "code-generator",
+        "m-cg",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-cg/module-manifest.toml"
+    },
+    {
+      "id": "flow:drug-inspection",
+      "type": "flow",
+      "name": "M-DI 药检单",
+      "summary": "M-DI 药检单 以 DrugInspectionDocument, AcceptanceRule, ReviewQueue 为核心语言模型，落实 docs/domain/m-di/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "drug-inspection",
+        "m-di",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-di/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:drug-inspection:step-1",
+      "type": "step",
+      "name": "确认 DrugInspectionDocument 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 DrugInspectionDocument, AcceptanceRule, ReviewQueue 的责任边界。",
+      "tags": [
+        "drug-inspection",
+        "m-di",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-di/module-manifest.toml"
+    },
+    {
+      "id": "step:drug-inspection:step-2",
+      "type": "step",
+      "name": "执行 药检单 核心职责",
+      "summary": "围绕 药检单 处理 DrugInspectionDocument, AcceptanceRule, ReviewQueue，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "drug-inspection",
+        "m-di",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-di/module-manifest.toml"
+    },
+    {
+      "id": "step:drug-inspection:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "drug-inspection",
+        "m-di",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-di/module-manifest.toml"
+    },
+    {
+      "id": "flow:packing-station",
+      "type": "flow",
+      "name": "M-PK 包装站",
+      "summary": "M-PK 包装站 以 PackingStation, Package, Scale, PackingTask 为核心语言模型，落实 docs/domain/m-pk/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "packing-station",
+        "m-pk",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-pk/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:packing-station:step-1",
+      "type": "step",
+      "name": "确认 PackingStation 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 PackingStation, Package, Scale, PackingTask 的责任边界。",
+      "tags": [
+        "packing-station",
+        "m-pk",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-pk/module-manifest.toml"
+    },
+    {
+      "id": "step:packing-station:step-2",
+      "type": "step",
+      "name": "执行 包装站 核心职责",
+      "summary": "围绕 包装站 处理 PackingStation, Package, Scale, PackingTask，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "packing-station",
+        "m-pk",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-pk/module-manifest.toml"
+    },
+    {
+      "id": "step:packing-station:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "packing-station",
+        "m-pk",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-pk/module-manifest.toml"
+    },
+    {
+      "id": "flow:parameter-mapping",
+      "type": "flow",
+      "name": "M-PM 参数对照",
+      "summary": "M-PM 参数对照 以 ParameterMapping, MappingRule, PendingMapping 为核心语言模型，落实 docs/domain/m-pm/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "parameter-mapping",
+        "m-pm",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-pm/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:parameter-mapping:step-1",
+      "type": "step",
+      "name": "确认 ParameterMapping 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 ParameterMapping, MappingRule, PendingMapping 的责任边界。",
+      "tags": [
+        "parameter-mapping",
+        "m-pm",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-pm/module-manifest.toml"
+    },
+    {
+      "id": "step:parameter-mapping:step-2",
+      "type": "step",
+      "name": "执行 参数对照 核心职责",
+      "summary": "围绕 参数对照 处理 ParameterMapping, MappingRule, PendingMapping，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "parameter-mapping",
+        "m-pm",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-pm/module-manifest.toml"
+    },
+    {
+      "id": "step:parameter-mapping:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "parameter-mapping",
+        "m-pm",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-pm/module-manifest.toml"
+    },
+    {
+      "id": "flow:quality-liaison",
+      "type": "flow",
+      "name": "M-QL 质量联系单",
+      "summary": "M-QL 质量联系单 以 QualityLiaison, ApprovalSource, Disposition 为核心语言模型，落实 docs/domain/m-ql/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "quality-liaison",
+        "m-ql",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-ql/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:quality-liaison:step-1",
+      "type": "step",
+      "name": "确认 QualityLiaison 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 QualityLiaison, ApprovalSource, Disposition 的责任边界。",
+      "tags": [
+        "quality-liaison",
+        "m-ql",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-ql/module-manifest.toml"
+    },
+    {
+      "id": "step:quality-liaison:step-2",
+      "type": "step",
+      "name": "执行 质量联系单 核心职责",
+      "summary": "围绕 质量联系单 处理 QualityLiaison, ApprovalSource, Disposition，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "quality-liaison",
+        "m-ql",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-ql/module-manifest.toml"
+    },
+    {
+      "id": "step:quality-liaison:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "quality-liaison",
+        "m-ql",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-ql/module-manifest.toml"
+    },
+    {
+      "id": "flow:reconciliation",
+      "type": "flow",
+      "name": "M-RC 对账",
+      "summary": "M-RC 对账 以 ReconciliationRule, Claim, Run, Item 为核心语言模型，落实 docs/domain/m-rc/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "reconciliation",
+        "m-rc",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-rc/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:reconciliation:step-1",
+      "type": "step",
+      "name": "确认 ReconciliationRule 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 ReconciliationRule, Claim, Run, Item 的责任边界。",
+      "tags": [
+        "reconciliation",
+        "m-rc",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-rc/module-manifest.toml"
+    },
+    {
+      "id": "step:reconciliation:step-2",
+      "type": "step",
+      "name": "执行 对账 核心职责",
+      "summary": "围绕 对账 处理 ReconciliationRule, Claim, Run, Item，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "reconciliation",
+        "m-rc",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-rc/module-manifest.toml"
+    },
+    {
+      "id": "step:reconciliation:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "reconciliation",
+        "m-rc",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-rc/module-manifest.toml"
+    },
+    {
+      "id": "flow:replenishment",
+      "type": "flow",
+      "name": "M-RP 补货",
+      "summary": "M-RP 补货 以 ReplenishmentRule, ReplenishmentTask, SafetyStock 为核心语言模型，落实 docs/domain/m-rp/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "replenishment",
+        "m-rp",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-rp/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:replenishment:step-1",
+      "type": "step",
+      "name": "确认 ReplenishmentRule 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 ReplenishmentRule, ReplenishmentTask, SafetyStock 的责任边界。",
+      "tags": [
+        "replenishment",
+        "m-rp",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-rp/module-manifest.toml"
+    },
+    {
+      "id": "step:replenishment:step-2",
+      "type": "step",
+      "name": "执行 补货 核心职责",
+      "summary": "围绕 补货 处理 ReplenishmentRule, ReplenishmentTask, SafetyStock，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "replenishment",
+        "m-rp",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-rp/module-manifest.toml"
+    },
+    {
+      "id": "step:replenishment:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "replenishment",
+        "m-rp",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-rp/module-manifest.toml"
+    },
+    {
+      "id": "flow:stock-adjustment",
+      "type": "flow",
+      "name": "M-SA 报损报溢",
+      "summary": "M-SA 报损报溢 以 StockAdjustment, Loss, Surplus, Destruction 为核心语言模型，落实 docs/domain/m-sa/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "stock-adjustment",
+        "m-sa",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-sa/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:stock-adjustment:step-1",
+      "type": "step",
+      "name": "确认 StockAdjustment 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 StockAdjustment, Loss, Surplus, Destruction 的责任边界。",
+      "tags": [
+        "stock-adjustment",
+        "m-sa",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-sa/module-manifest.toml"
+    },
+    {
+      "id": "step:stock-adjustment:step-2",
+      "type": "step",
+      "name": "执行 报损报溢 核心职责",
+      "summary": "围绕 报损报溢 处理 StockAdjustment, Loss, Surplus, Destruction，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "stock-adjustment",
+        "m-sa",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-sa/module-manifest.toml"
+    },
+    {
+      "id": "step:stock-adjustment:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "stock-adjustment",
+        "m-sa",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-sa/module-manifest.toml"
+    },
+    {
+      "id": "flow:traceability-code",
+      "type": "flow",
+      "name": "M-TC 追溯码模块",
+      "summary": "M-TC 追溯码模块 以 TraceCode, Nomenclature, GTIN, RegulatoryReport, ApplicationIdentifier 为核心语言模型，落实 docs/domain/m-tc/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "traceability-code",
+        "m-tc",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-tc/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:traceability-code:step-1",
+      "type": "step",
+      "name": "确认 TraceCode 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 TraceCode, Nomenclature, GTIN, RegulatoryReport, ApplicationIdentifier 的责任边界。",
+      "tags": [
+        "traceability-code",
+        "m-tc",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-tc/module-manifest.toml"
+    },
+    {
+      "id": "step:traceability-code:step-2",
+      "type": "step",
+      "name": "执行 追溯码模块 核心职责",
+      "summary": "围绕 追溯码模块 处理 TraceCode, Nomenclature, GTIN, RegulatoryReport, ApplicationIdentifier，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "traceability-code",
+        "m-tc",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-tc/module-manifest.toml"
+    },
+    {
+      "id": "step:traceability-code:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "traceability-code",
+        "m-tc",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-tc/module-manifest.toml"
+    },
+    {
+      "id": "flow:task-engine",
+      "type": "flow",
+      "name": "M-TE 任务引擎",
+      "summary": "M-TE 任务引擎 以 WarehouseTask, TaskGroup, Assignment, Transition 为核心语言模型，落实 docs/domain/m-te/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "task-engine",
+        "m-te",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-te/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:task-engine:step-1",
+      "type": "step",
+      "name": "确认 WarehouseTask 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 WarehouseTask, TaskGroup, Assignment, Transition 的责任边界。",
+      "tags": [
+        "task-engine",
+        "m-te",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-te/module-manifest.toml"
+    },
+    {
+      "id": "step:task-engine:step-2",
+      "type": "step",
+      "name": "执行 任务引擎 核心职责",
+      "summary": "围绕 任务引擎 处理 WarehouseTask, TaskGroup, Assignment, Transition，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "task-engine",
+        "m-te",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-te/module-manifest.toml"
+    },
+    {
+      "id": "step:task-engine:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "task-engine",
+        "m-te",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-te/module-manifest.toml"
+    },
+    {
+      "id": "flow:validation-rules",
+      "type": "flow",
+      "name": "M-VR 校验规则",
+      "summary": "M-VR 校验规则 以 ValidationRule, RuleSet, Violation 为核心语言模型，落实 docs/domain/m-vr/module-manifest.toml 声明的限界上下文责任。该 horizontal-business BC 通过依赖、集成和 Shared Kernel 与相邻上下文协作。",
+      "tags": [
+        "validation-rules",
+        "m-vr",
+        "horizontal-business",
+        "manifest-bearing-bc"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "docs/domain/m-vr/module-manifest.toml",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:validation-rules:step-1",
+      "type": "step",
+      "name": "确认 ValidationRule 边界",
+      "summary": "从 module-manifest 的 bounded_context 语言模型确认 ValidationRule, RuleSet, Violation 的责任边界。",
+      "tags": [
+        "validation-rules",
+        "m-vr",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-vr/module-manifest.toml"
+    },
+    {
+      "id": "step:validation-rules:step-2",
+      "type": "step",
+      "name": "执行 校验规则 核心职责",
+      "summary": "围绕 校验规则 处理 ValidationRule, RuleSet, Violation，遵循该 BC 的业务规则和状态约束。",
+      "tags": [
+        "validation-rules",
+        "m-vr",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "moderate",
+      "filePath": "docs/domain/m-vr/module-manifest.toml"
+    },
+    {
+      "id": "step:validation-rules:step-3",
+      "type": "step",
+      "name": "落实集成与审计",
+      "summary": "依据 manifest 的 integrations/shared_kernel 声明，与 H1/H2/H3 及相关上下文交互并保留追踪证据。",
+      "tags": [
+        "validation-rules",
+        "m-vr",
+        "manifest-evidence",
+        "process-step"
+      ],
+      "complexity": "simple",
+      "filePath": "docs/domain/m-vr/module-manifest.toml"
+    }
+  ],
+  "edges": [
+    {
+      "source": "domain:identity-master-data",
+      "target": "flow:auth-tenant",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:auth-tenant",
+      "target": "step:auth-tenant:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:auth-tenant",
+      "target": "step:auth-tenant:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:auth-tenant",
+      "target": "step:auth-tenant:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:audit-trail",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:audit-trail",
+      "target": "step:audit-trail:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:audit-trail",
+      "target": "step:audit-trail:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:audit-trail",
+      "target": "step:audit-trail:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:contract",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:contract",
+      "target": "step:contract:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:contract",
+      "target": "step:contract:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:contract",
+      "target": "step:contract:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "flow:wechat-notify",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:wechat-notify",
+      "target": "step:wechat-notify:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:wechat-notify",
+      "target": "step:wechat-notify:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:wechat-notify",
+      "target": "step:wechat-notify:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "flow:express",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:express",
+      "target": "step:express:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:express",
+      "target": "step:express:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:express",
+      "target": "step:express:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:state-machine",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:state-machine",
+      "target": "step:state-machine:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:state-machine",
+      "target": "step:state-machine:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:state-machine",
+      "target": "step:state-machine:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:import-export",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:import-export",
+      "target": "step:import-export:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:import-export",
+      "target": "step:import-export:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:import-export",
+      "target": "step:import-export:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "flow:erp-acl",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:erp-acl",
+      "target": "step:erp-acl:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:erp-acl",
+      "target": "step:erp-acl:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:erp-acl",
+      "target": "step:erp-acl:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "flow:print-template",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:print-template",
+      "target": "step:print-template:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:print-template",
+      "target": "step:print-template:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:print-template",
+      "target": "step:print-template:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:db-backup",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:db-backup",
+      "target": "step:db-backup:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:db-backup",
+      "target": "step:db-backup:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:db-backup",
+      "target": "step:db-backup:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "flow:dock-management",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:dock-management",
+      "target": "step:dock-management:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:dock-management",
+      "target": "step:dock-management:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:dock-management",
+      "target": "step:dock-management:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "flow:alert-engine",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:alert-engine",
+      "target": "step:alert-engine:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:alert-engine",
+      "target": "step:alert-engine:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:alert-engine",
+      "target": "step:alert-engine:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:identity-master-data",
+      "target": "flow:master-data",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:master-data",
+      "target": "step:master-data:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:master-data",
+      "target": "step:master-data:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:master-data",
+      "target": "step:master-data:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:inbound-quality",
+      "target": "flow:inbound",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:inbound",
+      "target": "step:inbound:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:inbound",
+      "target": "step:inbound:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:inbound",
+      "target": "step:inbound:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:inventory-cold-chain",
+      "target": "flow:inventory",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:inventory",
+      "target": "step:inventory:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:inventory",
+      "target": "step:inventory:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:inventory",
+      "target": "step:inventory:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:outbound-fulfillment",
+      "target": "flow:outbound",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:outbound",
+      "target": "step:outbound:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:outbound",
+      "target": "step:outbound:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:outbound",
+      "target": "step:outbound:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:inventory-cold-chain",
+      "target": "flow:cold-chain",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:cold-chain",
+      "target": "step:cold-chain:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:cold-chain",
+      "target": "step:cold-chain:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:cold-chain",
+      "target": "step:cold-chain:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:inventory-cold-chain",
+      "target": "flow:batch-adjustment",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:batch-adjustment",
+      "target": "step:batch-adjustment:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:batch-adjustment",
+      "target": "step:batch-adjustment:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:batch-adjustment",
+      "target": "step:batch-adjustment:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:code-generator",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:code-generator",
+      "target": "step:code-generator:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:code-generator",
+      "target": "step:code-generator:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:code-generator",
+      "target": "step:code-generator:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:inbound-quality",
+      "target": "flow:drug-inspection",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:drug-inspection",
+      "target": "step:drug-inspection:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:drug-inspection",
+      "target": "step:drug-inspection:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:drug-inspection",
+      "target": "step:drug-inspection:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:outbound-fulfillment",
+      "target": "flow:packing-station",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:packing-station",
+      "target": "step:packing-station:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:packing-station",
+      "target": "step:packing-station:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:packing-station",
+      "target": "step:packing-station:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "flow:parameter-mapping",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:parameter-mapping",
+      "target": "step:parameter-mapping:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:parameter-mapping",
+      "target": "step:parameter-mapping:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:parameter-mapping",
+      "target": "step:parameter-mapping:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:quality-liaison",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:quality-liaison",
+      "target": "step:quality-liaison:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:quality-liaison",
+      "target": "step:quality-liaison:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:quality-liaison",
+      "target": "step:quality-liaison:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:reconciliation",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:reconciliation",
+      "target": "step:reconciliation:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:reconciliation",
+      "target": "step:reconciliation:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:reconciliation",
+      "target": "step:reconciliation:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:outbound-fulfillment",
+      "target": "flow:replenishment",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:replenishment",
+      "target": "step:replenishment:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:replenishment",
+      "target": "step:replenishment:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:replenishment",
+      "target": "step:replenishment:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:inventory-cold-chain",
+      "target": "flow:stock-adjustment",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:stock-adjustment",
+      "target": "step:stock-adjustment:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:stock-adjustment",
+      "target": "step:stock-adjustment:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:stock-adjustment",
+      "target": "step:stock-adjustment:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:inventory-cold-chain",
+      "target": "flow:traceability-code",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:traceability-code",
+      "target": "step:traceability-code:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:traceability-code",
+      "target": "step:traceability-code:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:traceability-code",
+      "target": "step:traceability-code:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:outbound-fulfillment",
+      "target": "flow:task-engine",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:task-engine",
+      "target": "step:task-engine:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:task-engine",
+      "target": "step:task-engine:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:task-engine",
+      "target": "step:task-engine:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "flow:validation-rules",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:validation-rules",
+      "target": "step:validation-rules:step-1",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:validation-rules",
+      "target": "step:validation-rules:step-2",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:validation-rules",
+      "target": "step:validation-rules:step-3",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:identity-master-data",
+      "target": "domain:inbound-quality",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "H1 权限/多租户与 H3 跨端契约：提供租户、货主、仓库、商品和供应商档案",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:inbound-quality",
+      "target": "domain:inventory-cold-chain",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "验收与上架结果形成带批次和质量状态的库存",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:inventory-cold-chain",
+      "target": "domain:outbound-fulfillment",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "提供可用批次、效期和温控约束",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:outbound-fulfillment",
+      "target": "domain:integration-print-transport",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "发运结果触发打印、快递、TMS 和 ERP 回传",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:integration-print-transport",
+      "target": "domain:audit-rules-operations",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "H2 接收并追加事件：外部消息、设备任务和重试结果进入审计",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "domain:identity-master-data",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "H2 审计事件、H3 OpenAPI 契约与 H6 状态机：以审计、配置和状态规则约束权限与主数据变更",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:identity-master-data",
+      "target": "domain:outbound-fulfillment",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "H1 约束出库货主与操作员作用域，H3 发布出库跨端契约。",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "domain:inbound-quality",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "H2 记录收货/药检审计事件，H3 提供入库与药检 API 契约，H6 控制复核状态。",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "domain:inventory-cold-chain",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "H2 记录库存、批次与温控事件，H3 同步查询契约，H6 约束冻结/放行迁移。",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:audit-rules-operations",
+      "target": "domain:integration-print-transport",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "H2 审计外部消息与设备结果，H3 发布集成契约并由 H6 约束编排状态。",
+      "weight": 0.6
+    }
+  ],
+  "layers": [],
+  "tour": []
+}
