@@ -236,6 +236,7 @@ Wave 1 / Wave 2 / Wave 3 开发完成状态仍分别以 `just wave-1-complete-ch
 
 ## 后续 Wave 预告（不在当前 TODO，仅参考）
 
+- **Wave 6 后待排期**：项目图谱发现的设计问题按 [2026-07-31 整改任务与验收标准](docs/reviews/project-graph-design-remediation-2026-07-31.md) 逐项确认；未有后继 Wave / 范围决策前不执行，重叠范围仍回写既有计划、故事和 RTM
 - **Wave 1**：H1 权限/多租户、H2 审计追踪、H3 OpenAPI 工具链；`apps/web-admin/` 壳工程启动并复用 `@wms/ui`；`packages/api-client/` 自动生成
 - **Wave 1 前端边界**：业务页从 `prototypes/` 迁移生产必须走 ADR-0029 checklist
 - **Wave 2**：M1.a 基础档案 + M2 入库 schema + M6 报表骨架

@@ -190,6 +190,7 @@ nav:
       - SPIKE-005B WebView/Capacitor PDA: spikes/spike-005b-webview-capacitor-pda.md
   - 架构与领域:
     - 模块依赖图: architecture-dependencies.md
+    - AI 动态项目图谱: agent-knowledge-graph.md
     - 前后端分层设计规范: layered-design.md
     - 概念审计: concept-audit.md
     - 业务澄清记录: domain/clarifications.md
@@ -222,6 +223,7 @@ nav:
     - M2 入库模块整体审查 (2026-07-18): reviews/m2-overall-review-2026-07-18.md
     - M3 库存模块整体审查 (2026-07-18): reviews/m3-overall-review-2026-07-18.md
     - 延期故事快速闭环审计 (2026-07-15): reviews/deferred-story-closure-audit-2026-07-15.md
+    - 项目图谱设计问题整改任务与验收标准: reviews/project-graph-design-remediation-2026-07-31.md
     - Redis 必要性评估任务: reviews/redis-necessity-assessment-task-2026-07-31.md
     - 全项目治理真实缺口修复计划: reviews/governance-remediation-plan-2026-07-11.md
     - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md

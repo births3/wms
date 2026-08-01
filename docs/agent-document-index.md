@@ -56,6 +56,7 @@
 | [agent-collaboration.md](agent-collaboration.md) | AI 协作细则、确认流程和版本控制协作规则 |
 | [agent-commit-rules.md](agent-commit-rules.md) | AI 默认本地提交条件、禁止项和后续迭代规则 |
 | [agent-loop-engineering.md](agent-loop-engineering.md) | AI 闭环执行规范，定义目标、检查、反馈和停止条件 |
+| [agent-knowledge-graph.md](agent-knowledge-graph.md) | 动态项目图谱、业务域图、变更影响图和可视化入口 |
 | [governance.md](governance.md) | 治理体系、提交规范、分层门禁和验证分级 |
 | [coding-standards.md](coding-standards.md) | 代码书写规范 |
 | [frontend-coding-standards.md](frontend-coding-standards.md) | 前端编码规范 |
