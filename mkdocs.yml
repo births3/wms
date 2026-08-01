@@ -178,6 +178,7 @@ nav:
     - ADR-0043 直接生产前端开发: adr/0043-direct-production-frontend-workflow.md
     - ADR-0044 PostgreSQL 幂等权威存储: adr/0044-postgresql-idempotency-authority.md
     - ADR-0045 首版前保留 migration 链: adr/0045-pre-v1-migration-chain.md
+    - ADR-0046 高风险写入撤销存储 fail-closed: adr/0046-high-risk-write-revocation-fail-closed.md
     - 技术 Spike:
       - Spike 索引: spikes/README.md
       - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md
@@ -274,6 +275,7 @@ nav:
     - H8 ERP 消息性能验收: runbooks/h8-erp-message-performance.md
     - 药检单客户平台: runbooks/drug-inspection-customer-portal.md
     - Wave 1 运行证据: runbooks/wave-1-runtime-evidence.md
+    - H1 撤销存储故障: runbooks/auth-revocation-degradation.md
     - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
     - Wave 2 预发布环境: runbooks/wave-2-staging-environment.md
     - Wave 3 PDA 就绪: runbooks/wave-3-pda-readiness.md

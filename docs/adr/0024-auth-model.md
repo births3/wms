@@ -136,6 +136,10 @@ extractor 拿到 jwt 验签通过的 claims 后：
 - 应用层用 redis-rs 内置连接池 + 重试 + 健康探针
 - 告警阈值：连续 3 次失败 / 5s 无响应触发 P1
 
+> 2026-08-01 更新：高风险写入不再沿用本节的全量 fail-open 语义，改按
+> [ADR-0046](0046-high-risk-write-revocation-fail-closed.md) 分级；读取和普通写入仍按本节
+> 降级，高风险写入返回 `AUTH-010`。
+
 ### 2.4 AuthContext extractor
 
 `backend/crates/api/src/auth.rs`：
@@ -197,6 +201,7 @@ async fn list_items(
 | AUTH-007 | 401 | refresh_token 无效或过期（spike-001 未实现 refresh，留 Wave 1） |
 | AUTH-008 | 401 | 密码错（统一返 AUTH-003 防用户枚举？待业务方决定） |
 | AUTH-009 | 401 | permissions 已失效（用户权限变更后旧 token 仍持旧 permissions；客户端必须重新登录）|
+| AUTH-010 | 503 | 高风险写入的撤销存储不可用（见 ADR-0046） |
 
 ### 2.7 多租户隔离边界
 
@@ -217,7 +222,7 @@ async fn list_items(
 | 关联 | 衔接点 |
 |-------|--------|
 | SPIKE-002 H2 审计 | audit_event 表必含 `actor_id` `actor_name` `owner_id` `jti` 字段；来源全是 AuthContext |
-| docs/error-codes.md | AUTH-001..009 短编码进 §5.1 速查表（前端按 code 切换提示）；对应的 H1_AUTH_* 长编码进 §6 yaml 字典作治理脚本输入；本 ADR §2.6 与 docs/error-codes.md §5.1 双向一致是硬约束 |
+| docs/error-codes.md | AUTH-001..010 短编码进 §5.1 速查表（前端按 code 切换提示）；对应的 H1_AUTH_* 长编码进 §6 yaml 字典作治理脚本输入；本 ADR §2.6 与 docs/error-codes.md §5.1 双向一致是硬约束 |
 | ADR-0026 跨端契约 | LoginRequest / LoginResponse 用 utoipa::ToSchema；前端 packages/api-client 自动生成类型 |
 
 ---
@@ -283,13 +288,13 @@ async fn list_items(
 ### 负面
 
 - **handler 漏写 `ctx.owner_id` 过滤会越权**：必须靠模板 + 测试 + 审计三重保护
-- **token 内嵌 permissions 依赖 Redis 失效链路**：正常路径由 `permissions_changed_at` 让旧 token 下次请求即 401 `AUTH-009`；Redis 故障时按 §2.3.1 fail-open，接受最长 access TTL（1h）窗口并触发 P1 告警
+- **token 内嵌 permissions 依赖 Redis 失效链路**：正常路径由 `permissions_changed_at` 让旧 token 下次请求即 401 `AUTH-009`；Redis 故障时读取/普通写入按 §2.3.1 fail-open，高风险写入按 ADR-0046 fail-closed 并触发 P1 告警
 - **JWT secret 是单点**：泄露后所有 token 失效；缓解：走配置中心 + 轮换流程（ADR-0013 + ADR-0014）
 
 ### 风险
 
 - **handler 不用 ctx 直接拿 owner_id 而用 query 参数 owner_id** → 越权写入：W1.A 编码模板 + grep 治理脚本（禁止 query 接收 owner_id）
-- **Redis 故障导致撤销/权限失效实时性下降**：Redis 不可用时不阻断业务请求，但 blacklist 与 `permissions_changed_at` 退化到最长 access TTL（1h）窗口；ADR-0011 可观测体系必须监控 + 告警 P1
+- **Redis 故障导致撤销/权限失效实时性下降**：Redis 不可用时读取/普通写入仍有最长 access TTL（1h）窗口，高风险写入返回 503；ADR-0011 可观测体系必须监控 + 告警 P1
 - **PDA mmkv 失窃裸露 token**：丢机风险；缓解：mmkv 加密 + S5 锁定快速生效（24h 内）
 
 ---

@@ -72,7 +72,8 @@
 | [ADR-0043](0043-direct-production-frontend-workflow.md) | 直接生产前端开发与开发 Mock 走查 | Accepted | 不再新增原型；新页面直接写入 `apps/*`，使用开发 Mock 完成业务确认 |
 | [ADR-0044](0044-postgresql-idempotency-authority.md) | PostgreSQL 作为 HTTP 幂等权威存储 | Accepted | HTTP 幂等统一由 PostgreSQL `idempotency_request` 和共享实现承载；局部取代 ADR-0018 §1 的 Redis-first 文案 |
 | [ADR-0045](0045-pre-v1-migration-chain.md) | 首版前保留 PostgreSQL migration 链 | Accepted | 保留现有 114 条 migration；仓库、local/dev/staging 使用同一条链，空库基线由回归测试固定 |
-| ADR-0045+ | 未分配 | 后续按需新建 |
+| [ADR-0046](0046-high-risk-write-revocation-fail-closed.md) | 高风险写入撤销存储故障 fail-closed | Accepted | 读取/普通写入保留 fail-open；角色、审批、库存质量、关键状态和打印受控写入在撤销存储不可用时返回 503 `AUTH-010`；局部取代 ADR-0024 §2.3.1 |
+| ADR-0047+ | 未分配 | 后续按需新建 |
 
 > 编号永不复用。空缺编号必须在此表登记原因。
 

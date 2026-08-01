@@ -5,7 +5,7 @@
 
 use axum::{
     extract::FromRequestParts,
-    http::{header::AUTHORIZATION, request::Parts, StatusCode},
+    http::{header::AUTHORIZATION, request::Parts, Method, StatusCode},
     response::{IntoResponse, Response},
     Extension, Json,
 };
@@ -60,6 +60,67 @@ pub enum AuthError {
     CrossOwnerAccess,
     MissingRuntimePolicy,
     RevocationStoreUnavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AuthOperationRisk {
+    Read,
+    OrdinaryWrite,
+    HighRiskWrite,
+}
+
+const HIGH_RISK_WRITE_PATH_PREFIXES: &[&str] = &[
+    "/api/v1/auth/roles",
+    "/api/v1/auth/user-roles",
+    "/api/v1/auth/users",
+    "/api/v1/auth/api-keys",
+    "/api/v1/auth/sessions",
+    "/api/v1/m-vr/dual-person-policy",
+    "/api/v1/quality-liaisons",
+    "/api/v1/inventory/status-transitions",
+];
+
+const HIGH_RISK_WRITE_PATH_SUFFIXES: &[&str] = &[
+    "/approve",
+    "/cancel",
+    "/complete",
+    "/disable",
+    "/emergency-print",
+    "/enabled",
+    "/execute",
+    "/handle",
+    "/password",
+    "/prepare",
+    "/publish",
+    "/quality-approval",
+    "/release",
+    "/revalidate",
+    "/review",
+    "/revoke",
+    "/ship",
+    "/status",
+    "/submit",
+    "/transitions",
+    "/override",
+    "/void-request",
+];
+
+pub fn classify_auth_operation(method: &Method, path: &str) -> AuthOperationRisk {
+    if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
+        return AuthOperationRisk::Read;
+    }
+
+    let high_risk_prefix = HIGH_RISK_WRITE_PATH_PREFIXES
+        .iter()
+        .any(|prefix| path.starts_with(prefix));
+    let high_risk_suffix = HIGH_RISK_WRITE_PATH_SUFFIXES
+        .iter()
+        .any(|suffix| path.ends_with(suffix));
+    if high_risk_prefix || high_risk_suffix {
+        AuthOperationRisk::HighRiskWrite
+    } else {
+        AuthOperationRisk::OrdinaryWrite
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -121,6 +182,15 @@ impl AuthRuntimePolicy {
     }
 
     pub async fn validate_claims(&self, claims: &Claims) -> Result<(), AuthError> {
+        self.validate_claims_for(claims, AuthOperationRisk::Read)
+            .await
+    }
+
+    pub async fn validate_claims_for(
+        &self,
+        claims: &Claims,
+        risk: AuthOperationRisk,
+    ) -> Result<(), AuthError> {
         match self
             .revocation_store
             .permissions_changed_at(claims.sub)
@@ -130,22 +200,38 @@ impl AuthRuntimePolicy {
                 return Err(AuthError::PermissionsRevoked);
             }
             Ok(_) => {}
-            Err(error) if self.fail_open_on_store_error => {
-                tracing::warn!(error = ?error, alert = "P1", "auth revocation store unavailable; fail-open");
-                return Ok(());
-            }
-            Err(_) => return Err(AuthError::RevocationStoreUnavailable),
+            Err(error) => return self.handle_store_error(risk, error),
         }
 
         match self.revocation_store.jti_is_blacklisted(&claims.jti).await {
             Ok(true) => Err(AuthError::TokenRevoked),
             Ok(false) => Ok(()),
-            Err(error) if self.fail_open_on_store_error => {
-                tracing::warn!(error = ?error, alert = "P1", "auth revocation store unavailable; fail-open");
-                Ok(())
-            }
-            Err(_) => Err(AuthError::RevocationStoreUnavailable),
+            Err(error) => self.handle_store_error(risk, error),
         }
+    }
+
+    fn handle_store_error(
+        &self,
+        risk: AuthOperationRisk,
+        error: AuthRevocationStoreError,
+    ) -> Result<(), AuthError> {
+        let fail_open = self.should_fail_open(risk);
+        tracing::warn!(
+            error = ?error,
+            alert = "P1",
+            risk = ?risk,
+            fail_open,
+            "auth revocation store unavailable"
+        );
+        if fail_open {
+            Ok(())
+        } else {
+            Err(AuthError::RevocationStoreUnavailable)
+        }
+    }
+
+    fn should_fail_open(&self, risk: AuthOperationRisk) -> bool {
+        self.fail_open_on_store_error && risk != AuthOperationRisk::HighRiskWrite
     }
 }
 
@@ -296,7 +382,8 @@ where
             .get::<AuthRuntimePolicy>()
             .cloned()
             .ok_or(AuthError::MissingRuntimePolicy)?;
-        policy.validate_claims(&token_data.claims).await?;
+        let risk = classify_auth_operation(&parts.method, parts.uri.path());
+        policy.validate_claims_for(&token_data.claims, risk).await?;
         Ok(AuthContext::from_claims(token_data.claims))
     }
 }
@@ -367,7 +454,7 @@ impl IntoResponse for AuthError {
             ),
             AuthError::RevocationStoreUnavailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
-                "AUTH-REVOCATION-STORE-UNAVAILABLE",
+                "AUTH-010",
                 "权限失效检查暂不可用",
             ),
         };

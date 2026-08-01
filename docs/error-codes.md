@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 55 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 109 | 业务异常（数据冲突 / 校验失败）|
+| error | 110 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **175** | — |
+| **合计** | **176** | — |
 
 ---
 
@@ -87,7 +87,7 @@
 
 | 前缀 | 错误码数 | 主要场景 |
 |---|---|---|
-| H1 | 24 | 鉴权 / 多租户隔离 / API Key 生命周期 |
+| H1 | 25 | 鉴权 / 多租户隔离 / API Key 生命周期 |
 | H2 | 5 | 审计 / 事件总线 |
 | H4 | 14 | 通知发送 / 审批 / 重发 |
 | H6 | 2 | 状态机查询与校验 |
@@ -123,7 +123,8 @@ docs/error-codes.md（本文档，单一事实之源）
 
 ### 5.1 AUTH-XXX 短编码速查（ADR-0024 / spike-001 实测）
 
-ADR-0024 §2.6 定义 9 个 AUTH-XXX 短编码，用于前端按 code 切换提示（与 Stripe API 风格一致）。
+ADR-0024 §2.6 定义 9 个基础 AUTH-XXX 短编码，ADR-0046 增加 `AUTH-010`，用于前端按 code
+切换提示（与 Stripe API 风格一致）。
 本表是面向前端的 UX 速查；治理脚本字典（§6 yaml）使用 `H1_AUTH_*` 长编码。
 
 | 短码 | HTTP | 触发 | 对应 H1_* 长编码 |
@@ -137,11 +138,13 @@ ADR-0024 §2.6 定义 9 个 AUTH-XXX 短编码，用于前端按 code 切换提�
 | AUTH-007 | 401 | refresh_token 无效或过期 | `H1_AUTH_REFRESH_TOKEN_INVALID` （Wave 1 W1.A 加） |
 | AUTH-008 | 401 | 密码错（业务方可决定合并到 AUTH-003 防用户枚举） | `H1_AUTH_PASSWORD_INVALID` （Wave 1 W1.A 加） |
 | AUTH-009 | 401 | permissions 已失效（v0.2 新增；token 内 permissions 过时，需重新登录） | `H1_AUTH_PERMISSIONS_REVOKED` （Wave 1 W1.A 加） |
+| AUTH-010 | 503 | 高风险写入的撤销存储不可用，拒绝启动业务事务 | `H1_AUTH_REVOCATION_STORE_UNAVAILABLE`（ADR-0046） |
 
 **实施约束**（Wave 1 W1.A）：
 - 5 个"Wave 1 W1.A 加"的 H1_* 长编码必须在 W1.A 落地前补到 §6 yaml（治理脚本依赖）
 - 后端 IntoResponse 序列化 `code: "AUTH-XXX"` + `message: "中文提示"` 到 HTTP body（spike-001 实测可行）
-- 前端 `packages/api-client` 错误处理 switch case 用本表的 9 个短码
+- 前端 `packages/api-client` 错误处理 switch case 用本表的 10 个短码；`AUTH-010` 只允许按
+  幂等键和退避策略重试，不得盲目重放非幂等写入
 
 修改本表必须同步 ADR-0024 §2.6（双向一致是治理硬约束）。
 
@@ -274,6 +277,18 @@ error_codes:
     related_fields: []
     related_stories: [US-H1-002, US-H1-003]
     introduced_in: v3.1
+
+  - code: H1_AUTH_REVOCATION_STORE_UNAVAILABLE
+    module: H1
+    category: AUTH
+    detail: REVOCATION_STORE_UNAVAILABLE
+    http_status: 503
+    severity: error
+    message_zh: '高风险写入的权限失效检查暂不可用'
+    message_en: 'Revocation check unavailable for high-risk write'
+    related_fields: []
+    related_stories: [US-H1-003, US-H1-005]
+    introduced_in: v3.10
 
   - code: H1_LOGIN_LOCKED
     module: H1
