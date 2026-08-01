@@ -118,7 +118,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 |---|---|---|
 | AR-01 | 已完成 | 高风险写入 fail-closed；ADR-0046、策略矩阵和 H1 运行手册已同步（`8e9f568`）。 |
 | AR-02 | 已完成 | 操作上下文已从 runtime 鉴权边界分离（`b3bee45`）。 |
-| AR-03 | 已完成 | M4 查询参数进入请求与 query key，默认窗口外真实 PostgreSQL/Playwright 证据通过。 |
+| AR-03 | 历史证据通过，当前重跑受环境漂移阻塞 | M4 查询参数已进入请求与 query key；历史默认窗口外真实 PostgreSQL/Playwright 证据与截图保留。2026-08-01 复跑 `pnpm --dir apps/web-admin run test:e2e:m4-real` 在 webServer 启动阶段失败：`VersionMismatch(202606030001)`；需按 AR-12 补齐测试库 migration 后重采集，不能把旧截图当作当前运行证据。 owner：测试/部署负责人；恢复条件：修复测试库 migration 漂移并重新通过真实 Playwright。 |
 | AR-04 | 已完成 | 发运 application service 与 repository port 已落地，真实事务回滚证据通过（`2bbb4bd`）。 |
 | AR-05 | 已完成 | 采用“共享纯规则 + M4 事务执行”（用户确认 A），正常/短拣/非法跳转链路已接入（`cf352ee`）。 |
 | AR-06 | 已完成 | PostgreSQL-only、直接访问 baseline=0，补充同键并发真实 PostgreSQL 证据（`567fb98`）。 |
