@@ -866,7 +866,10 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
       Playwright 5/5 通过，临时 `_e2e` 库自动回收，页面级截图已登记；外部承运商、PDA、
       Print Agent/硬件缺口保持 deferred/blocked（AR-10）。
 - [ ] Render Worker 故障不阻塞核心 API 启动，且打印路径仍受控失败。
-- [ ] 图谱能追踪代表性的 API、数据表、测试、文档和部署链，并公开尚未解析的关系。
+- [x] 现有主图能追踪代表性的 API、数据表、测试、文档和部署链，并公开尚未解析的关系：
+      `check_knowledge_graph_traceability.py --json` 当前为 10584 节点、15454/15454 有效边、
+      未解析边 0，出库查询/H9 分类 PDF/药检下载/H2 审计四条稳定链均通过；官方刷新、freshness
+      和 KG-01B 域拓扑仍按各自验收项保持未完成。
 - [ ] `git diff --check`、`just gov-t1` 及所有任务定向检查均为退出码 `0`。
 
 ## 7. 本文档的 Review Loop
