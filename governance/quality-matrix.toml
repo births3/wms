@@ -2243,6 +2243,18 @@ title = "打印任务队列、顺序与重打"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "concurrent_resource", "api_change", "frontend_interaction", "critical_path", "hardware_runtime", "audit_compliance"]
+frontend_pages = ["h9-delivery-note-aggregation"]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+]
+e2e_screenshots = [
+  { page = "h9-delivery-note-aggregation", spec = "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdfs-ready.png" },
+]
+evidence_refs = [
+  "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-category-pdfs/category-pdfs-ready.png",
+]
 reason = "组套/打印项/尝试/租约状态和合法迁移、严格串行、普通暂停/紧急停止分流、失败推进、重打、改派与结果不明边界已确认；H6 定义、队列、页面、API、并发和真实打印机证据未实现。"
 owner = "H9 打印能力负责人"
 resume_when = "先完成含 operator_pause_applied 的无硬件任务状态机和 PostgreSQL 并发测试，再接真实 Windows Agent 与打印机 S4 证据。"
@@ -2322,6 +2334,18 @@ title = "Print Agent 注册、状态与设备映射"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "integration", "hardware_runtime", "runtime_guard", "audit_compliance"]
+frontend_pages = ["h9-print-devices"]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-device-slice-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-print-device-real.spec.ts",
+]
+e2e_screenshots = [
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png" },
+]
+evidence_refs = [
+  "prototypes/e2e/web-admin-h9-print-device-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png",
+]
 reason = "ADR-0040 已确认首次激活、专用 listener 白名单、H1 owner-scoped Key 分离、跨 owner 权限/H2 归属、H9 机器幂等、秘密不重显和 pilot 授权；MachineAuthContext、页面、协议、客户端和硬件证据均未实现。"
 owner = "H9 打印能力负责人"
 resume_when = "按 ADR-0040 冻结 Agent 激活、机器凭据、跨 owner 鉴权/审计、机器幂等、心跳、长轮询和结果回报 OpenAPI，实现状态测试门和一个逻辑输出槽纵向切片。"
@@ -2332,6 +2356,18 @@ title = "多 Agent 分配与故障降级"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "concurrent_resource", "api_change", "frontend_interaction", "hardware_runtime", "runtime_guard", "audit_compliance"]
+frontend_pages = ["h9-print-devices"]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-device-slice-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-print-device-real.spec.ts",
+]
+e2e_screenshots = [
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png" },
+]
+evidence_refs = [
+  "prototypes/e2e/web-admin-h9-print-device-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png",
+]
 reason = "地址/客户/线路优先级、同站点主备及 ADR-0041 在线交接、租约策略、assignment_epoch/lease_token fencing 已确认；分配规则、租约、故障转移、页面和多 Agent S4 证据未实现。"
 owner = "H9 打印能力负责人"
 resume_when = "按已确认站点模型完成单 Agent 主链后，实现同站点主备规则、离线先对账、在线持久化交接、租约释放权限、代次 fencing 和双 Agent 网络分区/故障恢复测试。"
@@ -2342,6 +2378,18 @@ title = "Agent 断网对账与本地空间"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "integration", "api_change", "frontend_interaction", "concurrent_resource", "hardware_runtime", "runtime_guard", "audit_compliance"]
+frontend_pages = ["h9-print-devices"]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-device-slice-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-print-device-real.spec.ts",
+]
+e2e_screenshots = [
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png" },
+]
+evidence_refs = [
+  "prototypes/e2e/web-admin-h9-print-device-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png",
+]
 reason = "断网、重启、对账、本地缓存和空间阈值已确认；客户端日志、清理、冲突处置、页面和 S4 证据未实现。"
 owner = "H9 打印能力负责人"
 resume_when = "完成 Agent 基础客户端后，用可控断网、重启和磁盘阈值场景实现恢复与不重复打印证据。"
@@ -2352,6 +2400,18 @@ title = "Print Agent 客户端与启动更新"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "integration", "api_change", "frontend_interaction", "hardware_runtime", "release_runtime", "runtime_guard", "audit_compliance"]
+frontend_pages = ["h9-print-devices"]
+e2e_checks = [
+  "node apps/web-admin/self-checks/h9-print-device-slice-self-check.mjs",
+  "pnpm --dir prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts e2e/web-admin-h9-print-device-real.spec.ts",
+]
+e2e_screenshots = [
+  { page = "h9-print-devices", spec = "prototypes/e2e/web-admin-h9-print-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png" },
+]
+evidence_refs = [
+  "prototypes/e2e/web-admin-h9-print-device-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/h9-print-devices/sites-and-mappings.png",
+]
 reason = "Windows、Tauri 2、React/Rust、Velopack、不可变发布、SHA-256、无发布者验真残余风险、pilot 短期授权、全局版本专用权限和机器下载协议均已由 ADR-0040 确认；客户端、发布链路和运行证据尚未创建。"
 owner = "H9 打印能力负责人"
 resume_when = "按 ADR-0040 创建最小 Windows Agent 与只读 /agent-releases 发布链路，验证恢复前禁用自动应用、pilot 授权绑定、全局版本权限/空 owner 集拒绝、SHA-256 失败关闭、完整包回退、最低版本和未决任务跳过，并保留无发布者验真的风险声明。"
@@ -5581,7 +5641,7 @@ test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test quality_liaison_postgres archive_revision::approved_archive_revision_publishes_single_warehouse_scoped_outbox -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_status_allocation_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres h8_product_change_replays_without_duplicate_update_or_audit -- --exact --test-threads=1",
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres_part2 h8_sales_return_create_replays_without_duplicate_order_or_audit -- --exact --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres h8_sales_return_create_replays_without_duplicate_order_or_audit -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_wave_planning_postgres h8_outbound_order_create_replays_without_duplicate_lines -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres manual_loss_is_numbered_executed_atomically_audited_and_idempotent -- --exact --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test stock_adjustment_postgres manual_surplus_is_numbered_executed_atomically_audited_and_idempotent -- --exact --test-threads=1",
@@ -5658,7 +5718,7 @@ evidence_refs = [
   "backend/crates/api/src/quality_liaison_handlers.rs",
   "backend/crates/api/tests/quality_liaison_postgres/archive_revision.rs",
   "backend/crates/api/tests/master_data_postgres/h8_product_change_idempotency.rs",
-  "backend/crates/api/tests/m2_deferred_closeout_postgres_part2.rs",
+  "backend/crates/api/tests/m2_deferred_closeout_postgres_included/part2.rs",
   "backend/crates/api/tests/wave4_wave_planning_postgres.rs",
   "backend/crates/api/tests/stock_adjustment_postgres.rs",
   "backend/crates/api/tests/stock_adjustment_postgres/surplus.rs",
