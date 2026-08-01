@@ -437,7 +437,7 @@ TypeScript schema，仍维护手写 DTO，adapter 的字符串 path 也未受生
       外使用裸 `fetch(`；`apps/**/src` 不设例外，allowlist 只允许共享生成客户端内部。
 - [x] 治理检查登记 rule_id/source/path/Tier，包含正反 fixture；不以批量白名单让当前违规假绿。
 - [x] 主管理端和客户平台的 typecheck、构建通过；主管理端 M3 真实 E2E 通过。
-- [ ] 客户平台真实 E2E 使用 `PORTAL_DATABASE_URL`，数据库名以 `_e2e` 结尾，测试自动清理数据。
+- [x] 客户平台真实 E2E 使用 `PORTAL_DATABASE_URL`，数据库名以 `_e2e` 结尾，测试自动清理数据。
 
 **最小验证**
 
