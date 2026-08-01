@@ -534,13 +534,15 @@ staging Compose 要求 H9 Render Worker 健康后才启动 WMS API。渲染是�
 
 - [x] 项目主人确认“核心 API 可启动、打印接口受控不可用”的降级边界（用户确认：API 与打印解耦）。
 - [ ] worker 不健康时 API `/healthz`、`/readyz` 和一个鉴权后的非打印核心接口仍可用。
-- [ ] 打印接口返回稳定错误码 `H9_CATEGORY_PDF_RENDER_FAILED`，不创建结果不明的任务，不吞掉失败。
+- [x] 服务层在 worker 故障时 fail-closed，持久化失败状态且同键可安全重试（H9 PostgreSQL 测试通过）。
+- [ ] 真实打印 HTTP 接口返回稳定错误码 `H9_CATEGORY_PDF_RENDER_FAILED`，不创建结果不明的任务，不吞掉失败。
 - [x] worker 恢复后新打印请求可成功；旧失败请求按既有幂等规则安全重试（PostgreSQL `failed_render_retries_same_instance_output_and_idempotency_key` 通过）。
 - [ ] 新增一个真实 Compose smoke：停止 worker、启动 API、验证非打印路径和打印受控失败，
       再恢复 worker 验证新请求及同键安全重试。
 - [x] smoke 使用唯一 `COMPOSE_PROJECT_NAME`、隔离 override、临时凭据、随机宿主端口和一次性卷，
       无论成功失败都执行 `down -v`；禁止停止、复用或清理默认 staging stack（脚本治理测试通过）。
-- [ ] Compose 配置检查显式注入非空测试值；worker `/healthz`、正确令牌和错误令牌均有 smoke。
+- [x] Compose 配置检查显式注入非空测试值（`docker compose ... config --quiet` 通过）。
+- [ ] worker `/healthz`、正确令牌和错误令牌均有真实 smoke。
 - [x] 部署 runbook 登记该 smoke、故障恢复步骤和证据边界（脚本/文档登记测试通过）。
 - [x] 不用 Render Worker E2E 替代 Print Agent 或物理打印机 S4 证据（runbook 明确边界）。
 
