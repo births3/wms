@@ -115,8 +115,6 @@ services:
         condition: service_healthy
       minio-init-staging:
         condition: service_completed_successfully
-      h9-render-worker-staging:
-        condition: service_healthy
     environment:
       - WMS_BIND_ADDR=0.0.0.0:8080
       - WMS_DB_URL=postgres://wms_staging:${WMS_STAGING_DB_PASSWORD}@postgres-staging:5432/wms_staging

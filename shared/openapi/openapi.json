@@ -23180,7 +23180,7 @@
         ],
         "responses": {
           "200": {
-            "description": "分类 PDF 准备完成或受控失败结果",
+            "description": "分类 PDF 准备完成",
             "content": {
               "application/json": {
                 "schema": {
@@ -23230,7 +23230,7 @@
             }
           },
           "502": {
-            "description": "H-FILE 存储失败",
+            "description": "H-FILE 存储或 Render Worker 失败",
             "content": {
               "application/json": {
                 "schema": {

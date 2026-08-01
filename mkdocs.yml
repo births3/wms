@@ -278,6 +278,7 @@ nav:
     - H1 撤销存储故障: runbooks/auth-revocation-degradation.md
     - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
     - Wave 2 预发布环境: runbooks/wave-2-staging-environment.md
+    - AR-09 Render Worker Compose 隔离烟测: runbooks/h9-render-worker-compose-smoke.md
     - Wave 3 PDA 就绪: runbooks/wave-3-pda-readiness.md
     - Wave 4 外部依赖证据: runbooks/wave-4-external-dependencies.md
     - Wave 5 硬件证据: runbooks/wave-5-hardware-evidence.md

@@ -274,10 +274,19 @@ async fn failed_render_retries_same_instance_output_and_idempotency_key(pool: Pg
     let failed = unavailable
         .prepare_category_pdfs(&scope.actor, instance.id, test_now(), "h9-pdf-fail-prepare")
         .await
-        .expect("worker failure should be persisted as a controlled result");
-    assert_eq!(failed.value.status, "failed");
-    assert_eq!(failed.value.outputs[0].processing_status, "failed");
-    assert_eq!(failed.value.outputs[0].attempt_count, 1);
+        .expect_err("worker failure must fail closed with a stable render error");
+    assert!(matches!(
+        failed,
+        PrintOrchestrationError::RenderWorker(_)
+    ));
+    let failed_state = unavailable
+        .list_category_pdfs(&scope.actor, instance.id)
+        .await
+        .expect("failed preparation should remain queryable");
+    assert_eq!(failed_state.preparation_status.as_deref(), Some("failed"));
+    assert_eq!(failed_state.data[0].processing_status, "failed");
+    assert_eq!(failed_state.data[0].attempt_count, 1);
+    let failed_output_id = failed_state.data[0].id;
     assert_eq!(
         single_instance(&unavailable, &scope, group).await.status,
         "waiting_documents"
@@ -293,7 +302,7 @@ async fn failed_render_retries_same_instance_output_and_idempotency_key(pool: Pg
         .expect("same key should retry the failed output");
     assert!(!retried.replayed);
     assert_eq!(retried.value.status, "completed");
-    assert_eq!(retried.value.outputs[0].id, failed.value.outputs[0].id);
+    assert_eq!(retried.value.outputs[0].id, failed_output_id);
     assert_eq!(retried.value.outputs[0].attempt_count, 2);
     assert_eq!(
         single_instance(&recovered, &scope, group).await.status,

@@ -28460,7 +28460,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description 分类 PDF 准备完成或受控失败结果 */
+            /** @description 分类 PDF 准备完成 */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -28505,7 +28505,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description H-FILE 存储失败 */
+            /** @description H-FILE 存储或 Render Worker 失败 */
             502: {
                 headers: {
                     [name: string]: unknown;

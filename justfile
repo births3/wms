@@ -1098,6 +1098,10 @@ wave-2-runtime-evidence-smoke *args:
 wave-2-h1-token *args:
     @python3 scripts/governance/generate_wave2_h1_token.py {{args}}
 
+# AR-09 真实 Compose 隔离烟测：验证 API 与 Render Worker 解耦及故障恢复
+h9-render-worker-compose-smoke:
+    @bash scripts/h9_render_worker_compose_smoke.sh
+
 # 定向验证两份 Wave 1 runtime evidence JSON（不检查其他静态完成项）
 wave-1-runtime-evidence-validate:
     @python3 scripts/governance/validate_wave1_runtime_evidence.py --kind all

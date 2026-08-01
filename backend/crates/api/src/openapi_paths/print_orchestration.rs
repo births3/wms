@@ -408,12 +408,12 @@ pub(crate) fn list_category_pdfs() {}
         ("Idempotency-Key" = String, Header, description = "首次生成和失败重试必须复用的幂等键")
     ),
     responses(
-        (status = 200, description = "分类 PDF 准备完成或受控失败结果", body = CategoryPdfPreparation),
+        (status = 200, description = "分类 PDF 准备完成", body = CategoryPdfPreparation),
         (status = 400, description = "缺少幂等键", body = ErrorResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "无分类 PDF 生成权限", body = ErrorResponse),
         (status = 409, description = "源单据未就绪或幂等冲突", body = ErrorResponse),
-        (status = 502, description = "H-FILE 存储失败", body = ErrorResponse)
+        (status = 502, description = "H-FILE 存储或 Render Worker 失败", body = ErrorResponse)
     ),
     security(("bearer_auth" = [])),
     tag = "print-orchestration"

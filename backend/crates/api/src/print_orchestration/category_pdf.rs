@@ -56,8 +56,12 @@ impl PrintOrchestrationService {
             .load_processable_outputs(ctx.owner_id, instance_id)
             .await?;
         let mut failure = None;
+        let mut render_failure = None;
         for output in pending {
             if let Err(error) = self.process_output(ctx, &output, now).await {
+                if let PrintOrchestrationError::RenderWorker(render_error) = &error {
+                    render_failure.get_or_insert_with(|| render_error.clone());
+                }
                 let reason = format!("{error:?}");
                 self.mark_output_failed(ctx.owner_id, output.id, &reason, now)
                     .await?;
@@ -91,6 +95,9 @@ impl PrintOrchestrationService {
             )
             .await?;
             tx.commit().await.map_err(map_db_error)?;
+            if let Some(error) = render_failure {
+                return Err(PrintOrchestrationError::RenderWorker(error));
+            }
         } else {
             let mut tx = self.repository.pool.begin().await.map_err(map_db_error)?;
             sqlx::query(
