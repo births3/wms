@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T01:00:30.131Z",
-    "gitCommitHash": "3023151e6ec78096deb25d93c454de23661cc7a5"
+    "analyzedAt": "2026-08-02T01:07:01.388Z",
+    "gitCommitHash": "1a7bee115096ba369beaefebe31ddb070c3046f3"
   },
   "nodes": [
     {
@@ -108879,7 +108879,7 @@
       "type": "document",
       "name": "redis-necessity-assessment-task-2026-07-31.md",
       "filePath": "docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
-      "summary": "定义 REDIS-01 的 Redis 必要性事实盘点、PostgreSQL/进程内替代评估和验收标准，覆盖鉴权撤销、双人策略、幂等、限流熔断、通知及部署依赖。文档记录“不新增 Redis 用途、暂不删除鉴权撤销硬依赖”的目标方向，并要求以真实性能、多实例、故障恢复和安全证据支撑后续迁移与 successor ADR，当前缺证据的项目保持 blocked。",
+      "summary": "定义 REDIS-01 的 Redis 必要性事实盘点、PostgreSQL/进程内替代评估和验收标准，覆盖鉴权撤销、双人策略、幂等、限流熔断、通知及部署依赖。文档记录“不新增 Redis 用途、暂不删除鉴权撤销硬依赖”的目标方向，明确 owner 与恢复条件，并要求以真实性能、多实例、故障恢复、安全、迁移和回滚证据支撑后续 successor ADR，当前缺证据的项目保持 blocked。",
       "tags": [
         "documentation",
         "infrastructure",
