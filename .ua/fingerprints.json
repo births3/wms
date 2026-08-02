@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "718e860ad336675d895f9b197f95d42aad79ad23",
-  "generatedAt": "2026-08-02T17:30:41.746Z",
+  "gitCommitHash": "0f81a6cd456b5fa297b8f758bef611f8d1bc7888",
+  "generatedAt": "2026-08-02T17:45:27.867Z",
   "files": {
     ".agents/skills/wms-execution-retrospective/SKILL.md": {
       "filePath": ".agents/skills/wms-execution-retrospective/SKILL.md",
@@ -295,7 +295,7 @@
     },
     "AGENTS.md": {
       "filePath": "AGENTS.md",
-      "contentHash": "483dc29ce45ed679cac5822e28b1d03883344a62b2b03890723abd7df942effd",
+      "contentHash": "b2d0f56e7a6f57bdda6d4c7795830a20ddc38eaf3e02ffce6b3ce7c8b4df5001",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -115624,12 +115624,12 @@
     },
     "docs/agent-knowledge-graph.md": {
       "filePath": "docs/agent-knowledge-graph.md",
-      "contentHash": "7b3a18026aa70cd2f0fb020e680f8499e0128c44ec98d9acf5e8d2947959e286",
+      "contentHash": "b12bc1f66a12a4e0578886aebb279e87efc9e0bb260dadb9481e3dae1e9197cb",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 116,
+      "totalLines": 126,
       "hasStructuralAnalysis": true
     },
     "docs/agent-loop-engineering.md": {
@@ -117284,7 +117284,7 @@
     },
     "docs/reviews/project-graph-design-remediation-2026-07-31.md": {
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "contentHash": "d00fc17c4499257cbdf0657def380f9847b6e36d682e9b75e1e0c6ab5f7eede6",
+      "contentHash": "d4fdbc0dbd1bcf410eab76d496ce065f9d196aa10b4f636aa64c78bbe0402357",
       "functions": [],
       "classes": [],
       "imports": [],

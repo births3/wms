@@ -31,8 +31,8 @@
       "Zustand"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端，覆盖多货主、3PL、连锁和监管对接全流程，采用治理优先与 outside-in TDD 的工程纪律。该项目包含超过 100 个源文件，建议按子目录限定分析范围以缩短分析时间。",
-    "analyzedAt": "2026-08-02T17:35:03.364Z",
-    "gitCommitHash": "718e860ad336675d895f9b197f95d42aad79ad23"
+    "analyzedAt": "2026-08-02T17:45:27.654Z",
+    "gitCommitHash": "0f81a6cd456b5fa297b8f758bef611f8d1bc7888"
   },
   "nodes": [
     {
@@ -110337,20 +110337,6 @@
       "complexity": "simple"
     },
     {
-      "id": "document:AGENTS.md",
-      "type": "document",
-      "name": "AGENTS.md",
-      "filePath": "AGENTS.md",
-      "summary": "AGENTS.md 文档，围绕 project 记录项目规则、背景、流程或验收依据。 共解析 14 个章节。",
-      "tags": [
-        "documentation",
-        "project",
-        "reference",
-        "project"
-      ],
-      "complexity": "moderate"
-    },
-    {
       "id": "document:CHANGELOG.md",
       "type": "document",
       "name": "CHANGELOG.md",
@@ -111844,20 +111830,6 @@
       "name": "agent-document-index.md",
       "filePath": "docs/agent-document-index.md",
       "summary": "agent-document-index.md 文档，围绕 project 记录项目规则、背景、流程或验收依据。 共解析 5 个章节。",
-      "tags": [
-        "documentation",
-        "project",
-        "reference",
-        "project"
-      ],
-      "complexity": "moderate"
-    },
-    {
-      "id": "document:docs/agent-knowledge-graph.md",
-      "type": "document",
-      "name": "agent-knowledge-graph.md",
-      "filePath": "docs/agent-knowledge-graph.md",
-      "summary": "agent-knowledge-graph.md 文档，围绕 project 记录项目规则、背景、流程或验收依据。 共解析 9 个章节。",
       "tags": [
         "documentation",
         "project",
@@ -113555,20 +113527,6 @@
       "name": "pattern-extraction-2026-05-18.md",
       "filePath": "docs/reviews/pattern-extraction-2026-05-18.md",
       "summary": "pattern-extraction-2026-05-18.md 文档，围绕 review 记录项目规则、背景、流程或验收依据。 共解析 24 个章节。",
-      "tags": [
-        "documentation",
-        "review",
-        "reference",
-        "project"
-      ],
-      "complexity": "complex"
-    },
-    {
-      "id": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "type": "document",
-      "name": "project-graph-design-remediation-2026-07-31.md",
-      "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "summary": "project-graph-design-remediation-2026-07-31.md 文档，围绕 review 记录项目规则、背景、流程或验收依据。 共解析 27 个章节。",
       "tags": [
         "documentation",
         "review",
@@ -187096,6 +187054,51 @@
         "reusable"
       ],
       "complexity": "simple"
+    },
+    {
+      "id": "document:AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "AGENTS.md",
+      "summary": "项目协作入口，集中记录 WMS 的边界、分层原则、常用命令、验证门禁、图谱路径和协作禁止事项；当前版本还固化了在 ignore 范围不变时自动选择图谱更新粒度的规则。",
+      "tags": [
+        "documentation",
+        "governance",
+        "collaboration",
+        "knowledge-graph",
+        "workflow"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/agent-knowledge-graph.md",
+      "type": "document",
+      "name": "agent-knowledge-graph.md",
+      "filePath": "docs/agent-knowledge-graph.md",
+      "summary": "项目图谱运行手册，定义共享输出、架构/业务/变更等视角、schema 与新鲜度门禁，并给出在持续批准的 ignore 范围下自动选择元数据、部分、架构或全量更新的判定表。",
+      "tags": [
+        "documentation",
+        "knowledge-graph",
+        "governance",
+        "freshness",
+        "workflow"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "type": "document",
+      "name": "project-graph-design-remediation-2026-07-31.md",
+      "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "summary": "全项目图谱设计整改计划与验收账本，记录 AR/KG/REDIS 任务的证据、Review Loop 和阻塞边界；KG-01A 已由提交 06649c6 的全量重建关闭，并记录 83 条 ALTER 语句到 58/58 唯一映射的追溯结果。",
+      "tags": [
+        "documentation",
+        "review",
+        "governance",
+        "acceptance",
+        "knowledge-graph"
+      ],
+      "complexity": "complex"
     }
   ],
   "edges": [
@@ -431950,6 +431953,877 @@
         "lineEnd": 9
       },
       "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/agent-collaboration.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 14,
+        "lineEnd": 14
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/agent-document-index.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 14,
+        "lineEnd": 14
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/adr/0038-pre-v1-compatibility-policy.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 33,
+        "lineEnd": 33
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/agent-knowledge-graph.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 60,
+        "lineEnd": 60
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/adr/0016-deployment.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 67,
+        "lineEnd": 67
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "file:apps/AGENTS.override.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 68,
+        "lineEnd": 68
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/agent-commit-rules.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 79,
+        "lineEnd": 79
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/governance.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 106,
+        "lineEnd": 106
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/coding-standards.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 112,
+        "lineEnd": 112
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/frontend-coding-standards.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 113,
+        "lineEnd": 113
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/layered-design.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 114,
+        "lineEnd": 114
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/adr/0006-tdd-and-test-layers.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 116,
+        "lineEnd": 116
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/adr/0043-direct-production-frontend-workflow.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 117,
+        "lineEnd": 117
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/architecture-dependencies.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 118,
+        "lineEnd": 118
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/adr/README.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 119,
+        "lineEnd": 119
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/infra/technical-specs.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 120,
+        "lineEnd": 120
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/concept-audit.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 121,
+        "lineEnd": 121
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/domain/clarifications.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 122,
+        "lineEnd": 122
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/glossary.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 123,
+        "lineEnd": 123
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:backend/AGENTS.override.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 130,
+        "lineEnd": 130
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:prototypes/AGENTS.override.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 132,
+        "lineEnd": 132
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:deploy/AGENTS.override.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 133,
+        "lineEnd": 133
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:scripts/AGENTS.override.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 134,
+        "lineEnd": 134
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:docs/runbooks/wave-6-closeout.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "AGENTS.md",
+        "lineStart": 138,
+        "lineEnd": 138
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/reviews/governance-remediation-plan-2026-07-11.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 19,
+        "lineEnd": 19
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/adr/0038-pre-v1-compatibility-policy.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 21,
+        "lineEnd": 21
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/adr/0035-wave-6-pre-release-evidence-closeout.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 22,
+        "lineEnd": 22
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/auth.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 51,
+        "lineEnd": 51
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/bin/wms_api.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 51,
+        "lineEnd": 51
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/audit/db.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 52,
+        "lineEnd": 52
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/print_orchestration/service.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 52,
+        "lineEnd": 52
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/state_machine.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 53,
+        "lineEnd": 53
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/outbound.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 53,
+        "lineEnd": 53
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/wave4_repository_part1.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 53,
+        "lineEnd": 53
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/wave4_handlers.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 54,
+        "lineEnd": 54
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/wave4_repository_part2.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 54,
+        "lineEnd": 54
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "table:backend/migrations/202606030001_wave3_core_tables.sql:migration",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 55,
+        "lineEnd": 55
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/admin_menu_idempotency.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 55,
+        "lineEnd": 55
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/dock_repository.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 55,
+        "lineEnd": 55
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/wechat_notify_idempotency.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 55,
+        "lineEnd": 55
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/web-admin/src/features/outbound/outbound-queries.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 56,
+        "lineEnd": 56
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 56,
+        "lineEnd": 56
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/web-admin/src/features/inventory/m3-ops-queries.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 57,
+        "lineEnd": 57
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/customer-portal/src/types.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 57,
+        "lineEnd": 57
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/customer-portal/src/api.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 57,
+        "lineEnd": 57
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "config:shared/openapi/customer-portal-openapi.yaml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 57,
+        "lineEnd": 57
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/web-admin/src/App.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 58,
+        "lineEnd": 58
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/web-admin/src/app-shell/AdminViewRenderer.tsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 58,
+        "lineEnd": 58
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:apps/web-admin/src/pages/outbound/m4-outbound-page-model.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 58,
+        "lineEnd": 58
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "service:deploy/docker-compose.staging.yml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 59,
+        "lineEnd": 59
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "config:governance/quality-matrix.toml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 60,
+        "lineEnd": 60
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:prototypes/playwright-web-admin-dev-config.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 60,
+        "lineEnd": 60
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:prototypes/e2e/web-admin-shell.spec.ts",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 60,
+        "lineEnd": 60
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/wave3_repository.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 61,
+        "lineEnd": 61
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "file:backend/crates/api/src/wave4_repository.rs",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 61,
+        "lineEnd": 61
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "table:backend/migrations/202606280002_database_design_standard_alignment.sql:migration",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 62,
+        "lineEnd": 62
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/agent-collaboration.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 87,
+        "lineEnd": 87
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 111,
+        "lineEnd": 111
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/adr/0024-auth-model.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 147,
+        "lineEnd": 147
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/layered-design.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 192,
+        "lineEnd": 192
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/domain/user-stories-h6-state-machine.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 314,
+        "lineEnd": 314
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/adr/0034-wave-3-operational-postgres-schema.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 358,
+        "lineEnd": 358
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/adr/0018-resilience-engineering.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 359,
+        "lineEnd": 359
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/coding-standards.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 360,
+        "lineEnd": 360
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/h1-menu-management-design.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 463,
+        "lineEnd": 463
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/infra/technical-specs.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 733,
+        "lineEnd": 733
+      },
+      "confidence": 0.99
+    },
+    {
+      "source": "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
+      "target": "document:docs/agent-commit-rules.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.99,
+      "sourceSpan": {
+        "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
+        "lineStart": 888,
+        "lineEnd": 888
+      },
+      "confidence": 0.99
     }
   ],
   "layers": [
@@ -434231,9 +435105,9 @@
   "traceability": {
     "schemaVersion": "1.0",
     "canonicalIdScheme": "<type>:<relative-path>[:symbol]",
-    "resolvedEdgeCount": 19513,
+    "resolvedEdgeCount": 19580,
     "unresolvedEdgeCount": 0,
-    "sourceSpanEdgeCount": 19513,
-    "confidenceEdgeCount": 19513
+    "sourceSpanEdgeCount": 19580,
+    "confidenceEdgeCount": 19580
   }
 }
