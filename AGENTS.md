@@ -56,6 +56,7 @@
 - 图谱数据统一放在 `.ua/`：架构图 `.ua/knowledge-graph.json`，业务域图 `.ua/domain-graph.json`，新鲜度元数据 `.ua/meta.json`。
 - 建图或更新调用 `understand-anything:understand`，业务流程视角调用 `understand-anything:understand-domain`，变更影响调用 `understand-anything:understand-diff`，可视化调用 `understand-anything:understand-dashboard`。
 - 使用图谱回答前运行 `python3 scripts/governance/check_knowledge_graph_freshness.py --json`：`sourceCommitHash` 可为当前 `HEAD` 或其祖先，但其后不得有 `.ua/` 之外的输入变化，且 `inputFingerprint` 必须匹配；旧 `gitCommitHash` 不兼容读取。存在未提交业务改动时，图谱只代表已分析基线，先做 diff 分析或更新图谱。
+- 项目主人已持续批准当前 `.ua/.understandignore`；该文件和额外 exclude 范围不变时，代理按运行手册自动选择元数据更新、部分更新、架构更新或全量更新，不再重复确认。范围改变时必须重新确认。
 - 详细的视角、更新触发器、Git 规则和使用边界见 [docs/agent-knowledge-graph.md](docs/agent-knowledge-graph.md)。
 
 ## 验证要求

@@ -79,7 +79,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，local/
 | AR-10 | 修正 H5 与同类虚假真实 E2E/截图证据 | 阻断证据 | P1 | 可用测试 PostgreSQL | 本地闭环完成，外部项 deferred（`dd699b8`） |
 | AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 已完成（B：生产基线 `51/51`、新增违规 `0`，`2948bd2`、`eb4f770`） |
 | AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 已完成（2026-08-02 dev-h2/staging 获授权精确重建；三环境均 114 installed/0 pending、mismatch=0，schema/种子/API 复审通过；旧数据不可恢复，旧运行证据作废并需重采集） |
-| KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | schema/更新命令确认；AR-12 已解除阻塞 | 部分完成（已验证图谱锚点 `d82b058`、分析源 `dc13800` 上为 10874 节点、21310 条有效边；待官方生成器重新生成并验收 ALTER） |
+| KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | schema/更新命令确认；AR-12 已解除阻塞 | 已完成（官方全量重建 `06649c6`；10760 节点、19513 条有效边，83 条 ALTER 语句形成 58/58 唯一映射） |
 | KG-01B | 修正业务域拓扑 | 中 | P1 | 既有计划 G2 完成 | 已完成（29/29 manifest，域图 122 节点/126 边，`efe42d7`、`e36a3b2`；已验证主图 `d82b058`） |
 | KG-02 | 确认并修正图谱新鲜度语义 | 中高 | P2 | 新鲜度方案确认 | 已完成（B：输入 `198b50d` 后独立图谱提交 `585ef30`，fresh） |
 | REDIS-01 | 评估 Redis 是否仍是必要基础设施 | 中高 | P2 | 无；不得先改运行时 | 决策方向完成，后续迁移 blocked（`d1109a3`、`1a7bee1`、`cebcc4e`） |
@@ -112,7 +112,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，local/
 
 `TODO.md` 只保留本计划的单一入口；具体状态以本表、3.2 执行回写和各父事实源为准。
 
-### 3.2 执行回写（截至 2026-08-02）
+### 3.2 执行回写（截至 2026-08-03）
 
 以下是当前分支的 Review Loop 状态；原验收标准仍是关闭任务的唯一判定，不以静态账本替代真实证据。
 
@@ -131,7 +131,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，local/
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | 已完成 | 项目主人于 2026-08-01 确认 B：门禁覆盖 `backend/crates/api/src/**` 中全部生产 `include!`，测试模块排除，历史项进入 baseline 且只能收缩；checker 当前 baseline/discovered `51/51`、新增违规 `0`。`document_numbering_repository` 语义模块拆分保留为代表性迁移证据（`2948bd2`、`eb4f770`）。后续生产 include 只能通过正式 Rust `mod` 迁移，baseline 只能减少。 |
 | AR-12 | 已完成 | 用户于 2026-08-02 明确确认 dev-h2/staging 数据可丢弃并重建。对精确数据库 `wms_dev_h2`（容器 `wms-dev-h2-postgres-dev-h2-1`，保留卷 `wms-dev-h2_postgres_dev_h2_data`）和 `wms_staging`（实际 project `wms-h8-perf`，容器 `wms-h8-perf-postgres-staging-1`，保留卷 `wms-h8-perf_postgres_staging_data`）分别停止 API，执行 `DROP DATABASE WITH FORCE`、`CREATE`，再由宿主机 sqlx-cli 0.8.6 对当前 `backend/migrations` 空库执行 114 条链。未删卷、未改 Redis、未改 local/test 或生产；MinIO 缺失是执行前既有状态，非本轮删除，Redis 保持运行。三环境独立复审均为 114 installed/0 pending、latest `202607280001`、all success、SHA-384 mismatch/missing=0；静态关系/索引/约束 `192/564/1159`、fingerprint `63fd1daab6ad7b04d1bea02b310e8ca7`、种子 `126/11/46`，当前 release `wms-api` 重编译后 dev 18081 与 staging 18084 的 health/ready=200、未鉴权 core=401。旧 dev/staging 数据因获准丢弃且未备份已不可恢复；绑定旧 schema/image 的历史运行证据作废并需重采集。AR-12 migration 同链恢复关闭；Wave 6 外部系统、硬件和正式发布 evidence 不因本项关闭。 |
-| KG-01A | 已解除阻塞、待官方生成器重新生成并验收 ALTER | 用户已确认采用 A（上游 Understand-Anything 生成器）。独立可复核锚点 `d82b058`、分析源 `dc13800` 上，主图为 10874 个节点、21310 条有效边，每条边均有来源定位与置信度，未解析边为 0；出库查询、H9 分类 PDF、药检单下载和 H2 审计四条稳定链及 traceability validator 均通过。`198b50d` 输入与 `585ef30` 图谱提交形成初始官方增量闭环；当前 provenance、源提交、实时规模和输入文件数以 `.ua/meta.json`、`.ua/fingerprints.json`、traceability 与新鲜度门禁为准。AR-12 migration 链与 checksum 漂移已恢复，下一步使用官方生成器重新生成并验证 ALTER 映射、traceability 和 freshness，完成后再关闭本项。owner：图谱/架构维护负责人。 |
+| KG-01A | 已完成 | 用户已确认采用 A（上游 Understand-Anything 生成器）。官方全量重建提交 `06649c6` 生成 10760 个节点、19513 条有效边，每条边均有来源定位与置信度，未解析边为 0；83 条 ALTER 语句按 migration/table 去重为 58 个映射，58/58 均连接 migration pseudo 与 canonical CREATE 表节点。出库查询、H9 分类 PDF、药检单下载、H2 审计四条稳定链、10 条明确 Markdown 文档关系、core schema validator、traceability 和 freshness 全部通过。当前 provenance、源提交、实时规模和输入文件数仍以 `.ua/meta.json`、`.ua/fingerprints.json` 和实时门禁为准。 |
 | KG-01B | 已完成 | 项目主人于 2026-08-01 确认 29 个 manifest-bearing BC（`efe42d7`）：12 个 H 横向能力、M1-M5 五个核心业务上下文、12 个 M- 横向能力；M6/M8/M9/M10 保持业务流程定位，H-INT/H-FILE/H-APV/H-SCH 保持契约扩展定位。`check_bounded_contexts.py --strict` 为 expected/found `29/29`，无 error/warning/info。官方 `understand-domain` 已生成 6 个业务域、29 个 manifest flow、87 个步骤和 126 条边；H1/H2/H3 在跨域关系中可见。官方 core `validateGraph` 成功，Dashboard 可读取 `domain-graph.json`（122 节点、126 边，`e36a3b2`）；H2 结构图追溯链为 10874 节点、21310/21310 有效边（已验证锚点 `d82b058`）。owner：架构/域模型负责人。 |
 | KG-02 | 已完成 | B 方案（源提交 + 输入指纹）已实现并有正反测试（`9a95416`）。输入文档 `198b50d` 与图谱提交 `585ef30` 形成初始可复核闭环；当前 source commit、输入文件数和指纹以 `.ua/meta.json`、`.ua/fingerprints.json` 及新鲜度门禁为准。图谱提交只改变 `.ua`，不会形成新的输入变化。 |
 | REDIS-01 | 决策方向完成，后续迁移 blocked | 已确认不新增 Redis；当前不删除 Redis（`d1109a3`、`1a7bee1`、`cebcc4e`）。owner：H1 鉴权/安全负责人和发布/运维负责人；恢复条件：successor ADR 与独立实现任务明确 PostgreSQL 撤销及安全故障语义，并补齐性能、多实例、迁移、回滚、监控、容量和演练证据。 |
@@ -792,9 +792,9 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 - [x] 支持 `operation -> handler -> service/repository -> table`、
       `implementation -> tested_by -> test/evidence`、文档关系和部署承载关系。
 - [x] 消费 AR-12 已生成的确定性 `CREATE/REFERENCES` 关系。
-- [ ] AR-12 环境 migration 链与 checksum 已恢复；使用官方生成器重新生成并关闭 `ALTER` 边验收。
-      owner：图谱/架构维护负责人；恢复条件：使用官方生成器重新生成并验证 ALTER 映射、traceability
-      和 freshness。
+- [x] AR-12 环境 migration 链与 checksum 已恢复；官方生成器已全量重新生成主图，83 条 ALTER
+      语句形成 58 个唯一 migration/table 映射，58/58 均有精确 `migrates` 边，并通过
+      traceability 和 freshness。
 - [x] 用当前已存在的出库查询、H9 分类 PDF、药检单下载、H2 审计四条稳定链验收；各 AR 任务
       的增量关系由各自 Review Loop 验证，不作为 KG-01A 前置。
 
@@ -913,8 +913,8 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
       `check_knowledge_graph_traceability.py --json` 在已验证锚点 `d82b058` 上为 10874 节点、
       21310/21310 有效边、未解析边 0，出库查询/H9 分类 PDF/药检下载/H2 审计四条稳定链均通过；
       当前规模以 traceability 实时输出为准，freshness 以实时门禁返回 `fresh` 为准，KG-01B 域拓扑
-      已完成，KG-01A 的 ALTER 验收已解除 AR-12 阻塞，仍待官方生成器重新生成并验收。
-- [ ] `git diff --check`、`just gov-t1` 及所有任务定向检查均为退出码 `0`。
+      已完成，KG-01A 的 58/58 ALTER 映射已由官方全量生成器重新生成并验收。
+- [x] `git diff --check`、`just gov-t1` 及所有任务定向检查均为退出码 `0`。
 
 ## 7. 本文档的 Review Loop
 
@@ -928,3 +928,4 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
 | R6 | AR-09 真实隔离 Compose smoke、证据边界与独立复审 | 通过：真实隔离 Compose smoke 全部检查通过（smoke/cleanup=0，secrets=false）；Luna 独立复审无 P0/P1/P2；证据不替代 Windows Print Agent/物理打印机 S4 |
 | R7 | AR-12 local/test、dev-h2、staging 精确重建、当前 migration 链与证据边界复核 | 通过：用户明确授权 dev-h2/staging 数据可丢弃并重建，本轮未做备份；分别停止 API，对 `wms_dev_h2`、`wms_staging` 精确 `DROP DATABASE WITH FORCE`/`CREATE`，由 host sqlx-cli 0.8.6 从空库执行当前 114 条链，保留 PostgreSQL data volume，未改 Redis/local/test/生产；三环境均 114 installed/0 pending、latest `202607280001`、all success、SHA-384 mismatch/missing=0，静态关系/索引/约束 `192/564/1159`，schema fingerprint `63fd1daab6ad7b04d1bea02b310e8ca7`，种子 `126/11/46`，schema baseline 1/1；dev 18081/staging 18084 health/ready=200、未鉴权 core=401。旧 dev/staging 数据不可恢复，旧 schema/image 运行证据作废并需重采集；MinIO 缺失为执行前既有状态，Redis 保持运行。 |
 | R8 | AR-12 关闭后的独立复审与 KG-01A 解阻边界 | 通过：两库独立复审均确认 114 installed/0 pending、latest `202607280001`、all success、SHA-384 mismatch/missing=0，三环境 schema/种子/fingerprint 一致；当前 release API 健康、就绪和未鉴权 core 响应符合预期。AR-12 migration 同链恢复关闭，KG-01A 已解除阻塞但仍待官方生成器重新生成并验收 ALTER；旧数据和旧 schema/image 证据不恢复，Wave 6 外部系统、硬件和正式发布 evidence 不因 AR-12 关闭。 |
+| R9 | KG-01A 官方全量重建、ALTER 映射与更新策略收口 | 通过：官方 Understand 全量重建提交 `06649c6` 为 10760 节点、19513/19513 有效边、未解析边 0；83 条 ALTER 语句形成 58 个唯一映射且 58/58 有精确来源，四条稳定链、10 条 Markdown 文档关系、core schema、traceability、freshness、table catalog、29/29 bounded contexts 和 T1 59/59 均通过。当前 ignore 获持续批准，后续由代理按运行手册自动选择部分、架构或全量更新，范围变化时再确认。 |
