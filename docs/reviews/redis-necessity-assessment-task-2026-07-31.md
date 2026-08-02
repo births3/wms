@@ -131,3 +131,7 @@ python3 -m pytest scripts/governance/tests/test_check_redis_usage_inventory.py -
 → 再 review → 记录结论。当前事实盘点和初步选型已完成；鉴权替代、真实性能/多实例基准和安全故障决策不足，
 因此 REDIS-01 不关闭，后续实现任务仍标记 blocked。没有项目主人确认不得删除 Redis、修改部署硬依赖或改写
 Accepted ADR。
+
+聚合 owner：H1 鉴权 / 安全负责人和发布 / 运维负责人。恢复条件：successor ADR 与独立实现任务明确
+PostgreSQL 撤销语义、安全故障策略（fail-open / fail-closed 与撤销窗口），并补齐 p99、多实例、故障恢复、
+数据迁移、回滚、监控、容量和演练证据；在这些条件全部满足前保持 blocked，不删除 Redis 或解除现有部署依赖。
