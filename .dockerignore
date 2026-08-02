@@ -1,0 +1,29 @@
+# Repository metadata and local analysis
+.git
+.ua
+.codex
+
+# Build and test outputs
+backend/target
+target
+node_modules
+**/node_modules
+**/dist
+**/build
+artifacts
+test-results
+coverage
+
+# Local configuration and secrets must never enter the build context
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+**/*.env
+secrets
+**/secrets
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx

@@ -8,6 +8,7 @@ SMOKE = Path("scripts/h9_render_worker_compose_smoke.sh")
 JUSTFILE = Path("justfile")
 RUNBOOK = Path("docs/runbooks/h9-render-worker-compose-smoke.md")
 DOCKERFILE = Path("backend/Dockerfile.wms-api")
+DOCKERIGNORE = Path(".dockerignore")
 
 
 def test_staging_api_does_not_wait_for_render_worker_health():
@@ -85,3 +86,20 @@ def test_smoke_entrypoint_and_runbook_are_registered():
     assert "非打印核心接口" in runbook
     assert "H9_CATEGORY_PDF_RENDER_FAILED" in runbook
     assert "down -v" in runbook
+
+
+def test_root_docker_context_excludes_build_outputs_and_local_secrets():
+    dockerignore = DOCKERIGNORE.read_text(encoding="utf-8").splitlines()
+    for pattern in (
+        ".git",
+        ".ua",
+        "backend/target",
+        "node_modules",
+        "**/node_modules",
+        ".env",
+        ".env.*",
+        "*.env",
+        "**/*.env",
+        "**/secrets",
+    ):
+        assert pattern in dockerignore

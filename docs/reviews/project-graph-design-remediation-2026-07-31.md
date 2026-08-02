@@ -73,7 +73,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-07 | 恢复生产前端 OpenAPI 客户端唯一入口 | 高 | P0+P1 | 无 | 已完成（M3 与客户平台真实 E2E 通过） |
 | AR-08A | 收敛菜单、视图和故障回退边界 | 中高 | P1+P2 | 菜单故障策略确认 | 已完成（H1 真实 E2E 5/5 与截图通过，`79d2688`、`3be857f`） |
 | AR-08B | 消除 M4 模型与组件循环依赖 | 中高 | P1 | AR-03 可独立先做 | 已完成（代码、自检、构建与 M4 真实 E2E 通过，`2149b85`） |
-| AR-09 | 解除 Render Worker 对核心 API 启动的硬阻塞 | 高 | P1+P2 | 部署行为确认 | 实现/服务级验证完成；真实 Compose 受 Docker daemon 失效代理和构建上下文阻塞（`ea93dfe`） |
+| AR-09 | 解除 Render Worker 对核心 API 启动的硬阻塞 | 高 | P1+P2 | 部署行为确认 | 实现/服务级验证完成；构建上下文阻塞已消除，真实 Compose 仍受 Docker daemon 失效代理阻塞（`ea93dfe`） |
 | AR-10 | 修正 H5 与同类虚假真实 E2E/截图证据 | 阻断证据 | P1 | 可用测试 PostgreSQL | 本地闭环完成，外部项 deferred（`dd699b8`） |
 | AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 已完成（B：生产基线 `51/51`、新增违规 `0`，`2948bd2`、`eb4f770`） |
 | AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 环境版本与历史 checksum 均漂移，备份/审批/运行证据待补（`9a97537`、`83419d4`） |
@@ -125,7 +125,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-07 | 已完成 | 客户平台真实 E2E 使用自动回收的 `_e2e` 数据库，4/4 通过。 |
 | AR-08A | 已完成 | 采用 fail-closed 菜单回退（用户确认 A）；真实 H1 Playwright 已覆盖发布菜单、低权限/无可用菜单、角色权限、会话和 API Key，5/5 通过并生成真实截图；同时修正 H1 配置误收集 M-DI/M-TE 用例的问题（本轮提交）。 |
 | AR-08B | 已完成 | M4 模型/组件循环已消除，构建与真实 E2E 通过（`2149b85`）。 |
-| AR-09 | 实现/服务级验证完成，隔离 Compose smoke 待运行环境 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`、`ea93dfe`）。截至 2026-08-02 的两次隔离 smoke 均在构建阶段退出 `1`，cleanup 为 `0`，所有业务检查为 `not-run`，不能作为通过证据。只读审计确认 Docker daemon 的两个 active systemd drop-in 均指向不可达 `192.168.124.5:7890`，BuildKit 因此无法解析 `rust:1.91-bookworm`；当前还缺 `node:22-bookworm-slim` 与 Worker 镜像。仓库根又缺少 `.dockerignore`，约 17 GiB build context 中 `backend/target` 约 16 GiB，历史日志已有 no-space/worker exit 139，禁止直接 `docker system prune` 或用旧临时镜像伪造证据。owner：部署/基础设施负责人；恢复条件：优先在可达 registry 的独立 runner 和干净 checkout 原样运行；若必须使用本机，需维护窗口统一修复两个 daemon proxy、评估共享 Compose 项目与磁盘后再运行。 |
+| AR-09 | 实现/服务级验证完成，隔离 Compose smoke 待运行环境 | 用户已确认“API 与打印解耦”；Compose 配置检查、Render Worker 单测、H9 PostgreSQL 失败持久化与同键重试测试通过（`de7160f`、`ea93dfe`）。截至 2026-08-02 的两次隔离 smoke 均在构建阶段退出 `1`，cleanup 为 `0`，所有业务检查为 `not-run`，不能作为通过证据。仓库根已新增 `.dockerignore` 并由 AR-09 治理测试约束，排除约 16 GiB 的 `backend/target`、本地图谱、依赖产物和本地密钥；按本机目录占用估算，根构建上下文由约 17 GiB 降至约 250 MiB，原 no-space/worker exit 139 风险已在仓库侧收敛。剩余阻塞是 Docker daemon 的两个 active systemd drop-in 均指向不可达 `192.168.124.5:7890`，BuildKit 因此无法解析 `rust:1.91-bookworm`，且当前还缺 `node:22-bookworm-slim` 与 Worker 镜像；禁止直接 `docker system prune` 或用旧临时镜像伪造证据。owner：部署/基础设施负责人；恢复条件：优先在可达 registry 的独立 runner 和干净 checkout 原样运行；若必须使用本机，需维护窗口统一修复两个 daemon proxy、评估共享 Compose 项目与磁盘后再运行。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | 已完成 | 项目主人于 2026-08-01 确认 B：门禁覆盖 `backend/crates/api/src/**` 中全部生产 `include!`，测试模块排除，历史项进入 baseline 且只能收缩；checker 当前 baseline/discovered `51/51`、新增违规 `0`。`document_numbering_repository` 语义模块拆分保留为代表性迁移证据（`2948bd2`、`eb4f770`）。后续生产 include 只能通过正式 Rust `mod` 迁移，baseline 只能减少。 |
 | AR-12 | 环境版本与 checksum 漂移，备份/运行证据待补 | 2026-08-02 只读复核确认 local/test、dev-h2、staging 分别为 `32/4/98` 条 migration，均落后仓库当前 114 条；逐条按 SQLx SHA-384 比对又发现历史 checksum 不一致分别为 `7/2/8` 条，首个 local/dev mismatch `202606030001` 与共享库 `VersionMismatch` 一致。因此不能直接补跑缺失 migration，更不能改 `_sqlx_migrations.checksum` 绕过。目录生成链、空库测试、“首版前保留现链”ADR 和依赖盘点已完成（`9a97537`、`83419d4`、`5a6c7fc`），但仓库未发现迁移前备份、备份完整性校验或恢复演练证据。owner：部署/发布负责人；恢复条件：先确认目标环境、维护窗、备份与恢复/重建路径；staging 默认卷不可销毁，旧 schema/API 证据作废后按 ADR-0045 恢复到当前链并重采集运行证据。 |
