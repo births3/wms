@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T14:43:18.896Z",
-    "gitCommitHash": "10f1c156986a29e7b074473622b1e3b54f2fa3e7"
+    "analyzedAt": "2026-08-02T15:16:57.306Z",
+    "gitCommitHash": "06cb6410eacb87dd9f408feb7d18a313749f45b7"
   },
   "nodes": [
     {
@@ -108870,13 +108870,13 @@
       "type": "document",
       "name": "project-graph-design-remediation-2026-07-31.md",
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "summary": "记录 2026-07-31 全项目知识图谱设计问题整改计划，将经源码、契约、测试、部署配置或 ADR 复核的问题拆分为 AR、KG 和 REDIS 任务，并明确依赖、状态与唯一关闭关系。文档回写截至 2026-08-02 的 Review Loop：AR-09 已由真实隔离 Compose smoke 关闭；仍未完成的是 AR-12、KG-01A 的 ALTER 验收和 REDIS-01 后续迁移，因此全计划不能宣称全部完成。",
+      "summary": "记录全项目图谱设计问题整改的任务边界、验收标准、证据锚点与 Review Loop 状态，明确不能以静态或推断证据宣称整项完成。local/test 已获可丢弃授权并按当前 migration 链精确重建为 114 installed/0 pending、SQLx checksum mismatch 0；dev-h2/staging 仍漂移，AR-12 尚未关闭，KG-01A 的 ALTER 验收继续等待。",
       "tags": [
         "documentation",
-        "architecture-remediation",
-        "acceptance-criteria",
-        "review-loop",
-        "knowledge-graph"
+        "governance",
+        "knowledge-graph",
+        "migration",
+        "review-loop"
       ],
       "complexity": "complex"
     },
