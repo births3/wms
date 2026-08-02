@@ -32,7 +32,7 @@ schema、约束、索引和确定性种子数据；表目录由同一条 migrati
 - `docs/database/table-catalog.md` 继续由
   `python3 scripts/governance/generate_table_catalog.py` 生成，不建立第二份表目录。
 
-## 环境盘点边界
+## 环境盘点快照（决策时）
 
 | 环境 | 当前可验证事实 | 处理规则 |
 |---|---|---|
@@ -41,6 +41,12 @@ schema、约束、索引和确定性种子数据；表目录由同一条 migrati
 | dev | 2026-08-01 只读查询 dev-h2：`_sqlx_migrations` 4 条，最新 `202606050001`，静态表 35，fingerprint `8dd2904e8ff5389c00c60d5f2e724b4e` | 已确认落后仓库链；发布前按现场流程补齐，不用 local 结果替代 |
 | staging | 2026-08-01 只读查询 staging Compose PostgreSQL：`_sqlx_migrations` 5 条，最新 `202606060001`，静态表 42，fingerprint `05d6d1268e4405c58ae770a86b070c69` | 已确认落后仓库链；部署前重新核对 migration、备份和证据，禁止未经批准销毁重建 |
 | production | 本次不探测、不修改 | 由正式发布流程和 ADR-0016 管理 |
+
+上表只记录本 ADR 决策时的只读快照，不作为后续环境现状的事实源。2026-08-02 只读复核显示
+staging 当前为 98 条 migration（与决策时快照不同，不代表链已恢复），且 local/dev/staging
+均存在历史 checksum 漂移；当前证据、owner 和恢复条件统一回写到
+[AR-12 整改任务](../reviews/project-graph-design-remediation-2026-07-31.md)。对现有 schema，
+在备份与审批完成前不得直接补跑缺失 migration；已确认可丢弃的 local/test 仍可按本 ADR 从零重建。
 
 ## 空库基线证据
 
