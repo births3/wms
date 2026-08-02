@@ -40,7 +40,8 @@
 
 另有一项已直接失败的基线：
 `python3 scripts/governance/generate_table_catalog.py --check --json` 曾返回退出码 `1`；
-AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续仍需补空库基线与迁移决策证据。
+AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，local/test 空库基线已补齐，
+dev/staging 同链迁移与发布证据仍待补。
 
 ### 2.1 已复核证据锚点
 
@@ -76,7 +77,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-09 | 解除 Render Worker 对核心 API 启动的硬阻塞 | 高 | P1+P2 | 部署行为确认 | 已完成（真实隔离 Compose smoke、服务级验证与独立复审通过，`b1d94bf`） |
 | AR-10 | 修正 H5 与同类虚假真实 E2E/截图证据 | 阻断证据 | P1 | 可用测试 PostgreSQL | 本地闭环完成，外部项 deferred（`dd699b8`） |
 | AR-11 | 阻止新增数字 `include!` 并改造一个代表聚合 | 中 | P1+P2 | AR-04/AR-05 后独立执行 | 已完成（B：生产基线 `51/51`、新增违规 `0`，`2948bd2`、`eb4f770`） |
-| AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | 环境版本与历史 checksum 均漂移，备份/审批/运行证据待补（`9a97537`、`83419d4`） |
+| AR-12 | 复核首版前 migration 基线与表所有权 | 中 | P2 | 数据库方案确认 | local/test 已按当前链重建并验证；dev-h2/staging 仍漂移，备份/审批/同链迁移与运行证据待补（`9a97537`、`83419d4`） |
 | KG-01A | 补齐确定性可追溯图谱关系 | 中高 | P1+P2 | schema/更新命令确认；ALTER 关系等待 AR-12 | 部分完成（已验证图谱锚点 `d82b058`、分析源 `dc13800` 上为 10874 节点、21310 条有效边；ALTER 验收待 AR-12） |
 | KG-01B | 修正业务域拓扑 | 中 | P1 | 既有计划 G2 完成 | 已完成（29/29 manifest，域图 122 节点/126 边，`efe42d7`、`e36a3b2`；已验证主图 `d82b058`） |
 | KG-02 | 确认并修正图谱新鲜度语义 | 中高 | P2 | 新鲜度方案确认 | 已完成（B：输入 `198b50d` 后独立图谱提交 `585ef30`，fresh） |
@@ -128,7 +129,7 @@ AR-12 首切片已修复生成链并将目录刷新为 193 张静态表，后续
 | AR-09 | 已完成 | 用户已确认“API 与打印解耦”；真实隔离 Compose smoke 证据（`/tmp/wms-ar09-evidence/wms-h9-render-smoke-9087-1795275/evidence.json`）显示 API health/ready/core=200，worker down print=502/code `H9_CATEGORY_PDF_RENDER_FAILED`/persisted failed，worker health=200/wrong token=401/correct token=200，恢复打印=200/persisted completed，smoke/cleanup=0，secrets=false；服务级验证与 `b1d94bf` 同步完成。Luna 独立复审无 P0/P1/P2；该证据不替代 Windows Print Agent/物理打印机 S4。 |
 | AR-10 | 本地闭环完成，外部项 deferred | H5 真实 HTTP/PostgreSQL E2E、截图和质量矩阵纠偏已通过（`dd699b8`）；承运商/PDA/Print Agent/硬件证据继续 deferred。 |
 | AR-11 | 已完成 | 项目主人于 2026-08-01 确认 B：门禁覆盖 `backend/crates/api/src/**` 中全部生产 `include!`，测试模块排除，历史项进入 baseline 且只能收缩；checker 当前 baseline/discovered `51/51`、新增违规 `0`。`document_numbering_repository` 语义模块拆分保留为代表性迁移证据（`2948bd2`、`eb4f770`）。后续生产 include 只能通过正式 Rust `mod` 迁移，baseline 只能减少。 |
-| AR-12 | 环境版本与 checksum 漂移，备份/运行证据待补 | 2026-08-02 只读复核确认 local/test、dev-h2、staging 分别为 `32/4/98` 条 migration，均落后仓库当前 114 条；逐条按 SQLx SHA-384 比对又发现历史 checksum 不一致分别为 `7/2/8` 条，首个 local/dev mismatch `202606030001` 与共享库 `VersionMismatch` 一致。因此不能直接补跑缺失 migration，更不能改 `_sqlx_migrations.checksum` 绕过。目录生成链、空库测试、“首版前保留现链”ADR 和依赖盘点已完成（`9a97537`、`83419d4`、`5a6c7fc`），但仓库未发现迁移前备份、备份完整性校验或恢复演练证据。owner：部署/发布负责人；恢复条件：先确认目标环境、维护窗、备份与恢复/重建路径；staging 默认卷不可销毁，旧 schema/API 证据作废后按 ADR-0045 恢复到当前链并重采集运行证据。 |
+| AR-12 | local/test 当前链验证完成，dev-h2/staging 仍漂移 | 用户于 2026-08-02 确认 local/test 数据可丢弃；本轮仅对宿主 PostgreSQL 14-main 的 `127.0.0.1:5434/wms_test` 执行精确 drop/create，再按当前仓库 migration 链重建。结果为 114 installed/0 pending、latest `202607280001`、SQLx SHA-384 mismatch=0；静态关系 192、索引 564、约束 1159、schema fingerprint `63fd1daab6ad7b04d1bea02b310e8ca7`、种子计数 `126/11/46`，`schema_baseline_postgres` 1/1 passed。dev-h2 未变：4 migrations/latest `202606050001`/checksum mismatch 2；staging 未变：98/latest `202607230001`/mismatch 8。不得关闭 AR-12：剩余仅 dev/staging 备份、审批、同链迁移与证据重采集；KG-01A `ALTER` 仍等待它们。owner：部署/发布负责人；恢复条件：先完成上述 dev/staging 恢复路径并重采集证据。 |
 | KG-01A | 部分完成，ALTER 验收待 AR-12 | 用户已确认采用 A（上游 Understand-Anything 生成器）。独立可复核锚点 `d82b058`、分析源 `dc13800` 上，主图为 10874 个节点、21310 条有效边，每条边均有来源定位与置信度，未解析边为 0；出库查询、H9 分类 PDF、药检单下载和 H2 审计四条稳定链及 traceability validator 均通过。`198b50d` 输入与 `585ef30` 图谱提交形成初始官方增量闭环；当前 provenance、源提交、实时规模和输入文件数以 `.ua/meta.json`、`.ua/fingerprints.json`、traceability 与新鲜度门禁为准。但 AR-12 环境 migration 链与 checksum 漂移尚未关闭，因此不能宣布 ALTER 边验收完成。owner：图谱/架构维护负责人；恢复条件：AR-12 完成 migration 链与 checksum 恢复并补齐环境证据后，使用官方生成器重新生成，再验证 ALTER 映射、traceability 和 freshness。 |
 | KG-01B | 已完成 | 项目主人于 2026-08-01 确认 29 个 manifest-bearing BC（`efe42d7`）：12 个 H 横向能力、M1-M5 五个核心业务上下文、12 个 M- 横向能力；M6/M8/M9/M10 保持业务流程定位，H-INT/H-FILE/H-APV/H-SCH 保持契约扩展定位。`check_bounded_contexts.py --strict` 为 expected/found `29/29`，无 error/warning/info。官方 `understand-domain` 已生成 6 个业务域、29 个 manifest flow、87 个步骤和 126 条边；H1/H2/H3 在跨域关系中可见。官方 core `validateGraph` 成功，Dashboard 可读取 `domain-graph.json`（122 节点、126 边，`e36a3b2`）；H2 结构图追溯链为 10874 节点、21310/21310 有效边（已验证锚点 `d82b058`）。owner：架构/域模型负责人。 |
 | KG-02 | 已完成 | B 方案（源提交 + 输入指纹）已实现并有正反测试（`9a95416`）。输入文档 `198b50d` 与图谱提交 `585ef30` 形成初始可复核闭环；当前 source commit、输入文件数和指纹以 `.ua/meta.json`、`.ua/fingerprints.json` 及新鲜度门禁为准。图谱提交只改变 `.ua`，不会形成新的输入变化。 |
@@ -679,10 +680,10 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 先修复现有 table catalog 生成链和可重建验证，再做 migration 基线决策；不直接压缩、
 删除或重写 migration 历史，不包含 ADR-0014 的 Oracle 数据迁移范围。
 
-**只读环境盘点（2026-08-02 复核）**
+**只读环境盘点（2026-08-02 执行前历史快照）**
 
 未探测或修改生产数据库；通过现有 local/test、dev-h2 和 staging PostgreSQL 只读查询
-`_sqlx_migrations` 与公开 schema 元数据，结果如下：
+`_sqlx_migrations` 与公开 schema 元数据，以下保留精确重建前的历史快照：
 
 | 环境 | 已应用 migration | 最新版本 | 静态表 | schema fingerprint |
 |---|---:|---|---:|---|
@@ -691,16 +692,35 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 | staging（`wms-h8-perf` Compose PostgreSQL） | 98 | `202607230001` | 144 | `2bd4e0298c569de240d1c0e78d64542a` |
 | 仓库 migration 链 | 114 | `202607280001` | — | — |
 
-该结果证明 dev/staging 当前并未跟随仓库 migration 链；staging 现场状态也已不同于
+该执行前历史快照显示 dev/staging 当时并未跟随仓库 migration 链；staging 现场状态也已不同于
 2026-08-01 的 5 条记录，旧证据必须作废或重采集。逐条比对 `_sqlx_migrations.checksum`
-与当前 SQL 文件的 SHA-384 后，local/dev/staging 分别有 7/2/8 条历史 checksum 不一致，
-因此不能直接补跑缺失 migration。盘点不等同于备份、数据可丢弃或发布证据确认。
+与当前 SQL 文件的 SHA-384 后，历史快照中的 local/dev/staging 分别有 7/2/8 条 checksum
+不一致，首个 local/dev mismatch 为 `202606030001`，与共享库 `VersionMismatch` 一致，因此当时不能直接补跑缺失 migration。local/test 已按下述当前结果重建；dev/staging
+的 checksum 漂移仍不能直接补跑缺失 migration。盘点不等同于备份、数据可丢弃或发布证据确认。
 
-**备份、可丢弃和证据依赖盘点（2026-08-01）**
+**当前结果（2026-08-02，local/test 精确重建后）**
+
+用户已确认 local/test 数据可丢弃。本轮仅对宿主 PostgreSQL 14-main 的
+`127.0.0.1:5434/wms_test` 执行精确 drop/create，再按当前仓库 migration 链重建；未探测或
+修改生产数据库。
+
+| 环境 | migration 状态 | latest | SQLx SHA-384 mismatch |
+|---|---|---|---:|
+| local/test（5434） | 114 installed / 0 pending | `202607280001` | 0 |
+| dev-h2（15432） | 4 | `202606050001` | 2 |
+| staging（`wms-h8-perf` Compose PostgreSQL） | 98 | `202607230001` | 8 |
+| 仓库 migration 链 | 114 | `202607280001` | — |
+
+local/test 当前静态关系为 192、索引 564、约束 1159，schema fingerprint 为
+`63fd1daab6ad7b04d1bea02b310e8ca7`，种子计数为 `126/11/46`；
+`schema_baseline_postgres` 为 1/1 passed。dev-h2 与 staging 的状态未变，仍须按发布流程补齐
+备份、审批、同链迁移和运行证据，不能将 local/test 结果外推为 dev/staging 完成。
+
+**备份、可丢弃和证据依赖盘点（2026-08-02 回写）**
 
 | 环境/资产 | 可丢弃边界 | 迁移前备份要求 | 运行证据影响 | 现场动作 |
 |---|---|---|---|---|
-| local/test（5434） | ADR-0045 允许按需从零重建；丢弃前仍需确认没有待保留本地数据 | 若保留数据，按 H10 重大变更前手动 `pg_dump`；从零重建不需要回填旧数据 | 不作为 dev/staging 发布证据 | 测试负责人确认是否可丢弃，必要时执行空库基线测试 |
+| local/test（5434） | 用户于 2026-08-02 已确认可丢弃；本轮已在宿主 PostgreSQL 14-main 的 `127.0.0.1:5434/wms_test` 精确 drop/create | 本次从零重建不需要保留数据备份或回填旧数据 | 不作为 dev/staging 发布证据 | 已按当前仓库 migration 链重建，并通过 `schema_baseline_postgres` 1/1；结果仅限 local/test |
 | dev-h2（Compose） | PostgreSQL/MinIO 使用 `postgres_dev_h2_data`、`minio_dev_h2_data`；仅在 dev 证据已封存或作废后可销毁 | 应用迁移前先做数据库备份并记录 checksum；不得以空库重建替代备份 | 现有 4 条 migration 和旧 API 运行证据需作废并重采集 | 部署负责人备份、批准卷重建或按现链补迁移，再重新采集 dev 证据 |
 | staging（Compose） | `postgres_staging_data`、`redis_staging_data`、`minio_staging_data` 默认不可丢弃；销毁必须先审批 | 按 H10 做迁移前全量备份、校验和恢复点记录 | 旧 schema/镜像与新链不一致，相关 staging 证据需重验 | 发布负责人完成备份、审批、补迁移和 smoke，再归档新证据 |
 | AR-09 隔离 smoke | 脚本生成的一次性卷由 `down -v` 清理，不承载正式业务数据 | 使用临时凭据，不要求正式库备份 | 只生成临时 smoke 记录，不能替代 staging 证据 | 先准备可迁移 H9 fixture、token 和 worker，再执行脚本 |
@@ -898,3 +918,4 @@ python3 -m pytest scripts/governance/tests/test_knowledge_graph_freshness.py -q
 | R4 | 文档链接、空白字符、T1 治理和最终独立复审 | 通过：三路复审无 blocker/high，T1 59/59 |
 | R5 | 前后端依赖方向是否有可运行的反向依赖门禁，且不把类型导入误判为运行时依赖 | 通过：`check_layer_dependency.py --json` 后端 384 个文件、前端 277 个文件，issues=0；正反 fixture 25/25 通过 |
 | R6 | AR-09 真实隔离 Compose smoke、证据边界与独立复审 | 通过：真实隔离 Compose smoke 全部检查通过（smoke/cleanup=0，secrets=false）；Luna 独立复审无 P0/P1/P2；证据不替代 Windows Print Agent/物理打印机 S4 |
+| R7 | AR-12 local/test 可丢弃确认后的精确重建、当前 migration 链与 dev/staging 漂移复核 | 通过：仅对宿主 PostgreSQL 14-main 的 `127.0.0.1:5434/wms_test` 精确 drop/create；114 installed/0 pending、latest `202607280001`、SQLx mismatch=0，静态关系/索引/约束 `192/564/1159`，schema fingerprint `63fd1daab6ad7b04d1bea02b310e8ca7`，种子 `126/11/46`，schema baseline 1/1。未通过项保持开放：dev-h2 `4/202606050001/mismatch2`、staging `98/202607230001/mismatch8` 的备份、审批、同链迁移与证据重采集；KG-01A `ALTER` 继续等待 AR-12。 |
