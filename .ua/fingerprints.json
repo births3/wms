@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "198b50df786d9fa52d8c935457a2413a3cb4f4d7",
-  "generatedAt": "2026-08-01T23:55:54.154Z",
+  "gitCommitHash": "56c75924887ed4913018aafed7eb0d4ddf3e2e53",
+  "generatedAt": "2026-08-02T00:11:27.509Z",
   "files": {
     ".agents/skills/wms-execution-retrospective/SKILL.md": {
       "filePath": ".agents/skills/wms-execution-retrospective/SKILL.md",
@@ -117257,12 +117257,12 @@
     },
     "docs/reviews/project-graph-design-remediation-2026-07-31.md": {
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "contentHash": "85b06d4b636ea8afe9b134f2edabdb425e60639e5a13d60694ab3b7340af557d",
+      "contentHash": "6e8adbfdab5bdf7bfb3a0680cedf43f6f5f05314b98a91a026cbdb984e1507a6",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 891,
+      "totalLines": 895,
       "hasStructuralAnalysis": true
     },
     "docs/reviews/redis-necessity-assessment-task-2026-07-31.md": {
