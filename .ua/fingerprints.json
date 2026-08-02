@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "8fb11da0e74a37f4db3cdd7d73d4b32997a8c7a6",
-  "generatedAt": "2026-08-02T00:43:11.212Z",
+  "gitCommitHash": "3023151e6ec78096deb25d93c454de23661cc7a5",
+  "generatedAt": "2026-08-02T00:59:53.938Z",
   "files": {
     ".dockerignore": {
       "filePath": ".dockerignore",
@@ -115547,12 +115547,12 @@
     },
     "docs/adr/0045-pre-v1-migration-chain.md": {
       "filePath": "docs/adr/0045-pre-v1-migration-chain.md",
-      "contentHash": "f10ea88f2a3c76c7294e70a191f159b4ab19f026a1ff8d8f861d4151e67e351b",
+      "contentHash": "39c75ce1a67552f3c87b749e06a63e8872ed7af4bc8a357d93dc93ab14eca8cc",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 85,
+      "totalLines": 90,
       "hasStructuralAnalysis": true
     },
     "docs/adr/0046-high-risk-write-revocation-fail-closed.md": {

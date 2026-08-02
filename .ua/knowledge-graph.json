@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T00:43:48.723Z",
-    "gitCommitHash": "8fb11da0e74a37f4db3cdd7d73d4b32997a8c7a6"
+    "analyzedAt": "2026-08-02T01:00:30.131Z",
+    "gitCommitHash": "3023151e6ec78096deb25d93c454de23661cc7a5"
   },
   "nodes": [
     {
@@ -106995,12 +106995,13 @@
       "type": "document",
       "name": "0045-pre-v1-migration-chain.md",
       "filePath": "docs/adr/0045-pre-v1-migration-chain.md",
-      "summary": "确定首版前保留现有 114 条 PostgreSQL migration 链，仓库、local、dev、staging 使用同一条链并以空库回归固定基线。",
+      "summary": "记录 ADR-0045 关于首个正式版本前保留 PostgreSQL migration 链的 Accepted 决策，要求仓库、local、dev 和 staging 使用同一条有序链，不删除、合并、改写或重新编号既有 migration。文档同时登记决策时的环境盘点、空库基线证据、发布前同步风险及重新评估条件，强调迁移与环境证据必须可追溯且可回滚。",
       "tags": [
+        "documentation",
         "architecture-decision",
-        "data-migration",
+        "database-migration",
         "postgresql",
-        "pre-v1"
+        "deployment-governance"
       ],
       "complexity": "moderate"
     },
