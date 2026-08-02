@@ -111,7 +111,7 @@ cargo test --manifest-path backend/Cargo.toml -p wms-api \
 - [x] 明确 PostgreSQL 不能替代的部分，不把 `LISTEN/NOTIFY` 当可靠消息队列，不把 advisory lock 当缓存。
 - [x] 记录项目主人“不做 Redis”的目标方向；如果改变 ADR-0018/0024 或部署拓扑，仍须先建 successor ADR，再建实现/迁移任务。
 - [ ] 任何删除 Redis 的后续任务都有数据迁移、回滚、监控、容量和故障演练标准；本任务不执行删除。
-- [ ] 将结论回写主整改计划、`docs/infra/cache-strategy.md`、相关 ADR、Compose/runbook 和 TODO 父状态。
+- [x] 将结论回写主整改计划、`docs/infra/cache-strategy.md`、相关 ADR、Compose/runbook 和 TODO 父状态。
 
 ## 5. 最小验证
 
