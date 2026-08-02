@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "06cb6410eacb87dd9f408feb7d18a313749f45b7",
-  "generatedAt": "2026-08-02T15:16:57.534Z",
+  "gitCommitHash": "41f0f4616f192f7e0c0792c5d3e9588a589c3212",
+  "generatedAt": "2026-08-02T16:01:53.364Z",
   "files": {
     ".dockerignore": {
       "filePath": ".dockerignore",
@@ -117284,12 +117284,12 @@
     },
     "docs/reviews/project-graph-design-remediation-2026-07-31.md": {
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "contentHash": "7df8a9c57bfbbb80456383a594a82ab7df2fb063e54bf453cbe3a25eca9b3da5",
+      "contentHash": "d00fc17c4499257cbdf0657def380f9847b6e36d682e9b75e1e0c6ab5f7eede6",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 921,
+      "totalLines": 930,
       "hasStructuralAnalysis": true
     },
     "docs/reviews/redis-necessity-assessment-task-2026-07-31.md": {

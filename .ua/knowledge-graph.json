@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T15:16:57.306Z",
-    "gitCommitHash": "06cb6410eacb87dd9f408feb7d18a313749f45b7"
+    "analyzedAt": "2026-08-02T16:01:53.217Z",
+    "gitCommitHash": "41f0f4616f192f7e0c0792c5d3e9588a589c3212"
   },
   "nodes": [
     {
@@ -108870,13 +108870,13 @@
       "type": "document",
       "name": "project-graph-design-remediation-2026-07-31.md",
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "summary": "记录全项目图谱设计问题整改的任务边界、验收标准、证据锚点与 Review Loop 状态，明确不能以静态或推断证据宣称整项完成。local/test 已获可丢弃授权并按当前 migration 链精确重建为 114 installed/0 pending、SQLx checksum mismatch 0；dev-h2/staging 仍漂移，AR-12 尚未关闭，KG-01A 的 ALTER 验收继续等待。",
+      "summary": "记录截至 2026-08-02 的全项目图谱设计整改执行与验收状态：AR-12 已完成，local/test、dev-h2、staging 均恢复到当前 114 条 migration 链，三环境 checksum mismatch 均为 0；dev/staging 旧数据因获准丢弃且未备份已不可恢复，绑定旧 schema/image 的历史运行证据作废并需重采集。KG-01A 已解除阻塞但仍待官方 Understand-Anything 生成器重新生成并验收 ALTER 映射，本文明确不能据此声称 KG-01A 或全计划已完成。",
       "tags": [
         "documentation",
-        "governance",
-        "knowledge-graph",
         "migration",
-        "review-loop"
+        "traceability",
+        "quality-gates",
+        "project-remediation"
       ],
       "complexity": "complex"
     },
