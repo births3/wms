@@ -12,6 +12,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from generate_table_catalog import ALTER_TABLE_RE, collect_catalog, collect_schema_events
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_GRAPH = REPO_ROOT / ".ua" / "knowledge-graph.json"
@@ -101,6 +103,193 @@ def _is_migration_path(value: Any) -> bool:
         return False
     normalized = value.replace("\\", "/")
     return "/migrations/" in f"/{normalized}" and normalized.endswith(".sql")
+
+
+def _graph_source_root(graph_path: Path) -> Path:
+    graph_parent = graph_path.resolve().parent
+    if graph_parent.name in {".ua", ".understand-anything"}:
+        return graph_parent.parent
+    return graph_parent
+
+
+def _resolve_graph_file(graph_path: Path, relative_path: str) -> Path | None:
+    """Resolve a graph-relative regular file without allowing root escape."""
+    normalized_path = relative_path.replace("\\", "/")
+    normalized = Path(normalized_path)
+    if (
+        normalized.is_absolute()
+        or re.match(r"^[A-Za-z]:/", normalized_path)
+        or ".." in normalized.parts
+    ):
+        return None
+    source_root = _graph_source_root(graph_path).resolve()
+    candidate = (source_root / normalized).resolve()
+    try:
+        candidate.relative_to(source_root)
+    except ValueError:
+        return None
+    if candidate.is_symlink() or not candidate.is_file():
+        return None
+    return candidate
+
+
+def _migration_alter_statements(sql: str) -> list[dict[str, Any]]:
+    statements: list[dict[str, Any]] = []
+    # Keep event discovery identical to generate_table_catalog.collect_schema_events;
+    # deduplication happens later per (migration path, table) mapping.
+    for match in ALTER_TABLE_RE.finditer(sql):
+        line_start = sql.count("\n", 0, match.start()) + 1
+        semicolon = sql.find(";", match.end())
+        line_end = (
+            sql.count("\n", 0, semicolon) + 1
+            if semicolon >= 0
+            else line_start
+        )
+        table = match.group(1).strip('"').lower()
+        statements.append(
+            {
+                "table": table,
+                "lineStart": line_start,
+                "lineEnd": line_end,
+            }
+        )
+    return statements
+
+
+def _validate_migration_alter_edges(
+    graph_path: Path,
+    nodes: list[Any],
+    edges: list[Any],
+) -> tuple[list[str], int, int, int]:
+    """Require one exact pseudo-migration -> canonical-table edge per ALTER mapping."""
+    issues: list[str] = []
+    node_ids = {
+        node.get("id")
+        for node in nodes
+        if isinstance(node, dict) and isinstance(node.get("id"), str)
+    }
+    pseudo_nodes: dict[str, str] = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = node.get("id")
+        file_path = node.get("filePath")
+        if not isinstance(node_id, str) or not isinstance(file_path, str):
+            continue
+        if (
+            node.get("type") == "table"
+            and node_id.endswith(":migration")
+            and _is_migration_path(file_path)
+        ):
+            pseudo_nodes[file_path.replace("\\", "/")] = node_id
+
+    migration_edges = [
+        edge
+        for edge in edges
+        if isinstance(edge, dict) and edge.get("type") == "migrates"
+    ]
+    catalog_root = _graph_source_root(graph_path)
+    canonical_ids = {
+        table.name.lower(): f"table:{table.migration}:{table.name}"
+        for table in collect_catalog(catalog_root)
+    }
+    expected_mappings = {
+        (event.migration.replace("\\", "/"), event.table.lower())
+        for event in collect_schema_events(catalog_root)
+        if event.kind == "alter"
+    }
+    statements_by_mapping: dict[tuple[str, str], list[dict[str, int]]] = {}
+    alter_statement_count = 0
+    missing_source_paths: set[str] = set()
+    for migration_path in sorted({path for path, _ in expected_mappings}):
+        source_path = _resolve_graph_file(graph_path, migration_path)
+        if source_path is None:
+            missing_source_paths.add(migration_path)
+            continue
+        try:
+            sql = source_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            issues.append(f"migration source file cannot be read: {migration_path}: {exc}")
+            missing_source_paths.add(migration_path)
+            continue
+        statements = _migration_alter_statements(sql)
+        alter_statement_count += len(statements)
+        for statement in statements:
+            statements_by_mapping.setdefault(
+                (migration_path, statement["table"]), []
+            ).append(
+                {
+                    "lineStart": statement["lineStart"],
+                    "lineEnd": statement["lineEnd"],
+                }
+            )
+
+    alter_mapping_count = len(expected_mappings)
+    matched_edge_count = 0
+    for migration_path, table_name in sorted(expected_mappings):
+        if migration_path in missing_source_paths:
+            issues.append(f"migration source file not found: {migration_path}")
+            continue
+        spans = statements_by_mapping.get((migration_path, table_name), [])
+        if not spans:
+            issues.append(
+                f"ALTER TABLE {table_name} at {migration_path} has no parsed source statement"
+            )
+            continue
+        canonical_id = canonical_ids.get(table_name)
+        representative = min(
+            spans, key=lambda span: (span["lineStart"], span["lineEnd"])
+        )
+        if canonical_id is None:
+            issues.append(
+                f"ALTER TABLE {table_name} at {migration_path}:"
+                f" line {representative['lineStart']} has no table-catalog creation mapping"
+            )
+            continue
+        if canonical_id not in node_ids:
+            issues.append(
+                f"ALTER TABLE {table_name} at {migration_path}:"
+                f" line {representative['lineStart']} missing canonical table node {canonical_id}"
+            )
+            continue
+        pseudo_id = pseudo_nodes.get(migration_path)
+        if pseudo_id is None:
+            issues.append(
+                f"ALTER TABLE {table_name} at {migration_path}:"
+                f" line {representative['lineStart']} missing migration pseudo node"
+            )
+            continue
+        matching_edges = [
+            edge
+            for edge in migration_edges
+            if edge.get("source") == pseudo_id
+            and edge.get("target") == canonical_id
+        ]
+        expected_span = {
+            "filePath": migration_path,
+            "lineStart": representative["lineStart"],
+            "lineEnd": representative["lineEnd"],
+        }
+        if (
+            len(matching_edges) == 1
+            and matching_edges[0].get("sourceSpan") == expected_span
+        ):
+            matched_edge_count += 1
+            continue
+        existing_spans = [edge.get("sourceSpan") for edge in matching_edges]
+        suffix = f"; existing sourceSpans={existing_spans!r}" if existing_spans else ""
+        multiplicity = (
+            f"; expected exactly one edge, found {len(matching_edges)}"
+            if len(matching_edges) > 1
+            else ""
+        )
+        issues.append(
+            f"ALTER TABLE {table_name} at {migration_path}:"
+            f" line {representative['lineStart']}-{representative['lineEnd']} missing "
+            f"migrates edge from {pseudo_id} with exact sourceSpan"
+            f"{suffix}{multiplicity or '; expected exactly one edge'}"
+        )
+    return issues, alter_statement_count, alter_mapping_count, matched_edge_count
 
 
 def _stable_chain(graph: dict[str, Any], domain: str) -> dict[str, Any]:
@@ -316,6 +505,15 @@ def validate_graph(path: Path | str, domain: str | None = None) -> dict[str, Any
         issues.append(
             "migration table nodes require traceable migrates edges sourced from SQL migrations"
         )
+    (
+        alter_issues,
+        alter_statement_count,
+        alter_mapping_count,
+        alter_edge_count,
+    ) = _validate_migration_alter_edges(
+        graph_path, nodes, edges
+    )
+    issues.extend(alter_issues)
 
     selected_domains = [domain] if domain else list(DOMAIN_SPECS)
     stable_chains: dict[str, dict[str, Any]] = {}
@@ -344,6 +542,9 @@ def validate_graph(path: Path | str, domain: str | None = None) -> dict[str, Any
         "migrationTraceability": {
             "migrationNodeCount": len(migration_node_ids - {None}),
             "migrationEdgeCount": len(migration_edges),
+            "alterStatementCount": alter_statement_count,
+            "alterMappingCount": alter_mapping_count,
+            "alterEdgeCount": alter_edge_count,
         },
         "stableChains": stable_chains,
         "issues": issues,

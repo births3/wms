@@ -1,0 +1,6 @@
+-- traceability fixture
+ALTER TABLE outbound_order
+    ADD COLUMN customer_ref TEXT;
+
+ALTER TABLE outbound_order
+    ADD COLUMN customer_ref_2 TEXT;
