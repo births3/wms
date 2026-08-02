@@ -4,7 +4,29 @@
 //! `deploy/feature_flags.toml` file and supports `WMS_FEATURE_*` environment
 //! overrides. It does not introduce business flags.
 
-use std::{collections::BTreeMap, env, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    path::{Path, PathBuf},
+};
+
+const FEATURE_FLAGS_FILE_ENV: &str = "WMS_FEATURE_FLAGS_FILE";
+
+pub fn resolve_feature_flags_file(default_path: impl Into<PathBuf>) -> PathBuf {
+    resolve_feature_flags_file_with_env(default_path, |name| env::var(name).ok())
+}
+
+fn resolve_feature_flags_file_with_env<F>(
+    default_path: impl Into<PathBuf>,
+    env_lookup: F,
+) -> PathBuf
+where
+    F: Fn(&str) -> Option<String>,
+{
+    env_lookup(FEATURE_FLAGS_FILE_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| default_path.into())
+}
 
 /// One registry entry from `deploy/feature_flags.toml`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -213,7 +235,18 @@ fn env_key_name(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{FeatureFlagError, FeatureFlagRegistry};
+    use std::path::PathBuf;
+
+    use super::{resolve_feature_flags_file_with_env, FeatureFlagError, FeatureFlagRegistry};
+
+    #[test]
+    fn runtime_file_override_wins_over_default() {
+        let path = resolve_feature_flags_file_with_env("deploy/feature_flags.toml", |name| {
+            (name == "WMS_FEATURE_FLAGS_FILE").then(|| "/app/deploy/feature_flags.toml".to_string())
+        });
+
+        assert_eq!(path, PathBuf::from("/app/deploy/feature_flags.toml"));
+    }
 
     #[test]
     fn empty_registry_keeps_flags_disabled() {

@@ -35,7 +35,7 @@ use wms_api::{
     drug_inspection_stamp_handlers::{drug_inspection_stamp_router, DrugInspectionStampAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     express::{express_router, ExpressAppState},
-    feature_flags::FeatureFlagRegistry,
+    feature_flags::{resolve_feature_flags_file, FeatureFlagRegistry},
     file_attachment_handlers::{file_attachment_router, FileAttachmentAppState},
     h2_lifecycle_handlers::{h2_lifecycle_router, H2LifecycleAppState},
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
@@ -75,7 +75,6 @@ const REDIS_URL_ENV: &str = "WMS_REDIS_URL";
 const DATABASE_URL_ENV: &str = "DATABASE_URL";
 const WMS_DB_URL_ENV: &str = "WMS_DB_URL";
 const DB_MAX_CONNECTIONS_ENV: &str = "WMS_DB_MAX_CONNECTIONS";
-const FEATURE_FLAGS_FILE_ENV: &str = "WMS_FEATURE_FLAGS_FILE";
 const H_FILE_STORAGE_ROOT_ENV: &str = "WMS_H_FILE_STORAGE_ROOT";
 const DEFAULT_BIND_ADDR: &str = "0.0.0.0:8080";
 const DEFAULT_DB_MAX_CONNECTIONS: u32 = 32;
@@ -106,9 +105,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
     })?;
     let database_url = database_url()?;
-    let feature_flags_file = PathBuf::from(
-        env::var(FEATURE_FLAGS_FILE_ENV).unwrap_or_else(|_| DEFAULT_FEATURE_FLAGS_FILE.to_string()),
-    );
+    let feature_flags_file = resolve_feature_flags_file(DEFAULT_FEATURE_FLAGS_FILE);
     let file_registry = FeatureFlagRegistry::from_file(&feature_flags_file).map_err(|error| {
         io::Error::new(
             io::ErrorKind::InvalidInput,

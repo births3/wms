@@ -34,7 +34,7 @@ use wms_api::{
     drug_inspection_stamp_handlers::{drug_inspection_stamp_router, DrugInspectionStampAppState},
     dual_person_policy_handlers::{dual_person_policy_router, DualPersonPolicyAppState},
     express::{express_router, ExpressAppState},
-    feature_flags::FeatureFlagRegistry,
+    feature_flags::{resolve_feature_flags_file, FeatureFlagRegistry},
     file_attachment::FileAttachmentService,
     file_attachment_handlers::{file_attachment_router, FileAttachmentAppState},
     h8_erp_connectors::{h8_erp_connector_router, H8ErpConnectorAppState},
@@ -164,10 +164,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             pool.clone(),
         )))
         .merge(config_center_router(ConfigCenterAppState::with_postgres(
-            FeatureFlagRegistry::from_file(
+            FeatureFlagRegistry::from_file(resolve_feature_flags_file(
                 std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                     .join("../../../deploy/feature_flags.toml"),
-            )
+            ))
             .map_err(|error| io::Error::other(format!("feature flags: {error:?}")))?,
             pool.clone(),
         )))

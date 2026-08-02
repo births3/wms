@@ -45,6 +45,7 @@ def test_compose_smoke_checks_persisted_failure_and_recovery_state():
     runbook = RUNBOOK.read_text(encoding="utf-8")
     for token in ("list_url", "preparation_status", "processing_status", '"failed"', '"completed"'):
         assert token in smoke
+    assert 'item.get("source_mode") == "rendered"' in smoke
     assert "持久化失败状态" in runbook
 
 

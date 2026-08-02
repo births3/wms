@@ -459,8 +459,9 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as handle:
     body = json.load(handle)
 assert body.get("preparation_status") == "failed", body
-assert body.get("data"), body
-assert all(item.get("processing_status") == "failed" for item in body["data"]), body
+rendered_items = [item for item in body.get("data", []) if item.get("source_mode") == "rendered"]
+assert rendered_items, body
+assert all(item.get("processing_status") == "failed" for item in rendered_items), body
 PY
 worker_down_list_status=failed
 cp "$list_response" "$evidence_dir/worker-down-list-response.json"
