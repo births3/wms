@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "177a3a9860dfe142e8c56ad7264f2cc8cbbd24ba",
-  "generatedAt": "2026-08-02T01:28:19.639Z",
+  "gitCommitHash": "b1d94bff885b26eac42ef2fadcd64d9d93258708",
+  "generatedAt": "2026-08-02T14:33:33.684Z",
   "files": {
     ".dockerignore": {
       "filePath": ".dockerignore",
@@ -25533,7 +25533,7 @@
     },
     "backend/crates/api/examples/wms_api_e2e.rs": {
       "filePath": "backend/crates/api/examples/wms_api_e2e.rs",
-      "contentHash": "a6646a5f207c0369eb06fbacc219a1251e57db05138860ac19a643fddad2e41c",
+      "contentHash": "6c7ae89f5f72ec8c70b8de904c49fdd8c8601c8f808222c91cdb13f663ad59f8",
       "functions": [
         {
           "name": "main",
@@ -25664,7 +25664,6 @@
           "specifiers": [
             "drug_inspection_copy_service::spawn_drug_inspection_copy_worker",
             "drug_inspection_portal_bridge::spawn_drug_inspection_portal_bridge",
-            "feature_flags::FeatureFlagRegistry",
             "file_attachment::FileAttachmentService",
             "print_orchestration::CategoryPdfRenderer",
             "wave4_handlers::postgres_outbound"
@@ -33022,14 +33021,14 @@
     },
     "backend/crates/api/src/bin/wms_api.rs": {
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
-      "contentHash": "c5c5fd1c95d3c4da71341082e7d254a1f2732d047526814bb01bdceee6f77369",
+      "contentHash": "5bc0e712db95b9546428e7d98f6d3717ca956880870b688f3f7a4c80e10769ab",
       "functions": [
         {
           "name": "main",
           "params": [],
           "returnType": "Result<(), Box<dyn Error>>",
           "exported": false,
-          "lineCount": 96
+          "lineCount": 94
         },
         {
           "name": "database_url",
@@ -33227,7 +33226,6 @@
           "specifiers": [
             "drug_inspection_copy_service::spawn_drug_inspection_copy_worker",
             "drug_inspection_portal_bridge::spawn_drug_inspection_portal_bridge",
-            "feature_flags::FeatureFlagRegistry",
             "reports_handlers::mount_reports",
             "state_machine::state_machine_router"
           ]
@@ -33247,7 +33245,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 520,
+      "totalLines": 517,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/bin/wms_api/audit_query.rs": {
@@ -42415,8 +42413,27 @@
     },
     "backend/crates/api/src/feature_flags.rs": {
       "filePath": "backend/crates/api/src/feature_flags.rs",
-      "contentHash": "507dc4f11d5b400dc3c39b0015d58f2958031d5785ac5b1207cec6b20cc5ffdd",
+      "contentHash": "8157bfb8ad8aaad4e1242b4b90b8d03098033e33761d73b8c9d8f3fd29155259",
       "functions": [
+        {
+          "name": "resolve_feature_flags_file",
+          "params": [
+            "default_path"
+          ],
+          "returnType": "PathBuf",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "resolve_feature_flags_file_with_env",
+          "params": [
+            "default_path",
+            "env_lookup"
+          ],
+          "returnType": "PathBuf",
+          "exported": false,
+          "lineCount": 11
+        },
         {
           "name": "empty",
           "params": [],
@@ -42601,12 +42618,12 @@
           "specifiers": [
             "collections::BTreeMap",
             "env",
-            "fs",
-            "path::Path"
+            "fs"
           ]
         }
       ],
       "exports": [
+        "resolve_feature_flags_file",
         "FeatureFlag",
         "FeatureFlagRegistry",
         "FeatureFlagError",
@@ -42619,7 +42636,7 @@
         "is_enabled",
         "is_enabled_with_env"
       ],
-      "totalLines": 310,
+      "totalLines": 343,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/file_attachment.rs": {
@@ -154208,7 +154225,7 @@
     },
     "scripts/governance/tests/test_h9_render_worker_decoupling.py": {
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-      "contentHash": "d78b33910d545575b43e315489ce9cfbbf91bd019fcebeaeb93d0bfbaedf2f56",
+      "contentHash": "6b393130e5c6a25da6aef605a4fc220df2c7607e1c6b100ae1b37a3eda7a9574",
       "functions": [
         {
           "name": "test_staging_api_does_not_wait_for_render_worker_health",
@@ -154226,7 +154243,7 @@
           "name": "test_compose_smoke_checks_persisted_failure_and_recovery_state",
           "params": [],
           "exported": true,
-          "lineCount": 6
+          "lineCount": 7
         },
         {
           "name": "test_compose_smoke_persists_non_secret_evidence_after_cleanup",
@@ -154277,7 +154294,7 @@
         "test_smoke_entrypoint_and_runbook_are_registered",
         "test_root_docker_context_excludes_build_outputs_and_local_secrets"
       ],
-      "totalLines": 106,
+      "totalLines": 107,
       "hasStructuralAnalysis": true
     },
     "scripts/governance/tests/test_idempotency_storage.py": {
@@ -171210,7 +171227,7 @@
     },
     "scripts/h9_render_worker_compose_smoke.sh": {
       "filePath": "scripts/h9_render_worker_compose_smoke.sh",
-      "contentHash": "f0e84bee7d18fa9de6a745810d058de6c32813ac6b9de99ff7869aad8c200c47",
+      "contentHash": "5e4044778c087eb31012b5e68a2720d3e36a1ee8955811e468c94d6bee48e02c",
       "functions": [
         {
           "name": "db_query",
@@ -171246,7 +171263,7 @@
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 532,
+      "totalLines": 533,
       "hasStructuralAnalysis": true
     },
     "scripts/mkdocs_copy_md_hook.py": {

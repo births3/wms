@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T01:28:19.495Z",
-    "gitCommitHash": "177a3a9860dfe142e8c56ad7264f2cc8cbbd24ba"
+    "analyzedAt": "2026-08-02T14:34:15.439Z",
+    "gitCommitHash": "b1d94bff885b26eac42ef2fadcd64d9d93258708"
   },
   "nodes": [
     {
@@ -31719,14 +31719,16 @@
       "type": "file",
       "name": "feature_flags.rs",
       "filePath": "backend/crates/api/src/feature_flags.rs",
-      "summary": "实现 feature flag 注册表、TOML 解析、环境变量覆盖和运行时启用判断。",
+      "summary": "提供 Wave 1 文件型特性开关注册表：读取治理维护的 TOML 文件，并支持运行时环境变量覆盖。解析失败或环境变量格式错误时按关闭策略处理。",
       "tags": [
-        "rust",
-        "api",
-        "feature-flag"
+        "config",
+        "feature-flag",
+        "parser",
+        "runtime",
+        "validation"
       ],
       "complexity": "complex",
-      "languageNotes": "Rust API 模块采用 handler、service/repository、审计与状态边界分层，结构来自 bundled tree-sitter 提取。"
+      "languageNotes": "Rust 模块使用 BTreeMap 保存稳定排序的开关注册表，并通过泛型闭包注入环境变量读取逻辑以便测试。"
     },
     {
       "id": "file:backend/crates/api/src/file_attachment_handlers.rs",
@@ -31793,13 +31795,13 @@
       "name": "empty",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        33,
-        37
+        55,
+        59
       ],
-      "summary": "在功能开关模块中实现 empty，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "创建不包含任何特性开关的空注册表。",
       "tags": [
-        "rust",
-        "function",
+        "factory",
+        "registry",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -31810,13 +31812,13 @@
       "name": "from_file",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        39,
-        44
+        61,
+        66
       ],
-      "summary": "在功能开关模块中实现 from_file，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "读取指定路径的特性开关文件，并将文本交给 TOML 风格解析器构造注册表。",
       "tags": [
-        "rust",
-        "function",
+        "io",
+        "parser",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -31827,16 +31829,17 @@
       "name": "from_toml_str",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        46,
-        95
+        68,
+        117
       ],
-      "summary": "在功能开关模块中实现 from_toml_str，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "逐行解析 flags 表及字段，组装并校验特性开关注册表；遇到非法结构或缺失必填字段时返回格式错误。",
       "tags": [
-        "rust",
-        "function",
-        "feature-flag"
+        "parser",
+        "validation",
+        "feature-flag",
+        "serialization"
       ],
-      "complexity": "moderate"
+      "complexity": "complex"
     },
     {
       "id": "function:backend/crates/api/src/feature_flags.rs:len",
@@ -31844,13 +31847,13 @@
       "name": "len",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        97,
-        99
+        119,
+        121
       ],
-      "summary": "在功能开关模块中实现 len，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "返回注册表中的特性开关数量。",
       "tags": [
-        "rust",
-        "function",
+        "query",
+        "registry",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -31861,13 +31864,13 @@
       "name": "is_empty",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        101,
-        103
+        123,
+        125
       ],
-      "summary": "在功能开关模块中实现 is_empty，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "判断注册表是否为空。",
       "tags": [
-        "rust",
-        "function",
+        "query",
+        "registry",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -31878,13 +31881,13 @@
       "name": "flags",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        105,
-        107
+        127,
+        129
       ],
-      "summary": "在功能开关模块中实现 flags，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "以迭代器形式暴露注册表中的特性开关条目。",
       "tags": [
-        "rust",
-        "function",
+        "query",
+        "iterator",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -31895,13 +31898,13 @@
       "name": "is_enabled",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        109,
-        111
+        131,
+        133
       ],
-      "summary": "在功能开关模块中实现 is_enabled，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "按真实进程环境变量查询指定特性开关是否启用。",
       "tags": [
-        "rust",
-        "function",
+        "query",
+        "runtime",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -31912,16 +31915,17 @@
       "name": "is_enabled_with_env",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        113,
-        129
+        135,
+        151
       ],
-      "summary": "在功能开关模块中实现 is_enabled_with_env，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "优先解析注入环境变量中的布尔覆盖值；覆盖值无效时安全关闭，否则回退到文件注册表状态。",
       "tags": [
-        "rust",
-        "function",
+        "query",
+        "override",
+        "fail-closed",
         "feature-flag"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "function:backend/crates/api/src/feature_flags.rs:push_partial",
@@ -31929,16 +31933,17 @@
       "name": "push_partial",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        141,
-        159
+        163,
+        181
       ],
-      "summary": "在功能开关模块中实现 push_partial，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "将部分解析的开关字段校验为完整条目并插入注册表，缺失必填字段时返回格式错误。",
       "tags": [
-        "rust",
-        "function",
+        "parser",
+        "validation",
+        "registry",
         "feature-flag"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "function:backend/crates/api/src/feature_flags.rs:parse_string",
@@ -31946,14 +31951,14 @@
       "name": "parse_string",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        170,
-        181
+        192,
+        203
       ],
-      "summary": "在功能开关模块中实现 parse_string，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "解析带引号或裸值的字符串字段，并拒绝空白分隔的非法值。",
       "tags": [
-        "rust",
-        "function",
-        "feature-flag"
+        "parser",
+        "validation",
+        "serialization"
       ],
       "complexity": "simple"
     },
@@ -31963,13 +31968,13 @@
       "name": "env_key_name",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        200,
-        212
+        222,
+        234
       ],
-      "summary": "在功能开关模块中实现 env_key_name，负责该流程的校验、编排或数据访问逻辑。",
+      "summary": "将特性开关键规范化为 WMS_FEATURE_* 环境变量名称，将非字母数字字符转换为下划线。",
       "tags": [
-        "rust",
-        "function",
+        "utility",
+        "environment",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -31980,14 +31985,14 @@
       "name": "FeatureFlag",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        11,
-        17
+        33,
+        39
       ],
-      "summary": "定义功能开关模块的 FeatureFlag 数据结构或服务契约。",
+      "summary": "表示一个文件型特性开关及其治理元数据，包括负责人、创建日期、清理期限和启用状态。",
       "tags": [
-        "rust",
-        "class",
-        "feature-flag"
+        "data-model",
+        "feature-flag",
+        "governance"
       ],
       "complexity": "simple"
     },
@@ -31997,16 +32002,17 @@
       "name": "FeatureFlagRegistry",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        21,
-        23
+        43,
+        45
       ],
-      "summary": "定义功能开关模块的 FeatureFlagRegistry 数据结构或服务契约。",
+      "summary": "封装 Wave 1 特性开关集合及其加载、查询和环境覆盖能力，是 API 运行时读取开关的主要入口。",
       "tags": [
-        "rust",
-        "class",
-        "feature-flag"
+        "feature-flag",
+        "registry",
+        "runtime",
+        "config"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "class:backend/crates/api/src/feature_flags.rs:FeatureFlagError",
@@ -32014,13 +32020,13 @@
       "name": "FeatureFlagError",
       "filePath": "backend/crates/api/src/feature_flags.rs",
       "lineRange": [
-        27,
-        30
+        49,
+        52
       ],
-      "summary": "定义功能开关模块的 FeatureFlagError 数据结构或服务契约。",
+      "summary": "定义特性开关文件读取失败和内容格式无效两类错误，供调用方区分启动配置问题。",
       "tags": [
-        "rust",
-        "class",
+        "error",
+        "validation",
         "feature-flag"
       ],
       "complexity": "simple"
@@ -112083,13 +112089,16 @@
       "type": "file",
       "name": "wms_api_e2e.rs",
       "filePath": "backend/crates/api/examples/wms_api_e2e.rs",
-      "summary": "WMS API 端到端示例服务，提供测试环境启动、健康检查和认证撤销状态的内存模拟。",
+      "summary": "真实数据 Web 管理端 E2E 的 Rust HTTP 入口：连接 PostgreSQL/Redis，执行可选种子与迁移，并挂载完整 API 路由及后台工作进程。该入口还提供健康检查和打印渲染所需的运行时配置。",
       "tags": [
-        "example",
-        "e2e",
-        "test-fixture"
+        "entry-point",
+        "e2e-test",
+        "api-server",
+        "integration",
+        "runtime"
       ],
-      "complexity": "complex"
+      "complexity": "complex",
+      "languageNotes": "使用 Tokio/Axum 启动异步 HTTP 服务，并通过环境变量切换数据库、Redis、特性开关和附件存储配置。"
     },
     {
       "id": "function:backend/crates/api/examples/wms_api_e2e.rs:main",
@@ -112100,13 +112109,14 @@
         81,
         252
       ],
-      "summary": "组装并启动对应示例或 WMS API 运行时。",
+      "summary": "读取 E2E 运行参数，初始化数据库连接、迁移、种子数据、附件服务和后台 worker，并组装带认证中间件的完整 Axum API 路由后监听 HTTP 请求。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "entry-point",
+        "e2e-test",
+        "api-server",
+        "orchestration"
       ],
-      "complexity": "moderate"
+      "complexity": "complex"
     },
     {
       "id": "function:backend/crates/api/examples/wms_api_e2e.rs:database_url",
@@ -112117,10 +112127,11 @@
         254,
         269
       ],
-      "summary": "实现 database_url 的后端业务逻辑。",
+      "summary": "解析非空的数据库连接字符串，优先使用 DATABASE_URL，缺失时回退到 WMS_DB_URL，并在两者均未配置时返回输入错误。",
       "tags": [
-        "function",
-        "backend",
+        "configuration",
+        "validation",
+        "database",
         "runtime"
       ],
       "complexity": "simple"
@@ -112134,13 +112145,14 @@
         279,
         279
       ],
-      "summary": "封装 AllowAllRevocationStore 的相关数据与行为。",
+      "summary": "E2E 环境的认证撤销存储占位实现，允许所有令牌且不持久化黑名单或权限变更时间，用于未配置 Redis 时维持测试服务可启动。",
       "tags": [
-        "class",
-        "backend",
-        "domain"
+        "test-double",
+        "authentication",
+        "revocation",
+        "runtime"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "file:backend/crates/api/src/alert_dashboard/export.rs",
@@ -112424,13 +112436,16 @@
       "type": "file",
       "name": "wms_api.rs",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
-      "summary": "WMS API 主二进制入口，组装配置、数据库连接、路由、OpenAPI、健康检查和内部文档访问。",
+      "summary": "WMS API 生产入口：读取运行时配置，初始化 PostgreSQL、Redis、特性开关和后台任务，并组装包含认证、韧性、打印、药检及业务模块的 Axum 路由。该文件同时提供健康检查、API 文档和 Prometheus 指标端点。",
       "tags": [
         "entry-point",
-        "api",
-        "runtime"
+        "api-server",
+        "routing",
+        "configuration",
+        "middleware"
       ],
-      "complexity": "complex"
+      "complexity": "complex",
+      "languageNotes": "使用 Tokio/Axum 构建异步 Rust 服务，通过共享 PostgreSQL 连接池和 Redis 连接初始化多个模块状态，并在路由层挂载认证与韧性中间件。"
     },
     {
       "id": "function:backend/crates/api/src/bin/wms_api.rs:main",
@@ -112438,16 +112453,17 @@
       "name": "main",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        85,
-        180
+        84,
+        177
       ],
-      "summary": "组装并启动对应示例或 WMS API 运行时。",
+      "summary": "读取绑定地址、JWT、Redis、数据库和特性开关配置，建立 PostgreSQL/Redis 连接并启动后台任务；随后组装完整 API 路由、认证运行时层并监听 HTTP 请求。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "entry-point",
+        "runtime",
+        "configuration",
+        "orchestration"
       ],
-      "complexity": "moderate"
+      "complexity": "complex"
     },
     {
       "id": "function:backend/crates/api/src/bin/wms_api.rs:database_url",
@@ -112455,13 +112471,14 @@
       "name": "database_url",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        182,
-        198
+        179,
+        195
       ],
-      "summary": "实现 database_url 的后端业务逻辑。",
+      "summary": "解析非空的数据库连接字符串，优先使用 DATABASE_URL，缺失时回退到 WMS_DB_URL，并在两者均未配置时返回输入错误。",
       "tags": [
-        "function",
-        "backend",
+        "configuration",
+        "validation",
+        "database",
         "runtime"
       ],
       "complexity": "simple"
@@ -112472,14 +112489,15 @@
       "name": "database_max_connections",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        200,
-        224
+        197,
+        221
       ],
-      "summary": "实现 database_max_connections 的后端业务逻辑。",
+      "summary": "读取并校验 WMS_DB_MAX_CONNECTIONS，缺省时返回默认连接数；对非整数、零值和环境读取错误统一返回输入错误。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "configuration",
+        "validation",
+        "database",
+        "resource-management"
       ],
       "complexity": "simple"
     },
@@ -112489,14 +112507,15 @@
       "name": "from_env",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        233,
-        243
+        230,
+        240
       ],
-      "summary": "实现 from_env 的后端业务逻辑。",
+      "summary": "将 WMS_API_DOCS_MODE 环境变量映射为 API 文档的开发或生产模式，缺省或未知值按开发模式处理。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "configuration",
+        "feature-flag",
+        "access-control",
+        "api-docs"
       ],
       "complexity": "simple"
     },
@@ -112506,16 +112525,18 @@
       "name": "app",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        249,
-        400
+        246,
+        397
       ],
-      "summary": "组装并启动对应示例或 WMS API 运行时。",
+      "summary": "初始化各业务模块的应用状态并组合 Axum 路由，覆盖基础资料、药检、打印、ERP、任务、告警和报表等能力；最后挂载 API 文档模式、韧性中间件和 API Key 认证中间件。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "api-server",
+        "routing",
+        "dependency-injection",
+        "middleware",
+        "orchestration"
       ],
-      "complexity": "moderate"
+      "complexity": "complex"
     },
     {
       "id": "function:backend/crates/api/src/bin/wms_api.rs:api_docs",
@@ -112523,16 +112544,17 @@
       "name": "api_docs",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        417,
-        440
+        414,
+        437
       ],
-      "summary": "实现 api_docs 的后端业务逻辑。",
+      "summary": "在开发模式下返回 Swagger UI 页面，并在生产模式或非内部请求时拒绝访问。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "api-docs",
+        "security",
+        "http-handler",
+        "swagger"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "function:backend/crates/api/src/bin/wms_api.rs:redoc_docs",
@@ -112540,14 +112562,15 @@
       "name": "redoc_docs",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        442,
-        460
+        439,
+        457
       ],
-      "summary": "实现 redoc_docs 的后端业务逻辑。",
+      "summary": "校验文档访问来源后返回 ReDoc HTML 页面，用于浏览 API OpenAPI 描述。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "api-docs",
+        "security",
+        "http-handler",
+        "redoc"
       ],
       "complexity": "simple"
     },
@@ -112557,14 +112580,15 @@
       "name": "metrics",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        462,
-        476
+        459,
+        473
       ],
-      "summary": "实现 metrics 的后端业务逻辑。",
+      "summary": "对指标端点执行内部访问控制，并以 Prometheus 文本格式返回韧性状态指标。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "monitoring",
+        "metrics",
+        "security",
+        "http-handler"
       ],
       "complexity": "simple"
     },
@@ -112574,14 +112598,15 @@
       "name": "docs_request_ip",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        485,
-        500
+        482,
+        497
       ],
-      "summary": "实现 docs_request_ip 的后端业务逻辑。",
+      "summary": "从 X-Forwarded-For 或 X-Real-IP 请求头提取并规范化客户端 IP，供文档和指标访问控制使用。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "security",
+        "http-handler",
+        "networking",
+        "validation"
       ],
       "complexity": "simple"
     },
@@ -112591,14 +112616,15 @@
       "name": "ip_is_internal",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        502,
-        512
+        499,
+        509
       ],
-      "summary": "实现 ip_is_internal 的后端业务逻辑。",
+      "summary": "判断 IPv4 私有网段、回环地址以及 IPv6 回环地址，作为生产文档和指标端点的来源限制。",
       "tags": [
-        "function",
-        "backend",
-        "runtime"
+        "security",
+        "networking",
+        "validation",
+        "access-control"
       ],
       "complexity": "simple"
     },
@@ -112608,14 +112634,15 @@
       "name": "ApiDocsMode",
       "filePath": "backend/crates/api/src/bin/wms_api.rs",
       "lineRange": [
-        227,
-        230
+        224,
+        227
       ],
-      "summary": "封装 ApiDocsMode 的相关数据与行为。",
+      "summary": "表示 API 文档的开发/生产暴露模式，并封装生产模式下必须限制内部 IP 的判定。",
       "tags": [
-        "class",
-        "backend",
-        "domain"
+        "api-docs",
+        "configuration",
+        "security",
+        "enum"
       ],
       "complexity": "simple"
     },
@@ -173325,15 +173352,16 @@
       "type": "file",
       "name": "test_h9_render_worker_decoupling.py",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-      "summary": "为 AR-09 Render Worker 解耦提供 Python 治理测试，检查 staging API 依赖、隔离 Compose smoke 的故障闭环、证据清理和入口/运行手册登记，并验证根 Docker 上下文不会带入构建产物或密钥。",
+      "summary": "AR-09 治理测试，验证 staging API 与打印渲染 worker 解耦，并检查渲染失败时 fail-closed、失败状态持久化、恢复重试、隔离 Compose 证据和 Docker 上下文安全边界。",
       "tags": [
         "test",
         "governance",
         "render-worker",
-        "compose-smoke",
+        "integration",
         "security"
       ],
-      "complexity": "moderate"
+      "complexity": "moderate",
+      "languageNotes": "使用 pytest 风格测试函数读取 Compose、shell smoke、runbook 和 Docker 配置文本，以静态断言守住 AR-09 部署与验收契约。"
     },
     {
       "id": "file:scripts/governance/tests/test_idempotency_storage.py",
@@ -173424,12 +173452,12 @@
         14,
         22
       ],
-      "summary": "验证 staging API 的 Compose 配置不把 Render Worker 健康状态作为启动依赖，同时保留受控的渲染服务 URL。",
+      "summary": "断言 staging API 保留显式依赖但不等待渲染 worker 健康状态，且仍配置渲染服务 URL。",
       "tags": [
         "test",
-        "deployment",
-        "render-worker",
-        "startup"
+        "governance",
+        "service-dependency",
+        "fail-closed"
       ],
       "complexity": "simple"
     },
@@ -173442,15 +173470,15 @@
         25,
         40
       ],
-      "summary": "检查 Compose smoke 脚本使用隔离项目和临时环境文件，并覆盖失败关闭、健康检查、鉴权和清理约束。",
+      "summary": "检查 Compose smoke 使用隔离项目和环境文件，并覆盖 worker、PDF 渲染失败码、健康检查、认证及清理路径。",
       "tags": [
         "test",
-        "compose-smoke",
+        "compose",
+        "smoke-test",
         "isolation",
-        "fail-closed",
-        "security"
+        "fail-closed"
       ],
-      "complexity": "moderate"
+      "complexity": "simple"
     },
     {
       "id": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_checks_persisted_failure_and_recovery_state",
@@ -173459,14 +173487,14 @@
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
         43,
-        48
+        49
       ],
-      "summary": "验证 smoke 流程检查打印失败状态和恢复完成状态的持久化字段及相关运行手册说明。",
+      "summary": "确认 smoke 验证打印准备与处理状态，并覆盖持久化 failed 到 completed 的恢复闭环。",
       "tags": [
         "test",
-        "compose-smoke",
         "persistence",
-        "recovery"
+        "recovery",
+        "render-worker"
       ],
       "complexity": "simple"
     },
@@ -173476,17 +173504,17 @@
       "name": "test_compose_smoke_persists_non_secret_evidence_after_cleanup",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        51,
-        63
+        52,
+        64
       ],
-      "summary": "验证 Compose smoke 清理后仍写出不含秘密的证据清单，并记录项目名和清理退出码。",
+      "summary": "断言 smoke 在清理隔离资源后仍写出不含秘密的 evidence manifest，并记录项目名与清理结果。",
       "tags": [
         "test",
         "evidence",
         "cleanup",
         "security"
       ],
-      "complexity": "moderate"
+      "complexity": "simple"
     },
     {
       "id": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_bootstraps_an_isolated_h9_fixture",
@@ -173494,18 +173522,18 @@
       "name": "test_compose_smoke_bootstraps_an_isolated_h9_fixture",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        66,
-        78
+        67,
+        79
       ],
-      "summary": "验证 smoke 脚本或 API Dockerfile 能创建隔离的 H9 端到端夹具，并使用种子、JWT 和组套截单路径。",
+      "summary": "验证 smoke 自包含地启动 H9 隔离夹具，包含 E2E 种子、手工截止单据和打印编排权限，同时不把真实认证密钥写入脚本。",
       "tags": [
         "test",
         "fixture",
-        "integration-test",
-        "h9",
-        "render-worker"
+        "e2e",
+        "security",
+        "isolation"
       ],
-      "complexity": "moderate"
+      "complexity": "simple"
     },
     {
       "id": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_smoke_entrypoint_and_runbook_are_registered",
@@ -173513,15 +173541,15 @@
       "name": "test_smoke_entrypoint_and_runbook_are_registered",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        81,
-        88
+        82,
+        89
       ],
-      "summary": "验证 justfile 与运行手册登记 Compose smoke 入口，并保留非打印核心接口和失败码说明。",
+      "summary": "确保 just 入口和运行手册登记 H9 smoke，并说明非打印核心接口、渲染失败码及 Compose 清理要求。",
       "tags": [
         "test",
+        "documentation",
         "runbook",
-        "governance",
-        "compose-smoke"
+        "justfile"
       ],
       "complexity": "simple"
     },
@@ -184234,13 +184262,16 @@
       "type": "file",
       "name": "h9_render_worker_compose_smoke.sh",
       "filePath": "scripts/h9_render_worker_compose_smoke.sh",
-      "summary": "h9_render_worker_compose_smoke.sh 项目源文件。",
+      "summary": "通过临时 Docker Compose 项目执行 H9 Render Worker 的端到端冒烟验收：验证 API 健康状态、渲染服务停机时的失败落库、Worker 鉴权与 PDF 返回，以及 Worker 恢复后的同键重试。脚本同时收集响应、PDF 和清理状态等证据，并在退出时销毁隔离资源。",
       "tags": [
-        "backend",
-        "rust",
-        "service"
+        "smoke-test",
+        "docker-compose",
+        "integration-test",
+        "evidence",
+        "cleanup"
       ],
-      "complexity": "complex"
+      "complexity": "complex",
+      "languageNotes": "Bash 脚本使用 set -Eeuo pipefail、trap 清理、动态本地端口和 Python 辅助逻辑，串联 Compose、curl、psql 与证据生成。"
     },
     {
       "id": "function:scripts/h9_render_worker_compose_smoke.sh:cleanup",
@@ -184251,11 +184282,12 @@
         173,
         261
       ],
-      "summary": "实现 cleanup 的后端业务逻辑。",
+      "summary": "在脚本退出时停止并删除隔离的 Compose 服务和卷，复制关键请求、响应、Worker 输出及清理日志，随后生成包含所有验收状态与退出码的 AR-09 证据 JSON。",
       "tags": [
-        "function",
-        "test",
-        "runtime"
+        "cleanup",
+        "evidence",
+        "docker-compose",
+        "resource-lifecycle"
       ],
       "complexity": "moderate"
     },
@@ -184268,11 +184300,12 @@
         267,
         277
       ],
-      "summary": "实现 wait_http 的后端业务逻辑。",
+      "summary": "以固定重试窗口轮询 HTTP 地址，服务可访问时成功返回，超时则输出目标地址并使冒烟流程失败。",
       "tags": [
-        "function",
-        "test",
-        "runtime"
+        "health-check",
+        "http",
+        "retry",
+        "utility"
       ],
       "complexity": "simple"
     },
@@ -184383,17 +184416,51 @@
       "name": "test_root_docker_context_excludes_build_outputs_and_local_secrets",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        91,
-        105
+        92,
+        106
       ],
-      "summary": "验证根 .dockerignore 排除构建产物、依赖目录、环境变量、密钥目录和证书等本地敏感输入。",
+      "summary": "检查根 Docker 构建上下文排除 Git、构建产物、node_modules、环境文件和 secrets，避免敏感内容进入镜像构建。",
       "tags": [
         "test",
         "docker",
-        "configuration",
-        "security"
+        "security",
+        "build-context"
       ],
-      "complexity": "moderate"
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/crates/api/src/feature_flags.rs:resolve_feature_flags_file",
+      "type": "function",
+      "name": "resolve_feature_flags_file",
+      "filePath": "backend/crates/api/src/feature_flags.rs",
+      "lineRange": [
+        15,
+        17
+      ],
+      "summary": "解析特性开关文件路径；当 WMS_FEATURE_FLAGS_FILE 存在时使用运行时覆盖路径，否则返回默认路径。",
+      "tags": [
+        "config",
+        "runtime",
+        "feature-flag"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/crates/api/src/feature_flags.rs:resolve_feature_flags_file_with_env",
+      "type": "function",
+      "name": "resolve_feature_flags_file_with_env",
+      "filePath": "backend/crates/api/src/feature_flags.rs",
+      "lineRange": [
+        19,
+        29
+      ],
+      "summary": "使用注入的环境变量查找器选择特性开关文件路径，集中实现覆盖优先于默认值的规则。",
+      "tags": [
+        "config",
+        "dependency-injection",
+        "runtime"
+      ],
+      "complexity": "simple"
     }
   ],
   "edges": [
@@ -229621,10 +229688,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 33,
-        "lineEnd": 37
+        "lineStart": 55,
+        "lineEnd": 59
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229634,10 +229701,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 39,
-        "lineEnd": 44
+        "lineStart": 61,
+        "lineEnd": 66
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229647,10 +229714,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 46,
-        "lineEnd": 95
+        "lineStart": 68,
+        "lineEnd": 117
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229660,10 +229727,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 97,
-        "lineEnd": 99
+        "lineStart": 119,
+        "lineEnd": 121
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229673,10 +229740,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 101,
-        "lineEnd": 103
+        "lineStart": 123,
+        "lineEnd": 125
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229686,10 +229753,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 105,
-        "lineEnd": 107
+        "lineStart": 127,
+        "lineEnd": 129
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229699,10 +229766,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 109,
-        "lineEnd": 111
+        "lineStart": 131,
+        "lineEnd": 133
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229712,10 +229779,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 113,
-        "lineEnd": 129
+        "lineStart": 135,
+        "lineEnd": 151
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229725,10 +229792,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 141,
-        "lineEnd": 159
+        "lineStart": 163,
+        "lineEnd": 181
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229738,10 +229805,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 170,
-        "lineEnd": 181
+        "lineStart": 192,
+        "lineEnd": 203
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229751,10 +229818,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 200,
-        "lineEnd": 212
+        "lineStart": 222,
+        "lineEnd": 234
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229764,10 +229831,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 11,
-        "lineEnd": 17
+        "lineStart": 33,
+        "lineEnd": 39
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229777,10 +229844,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 21,
-        "lineEnd": 23
+        "lineStart": 43,
+        "lineEnd": 45
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -229790,10 +229857,10 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 27,
-        "lineEnd": 30
+        "lineStart": 49,
+        "lineEnd": 52
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/file_attachment_handlers.rs",
@@ -230726,10 +230793,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 11,
-        "lineEnd": 11
+        "lineStart": 33,
+        "lineEnd": 33
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230739,10 +230806,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 21,
-        "lineEnd": 21
+        "lineStart": 43,
+        "lineEnd": 43
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230752,10 +230819,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 27,
-        "lineEnd": 27
+        "lineStart": 49,
+        "lineEnd": 49
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230765,10 +230832,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 33,
-        "lineEnd": 33
+        "lineStart": 55,
+        "lineEnd": 55
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230778,10 +230845,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 39,
-        "lineEnd": 39
+        "lineStart": 61,
+        "lineEnd": 61
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230791,10 +230858,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 46,
-        "lineEnd": 46
+        "lineStart": 68,
+        "lineEnd": 68
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230804,10 +230871,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 97,
-        "lineEnd": 97
+        "lineStart": 119,
+        "lineEnd": 119
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230817,10 +230884,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 101,
-        "lineEnd": 101
+        "lineStart": 123,
+        "lineEnd": 123
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230830,10 +230897,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 105,
-        "lineEnd": 105
+        "lineStart": 127,
+        "lineEnd": 127
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230843,10 +230910,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 109,
-        "lineEnd": 109
+        "lineStart": 131,
+        "lineEnd": 131
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/feature_flags.rs",
@@ -230856,10 +230923,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/feature_flags.rs",
-        "lineStart": 113,
-        "lineEnd": 113
+        "lineStart": 135,
+        "lineEnd": 135
       },
-      "confidence": 0.8
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/file_attachment_handlers.rs",
@@ -358082,39 +358149,39 @@
       "target": "function:backend/crates/api/examples/wms_api_e2e.rs:main",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/examples/wms_api_e2e.rs",
         "lineStart": 81,
         "lineEnd": 252
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/examples/wms_api_e2e.rs",
       "target": "function:backend/crates/api/examples/wms_api_e2e.rs:database_url",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/examples/wms_api_e2e.rs",
         "lineStart": 254,
         "lineEnd": 269
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/examples/wms_api_e2e.rs",
       "target": "class:backend/crates/api/examples/wms_api_e2e.rs:AllowAllRevocationStore",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/examples/wms_api_e2e.rs",
         "lineStart": 279,
         "lineEnd": 279
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "function:backend/crates/api/examples/wms_api_e2e.rs:main",
@@ -358511,143 +358578,143 @@
       "target": "function:backend/crates/api/src/bin/wms_api.rs:main",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 85,
-        "lineEnd": 180
+        "lineStart": 84,
+        "lineEnd": 177
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:database_url",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 182,
-        "lineEnd": 198
+        "lineStart": 179,
+        "lineEnd": 195
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:database_max_connections",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 200,
-        "lineEnd": 224
+        "lineStart": 197,
+        "lineEnd": 221
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:from_env",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 233,
-        "lineEnd": 243
+        "lineStart": 230,
+        "lineEnd": 240
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:app",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 249,
-        "lineEnd": 400
+        "lineStart": 246,
+        "lineEnd": 397
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:api_docs",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 417,
-        "lineEnd": 440
+        "lineStart": 414,
+        "lineEnd": 437
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:redoc_docs",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 442,
-        "lineEnd": 460
+        "lineStart": 439,
+        "lineEnd": 457
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:metrics",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 462,
-        "lineEnd": 476
+        "lineStart": 459,
+        "lineEnd": 473
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:docs_request_ip",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 485,
-        "lineEnd": 500
+        "lineStart": 482,
+        "lineEnd": 497
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "function:backend/crates/api/src/bin/wms_api.rs:ip_is_internal",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 502,
-        "lineEnd": 512
+        "lineStart": 499,
+        "lineEnd": 509
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:backend/crates/api/src/bin/wms_api.rs",
       "target": "class:backend/crates/api/src/bin/wms_api.rs:ApiDocsMode",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "backend/crates/api/src/bin/wms_api.rs",
-        "lineStart": 227,
-        "lineEnd": 230
+        "lineStart": 224,
+        "lineEnd": 227
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "function:backend/crates/api/src/bin/wms_api.rs:main",
@@ -440781,7 +440848,7 @@
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
         "lineStart": 43,
-        "lineEnd": 48
+        "lineEnd": 49
       },
       "confidence": 1
     },
@@ -440793,8 +440860,8 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 51,
-        "lineEnd": 63
+        "lineStart": 52,
+        "lineEnd": 64
       },
       "confidence": 1
     },
@@ -440806,8 +440873,8 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 66,
-        "lineEnd": 78
+        "lineStart": 67,
+        "lineEnd": 79
       },
       "confidence": 1
     },
@@ -440819,8 +440886,8 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 81,
-        "lineEnd": 88
+        "lineStart": 82,
+        "lineEnd": 89
       },
       "confidence": 1
     },
@@ -440835,7 +440902,7 @@
         "lineStart": 14,
         "lineEnd": 14
       },
-      "confidence": 0.9
+      "confidence": 0.8
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
@@ -440848,7 +440915,7 @@
         "lineStart": 25,
         "lineEnd": 25
       },
-      "confidence": 0.9
+      "confidence": 0.8
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
@@ -440861,7 +440928,7 @@
         "lineStart": 43,
         "lineEnd": 43
       },
-      "confidence": 0.9
+      "confidence": 0.8
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
@@ -440871,10 +440938,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 51,
-        "lineEnd": 51
+        "lineStart": 52,
+        "lineEnd": 52
       },
-      "confidence": 0.9
+      "confidence": 0.8
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
@@ -440884,10 +440951,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 66,
-        "lineEnd": 66
+        "lineStart": 67,
+        "lineEnd": 67
       },
-      "confidence": 0.9
+      "confidence": 0.8
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
@@ -440897,10 +440964,10 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 81,
-        "lineEnd": 81
+        "lineStart": 82,
+        "lineEnd": 82
       },
-      "confidence": 0.9
+      "confidence": 0.8
     },
     {
       "source": "file:scripts/governance/tests/test_idempotency_storage.py",
@@ -457932,26 +457999,26 @@
       "target": "function:scripts/h9_render_worker_compose_smoke.sh:cleanup",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/h9_render_worker_compose_smoke.sh",
         "lineStart": 173,
         "lineEnd": 261
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/h9_render_worker_compose_smoke.sh",
       "target": "function:scripts/h9_render_worker_compose_smoke.sh:wait_http",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/h9_render_worker_compose_smoke.sh",
         "lineStart": 267,
         "lineEnd": 277
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/mkdocs_copy_md_hook.py",
@@ -458188,8 +458255,8 @@
       "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 91,
-        "lineEnd": 105
+        "lineStart": 92,
+        "lineEnd": 106
       },
       "confidence": 1
     },
@@ -458201,10 +458268,86 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 91,
-        "lineEnd": 91
+        "lineStart": 92,
+        "lineEnd": 92
       },
-      "confidence": 0.9
+      "confidence": 0.8
+    },
+    {
+      "source": "file:backend/crates/api/src/feature_flags.rs",
+      "target": "function:backend/crates/api/src/feature_flags.rs:resolve_feature_flags_file",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1,
+      "sourceSpan": {
+        "filePath": "backend/crates/api/src/feature_flags.rs",
+        "lineStart": 15,
+        "lineEnd": 17
+      },
+      "confidence": 1
+    },
+    {
+      "source": "file:backend/crates/api/src/feature_flags.rs",
+      "target": "function:backend/crates/api/src/feature_flags.rs:resolve_feature_flags_file_with_env",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1,
+      "sourceSpan": {
+        "filePath": "backend/crates/api/src/feature_flags.rs",
+        "lineStart": 19,
+        "lineEnd": 29
+      },
+      "confidence": 1
+    },
+    {
+      "source": "file:backend/crates/api/src/feature_flags.rs",
+      "target": "function:backend/crates/api/src/feature_flags.rs:resolve_feature_flags_file",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8,
+      "sourceSpan": {
+        "filePath": "backend/crates/api/src/feature_flags.rs",
+        "lineStart": 15,
+        "lineEnd": 15
+      },
+      "confidence": 1
+    },
+    {
+      "source": "function:backend/crates/api/src/bin/wms_api.rs:main",
+      "target": "function:backend/crates/api/src/feature_flags.rs:resolve_feature_flags_file",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8,
+      "sourceSpan": {
+        "filePath": "backend/crates/api/src/bin/wms_api.rs",
+        "lineStart": 108,
+        "lineEnd": 108
+      },
+      "confidence": 1
+    },
+    {
+      "source": "function:backend/crates/api/examples/wms_api_e2e.rs:main",
+      "target": "function:backend/crates/api/src/feature_flags.rs:resolve_feature_flags_file",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8,
+      "sourceSpan": {
+        "filePath": "backend/crates/api/examples/wms_api_e2e.rs",
+        "lineStart": 167,
+        "lineEnd": 167
+      },
+      "confidence": 1
+    },
+    {
+      "source": "file:scripts/h9_render_worker_compose_smoke.sh",
+      "target": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5,
+      "sourceSpan": {
+        "filePath": "scripts/h9_render_worker_compose_smoke.sh"
+      },
+      "confidence": 1
     }
   ],
   "layers": [
@@ -460502,9 +460645,9 @@
   "traceability": {
     "schemaVersion": "1.0",
     "canonicalIdScheme": "<type>:<relative-path>[:symbol]",
-    "resolvedEdgeCount": 21310,
+    "resolvedEdgeCount": 21316,
     "unresolvedEdgeCount": 0,
-    "sourceSpanEdgeCount": 21310,
-    "confidenceEdgeCount": 21310
+    "sourceSpanEdgeCount": 21316,
+    "confidenceEdgeCount": 21316
   }
 }
