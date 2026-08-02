@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T01:07:01.388Z",
-    "gitCommitHash": "1a7bee115096ba369beaefebe31ddb070c3046f3"
+    "analyzedAt": "2026-08-02T01:19:34.194Z",
+    "gitCommitHash": "dc13800a0a98d2443545cd022853bf89a51ba9ec"
   },
   "nodes": [
     {
@@ -108864,7 +108864,7 @@
       "type": "document",
       "name": "project-graph-design-remediation-2026-07-31.md",
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "summary": "记录 2026-07-31 全项目知识图谱设计问题整改计划，将经源码、契约、测试、部署配置或 ADR 复核的问题拆分为 AR、KG 和 REDIS 任务，并明确依赖、状态与唯一关闭关系。文档持续回写执行证据，为每项任务提供验收标准、最小验证命令和 Review Loop，强调 Wave 6 后排期边界、真实运行证据以及图谱可追溯性与新鲜度治理。",
+      "summary": "记录 2026-07-31 全项目知识图谱设计问题整改计划，将经源码、契约、测试、部署配置或 ADR 复核的问题拆分为 AR、KG 和 REDIS 任务，并明确依赖、状态与唯一关闭关系。文档回写截至 2026-08-02 的 Review Loop、验收证据和阻塞恢复条件，强调 Wave 6 后排期边界、真实运行证据以及图谱可追溯性与新鲜度治理，未将仍待验证的整改宣称为完成。",
       "tags": [
         "documentation",
         "architecture-remediation",
