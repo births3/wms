@@ -1,8 +1,18 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "56c75924887ed4913018aafed7eb0d4ddf3e2e53",
-  "generatedAt": "2026-08-02T00:11:27.509Z",
+  "gitCommitHash": "527ec8ae1007fcaf57094c7ad7018a7e6fab34e8",
+  "generatedAt": "2026-08-02T00:29:59.092Z",
   "files": {
+    ".dockerignore": {
+      "filePath": ".dockerignore",
+      "contentHash": "8baaa0eec6d441a10e71451c2accc6320847dde35297117f410df212d55f42dd",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": false
+    },
     ".agents/skills/wms-execution-retrospective/SKILL.md": {
       "filePath": ".agents/skills/wms-execution-retrospective/SKILL.md",
       "contentHash": "7fec1c8863025406e00d3e58f12aeb9502886d653a5e511168d18acfe208181a",
@@ -117257,12 +117267,12 @@
     },
     "docs/reviews/project-graph-design-remediation-2026-07-31.md": {
       "filePath": "docs/reviews/project-graph-design-remediation-2026-07-31.md",
-      "contentHash": "6e8adbfdab5bdf7bfb3a0680cedf43f6f5f05314b98a91a026cbdb984e1507a6",
+      "contentHash": "1ec841c507707aa110c397e353f65ce1247cac75205812711c9f45b299510e04",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 895,
+      "totalLines": 896,
       "hasStructuralAnalysis": true
     },
     "docs/reviews/redis-necessity-assessment-task-2026-07-31.md": {
@@ -154198,7 +154208,7 @@
     },
     "scripts/governance/tests/test_h9_render_worker_decoupling.py": {
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-      "contentHash": "e4ab858748c59c5debacd13d99af57fd3c3075ede46ca53e1f89ad0047f5c0e2",
+      "contentHash": "d78b33910d545575b43e315489ce9cfbbf91bd019fcebeaeb93d0bfbaedf2f56",
       "functions": [
         {
           "name": "test_staging_api_does_not_wait_for_render_worker_health",
@@ -154235,6 +154245,12 @@
           "params": [],
           "exported": true,
           "lineCount": 8
+        },
+        {
+          "name": "test_root_docker_context_excludes_build_outputs_and_local_secrets",
+          "params": [],
+          "exported": true,
+          "lineCount": 15
         }
       ],
       "classes": [],
@@ -154258,9 +154274,10 @@
         "test_compose_smoke_checks_persisted_failure_and_recovery_state",
         "test_compose_smoke_persists_non_secret_evidence_after_cleanup",
         "test_compose_smoke_bootstraps_an_isolated_h9_fixture",
-        "test_smoke_entrypoint_and_runbook_are_registered"
+        "test_smoke_entrypoint_and_runbook_are_registered",
+        "test_root_docker_context_excludes_build_outputs_and_local_secrets"
       ],
-      "totalLines": 88,
+      "totalLines": 106,
       "hasStructuralAnalysis": true
     },
     "scripts/governance/tests/test_idempotency_storage.py": {

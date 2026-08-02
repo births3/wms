@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T00:11:27.351Z",
-    "gitCommitHash": "56c75924887ed4913018aafed7eb0d4ddf3e2e53"
+    "analyzedAt": "2026-08-02T00:31:49.911Z",
+    "gitCommitHash": "527ec8ae1007fcaf57094c7ad7018a7e6fab34e8"
   },
   "nodes": [
     {
@@ -173324,12 +173324,13 @@
       "type": "file",
       "name": "test_h9_render_worker_decoupling.py",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-      "summary": "治理测试模块，验证H9 渲染 Worker规则、证据链与失败时的门禁行为。",
+      "summary": "为 AR-09 Render Worker 解耦提供 Python 治理测试，检查 staging API 依赖、隔离 Compose smoke 的故障闭环、证据清理和入口/运行手册登记，并验证根 Docker 上下文不会带入构建产物或密钥。",
       "tags": [
         "test",
         "governance",
-        "python",
-        "h9-render-worker"
+        "render-worker",
+        "compose-smoke",
+        "security"
       ],
       "complexity": "moderate"
     },
@@ -173419,16 +173420,15 @@
       "name": "test_staging_api_does_not_wait_for_render_worker_health",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        13,
-        21
+        14,
+        22
       ],
-      "summary": "验证H9 渲染 Worker治理场景：test staging api does not wait for render worker health。",
+      "summary": "验证 staging API 的 Compose 配置不把 Render Worker 健康状态作为启动依赖，同时保留受控的渲染服务 URL。",
       "tags": [
         "test",
-        "governance",
-        "python",
-        "h9-render-worker",
-        "scenario"
+        "deployment",
+        "render-worker",
+        "startup"
       ],
       "complexity": "simple"
     },
@@ -173438,18 +173438,18 @@
       "name": "test_compose_smoke_isolated_and_fail_closed",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        24,
-        39
+        25,
+        40
       ],
-      "summary": "验证H9 渲染 Worker治理场景：test compose smoke isolated and fail closed。",
+      "summary": "检查 Compose smoke 脚本使用隔离项目和临时环境文件，并覆盖失败关闭、健康检查、鉴权和清理约束。",
       "tags": [
         "test",
-        "governance",
-        "python",
-        "h9-render-worker",
-        "scenario"
+        "compose-smoke",
+        "isolation",
+        "fail-closed",
+        "security"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_checks_persisted_failure_and_recovery_state",
@@ -173457,16 +173457,15 @@
       "name": "test_compose_smoke_checks_persisted_failure_and_recovery_state",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        42,
-        47
+        43,
+        48
       ],
-      "summary": "验证H9 渲染 Worker治理场景：test compose smoke checks persisted failure and recovery state。",
+      "summary": "验证 smoke 流程检查打印失败状态和恢复完成状态的持久化字段及相关运行手册说明。",
       "tags": [
         "test",
-        "governance",
-        "python",
-        "h9-render-worker",
-        "scenario"
+        "compose-smoke",
+        "persistence",
+        "recovery"
       ],
       "complexity": "simple"
     },
@@ -173476,18 +173475,17 @@
       "name": "test_compose_smoke_persists_non_secret_evidence_after_cleanup",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        50,
-        62
+        51,
+        63
       ],
-      "summary": "验证H9 渲染 Worker治理场景：test compose smoke persists non secret evidence after cleanup。",
+      "summary": "验证 Compose smoke 清理后仍写出不含秘密的证据清单，并记录项目名和清理退出码。",
       "tags": [
         "test",
-        "governance",
-        "python",
-        "h9-render-worker",
-        "scenario"
+        "evidence",
+        "cleanup",
+        "security"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_bootstraps_an_isolated_h9_fixture",
@@ -173495,18 +173493,18 @@
       "name": "test_compose_smoke_bootstraps_an_isolated_h9_fixture",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        65,
-        77
+        66,
+        78
       ],
-      "summary": "验证H9 渲染 Worker治理场景：test compose smoke bootstraps an isolated h9 fixture。",
+      "summary": "验证 smoke 脚本或 API Dockerfile 能创建隔离的 H9 端到端夹具，并使用种子、JWT 和组套截单路径。",
       "tags": [
         "test",
-        "governance",
-        "python",
-        "h9-render-worker",
-        "scenario"
+        "fixture",
+        "integration-test",
+        "h9",
+        "render-worker"
       ],
-      "complexity": "simple"
+      "complexity": "moderate"
     },
     {
       "id": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_smoke_entrypoint_and_runbook_are_registered",
@@ -173514,16 +173512,15 @@
       "name": "test_smoke_entrypoint_and_runbook_are_registered",
       "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "lineRange": [
-        80,
-        87
+        81,
+        88
       ],
-      "summary": "验证H9 渲染 Worker治理场景：test smoke entrypoint and runbook are registered。",
+      "summary": "验证 justfile 与运行手册登记 Compose smoke 入口，并保留非打印核心接口和失败码说明。",
       "tags": [
         "test",
+        "runbook",
         "governance",
-        "python",
-        "h9-render-worker",
-        "scenario"
+        "compose-smoke"
       ],
       "complexity": "simple"
     },
@@ -184363,6 +184360,39 @@
         "governance"
       ],
       "complexity": "complex"
+    },
+    {
+      "id": "config:.dockerignore",
+      "type": "config",
+      "name": ".dockerignore",
+      "filePath": ".dockerignore",
+      "summary": "定义根 Docker build context 的排除规则，过滤仓库元数据、构建产物、依赖目录、测试输出以及环境变量和证书等本地敏感文件，避免它们进入镜像构建上下文。",
+      "tags": [
+        "configuration",
+        "containerization",
+        "build-context",
+        "security",
+        "ignore-patterns"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_root_docker_context_excludes_build_outputs_and_local_secrets",
+      "type": "function",
+      "name": "test_root_docker_context_excludes_build_outputs_and_local_secrets",
+      "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
+      "lineRange": [
+        91,
+        105
+      ],
+      "summary": "验证根 .dockerignore 排除构建产物、依赖目录、环境变量、密钥目录和证书等本地敏感输入。",
+      "tags": [
+        "test",
+        "docker",
+        "configuration",
+        "security"
+      ],
+      "complexity": "moderate"
     }
   ],
   "edges": [
@@ -440720,78 +440750,78 @@
       "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_staging_api_does_not_wait_for_render_worker_health",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 13,
-        "lineEnd": 21
+        "lineStart": 14,
+        "lineEnd": 22
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_isolated_and_fail_closed",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 24,
-        "lineEnd": 39
+        "lineStart": 25,
+        "lineEnd": 40
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_checks_persisted_failure_and_recovery_state",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 42,
-        "lineEnd": 47
+        "lineStart": 43,
+        "lineEnd": 48
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_persists_non_secret_evidence_after_cleanup",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 50,
-        "lineEnd": 62
+        "lineStart": 51,
+        "lineEnd": 63
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_compose_smoke_bootstraps_an_isolated_h9_fixture",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 65,
-        "lineEnd": 77
+        "lineStart": 66,
+        "lineEnd": 78
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
       "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_smoke_entrypoint_and_runbook_are_registered",
       "type": "contains",
       "direction": "forward",
-      "weight": 1.0,
+      "weight": 1,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 80,
-        "lineEnd": 87
+        "lineStart": 81,
+        "lineEnd": 88
       },
-      "confidence": 1.0
+      "confidence": 1
     },
     {
       "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
@@ -440801,8 +440831,8 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 13,
-        "lineEnd": 13
+        "lineStart": 14,
+        "lineEnd": 14
       },
       "confidence": 0.9
     },
@@ -440814,8 +440844,8 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 24,
-        "lineEnd": 24
+        "lineStart": 25,
+        "lineEnd": 25
       },
       "confidence": 0.9
     },
@@ -440827,8 +440857,8 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 42,
-        "lineEnd": 42
+        "lineStart": 43,
+        "lineEnd": 43
       },
       "confidence": 0.9
     },
@@ -440840,8 +440870,8 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 50,
-        "lineEnd": 50
+        "lineStart": 51,
+        "lineEnd": 51
       },
       "confidence": 0.9
     },
@@ -440853,8 +440883,8 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 65,
-        "lineEnd": 65
+        "lineStart": 66,
+        "lineEnd": 66
       },
       "confidence": 0.9
     },
@@ -440866,8 +440896,8 @@
       "weight": 0.8,
       "sourceSpan": {
         "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
-        "lineStart": 80,
-        "lineEnd": 80
+        "lineStart": 81,
+        "lineEnd": 81
       },
       "confidence": 0.9
     },
@@ -458148,6 +458178,32 @@
       },
       "confidence": 0.99,
       "description": "The QueryBuilder statement in list_events has a literal FROM audit_event clause at this source line; this is the smallest implementation-to-table relation satisfying the H2 checker."
+    },
+    {
+      "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
+      "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_root_docker_context_excludes_build_outputs_and_local_secrets",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1,
+      "sourceSpan": {
+        "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
+        "lineStart": 91,
+        "lineEnd": 105
+      },
+      "confidence": 1
+    },
+    {
+      "source": "file:scripts/governance/tests/test_h9_render_worker_decoupling.py",
+      "target": "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_root_docker_context_excludes_build_outputs_and_local_secrets",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8,
+      "sourceSpan": {
+        "filePath": "scripts/governance/tests/test_h9_render_worker_decoupling.py",
+        "lineStart": 91,
+        "lineEnd": 91
+      },
+      "confidence": 0.9
     }
   ],
   "layers": [
@@ -459764,7 +459820,8 @@
         "file:scripts/h8_erp_interface_sync/test_inbound_terminal_state.py",
         "file:scripts/h8_erp_interface_sync/test_outbound_receipts.py",
         "file:scripts/h8_erp_interface_sync/test_outbound_routing.py",
-        "file:scripts/h8_erp_interface_sync/test_reconciliation_pull.py"
+        "file:scripts/h8_erp_interface_sync/test_reconciliation_pull.py",
+        "function:scripts/governance/tests/test_h9_render_worker_decoupling.py:test_root_docker_context_excludes_build_outputs_and_local_secrets"
       ]
     },
     {
@@ -460050,7 +460107,8 @@
         "config:shared/openapi/openapi.json",
         "file:backend/Cargo.toml",
         "file:justfile",
-        "file:packages/ui/package.json"
+        "file:packages/ui/package.json",
+        "config:.dockerignore"
       ]
     },
     {
@@ -460443,9 +460501,9 @@
   "traceability": {
     "schemaVersion": "1.0",
     "canonicalIdScheme": "<type>:<relative-path>[:symbol]",
-    "resolvedEdgeCount": 21308,
+    "resolvedEdgeCount": 21310,
     "unresolvedEdgeCount": 0,
-    "sourceSpanEdgeCount": 21308,
-    "confidenceEdgeCount": 21308
+    "sourceSpanEdgeCount": 21310,
+    "confidenceEdgeCount": 21310
   }
 }
