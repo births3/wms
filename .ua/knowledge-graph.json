@@ -36,8 +36,8 @@
       "pnpm"
     ],
     "description": "医药冷链 GSP 合规仓储管理系统，面向 PC、PAD 与 PDA 三端协同，覆盖多货主、3PL、连锁及监管对接的仓储全流程。项目以治理优先和 TDD 驱动，按依赖图分波次推进。",
-    "analyzedAt": "2026-08-02T00:31:49.911Z",
-    "gitCommitHash": "527ec8ae1007fcaf57094c7ad7018a7e6fab34e8"
+    "analyzedAt": "2026-08-02T00:43:48.723Z",
+    "gitCommitHash": "8fb11da0e74a37f4db3cdd7d73d4b32997a8c7a6"
   },
   "nodes": [
     {
@@ -108874,19 +108874,19 @@
       "complexity": "complex"
     },
     {
-      "id": "file:docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
-      "type": "file",
+      "id": "document:docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
+      "type": "document",
       "name": "redis-necessity-assessment-task-2026-07-31.md",
       "filePath": "docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
-      "summary": "定义 Redis 必要性评估任务，盘点使用面、事实边界、评估方法和决策矩阵。",
+      "summary": "定义 REDIS-01 的 Redis 必要性事实盘点、PostgreSQL/进程内替代评估和验收标准，覆盖鉴权撤销、双人策略、幂等、限流熔断、通知及部署依赖。文档记录“不新增 Redis 用途、暂不删除鉴权撤销硬依赖”的目标方向，并要求以真实性能、多实例、故障恢复和安全证据支撑后续迁移与 successor ADR，当前缺证据的项目保持 blocked。",
       "tags": [
-        "markdown",
-        "review",
+        "documentation",
+        "infrastructure",
         "redis",
-        "architecture"
+        "architecture-decision",
+        "acceptance-criteria"
       ],
-      "complexity": "moderate",
-      "languageNotes": "Review 文档记录 WMS 设计、治理、用户故事和验收证据的审查结论与缺口闭环。"
+      "complexity": "moderate"
     },
     {
       "id": "file:docs/reviews/software-design-audit-2026-05-18.md",
@@ -460362,7 +460362,7 @@
         "file:docs/reviews/m3-overall-review-2026-07-18.md",
         "file:docs/reviews/pattern-extraction-2026-05-18.md",
         "document:docs/reviews/project-graph-design-remediation-2026-07-31.md",
-        "file:docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
+        "document:docs/reviews/redis-necessity-assessment-task-2026-07-31.md",
         "file:docs/reviews/software-design-audit-2026-05-18.md",
         "file:docs/reviews/us-h9-001-acceptance-2026-07-26.md",
         "file:docs/reviews/us-h9-002-acceptance-2026-07-26.md",
