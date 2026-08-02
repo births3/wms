@@ -1,18 +1,8 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "41f0f4616f192f7e0c0792c5d3e9588a589c3212",
-  "generatedAt": "2026-08-02T16:01:53.364Z",
+  "gitCommitHash": "718e860ad336675d895f9b197f95d42aad79ad23",
+  "generatedAt": "2026-08-02T17:30:41.746Z",
   "files": {
-    ".dockerignore": {
-      "filePath": ".dockerignore",
-      "contentHash": "8baaa0eec6d441a10e71451c2accc6320847dde35297117f410df212d55f42dd",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 30,
-      "hasStructuralAnalysis": false
-    },
     ".agents/skills/wms-execution-retrospective/SKILL.md": {
       "filePath": ".agents/skills/wms-execution-retrospective/SKILL.md",
       "contentHash": "7fec1c8863025406e00d3e58f12aeb9502886d653a5e511168d18acfe208181a",
@@ -262,6 +252,16 @@
       "exports": [],
       "totalLines": 96,
       "hasStructuralAnalysis": true
+    },
+    ".dockerignore": {
+      "filePath": ".dockerignore",
+      "contentHash": "8baaa0eec6d441a10e71451c2accc6320847dde35297117f410df212d55f42dd",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": false
     },
     ".gitattributes": {
       "filePath": ".gitattributes",
@@ -115569,7 +115569,7 @@
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 90,
+      "totalLines": 91,
       "hasStructuralAnalysis": true
     },
     "docs/adr/0046-high-risk-write-revocation-fail-closed.md": {
@@ -117289,7 +117289,7 @@
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 930,
+      "totalLines": 931,
       "hasStructuralAnalysis": true
     },
     "docs/reviews/redis-necessity-assessment-task-2026-07-31.md": {
@@ -117299,7 +117299,7 @@
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 137,
+      "totalLines": 138,
       "hasStructuralAnalysis": true
     },
     "docs/reviews/software-design-audit-2026-05-18.md": {
@@ -140781,7 +140781,7 @@
     },
     "scripts/governance/check_knowledge_graph_traceability.py": {
       "filePath": "scripts/governance/check_knowledge_graph_traceability.py",
-      "contentHash": "435db3a6921fcd30282e340f95d0e743b9d9d3d337ab103f6a516623184f8ac2",
+      "contentHash": "c0ea2e8ca27115578f7e7e8b967cbc87974ee9a087d52a47e38cd99ba4024c5a",
       "functions": [
         {
           "name": "_text",
@@ -140839,6 +140839,45 @@
           "lineCount": 5
         },
         {
+          "name": "_graph_source_root",
+          "params": [
+            "graph_path"
+          ],
+          "returnType": "Path",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "_resolve_graph_file",
+          "params": [
+            "graph_path",
+            "relative_path"
+          ],
+          "returnType": "Path | None",
+          "exported": true,
+          "lineCount": 19
+        },
+        {
+          "name": "_migration_alter_statements",
+          "params": [
+            "sql"
+          ],
+          "returnType": "list[dict[str, Any]]",
+          "exported": true,
+          "lineCount": 21
+        },
+        {
+          "name": "_validate_migration_alter_edges",
+          "params": [
+            "graph_path",
+            "nodes",
+            "edges"
+          ],
+          "returnType": "tuple[list[str], int, int, int]",
+          "exported": true,
+          "lineCount": 134
+        },
+        {
           "name": "_stable_chain",
           "params": [
             "graph",
@@ -140856,7 +140895,7 @@
           ],
           "returnType": "dict[str, Any]",
           "exported": true,
-          "lineCount": 170
+          "lineCount": 182
         },
         {
           "name": "main",
@@ -140917,6 +140956,14 @@
           "specifiers": [
             "Any"
           ]
+        },
+        {
+          "source": "generate_table_catalog",
+          "specifiers": [
+            "ALTER_TABLE_RE",
+            "collect_catalog",
+            "collect_schema_events"
+          ]
         }
       ],
       "exports": [
@@ -140926,11 +140973,15 @@
         "_valid_span",
         "_valid_confidence",
         "_is_migration_path",
+        "_graph_source_root",
+        "_resolve_graph_file",
+        "_migration_alter_statements",
+        "_validate_migration_alter_edges",
         "_stable_chain",
         "validate_graph",
         "main"
       ],
-      "totalLines": 383,
+      "totalLines": 584,
       "hasStructuralAnalysis": true
     },
     "scripts/governance/check_layer_dependency.py": {
@@ -151918,6 +151969,26 @@
       "totalLines": 296,
       "hasStructuralAnalysis": true
     },
+    "scripts/governance/tests/fixtures/knowledge_graph_traceability/alter_case/backend/migrations/202601010001_outbound.sql.txt": {
+      "filePath": "scripts/governance/tests/fixtures/knowledge_graph_traceability/alter_case/backend/migrations/202601010001_outbound.sql.txt",
+      "contentHash": "a9af3d91781da75aa404f9d90f2a5ba57b505e764d6babbd0d7c78e9019ae2d9",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 4,
+      "hasStructuralAnalysis": false
+    },
+    "scripts/governance/tests/fixtures/knowledge_graph_traceability/alter_case/backend/migrations/202601010003_alter.sql.txt": {
+      "filePath": "scripts/governance/tests/fixtures/knowledge_graph_traceability/alter_case/backend/migrations/202601010003_alter.sql.txt",
+      "contentHash": "fcd55a9fba817482cd6a337c831c3de7b7afaa7ca42d381aa470be87b1df675f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 7,
+      "hasStructuralAnalysis": false
+    },
     "scripts/governance/tests/fixtures/knowledge_graph_traceability/invalid.json": {
       "filePath": "scripts/governance/tests/fixtures/knowledge_graph_traceability/invalid.json",
       "contentHash": "7c43d2dfc86c1c6708fac8980393d18410dc3c142e147150b0ff66ad65ffabf6",
@@ -154515,8 +154586,18 @@
     },
     "scripts/governance/tests/test_knowledge_graph_traceability.py": {
       "filePath": "scripts/governance/tests/test_knowledge_graph_traceability.py",
-      "contentHash": "b18de160865481d27788c0da2cef8a9bb6d94b2d4d6787bc6169af413a9f05d8",
+      "contentHash": "e42fef2f602794baeb49aab21adee77ee136a34f8f906a1ff13643eab9d08cb6",
       "functions": [
+        {
+          "name": "_write_alter_graph",
+          "params": [
+            "tmp_path",
+            "source_spans"
+          ],
+          "returnType": "Path",
+          "exported": true,
+          "lineCount": 51
+        },
         {
           "name": "test_valid_fixture_passes",
           "params": [],
@@ -154544,6 +154625,62 @@
           "lineCount": 13
         },
         {
+          "name": "test_alter_edges_require_the_event_source_span_line",
+          "params": [
+            "tmp_path"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "test_alter_edges_dedupe_repeated_events_and_report_counts",
+          "params": [
+            "tmp_path"
+          ],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "test_alter_edges_reject_non_representative_duplicate_span",
+          "params": [
+            "tmp_path"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "test_alter_edges_require_catalog_creation_target",
+          "params": [
+            "tmp_path"
+          ],
+          "exported": true,
+          "lineCount": 24
+        },
+        {
+          "name": "test_alter_edges_require_migration_pseudo_node",
+          "params": [
+            "tmp_path"
+          ],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "test_resolve_graph_file_rejects_absolute_and_parent_paths",
+          "params": [
+            "tmp_path"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "test_resolve_graph_file_rejects_symlink_escape",
+          "params": [
+            "tmp_path"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
           "name": "test_domain_filter_keeps_stable_chain_validation",
           "params": [
             "path"
@@ -154558,6 +154695,12 @@
           "source": "json",
           "specifiers": [
             "json"
+          ]
+        },
+        {
+          "source": "shutil",
+          "specifiers": [
+            "shutil"
           ]
         },
         {
@@ -154581,18 +154724,27 @@
         {
           "source": "check_knowledge_graph_traceability",
           "specifiers": [
+            "_resolve_graph_file",
             "validate_graph"
           ]
         }
       ],
       "exports": [
+        "_write_alter_graph",
         "test_valid_fixture_passes",
         "test_invalid_fixture_reports_each_traceability_failure",
         "test_json_fixture_is_stable_and_has_no_unknown_top_level_data",
         "test_migration_nodes_require_traceable_migration_edges",
+        "test_alter_edges_require_the_event_source_span_line",
+        "test_alter_edges_dedupe_repeated_events_and_report_counts",
+        "test_alter_edges_reject_non_representative_duplicate_span",
+        "test_alter_edges_require_catalog_creation_target",
+        "test_alter_edges_require_migration_pseudo_node",
+        "test_resolve_graph_file_rejects_absolute_and_parent_paths",
+        "test_resolve_graph_file_rejects_symlink_escape",
         "test_domain_filter_keeps_stable_chain_validation"
       ],
-      "totalLines": 68,
+      "totalLines": 217,
       "hasStructuralAnalysis": true
     },
     "scripts/governance/tests/test_m1_master_data_source_actions.py": {
