@@ -32,18 +32,19 @@ for (const token of [
   "product_code",
   "product_name",
   "packaging_levels",
-  "external_ref",
+  "x_wmsinter_GoodsInfo",
+  "x_wmsinter_InventoryReceiveItems",
+  "awaiting_receipt",
+  "readonly",
+  "queryErrorMessage",
   "probe_credentials_configured",
   "disabled: !connector.probe_credentials_configured",
 ]) assert.match(page, new RegExp(token));
 for (const label of [
   "同步状态",
-  "更新时间（最近 7 天）",
+  "写入时间（最近 7 天）",
   "外部单据号",
-  "外部引用",
-  "来源发件箱 ID",
   "事件类型",
-  "仓库 ID",
   "记录 ID",
   "报文摘要",
   "商品编码",
@@ -58,6 +59,8 @@ assert.match(page, /key: "sync_status", label: "同步状态", type: "multiSelec
 assert.match(page, /storageKey=\{`h8\.erp-interface-tables\.\$\{tableKey\}`\}/);
 assert.match(page, /<DataGrid\s+key=\{tableKey\}/);
 assert.doesNotMatch(page, /payload_json/);
+assert.doesNotMatch(page, /if_in_asn|if_in_product_master|if_out_message/);
+assert.doesNotMatch(page, /key: "external_ref"|key: "source_outbox_id"|key: "warehouse_id"/);
 assert.match(connectorPage, /接口表探查账号（只读）/);
 assert.match(connectorPage, /expected_probe_config_version/);
 

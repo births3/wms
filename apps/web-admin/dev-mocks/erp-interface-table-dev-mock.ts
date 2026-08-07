@@ -4,7 +4,6 @@ import { devOwnerId } from "./web-admin-dev-mock-model";
 import { sendError, sendJson } from "./web-admin-dev-mock-core-common";
 
 const connectorId = "00000000-0000-0000-0000-00000000e801";
-const warehouseId = "00000000-0000-0000-0000-00000000w001";
 
 type DevInterfaceRow = {
   row_id: string;
@@ -28,17 +27,17 @@ type DevInterfaceRow = {
 
 const rows: DevInterfaceRow[] = [
   {
-    row_id: "00000000-0000-0000-0000-00000000f001",
+    row_id: "1001",
     connector_id: connectorId,
-    table_key: "if_in_asn",
+    table_key: "x_wmsinter_InboundOrder",
     owner_id: devOwnerId,
-    warehouse_id: warehouseId,
-    business_key: "ASN-20260719-001",
-    business_fields: [],
-    event_type: "asn.received",
-    external_ref: "ERP-ASN-001",
-    wms_resource_id: "00000000-0000-0000-0000-00000000a001",
-    sync_status: "success",
+    warehouse_id: null,
+    business_key: "RK20260805-001",
+    business_fields: [{ key: "owner_code", value: "ZBPF7" }],
+    event_type: null,
+    external_ref: null,
+    wms_resource_id: null,
+    sync_status: "acked",
     retry_count: 0,
     last_error: null,
     idempotency_key: "h8-asn-001",
@@ -47,15 +46,15 @@ const rows: DevInterfaceRow[] = [
     payload_summary: '{"asn_no":"ASN-20260719-001","line_count":2}',
   },
   {
-    row_id: "00000000-0000-0000-0000-00000000f002",
+    row_id: "1002",
     connector_id: connectorId,
-    table_key: "if_in_asn",
+    table_key: "x_wmsinter_InboundOrder",
     owner_id: devOwnerId,
-    warehouse_id: warehouseId,
-    business_key: "ASN-20260719-002",
-    business_fields: [],
-    event_type: "asn.received",
-    external_ref: "ERP-ASN-002",
+    warehouse_id: null,
+    business_key: "RK20260805-002",
+    business_fields: [{ key: "owner_code", value: "ZBPF7" }],
+    event_type: null,
+    external_ref: null,
     wms_resource_id: null,
     sync_status: "failed",
     retry_count: 2,
@@ -66,15 +65,15 @@ const rows: DevInterfaceRow[] = [
     payload_summary: '{"asn_no":"ASN-20260719-002","line_count":1}',
   },
   {
-    row_id: "00000000-0000-0000-0000-00000000f003",
+    row_id: "2001",
     connector_id: connectorId,
-    table_key: "if_out_message",
+    table_key: "x_wmsinter_WmsEvent",
     owner_id: devOwnerId,
     warehouse_id: null,
-    business_key: "OUT-20260719-001",
-    business_fields: [],
-    event_type: "shipment.confirmed",
-    external_ref: "ERP-OUT-001",
+    business_key: "evt-0801",
+    business_fields: [{ key: "owner_code", value: "ZBPF7" }],
+    event_type: "inventory_status",
+    external_ref: null,
     wms_resource_id: null,
     sync_status: "acked",
     retry_count: 0,
@@ -85,13 +84,14 @@ const rows: DevInterfaceRow[] = [
     payload_summary: '{"message_type":"shipment.confirmed","outbox_id":"OUT-20260719-001"}',
   },
   {
-    row_id: "00000000-0000-0000-0000-00000000f004",
+    row_id: "3001",
     connector_id: connectorId,
-    table_key: "if_in_product_master",
+    table_key: "x_wmsinter_GoodsInfo",
     owner_id: devOwnerId,
     warehouse_id: null,
     business_key: "DEMO-PM-001",
     business_fields: [
+      { key: "owner_code", value: "ZBPF7" },
       { key: "product_code", value: "DEMO-P-001" },
       { key: "product_name", value: "演示商品-对乙酰氨基酚片" },
       { key: "spec", value: "0.5g*24片" },
@@ -111,17 +111,9 @@ const rows: DevInterfaceRow[] = [
 
 const productMasterDetailFields = [
   { key: "approval_no", value: "国药准字H000000" },
-  { key: "dosage_form", value: "片剂" },
   { key: "manufacturer", value: "演示制药" },
   { key: "special_drug_category", value: "普通药品" },
   { key: "storage_condition", value: "常温保存" },
-  { key: "udi_code", value: "06912345678901" },
-  { key: "electronic_regulatory_code", value: "DEMO-REG-001" },
-  { key: "length_mm", value: "120" },
-  { key: "width_mm", value: "80" },
-  { key: "height_mm", value: "50" },
-  { key: "volume_cm3", value: "480" },
-  { key: "weight_g", value: "350.5" },
   {
     key: "packaging_levels",
     value: '[{"unit":"片","ratio_to_base":1,"is_base":true,"is_default":false,"sort_order":1},{"unit":"盒","ratio_to_base":24,"is_base":false,"is_default":true,"sort_order":2}]',
@@ -172,7 +164,7 @@ export async function handleH8ErpInterfaceTableDevMock(
       connector_name: "示例 REST ERP",
       channel_mode: "interface_table",
       status: "testing",
-      warehouse_ids: [warehouseId],
+      warehouse_ids: [],
       probe_credentials_configured: true,
     }]);
     return true;
@@ -196,7 +188,7 @@ export async function handleH8ErpInterfaceTableDevMock(
       .filter(([key]) => key !== "business_fields")
       .map(([key, value]) => ({ key, value: value == null ? null : String(value) }));
     fields.push(...row.business_fields);
-    if (row.table_key === "if_in_product_master") fields.push(...productMasterDetailFields);
+    if (row.table_key === "x_wmsinter_GoodsInfo") fields.push(...productMasterDetailFields);
     sendJson(res, 200, {
       row,
       fields,

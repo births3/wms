@@ -29,30 +29,56 @@ import {
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const TABLES = [
-  ["if_in_asn", "入站 ASN"],
-  ["if_in_outbound_order", "入站出库订单"],
-  ["if_in_return_order", "入站退货申请"],
-  ["if_in_product_master", "商品主数据"],
-  ["if_in_product_change", "商品主数据变更"],
-  ["if_out_message", "出站消息"],
+  ["x_wmsinter_GoodsInfo", "商品主数据"],
+  ["x_wmsinter_CustomerInfo", "客户主数据"],
+  ["x_wmsinter_SupplierInfo", "供应商主数据"],
+  ["x_wmsinter_InboundOrder", "入库单头"],
+  ["x_wmsinter_InboundOrderItems", "入库单明细"],
+  ["x_wmsinter_OutboundOrder", "出库单头"],
+  ["x_wmsinter_OutboundOrderItems", "出库单明细"],
+  ["x_wmsinter_OrderFeedback", "订单状态反馈"],
+  ["x_wmsinter_OrderCommand", "订单命令"],
+  ["x_wmsinter_InboundFeedback", "入库明细反馈"],
+  ["x_wmsinter_OutboundFeedback", "出库明细反馈"],
+  ["x_wmsinter_WmsEvent", "WMS 事件"],
+  ["x_wmsinter_InventoryPushHeader", "ERP 库存快照头"],
+  ["x_wmsinter_InventoryPushItems", "ERP 库存快照明细"],
+  ["x_wmsinter_InventoryReceiveHeader", "WMS 库存快照头"],
+  ["x_wmsinter_InventoryReceiveItems", "WMS 库存快照明细"],
 ] as const;
 
-const INBOUND_STATUSES = ["pending", "processing", "success", "failed", "dead"];
-const OUTBOUND_STATUSES = [...INBOUND_STATUSES, "acked"];
+const MAIN_TABLES = new Set([
+  "x_wmsinter_GoodsInfo",
+  "x_wmsinter_CustomerInfo",
+  "x_wmsinter_SupplierInfo",
+  "x_wmsinter_InboundOrder",
+  "x_wmsinter_OutboundOrder",
+  "x_wmsinter_OrderFeedback",
+  "x_wmsinter_OrderCommand",
+  "x_wmsinter_InboundFeedback",
+  "x_wmsinter_OutboundFeedback",
+  "x_wmsinter_WmsEvent",
+  "x_wmsinter_InventoryPushHeader",
+  "x_wmsinter_InventoryReceiveHeader",
+]);
+const V19_STATUSES = ["pending", "processing", "awaiting_receipt", "failed", "dead", "acked"];
 const STATUS_LABELS: Record<string, string> = {
   pending: "待处理",
   processing: "处理中",
-  success: "成功",
-  failed: "失败",
+  awaiting_receipt: "技术接收完成",
+  failed: "可重试失败",
   dead: "死信",
-  acked: "已确认",
+  acked: "业务已提交",
+  readonly: "只读子记录",
+  unknown: "未知状态",
   testing: "测试中",
   active: "已启用",
   disabled: "已停用",
 };
 const DETAIL_FIELD_LABELS: Record<string, string> = {
   id: "记录 ID",
-  owner_id: "货主 ID",
+  owner_id: "WMS 货主 ID",
+  owner_code: "ERP 货主编码",
   business_key: "业务键摘要",
   event_type: "事件类型",
   external_ref: "外部引用",
@@ -69,17 +95,9 @@ const DETAIL_FIELD_LABELS: Record<string, string> = {
   product_name: "商品名称",
   spec: "规格",
   approval_no: "批准文号",
-  dosage_form: "剂型",
   manufacturer: "生产厂家",
   special_drug_category: "特殊药品分类",
   storage_condition: "储存条件",
-  udi_code: "UDI 编码",
-  electronic_regulatory_code: "电子监管码",
-  length_mm: "长度（毫米）",
-  width_mm: "宽度（毫米）",
-  height_mm: "高度（毫米）",
-  volume_cm3: "体积（立方厘米）",
-  weight_g: "重量（克）",
   schema_version: "契约版本",
 };
 
@@ -100,12 +118,9 @@ export const h8ErpInterfaceTableQueryFields: QueryPanelField[] = [
     options: TABLES.map(([value, label]) => ({ value, label: `${label}（${value}）` })),
   },
   { key: "sync_status", label: "同步状态", type: "multiSelect", options: [] },
-  { key: "updated_at", label: "更新时间（最近 7 天）", type: "dateRange" },
+  { key: "updated_at", label: "写入时间（最近 7 天）", type: "dateRange" },
   { key: "external_doc_no", label: "外部单据号", type: "text" },
-  { key: "external_ref", label: "外部引用", type: "text" },
-  { key: "source_outbox_id", label: "来源发件箱 ID", type: "text" },
   { key: "event_type", label: "事件类型", type: "text" },
-  { key: "warehouse_id", label: "仓库 ID", type: "text" },
   { key: "idempotency_key", label: "幂等键", type: "text" },
 ];
 const h8ErpInterfaceTableQueryFieldDefinitions = h8ErpInterfaceTableQueryFields;
@@ -129,16 +144,9 @@ const columns: DataGridColumn<H8ErpInterfaceTableRow>[] = [
   { key: "updated_at", header: "更新时间", width: 175, render: (row) => new Date(row.updated_at).toLocaleString() },
 ];
 
-const wmsResourceColumn: DataGridColumn<H8ErpInterfaceTableRow> = {
-  key: "wms_resource_id",
-  header: "WMS 资源 ID",
-  width: 230,
-  render: (row) => row.wms_resource_id ?? "—",
-};
-
 const productColumns: DataGridColumn<H8ErpInterfaceTableRow>[] = [
-  { key: "business_key", header: "外部单号", width: 180, render: (row) => row.business_key ?? "—" },
-  { key: "owner_id", header: "货主 ID", width: 230, mono: true },
+  { key: "row_id", header: "记录 ID", width: 110, mono: true },
+  { key: "owner_code", header: "ERP 货主编码", width: 130, render: (row) => businessValue(row, "owner_code") },
   { key: "product_code", header: "商品编码", width: 160, render: (row) => businessValue(row, "product_code") },
   { key: "product_name", header: "商品名称", width: 240, render: (row) => businessValue(row, "product_name") },
   { key: "spec", header: "规格", width: 160, render: (row) => businessValue(row, "spec") },
@@ -161,21 +169,18 @@ const PRODUCT_DETAIL_GROUPS = [
     "药品与监管",
     [
       "approval_no",
-      "dosage_form",
       "manufacturer",
       "special_drug_category",
       "storage_condition",
-      "udi_code",
-      "electronic_regulatory_code",
     ],
   ],
-  ["物流与包装", ["length_mm", "width_mm", "height_mm", "volume_cm3", "weight_g"]],
+  ["物流与包装", []],
   [
     "同步追踪",
     [
       "schema_version",
+      "owner_code",
       "owner_id",
-      "wms_resource_id",
       "sync_status",
       "retry_count",
       "last_error",
@@ -300,25 +305,33 @@ function toIsoDay(value: string | undefined, end = false): string | undefined {
 function defaultQuery(connectorId = ""): QueryPanelValue {
   return {
     connector_id: connectorId,
-    table_key: "if_in_asn",
+    table_key: "x_wmsinter_GoodsInfo",
     sync_status: [],
     updated_at: {},
     external_doc_no: "",
-    external_ref: "",
-    source_outbox_id: "",
     event_type: "",
-    warehouse_id: "",
     idempotency_key: "",
   };
 }
 
 function isApplicable(tableKey: string, key: string): boolean {
-  if (tableKey === "if_out_message") return ["source_outbox_id", "event_type", "idempotency_key"].includes(key);
-  if (tableKey === "if_in_product_master" || tableKey === "if_in_product_change") return ["external_doc_no", "idempotency_key"].includes(key);
-  if (tableKey === "if_in_asn" || tableKey === "if_in_return_order") {
-    return ["external_doc_no", "external_ref", "warehouse_id", "idempotency_key"].includes(key);
-  }
-  return ["external_doc_no", "warehouse_id", "idempotency_key"].includes(key);
+  if (key === "idempotency_key") return true;
+  if (key === "event_type") return tableKey === "x_wmsinter_WmsEvent";
+  if (key !== "external_doc_no") return false;
+  return [
+    "x_wmsinter_InboundOrder",
+    "x_wmsinter_InboundOrderItems",
+    "x_wmsinter_OutboundOrder",
+    "x_wmsinter_OutboundOrderItems",
+    "x_wmsinter_OrderFeedback",
+    "x_wmsinter_OrderCommand",
+    "x_wmsinter_InboundFeedback",
+    "x_wmsinter_OutboundFeedback",
+  ].includes(tableKey);
+}
+
+function queryErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message.trim() ? `${fallback}：${error.message}` : fallback;
 }
 
 export function ErpInterfaceTablePage() {
@@ -338,22 +351,19 @@ export function ErpInterfaceTablePage() {
     }
   }, [draftQuery.connector_id, firstReadyConnectorId, setAppliedQuery, setDraftQuery]);
 
-  const tableKey = String(appliedQuery.table_key ?? "if_in_asn");
+  const tableKey = String(appliedQuery.table_key ?? "x_wmsinter_GoodsInfo");
   const selectedConnector = connectors.find((connector) => connector.id === String(appliedQuery.connector_id ?? ""));
   const selectedConnectorReady = selectedConnector?.probe_credentials_configured === true;
   const range = asRange(appliedQuery.updated_at);
   const listQuery = useH8ErpInterfaceTableRowsQuery({
     connector_id: String(appliedQuery.connector_id ?? ""),
     table_key: tableKey,
-    sync_status: Array.isArray(appliedQuery.sync_status)
+    sync_status: MAIN_TABLES.has(tableKey) && Array.isArray(appliedQuery.sync_status)
       ? appliedQuery.sync_status.join(",") || undefined
       : undefined,
     time_from: toIsoDay(range.from),
     time_to: toIsoDay(range.to, true),
-    warehouse_id: isApplicable(tableKey, "warehouse_id") ? String(appliedQuery.warehouse_id ?? "") || undefined : undefined,
     external_doc_no: isApplicable(tableKey, "external_doc_no") ? String(appliedQuery.external_doc_no ?? "") || undefined : undefined,
-    external_ref: isApplicable(tableKey, "external_ref") ? String(appliedQuery.external_ref ?? "") || undefined : undefined,
-    source_outbox_id: isApplicable(tableKey, "source_outbox_id") ? String(appliedQuery.source_outbox_id ?? "") || undefined : undefined,
     event_type: isApplicable(tableKey, "event_type") ? String(appliedQuery.event_type ?? "") || undefined : undefined,
     idempotency_key: String(appliedQuery.idempotency_key ?? "") || undefined,
     page: 1,
@@ -362,18 +372,21 @@ export function ErpInterfaceTablePage() {
   const detailQuery = useH8ErpInterfaceTableDetailQuery(String(appliedQuery.connector_id ?? ""), tableKey, detailId);
   const rows = listQuery.data?.items ?? [];
   const selected = rows.find((row) => row.row_id === selectedKeys[0]);
-  const draftTableKey = String(draftQuery.table_key ?? "if_in_asn");
-  const draftStatusOptions = draftTableKey === "if_out_message" ? OUTBOUND_STATUSES : INBOUND_STATUSES;
+  const draftTableKey = String(draftQuery.table_key ?? "x_wmsinter_GoodsInfo");
   // 查询闸门必须依据草稿里选中的连接：按 appliedQuery 判断会在“已应用连接不可用”时死锁，永远无法查询。
   const draftConnector = connectors.find((connector) => connector.id === String(draftQuery.connector_id ?? ""));
   const draftConnectorReady = draftConnector?.probe_credentials_configured === true;
   const h8ErpInterfaceTableQueryFields = h8ErpInterfaceTableQueryFieldDefinitions
-    .filter((field) => h8ErpInterfaceTableCoreQueryFieldKeys.includes(field.key) || isApplicable(draftTableKey, field.key))
+    .filter((field) =>
+      (h8ErpInterfaceTableCoreQueryFieldKeys.includes(field.key) &&
+        (field.key !== "sync_status" || MAIN_TABLES.has(draftTableKey))) ||
+      isApplicable(draftTableKey, field.key),
+    )
     .map((field) =>
       field.key === "connector_id"
       ? { ...field, options: [{ label: "请选择", value: "" }, ...connectors.map((connector) => ({ label: connector.probe_credentials_configured ? `${connector.connector_name}（${connector.connector_code} · ${statusLabel(connector.status)}）` : `${connector.connector_name}（${connector.connector_code} · 未配置独立探查凭据）`, value: connector.id, disabled: !connector.probe_credentials_configured }))] }
       : field.key === "sync_status"
-        ? { ...field, options: draftStatusOptions.map((value) => ({ label: statusLabel(value), value })) }
+        ? { ...field, options: V19_STATUSES.map((value) => ({ label: statusLabel(value), value })) }
       : field,
     );
   const toolbarActions: DataGridToolbarAction[] = [
@@ -394,13 +407,11 @@ export function ErpInterfaceTablePage() {
         fields={h8ErpInterfaceTableQueryFields}
         defaultVisibleFieldKeys={h8ErpInterfaceTableCoreQueryFieldKeys}
         value={draftQuery}
-        onValueChange={(next) =>
-          setDraftQuery(
-            next.table_key !== "if_out_message" && Array.isArray(next.sync_status)
-              ? { ...next, sync_status: next.sync_status.filter((status) => status !== "acked") }
-              : next,
-          )
-        }
+        onValueChange={(next) => setDraftQuery(
+          MAIN_TABLES.has(String(next.table_key ?? "x_wmsinter_GoodsInfo"))
+            ? next
+            : { ...next, sync_status: [] },
+        )}
         onQuery={() => { if (draftConnectorReady) applyQuery(draftQuery); }}
         onReset={resetQuery}
       />
@@ -414,17 +425,11 @@ export function ErpInterfaceTablePage() {
           连接状态为 {statusLabel(selectedConnector.status)}；探查仍允许用于排障，但请确认接口库只读凭据和网络状态。
         </div>
       ) : null}
-      {listQuery.isError ? <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">接口表读取失败：请检查探查凭据、连接可达性或权限。</div> : null}
+      {listQuery.isError ? <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{queryErrorMessage(listQuery.error, "接口表读取失败")}</div> : null}
       <DataGrid
         key={tableKey}
         storageKey={`h8.erp-interface-tables.${tableKey}`}
-        columns={
-          tableKey === "if_in_product_master"
-            ? productColumns
-            : tableKey === "if_out_message"
-              ? columns
-              : [columns.slice(0, 2), wmsResourceColumn, columns.slice(2)].flat()
-        }
+        columns={tableKey === "x_wmsinter_GoodsInfo" ? productColumns : columns}
         data={rows}
         rowKey={(row) => row.row_id}
         selectable
@@ -437,16 +442,16 @@ export function ErpInterfaceTablePage() {
       <Dialog open={detailId != null} onOpenChange={(open) => !open && setDetailId(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{tableKey === "if_in_product_master" ? "商品主数据接口行详情" : "接口表行详情"}</DialogTitle>
+            <DialogTitle>{tableKey === "x_wmsinter_GoodsInfo" ? "商品主数据接口行详情" : "接口表行详情"}</DialogTitle>
             <DialogDescription>联合身份：连接 + 表 + 行 ID；仅展示服务端白名单业务字段和脱敏摘要。</DialogDescription>
           </DialogHeader>
           {detailQuery.data ? (
-            tableKey === "if_in_product_master" ? (
+            tableKey === "x_wmsinter_GoodsInfo" ? (
               <ProductMasterDetail detail={detailQuery.data} />
             ) : (
               <div className="grid max-h-[60vh] gap-2 overflow-auto text-sm">{detailQuery.data.fields.map((field) => <div key={field.key} className="grid grid-cols-[10rem_1fr] gap-2 rounded border px-2 py-1"><span className="font-medium">{DETAIL_FIELD_LABELS[field.key] ?? "其他字段"}</span><span className="break-all">{detailValue(field.key, field.value)}</span></div>)}</div>
             )
-          ) : detailQuery.isError ? <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">详情读取失败：请检查连接、权限或行是否仍存在。</div> : <p className="text-sm text-muted-foreground">加载中…</p>}
+          ) : detailQuery.isError ? <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{queryErrorMessage(detailQuery.error, "详情读取失败")}</div> : <p className="text-sm text-muted-foreground">加载中…</p>}
           <DialogFooter><DialogClose asChild><Button type="button" variant="outline">关闭</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>

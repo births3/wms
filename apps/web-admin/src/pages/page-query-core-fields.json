@@ -111,7 +111,7 @@
       "fieldConstant": "h8ErpInterfaceTableQueryFields",
       "coreConstant": "h8ErpInterfaceTableCoreQueryFieldKeys",
       "core": ["connector_id", "table_key", "sync_status", "updated_at"],
-      "more": ["external_doc_no", "external_ref", "source_outbox_id", "event_type", "warehouse_id", "idempotency_key"]
+      "more": ["external_doc_no", "event_type", "idempotency_key"]
     },
     {
       "id": "h1-menu-management",
