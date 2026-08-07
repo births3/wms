@@ -212,25 +212,6 @@ async fn detail_row(
     let table_spec = interface_table_spec(table_key).ok_or_else(|| {
         H8InterfaceTableHandlerError::BadRequest("table_key is not allowlisted".into())
     })?;
-    if Uuid::parse_str(&row_id).is_err() {
-        write_query_audit(
-            &state,
-            &ctx,
-            "h8_interface_table_detail_query",
-            connector.id,
-            table_key,
-            serde_json::json!({
-                "row_id": row_id,
-                "warehouse_column": if table_spec.has_warehouse_id { "warehouse_id" } else { "无仓列" },
-                "hit": false,
-            }),
-            0,
-        )
-        .await?;
-        return Err(H8InterfaceTableHandlerError::Repo(
-            H8InterfaceTableRepoError::NotFound,
-        ));
-    }
     let detail = match state
         .repository
         .detail(&connector, table_key, &row_id, ctx.warehouse_scope)
@@ -317,7 +298,9 @@ fn ensure_scope_query(
     let spec = interface_table_spec(table_key).ok_or_else(|| {
         H8InterfaceTableHandlerError::BadRequest("table_key is not allowlisted".into())
     })?;
-    if !spec.has_warehouse_id && ctx.warehouse_scope.is_some() {
+    if !spec.has_warehouse_id
+        && (ctx.warehouse_scope.is_some() || !connector.warehouse_ids.is_empty())
+    {
         return Err(H8InterfaceTableHandlerError::Repo(
             H8InterfaceTableRepoError::Forbidden,
         ));
@@ -379,17 +362,54 @@ fn filter_summary(query: &H8ErpInterfaceTableQuery, has_warehouse_id: bool) -> s
 
 #[cfg(test)]
 mod tests {
-    use super::{filter_summary, probe_credentials_configured};
+    use super::{ensure_scope_query, filter_summary, probe_credentials_configured};
     use chrono::Utc;
     use uuid::Uuid;
-    use wms_domain::H8ErpInterfaceTableQuery;
+    use wms_domain::{H8ErpConnector, H8ErpInterfaceTableQuery};
+
+    use crate::operation_context::OperationContext;
+
+    fn connector(warehouse_ids: Vec<Uuid>) -> H8ErpConnector {
+        let now = Utc::now();
+        H8ErpConnector {
+            id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            connector_code: "scope-test".into(),
+            connector_name: "Scope Test".into(),
+            warehouse_ids,
+            directions: vec!["inbound".into()],
+            message_types: vec!["product_master".into()],
+            channel_mode: "interface_table".into(),
+            api_base_url: None,
+            interface_db_host: None,
+            interface_db_port: None,
+            interface_db_name: None,
+            interface_db_username: None,
+            api_key_id: None,
+            bearer_secret_alias: None,
+            interface_db_password_alias: None,
+            interface_probe_db_username: None,
+            interface_probe_db_password_alias: None,
+            interface_probe_db_password_alias_set: false,
+            interface_probe_config_version: 1,
+            status: "active".into(),
+            config_version: 1,
+            first_activated_at: None,
+            last_tested_version: None,
+            last_tested_at: None,
+            last_tested_succeeded: None,
+            last_tested_error_summary: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
 
     #[test]
     fn audit_summary_marks_owner_wide_tables_without_warehouse_column() {
         let now = Utc::now();
         let query = H8ErpInterfaceTableQuery {
             connector_id: Uuid::new_v4(),
-            table_key: "if_in_product_master".into(),
+            table_key: "x_wmsinter_GoodsInfo".into(),
             updated_from: now,
             updated_to: now,
             sync_status: None,
@@ -418,5 +438,20 @@ mod tests {
             Some("probe"),
             Some("vault://h8/probe")
         ));
+    }
+
+    #[test]
+    fn owner_wide_table_rejects_connector_warehouse_whitelist_it_cannot_enforce() {
+        let connector = connector(vec![Uuid::new_v4()]);
+        let ctx = OperationContext {
+            user_id: Uuid::new_v4(),
+            owner_id: connector.owner_id,
+            actor_name: "admin".into(),
+            permissions: vec![],
+            jti: "scope-test".into(),
+            warehouse_scope: None,
+        };
+
+        assert!(ensure_scope_query(&ctx, &connector, "x_wmsinter_GoodsInfo", None).is_err());
     }
 }

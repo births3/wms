@@ -8,13 +8,15 @@ use wms_domain::{
 
 #[test]
 fn allowlist_and_table_specific_status_filters_are_enforced() {
-    assert!(interface_table_spec("if_in_asn").is_some());
+    assert!(interface_table_spec("x_wmsinter_GoodsInfo").is_some());
+    assert!(interface_table_spec("x_wmsinter_InboundOrderItems").is_some());
+    assert!(interface_table_spec("if_in_asn").is_none());
     assert!(interface_table_spec("h8_erp_connectors").is_none());
 
     let now = Utc::now();
     let valid = H8ErpInterfaceTableQuery {
         connector_id: Uuid::new_v4(),
-        table_key: "if_in_asn".into(),
+        table_key: "x_wmsinter_InboundOrder".into(),
         updated_from: now - Duration::days(7),
         updated_to: now,
         sync_status: Some("failed".into()),
@@ -31,27 +33,34 @@ fn allowlist_and_table_specific_status_filters_are_enforced() {
     assert!(valid.validate().is_ok());
 
     let valid_multi_status = H8ErpInterfaceTableQuery {
-        sync_status: Some("pending,failed".into()),
+        sync_status: Some("pending,awaiting_receipt,failed,acked".into()),
         ..valid.clone()
     };
     assert_eq!(
         valid_multi_status.sync_statuses(),
-        vec!["pending", "failed"]
+        vec!["pending", "awaiting_receipt", "failed", "acked"]
     );
     assert!(valid_multi_status.validate().is_ok());
 
     let invalid_status = H8ErpInterfaceTableQuery {
-        sync_status: Some("pending,acked".into()),
+        sync_status: Some("success".into()),
         ..valid.clone()
     };
     assert!(invalid_status.validate().is_err());
 
     let invalid_external_ref = H8ErpInterfaceTableQuery {
-        table_key: "if_in_outbound_order".into(),
+        table_key: "x_wmsinter_OutboundOrder".into(),
         external_ref: Some("ERP-REF".into()),
         ..valid.clone()
     };
     assert!(invalid_external_ref.validate().is_err());
+
+    let child_with_status = H8ErpInterfaceTableQuery {
+        table_key: "x_wmsinter_InboundOrderItems".into(),
+        sync_status: Some("pending".into()),
+        ..valid.clone()
+    };
+    assert!(child_with_status.validate().is_err());
 
     let invalid_range = H8ErpInterfaceTableQuery {
         updated_from: now - Duration::days(32),
@@ -113,7 +122,7 @@ fn product_master_row_serializes_safe_business_fields() {
     let row = H8ErpInterfaceTableRow {
         row_id: Uuid::new_v4().to_string(),
         connector_id: Uuid::new_v4(),
-        table_key: "if_in_product_master".into(),
+        table_key: "x_wmsinter_GoodsInfo".into(),
         owner_id: Uuid::new_v4(),
         warehouse_id: None,
         business_key: Some("DEMO-PM-001".into()),

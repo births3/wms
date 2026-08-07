@@ -76,7 +76,7 @@ mod tests {
             "h8_interface_table_list_query",
             "H8",
             "h8_erp_interface_table",
-            "connector:if_in_asn",
+            "connector:x_wmsinter_InboundOrder",
             None,
         );
 

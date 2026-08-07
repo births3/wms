@@ -11,15 +11,15 @@ pub const H8_INTERFACE_TABLE_PAYLOAD_SUMMARY_MAX_BYTES: usize = 4096;
 /// 原始报文或结构化业务字段进入 JSON 解析前允许的最大字节数。
 pub const H8_INTERFACE_TABLE_PAYLOAD_PARSE_MAX_BYTES: usize = 1024 * 1024;
 
-const INBOUND_STATUSES: &[&str] = &["pending", "processing", "success", "failed", "dead"];
-const OUTBOUND_STATUSES: &[&str] = &[
+const V19_MAIN_STATUSES: &[&str] = &[
     "pending",
     "processing",
-    "success",
+    "awaiting_receipt",
     "failed",
     "dead",
     "acked",
 ];
+const V19_CHILD_STATUSES: &[&str] = &[];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct H8InterfaceTableSpec {
@@ -31,40 +31,100 @@ pub struct H8InterfaceTableSpec {
 
 const INTERFACE_TABLE_SPECS: &[H8InterfaceTableSpec] = &[
     H8InterfaceTableSpec {
-        table_key: "if_in_asn",
-        has_warehouse_id: true,
-        has_wms_resource_id: true,
-        allowed_sync_statuses: INBOUND_STATUSES,
-    },
-    H8InterfaceTableSpec {
-        table_key: "if_in_outbound_order",
-        has_warehouse_id: true,
-        has_wms_resource_id: true,
-        allowed_sync_statuses: INBOUND_STATUSES,
-    },
-    H8InterfaceTableSpec {
-        table_key: "if_in_return_order",
-        has_warehouse_id: true,
-        has_wms_resource_id: true,
-        allowed_sync_statuses: INBOUND_STATUSES,
-    },
-    H8InterfaceTableSpec {
-        table_key: "if_in_product_master",
-        has_warehouse_id: false,
-        has_wms_resource_id: true,
-        allowed_sync_statuses: INBOUND_STATUSES,
-    },
-    H8InterfaceTableSpec {
-        table_key: "if_in_product_change",
-        has_warehouse_id: false,
-        has_wms_resource_id: true,
-        allowed_sync_statuses: INBOUND_STATUSES,
-    },
-    H8InterfaceTableSpec {
-        table_key: "if_out_message",
+        table_key: "x_wmsinter_GoodsInfo",
         has_warehouse_id: false,
         has_wms_resource_id: false,
-        allowed_sync_statuses: OUTBOUND_STATUSES,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_CustomerInfo",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_SupplierInfo",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_InboundOrder",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_InboundOrderItems",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_CHILD_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_OutboundOrder",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_OutboundOrderItems",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_CHILD_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_OrderFeedback",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_OrderCommand",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_InboundFeedback",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_OutboundFeedback",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_WmsEvent",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_InventoryPushHeader",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_InventoryPushItems",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_CHILD_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_InventoryReceiveHeader",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_MAIN_STATUSES,
+    },
+    H8InterfaceTableSpec {
+        table_key: "x_wmsinter_InventoryReceiveItems",
+        has_warehouse_id: false,
+        has_wms_resource_id: false,
+        allowed_sync_statuses: V19_CHILD_STATUSES,
     },
 ];
 
@@ -188,24 +248,35 @@ impl H8ErpInterfaceTableQuery {
                 "warehouse_id",
             ));
         }
-        if self.external_doc_no.is_some() && self.table_key == "if_out_message" {
+        if self.external_doc_no.is_some()
+            && !matches!(
+                self.table_key.as_str(),
+                "x_wmsinter_InboundOrder"
+                    | "x_wmsinter_InboundOrderItems"
+                    | "x_wmsinter_OutboundOrder"
+                    | "x_wmsinter_OutboundOrderItems"
+                    | "x_wmsinter_OrderFeedback"
+                    | "x_wmsinter_OrderCommand"
+                    | "x_wmsinter_InboundFeedback"
+                    | "x_wmsinter_OutboundFeedback"
+            )
+        {
             return Err(H8InterfaceTableQueryError::FilterNotSupported(
                 "external_doc_no",
             ));
         }
-        if self.external_ref.is_some()
-            && !matches!(self.table_key.as_str(), "if_in_asn" | "if_in_return_order")
-        {
+        if self.external_ref.is_some() {
             return Err(H8InterfaceTableQueryError::FilterNotSupported(
                 "external_ref",
             ));
         }
-        if (self.source_outbox_id.is_some() || self.event_type.is_some())
-            && self.table_key != "if_out_message"
-        {
+        if self.source_outbox_id.is_some() {
             return Err(H8InterfaceTableQueryError::FilterNotSupported(
-                "source_outbox_id/event_type",
+                "source_outbox_id",
             ));
+        }
+        if self.event_type.is_some() && self.table_key != "x_wmsinter_WmsEvent" {
+            return Err(H8InterfaceTableQueryError::FilterNotSupported("event_type"));
         }
         if self.wms_resource_id.is_some() && !spec.has_wms_resource_id {
             return Err(H8InterfaceTableQueryError::FilterNotSupported(
