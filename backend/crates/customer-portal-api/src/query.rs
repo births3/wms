@@ -84,7 +84,7 @@ pub async fn list_orders(
              o.id, o.order_no, o.status,
              c.customer_code, c.customer_name,
              o.delivery_address_id, a.address_code,
-             o.address_snapshot->>'address_name' AS address_name,
+             COALESCE(o.address_snapshot->>'address_name', a.address_name) AS address_name,
              lines.product_codes, lines.product_names, lines.batch_nos, lines.quantities,
              o.shipped_at, o.signed_at,
              lines.line_count,

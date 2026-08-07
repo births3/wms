@@ -15,163 +15,8 @@ use wms_customer_portal_api::{export::process_next_export, portal_router, Portal
 
 const JWT_SECRET: &str = "portal-test-jwt-secret-at-least-32-bytes";
 const PROJECTION_KEY: &str = "portal-test-projection-key";
-const PASSWORD: &str = "PortalTest1234";
 
 include!("customer_portal_postgres/support.rs");
-
-async fn seed_user(
-    pool: &PgPool,
-    customer_id: Uuid,
-    username: &str,
-    role: &str,
-    history: bool,
-    address_ids: &[Uuid],
-) -> Uuid {
-    let user_id = Uuid::new_v4();
-    let password_hash = bcrypt::hash(PASSWORD, 4).expect("test password should hash");
-    sqlx::query(
-        "INSERT INTO portal_users (
-            id, customer_id, username, display_name, password_hash,
-            role, status, can_view_report_history
-         )
-         VALUES ($1, $2, $3, $3, $4, $5, 'active', $6)",
-    )
-    .bind(user_id)
-    .bind(customer_id)
-    .bind(username)
-    .bind(password_hash)
-    .bind(role)
-    .bind(history)
-    .execute(pool)
-    .await
-    .expect("portal user should seed");
-    for address_id in address_ids {
-        sqlx::query("INSERT INTO portal_user_addresses (user_id, address_id) VALUES ($1, $2)")
-            .bind(user_id)
-            .bind(address_id)
-            .execute(pool)
-            .await
-            .expect("portal address scope should seed");
-    }
-    user_id
-}
-
-async fn login(app: &axum::Router, username: &str) -> String {
-    let response = app
-        .clone()
-        .oneshot(json_request(
-            "POST",
-            "/api/v1/auth/login",
-            None,
-            json!({ "username": username, "password": PASSWORD }),
-        ))
-        .await
-        .expect("login should respond");
-    assert_eq!(response.status(), StatusCode::OK);
-    response_json(response).await["access_token"]
-        .as_str()
-        .expect("access token should exist")
-        .to_string()
-}
-
-fn order_payload(
-    id: Uuid,
-    customer_id: Uuid,
-    address_id: Uuid,
-    order_no: &str,
-    status: &str,
-    product_id: Uuid,
-    batch_no: &str,
-) -> Value {
-    json!({
-        "id": id,
-        "customer_id": customer_id,
-        "order_no": order_no,
-        "status": status,
-        "delivery_address_id": address_id,
-        "address_snapshot": { "address_name": format!("{order_no} 收货地址") },
-        "shipped_at": Utc::now() - Duration::hours(1),
-        "signed_at": if status == "signed" { Some(Utc::now()) } else { None },
-        "updated_at": Utc::now(),
-        "lines": [{
-            "id": Uuid::new_v4(),
-            "product_id": product_id,
-            "product_code": "P-001",
-            "product_name": "真实药品",
-            "batch_no": batch_no,
-            "quantity": 12.0
-        }]
-    })
-}
-
-#[allow(clippy::too_many_arguments)]
-fn report_payload(
-    id: Uuid,
-    report_id: Uuid,
-    owner_id: Uuid,
-    product_id: Uuid,
-    version_number: i32,
-    current: bool,
-    copy_status: &str,
-    storage_key: Option<&str>,
-) -> Value {
-    json!({
-        "id": id,
-        "report_id": report_id,
-        "owner_id": owner_id,
-        "product_id": product_id,
-        "batch_no": "BATCH-001",
-        "version_number": version_number,
-        "report_no": format!("REPORT-{version_number}"),
-        "status": if current { "confirmed" } else { "superseded" },
-        "is_current": current,
-        "modification_reason": if version_number > 1 { Some("供应商更正") } else { None },
-        "customer_copy_status": copy_status,
-        "customer_copy_storage_key": storage_key,
-        "customer_copy_file_name": storage_key.map(|_| format!("report-v{version_number}.pdf")),
-        "customer_copy_size": storage_key.map(|_| 24_i64),
-        "customer_copy_hash": storage_key.map(|_| format!("hash-{version_number}")),
-        "digitally_signed_original": false,
-        "confirmed_at": Utc::now() - Duration::minutes(3 - version_number as i64),
-        "updated_at": Utc::now() + Duration::seconds(version_number as i64)
-    })
-}
-
-async fn seed_customer_and_addresses(app: &axum::Router) -> (Uuid, Uuid, Uuid) {
-    let customer_id = Uuid::new_v4();
-    let address_a = Uuid::new_v4();
-    let address_b = Uuid::new_v4();
-    project(
-        app,
-        "customer.upsert",
-        json!({
-            "id": customer_id,
-            "customer_code": "C-REAL",
-            "customer_name": "真实客户",
-            "updated_at": Utc::now()
-        }),
-    )
-    .await;
-    for (id, code, name) in [
-        (address_a, "A-001", "一号门店"),
-        (address_b, "A-002", "二号门店"),
-    ] {
-        project(
-            app,
-            "customer_address.upsert",
-            json!({
-                "id": id,
-                "customer_id": customer_id,
-                "address_code": code,
-                "address_name": name,
-                "address_snapshot": { "address": name },
-                "updated_at": Utc::now()
-            }),
-        )
-        .await;
-    }
-    (customer_id, address_a, address_b)
-}
 
 #[sqlx::test(migrations = "./migrations")]
 async fn independent_projection_and_address_history_permissions_are_enforced(pool: PgPool) {
@@ -391,6 +236,60 @@ async fn independent_projection_and_address_history_permissions_are_enforced(poo
     .await
     .expect("audit count should read");
     assert!(audit_count >= 7);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn list_orders_falls_back_to_address_table_when_snapshot_lacks_address_name(pool: PgPool) {
+    let state = PortalState::new(pool.clone(), JWT_SECRET, PROJECTION_KEY, storage_root());
+    let app = portal_router(state);
+    let (customer_id, address_a, _) = seed_customer_and_addresses(&app).await;
+    let product_id = Uuid::new_v4();
+    let mut payload = order_payload(
+        Uuid::new_v4(),
+        customer_id,
+        address_a,
+        "SO-NO-SNAPSHOT-NAME",
+        "shipped",
+        product_id,
+        "BATCH-001",
+    );
+    // 生产快照（wave4_repository_part1 的 jsonb_build_object）不含 address_name 键，
+    // 必须回退到 portal_customer_addresses.address_name，否则 try_get 解码失败整页 500。
+    payload["address_snapshot"] = json!({
+        "province": "广东省",
+        "city": "广州市",
+        "detail_address": "某路 1 号",
+    });
+    project(&app, "outbound_order.upsert", payload).await;
+    seed_user(
+        &pool,
+        customer_id,
+        "portal-admin",
+        "customer_admin",
+        false,
+        &[],
+    )
+    .await;
+    let token = login(&app, "portal-admin").await;
+    let response = app
+        .clone()
+        .oneshot(json_request(
+            "GET",
+            "/api/v1/orders",
+            Some(&token),
+            json!({}),
+        ))
+        .await
+        .expect("orders should respond");
+    assert_eq!(response.status(), StatusCode::OK);
+    let orders = response_json(response).await;
+    let order = orders
+        .as_array()
+        .expect("orders should be array")
+        .iter()
+        .find(|order| order["order_no"] == "SO-NO-SNAPSHOT-NAME")
+        .expect("order should be listed");
+    assert_eq!(order["address_name"], "一号门店");
 }
 
 #[sqlx::test(migrations = "./migrations")]
