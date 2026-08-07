@@ -23,17 +23,18 @@ def settings() -> SimpleNamespace:
 
 class TestOutboundReceipts(unittest.TestCase):
     def test_lists_only_acked_interface_rows(self) -> None:
-        output = (
-            '[{"id":"11111111-1111-1111-1111-111111111111",'
-            '"idempotency_key":"out:inventory_snapshot_erp_feedback_outbox:source-1",'
-            '"erp_ack_ref":"erp|ack-1"}]\n'
-        )
-        with patch.object(worker_mssql, "sqlcmd_query", return_value=output) as query:
-            rows = worker_mssql.list_acked_outbound(settings())
+        key = "11111111-1111-1111-1111-111111111111"
+        with patch.object(
+            worker_mssql,
+            "mssql_query",
+            side_effect=[[{"row_id": 7, "IdempotencyKey": key}], [], [], [], []],
+        ) as query:
+            rows = worker_mssql.list_acked_outbound(settings(), [key])
 
-        self.assertEqual(rows[0]["erp_ack_ref"], "erp|ack-1")
-        self.assertIn("sync_status = N'acked'", query.call_args.args[1])
-        self.assertIn("FOR JSON PATH", query.call_args.args[1])
+        self.assertEqual(rows[0]["id"], "x_wmsinter_OrderFeedback:7")
+        self.assertEqual(rows[0]["idempotency_key"], key)
+        self.assertIn("handelflag = 5", query.call_args_list[0].args[1])
+        self.assertNotIn("FOR JSON PATH", query.call_args_list[0].args[1])
 
     def test_records_business_receipt_then_marks_interface_row_consumed(self) -> None:
         row = {
@@ -72,7 +73,7 @@ class TestOutboundReceipts(unittest.TestCase):
             return 200, {"id": "message-1", "sync_status": "acked"}, ""
 
         with (
-            patch.object(outbound_publish, "list_acked_outbound", return_value=[row]),
+            patch.object(outbound_publish, "list_acked_outbound", return_value=[row]) as listed,
             patch.object(outbound_publish, "mark_outbound_receipt_recorded") as mark,
         ):
             processed = sync_worker.process_outbound_receipts(
@@ -84,7 +85,101 @@ class TestOutboundReceipts(unittest.TestCase):
         self.assertEqual(calls[1][2]["stage"], "receipt")
         self.assertEqual(calls[1][2]["result"], "ok")
         self.assertEqual(calls[1][2]["message_id"], "message-1")
+        listed.assert_called_once_with(settings(), [row["idempotency_key"]])
         mark.assert_called_once_with(settings(), row["id"])
+
+    def test_table_receipt_follows_next_cursor_until_acked_row_is_found(self) -> None:
+        acked_row = {
+            "id": "x_wmsinter_OrderFeedback:7",
+            "idempotency_key": (
+                "out:inventory_snapshot_erp_feedback_outbox:"
+                "33333333-3333-3333-3333-333333333333"
+            ),
+        }
+        get_paths: list[str] = []
+
+        def fake_http(_settings, method, path, body, _idem):
+            if method == "GET":
+                get_paths.append(path)
+                if "cursor=" not in path:
+                    return (
+                        200,
+                        {
+                            "data": [
+                                {
+                                    "id": "message-page-1",
+                                    "connector_id": settings().connector_id,
+                                    "connector_code": "SELF-ERP",
+                                    "config_version": 2,
+                                    "direction": "outbound",
+                                    "message_type": "inventory_snapshot",
+                                    "schema_version": "1",
+                                    "external_ref": "COUNT-1",
+                                    "idempotency_key": (
+                                        "out:inventory_snapshot_erp_feedback_outbox:"
+                                        "11111111-1111-1111-1111-111111111111"
+                                    ),
+                                    "correlation_id": "corr-1",
+                                    "channel": "interface_table",
+                                    "sync_status": "awaiting_receipt",
+                                    "warehouse_id": None,
+                                }
+                            ],
+                            "page": {"next_cursor": "page-2"},
+                        },
+                        "",
+                    )
+                return (
+                    200,
+                    {
+                        "data": [
+                            {
+                                "id": "message-page-2",
+                                "connector_id": settings().connector_id,
+                                "connector_code": "SELF-ERP",
+                                "config_version": 2,
+                                "direction": "outbound",
+                                "message_type": "inventory_snapshot",
+                                "schema_version": "1",
+                                "external_ref": "COUNT-2",
+                                "idempotency_key": acked_row["idempotency_key"],
+                                "correlation_id": "corr-2",
+                                "channel": "interface_table",
+                                "sync_status": "awaiting_receipt",
+                                "warehouse_id": None,
+                            }
+                        ],
+                        "page": {"next_cursor": None},
+                    },
+                    "",
+                )
+            self.assertEqual(body["message_id"], "message-page-2")
+            return 200, {"id": "message-page-2", "sync_status": "acked"}, ""
+
+        with (
+            patch.object(
+                outbound_publish, "list_acked_outbound", return_value=[acked_row]
+            ) as listed,
+            patch.object(outbound_publish, "mark_outbound_receipt_recorded") as mark,
+        ):
+            processed = sync_worker.process_outbound_receipts(
+                settings(),
+                http_json_fn=fake_http,
+            )
+
+        self.assertEqual(processed, 1)
+        self.assertEqual(len(get_paths), 2)
+        self.assertIn("cursor=page-2", get_paths[1])
+        listed.assert_called_once_with(
+            settings(),
+            [
+                "out:inventory_snapshot_erp_feedback_outbox:"
+                "11111111-1111-1111-1111-111111111111",
+                "out:inventory_snapshot_erp_feedback_outbox:"
+                "33333333-3333-3333-3333-333333333333",
+            ],
+        )
+        mark.assert_called_once_with(settings(), acked_row["id"])
 
     def test_due_receipt_timeout_requeues_original_outbox_until_server_returns_dead(
         self,

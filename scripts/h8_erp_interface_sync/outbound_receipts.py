@@ -144,67 +144,79 @@ def process_table_receipts(
     settings: Any,
     *,
     http_json_fn: Callable[..., tuple[int, Any, str]],
-    list_acked_fn: Callable[[Any], list[dict[str, Any]]],
+    list_acked_fn: Callable[[Any, list[str]], list[dict[str, Any]]],
     mark_recorded_fn: Callable[[Any, str], None],
 ) -> int:
     """把接口表 ERP 业务确认回写为 H8 acked。"""
     processed = 0
-    for row in list_acked_fn(settings):
-        try:
-            query = urllib.parse.urlencode(
-                {
+    # 待回执可能超过单页 limit，必须按 next_cursor 收齐全量 key，
+    # 否则窗口外的 acked 行 key 查不到对应消息，回执被永久跳过。
+    messages: dict[str, dict[str, Any]] = {}
+    cursor: str | None = None
+    while True:
+        query_params = {
+            "direction": "outbound",
+            "status": "awaiting_receipt",
+            "connector_id": settings.connector_id,
+            "created_from": "1970-01-01T00:00:00Z",
+            "limit": 200,
+        }
+        if cursor:
+            query_params["cursor"] = cursor
+        query = urllib.parse.urlencode(query_params)
+        status, parsed, raw = http_json_fn(
+            settings,
+            "GET",
+            f"/api/v1/integration/erp-messages?{query}",
+            None,
+            "h8-table-receipt-list",
+        )
+        if status != 200 or not isinstance(parsed, dict):
+            raise WorkerHttpError(status, "outbound receipt list", raw)
+        for message in parsed.get("data", []):
+            messages[str(message["idempotency_key"])] = message
+        cursor = parsed.get("page", {}).get("next_cursor")
+        if not cursor:
+            break
+    keys = list(messages)
+    for start in range(0, len(keys), 200):
+        for row in list_acked_fn(settings, keys[start : start + 200]):
+            try:
+                message = messages[row["idempotency_key"]]
+                if message.get("connector_id") != settings.connector_id:
+                    raise RuntimeError("outbound receipt connector mismatch")
+                body = {
+                    "stage": "receipt",
+                    "result": "ok",
                     "direction": "outbound",
-                    "connector_id": settings.connector_id,
-                    "idempotency_key": row["idempotency_key"],
-                    "created_from": "1970-01-01T00:00:00Z",
-                    "limit": 2,
+                    "message_type": message["message_type"],
+                    "schema_version": message["schema_version"],
+                    "external_ref": message["external_ref"],
+                    "idempotency_key": message["idempotency_key"],
+                    "correlation_id": message["correlation_id"],
+                    "channel": message["channel"],
+                    "connector_id": message.get("connector_id"),
+                    "connector_code": message.get("connector_code"),
+                    "config_version": message.get("config_version"),
+                    "message_id": message["id"],
+                    "warehouse_id": message.get("warehouse_id"),
                 }
-            )
-            status, parsed, raw = http_json_fn(
-                settings,
-                "GET",
-                f"/api/v1/integration/erp-messages?{query}",
-                None,
-                f"h8-receipt-find-{row['id']}",
-            )
-            messages = parsed.get("data", []) if isinstance(parsed, dict) else []
-            if status != 200 or len(messages) != 1:
-                raise WorkerHttpError(status, "outbound receipt lookup", raw)
-            message = messages[0]
-            if message.get("connector_id") != settings.connector_id:
-                raise RuntimeError("outbound receipt connector mismatch")
-            body = {
-                "stage": "receipt",
-                "result": "ok",
-                "direction": "outbound",
-                "message_type": message["message_type"],
-                "schema_version": message["schema_version"],
-                "external_ref": message["external_ref"],
-                "idempotency_key": message["idempotency_key"],
-                "correlation_id": message["correlation_id"],
-                "channel": message["channel"],
-                "connector_id": message.get("connector_id"),
-                "connector_code": message.get("connector_code"),
-                "config_version": message.get("config_version"),
-                "message_id": message["id"],
-                "warehouse_id": message.get("warehouse_id"),
-            }
-            status, parsed, raw = http_json_fn(
-                settings,
-                "POST",
-                "/api/v1/integration/erp-messages/lifecycle",
-                body,
-                f"h8-receipt-{row['id']}",
-            )
-            if status not in (200, 201) or not isinstance(parsed, dict):
-                raise WorkerHttpError(status, "outbound receipt", raw)
-            if parsed.get("sync_status") != "acked":
-                raise RuntimeError("outbound receipt did not reach acked")
-            mark_recorded_fn(settings, row["id"])
-            processed += 1
-        except Exception as exc:  # noqa: BLE001 — 保留 acked 行供下一轮重试
-            summary = sanitize_worker_error(
-                str(exc), (settings.api_token, settings.mssql_password)
-            )
-            print(f"[h8-out] receipt pending {row['id']}: {summary}", flush=True)
+                status, parsed, raw = http_json_fn(
+                    settings,
+                    "POST",
+                    "/api/v1/integration/erp-messages/lifecycle",
+                    body,
+                    f"h8-receipt-{row['id']}",
+                )
+                if status not in (200, 201) or not isinstance(parsed, dict):
+                    raise WorkerHttpError(status, "outbound receipt", raw)
+                if parsed.get("sync_status") != "acked":
+                    raise RuntimeError("outbound receipt did not reach acked")
+                mark_recorded_fn(settings, row["id"])
+                processed += 1
+            except Exception as exc:  # noqa: BLE001 — 保留 acked 行供下一轮重试
+                summary = sanitize_worker_error(
+                    str(exc), (settings.api_token, settings.mssql_password)
+                )
+                print(f"[h8-out] receipt pending {row['id']}: {summary}", flush=True)
     return processed
