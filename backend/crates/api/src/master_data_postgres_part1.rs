@@ -177,6 +177,96 @@ struct SpecialDrugCategoryRow {
 }
 
 impl PgMasterDataReadRepository {
+    pub async fn resolve_active_warehouse_id(
+        &self,
+        owner_id: Uuid,
+        warehouse_code: &str,
+    ) -> Result<Option<Uuid>, MasterDataError> {
+        sqlx::query_scalar(
+            "SELECT id FROM warehouses WHERE owner_id=$1 AND warehouse_code=$2 AND status='active'",
+        )
+        .bind(owner_id)
+        .bind(warehouse_code)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)
+    }
+
+    pub async fn resolve_active_supplier_id(
+        &self,
+        owner_id: Uuid,
+        supplier_code: &str,
+    ) -> Result<Option<Uuid>, MasterDataError> {
+        sqlx::query_scalar(
+            "SELECT id FROM suppliers WHERE owner_id=$1 AND supplier_code=$2 AND status='active'",
+        )
+        .bind(owner_id)
+        .bind(supplier_code)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)
+    }
+
+    pub async fn resolve_active_customer_id(
+        &self,
+        owner_id: Uuid,
+        customer_code: &str,
+    ) -> Result<Option<Uuid>, MasterDataError> {
+        sqlx::query_scalar(
+            "SELECT id FROM customers WHERE owner_id=$1 AND customer_code=$2 AND status='active'",
+        )
+        .bind(owner_id)
+        .bind(customer_code)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)
+    }
+
+    pub async fn upsert_erp_customer_address(
+        &self,
+        owner_id: Uuid,
+        customer_id: Uuid,
+        erp_address_id: i64,
+        address_code: &str,
+        detail_address: &str,
+        contact_name: Option<&str>,
+        contact_phone: Option<&str>,
+        now: DateTime<Utc>,
+    ) -> Result<Uuid, MasterDataError> {
+        sqlx::query_scalar(
+            r#"
+            INSERT INTO customer_addresses (
+                id, owner_id, customer_id, erp_address_id, address_code,
+                province, city, district, detail_address, contact_name, contact_phone,
+                is_default, created_at, updated_at
+            )
+            VALUES ($1,$2,$3,$4,$5,'','','',$6,$7,$8,FALSE,$9,$9)
+            ON CONFLICT (owner_id, address_code) WHERE address_code IS NOT NULL DO UPDATE
+               SET erp_address_id=EXCLUDED.erp_address_id,
+                   detail_address=EXCLUDED.detail_address,
+                   contact_name=EXCLUDED.contact_name,
+                   contact_phone=EXCLUDED.contact_phone,
+                   updated_at=EXCLUDED.updated_at,
+                   version=customer_addresses.version+1
+             WHERE customer_addresses.customer_id=EXCLUDED.customer_id
+            RETURNING id
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(customer_id)
+        .bind(erp_address_id)
+        .bind(address_code)
+        .bind(detail_address)
+        .bind(contact_name.unwrap_or_default())
+        .bind(contact_phone.unwrap_or_default())
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(MasterDataError::DuplicateCode(address_code.to_string()))
+    }
+
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
