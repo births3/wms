@@ -9,7 +9,7 @@ UPDATE system_dictionary_categories
                    '["inbound", "outbound", "internal"]'::jsonb
                ),
                '{properties,workflow_template,enum}',
-               '["purchase_inbound", "sales_return", "purchase_return_outbound", "sales_outbound", "stock_loss", "stock_surplus", "quality_liaison"]'::jsonb
+               '["purchase_inbound", "sales_return", "other_inbound", "purchase_return_outbound", "sales_outbound", "sample_outbound", "other_outbound", "stock_loss", "stock_surplus", "quality_liaison"]'::jsonb
            ),
            '{properties,batch_policy,enum}',
            '["standard_batch", "specified_batch", "optional"]'::jsonb

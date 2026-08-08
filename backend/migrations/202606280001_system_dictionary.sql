@@ -77,8 +77,11 @@ VALUES (
                 "enum": [
                     "purchase_inbound",
                     "sales_return",
+                    "other_inbound",
                     "purchase_return_outbound",
-                    "sales_outbound"
+                    "sales_outbound",
+                    "sample_outbound",
+                    "other_outbound"
                 ]
             },
             "batch_policy": {
@@ -151,6 +154,24 @@ FROM (
             'sales_outbound',
             '销售出库',
             '{"direction": "outbound", "workflow_template": "sales_outbound", "batch_policy": "standard_batch"}'::jsonb
+        ),
+        (
+            '10000000-0000-0000-0000-000000000018'::uuid,
+            'other_inbound',
+            '其他入库',
+            '{"direction": "inbound", "workflow_template": "other_inbound", "batch_policy": "standard_batch"}'::jsonb
+        ),
+        (
+            '10000000-0000-0000-0000-000000000019'::uuid,
+            'sample_outbound',
+            '样品出库',
+            '{"direction": "outbound", "workflow_template": "sample_outbound", "batch_policy": "standard_batch"}'::jsonb
+        ),
+        (
+            '10000000-0000-0000-0000-000000000020'::uuid,
+            'other_outbound',
+            '其他出库',
+            '{"direction": "outbound", "workflow_template": "other_outbound", "batch_policy": "standard_batch"}'::jsonb
         )
 ) AS seed(id, item_code, item_name, params)
 WHERE NOT EXISTS (
