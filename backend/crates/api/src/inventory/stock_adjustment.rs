@@ -8,12 +8,12 @@ pub(crate) async fn add_for_stock_surplus_in_tx(
     owner_id: Uuid,
     batch_id: Uuid,
     warehouse_id: Uuid,
-    quantity: i64,
+    quantity: wms_domain::Quantity,
     source_document_id: Uuid,
     approval_source: &str,
     approval_id: &str,
     now: DateTime<Utc>,
-) -> Result<Option<i64>, sqlx::Error> {
+) -> Result<Option<wms_domain::Quantity>, sqlx::Error> {
     let required_volume = sqlx::query_scalar::<_, i64>(
         r#"
         WITH target AS (
@@ -84,7 +84,7 @@ pub(crate) async fn add_for_stock_surplus_in_tx(
     if required_volume.is_none() {
         return Ok(None);
     }
-    let total = sqlx::query_scalar::<_, i64>(
+    let total = sqlx::query_scalar::<_, wms_domain::Quantity>(
         r#"
         UPDATE inventory_batches
            SET qty_on_hand = qty_on_hand + $3,

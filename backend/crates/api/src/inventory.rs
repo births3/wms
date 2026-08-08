@@ -27,14 +27,14 @@ pub(crate) async fn deduct_for_stock_loss_in_tx(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     batch_id: Uuid,
-    quantity: i64,
+    quantity: wms_domain::Quantity,
     source_document_id: Uuid,
     approval_source: &str,
     approval_id: &str,
     clear_recall: bool,
     now: DateTime<Utc>,
-) -> Result<Option<i64>, sqlx::Error> {
-    let remaining = sqlx::query_scalar::<_, i64>(
+) -> Result<Option<wms_domain::Quantity>, sqlx::Error> {
+    let remaining = sqlx::query_scalar::<_, wms_domain::Quantity>(
         r#"
         UPDATE inventory_batches
            SET qty_on_hand = qty_on_hand - $3,
@@ -113,7 +113,7 @@ impl InventoryStore {
         today: NaiveDate,
         now: DateTime<Utc>,
     ) -> Result<InventoryBatch, InventoryError> {
-        if req.qty <= 0 {
+        if req.qty <= wms_domain::Quantity::ZERO {
             return Err(InventoryError::InvalidQuantity);
         }
         let expiry = NaiveDate::parse_from_str(&req.expiry_date, "%Y-%m-%d")
@@ -151,7 +151,7 @@ impl InventoryStore {
                 production_date: req.production_date.clone(),
                 expiry_date: req.expiry_date.clone(),
                 qty_on_hand: req.qty,
-                qty_locked: 0,
+                qty_locked: wms_domain::Quantity::ZERO,
                 quality_status: req.quality_status.clone(),
                 location_id: req.location_id,
                 location_code: req.location_code.clone(),
@@ -233,14 +233,18 @@ impl InventoryStore {
         })
     }
 
-    pub fn available_qty(&self, ctx: &AuthContext, batch_id: Uuid) -> Result<i64, InventoryError> {
+    pub fn available_qty(
+        &self,
+        ctx: &AuthContext,
+        batch_id: Uuid,
+    ) -> Result<wms_domain::Quantity, InventoryError> {
         let batch = self
             .batches
             .get(&batch_id)
             .filter(|batch| batch.owner_id == ctx.owner_id)
             .ok_or(InventoryError::NotFound)?;
         if batch.quality_status != STATUS_QUALIFIED || batch.recall_flag {
-            return Ok(0);
+            return Ok(wms_domain::Quantity::ZERO);
         }
         Ok(batch.qty_on_hand - batch.qty_locked)
     }
@@ -458,7 +462,7 @@ mod tests {
             batch_no: "B202606".to_string(),
             production_date: "2026-01-01".to_string(),
             expiry_date: "2028-01-01".to_string(),
-            qty: 10,
+            qty: 10.into(),
             quality_status: STATUS_QUALIFIED.to_string(),
             location_id: Uuid::new_v4(),
             location_code: "A-01-01".to_string(),
@@ -481,7 +485,7 @@ mod tests {
             .putaway_from_inbound(&ctx_a, putaway_req(), today, now)
             .expect("putaway");
 
-        assert_eq!(store.available_qty(&ctx_a, batch.id), Ok(10));
+        assert_eq!(store.available_qty(&ctx_a, batch.id), Ok(10.into()));
         assert!(matches!(
             store.available_qty(&ctx_b, batch.id),
             Err(InventoryError::NotFound)
@@ -532,7 +536,7 @@ mod tests {
             .expect("status change");
 
         assert_eq!(quarantined.quality_status, STATUS_QUARANTINED);
-        assert_eq!(store.available_qty(&ctx, batch.id), Ok(0));
+        assert_eq!(store.available_qty(&ctx, batch.id), Ok(0.into()));
     }
 
     #[test]
@@ -563,7 +567,7 @@ mod tests {
             .expect_err("blank status reason must be rejected");
 
         assert_eq!(error, InventoryError::InvalidReason);
-        assert_eq!(store.available_qty(&ctx, batch.id), Ok(10));
+        assert_eq!(store.available_qty(&ctx, batch.id), Ok(10.into()));
     }
 
     #[test]
