@@ -349,10 +349,10 @@ async fn collect_outbound_validation_failures(
         return Ok(failures);
     }
     for line in &order.lines {
-        let (batch_count, available_qty): (i64, i64) = sqlx::query_as(
+        let (batch_count, available_qty): (i64, wms_domain::Quantity) = sqlx::query_as(
             r#"
             SELECT COUNT(*)::BIGINT,
-                   COALESCE(SUM(qty_on_hand - qty_locked), 0)::BIGINT
+                   COALESCE(SUM(qty_on_hand - qty_locked), 0)
               FROM inventory_batches
              WHERE owner_id = $1
                AND product_code = $2
@@ -396,7 +396,7 @@ async fn collect_locked_allocation_task_drafts(
     order_no: &str,
 ) -> Result<Vec<PickTaskDraft>, Wave4RepositoryError> {
     let allocated_tasks =
-        sqlx::query_as::<_, (Uuid, i32, Uuid, String, String, Uuid, String, Uuid, i64)>(
+        sqlx::query_as::<_, (Uuid, i32, Uuid, String, String, Uuid, String, Uuid, wms_domain::Quantity)>(
             r#"
             SELECT allocation.batch_id,
                    allocation.line_no,

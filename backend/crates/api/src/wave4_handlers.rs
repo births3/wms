@@ -102,6 +102,11 @@ impl IntoResponse for Wave4HandlerError {
             Wave4HandlerError::Repository(Wave4RepositoryError::OrderAlreadyInWave) => {
                 (StatusCode::CONFLICT, "W4-409", "订单已加入其他波次")
             }
+            Wave4HandlerError::Repository(Wave4RepositoryError::PendingErpCancel) => (
+                StatusCode::CONFLICT,
+                "W4-409",
+                "订单存在待处理的 ERP 取消命令",
+            ),
             Wave4HandlerError::Repository(Wave4RepositoryError::MissingSecondReviewer) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M4_DUAL_PERSON_REQUIRED",

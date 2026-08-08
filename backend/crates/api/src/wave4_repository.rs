@@ -103,6 +103,7 @@ pub enum Wave4RepositoryError {
     InvalidTraceabilityEvent,
     IdempotencyConflict,
     OrderAlreadyInWave,
+    PendingErpCancel,
     ShortPickNotReplenished,
     MissingSecondReviewer,
     UnqualifiedSecondReviewer,
@@ -136,8 +137,8 @@ struct InventoryBatchRow {
     batch_no: String,
     production_date: NaiveDate,
     expiry_date: NaiveDate,
-    qty_on_hand: i64,
-    qty_locked: i64,
+    qty_on_hand: wms_domain::Quantity,
+    qty_locked: wms_domain::Quantity,
     quality_status: String,
     location_id: Uuid,
     location_code: String,
@@ -191,11 +192,11 @@ struct OutboundOrderLineRow {
     line_no: i32,
     product_code: String,
     batch_no: String,
-    planned_qty: i64,
-    picked_qty: i64,
-    reviewed_qty: i64,
-    shipped_qty: i64,
-    short_pick_qty: i64,
+    planned_qty: wms_domain::Quantity,
+    picked_qty: wms_domain::Quantity,
+    reviewed_qty: wms_domain::Quantity,
+    shipped_qty: wms_domain::Quantity,
+    short_pick_qty: wms_domain::Quantity,
 }
 
 #[derive(FromRow)]
@@ -218,7 +219,7 @@ struct PickTaskDraft {
     batch_no: String,
     location_id: Uuid,
     location_code: String,
-    planned_qty: i64,
+    planned_qty: wms_domain::Quantity,
 }
 
 #[derive(FromRow)]
@@ -478,8 +479,8 @@ async fn deduct_inventory_for_outbound(
     now: DateTime<Utc>,
 ) -> Result<(), Wave4RepositoryError> {
     let mut remaining = line.planned_qty;
-    while remaining > 0 {
-        let row: Option<(Uuid, i64)> = sqlx::query_as(
+    while remaining > wms_domain::Quantity::ZERO {
+        let row: Option<(Uuid, wms_domain::Quantity)> = sqlx::query_as(
             r#"
             SELECT id, qty_on_hand - qty_locked AS available_qty
               FROM inventory_batches

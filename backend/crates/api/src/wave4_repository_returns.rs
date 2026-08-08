@@ -25,7 +25,7 @@ struct PurchaseReturnOrderRow {
     approval_source: String,
     status: String,
     product_code: String,
-    qty: i64,
+    qty: wms_domain::Quantity,
     reject_reason: Option<String>,
     shipped_at: Option<DateTime<Utc>>,
     shipped_by: Option<Uuid>,
@@ -67,7 +67,7 @@ impl PgWave4Repository {
                 return Err(Wave4RepositoryError::MissingRequiredField(field));
             }
         }
-        if req.qty <= 0 {
+        if req.qty <= wms_domain::Quantity::ZERO {
             return Err(Wave4RepositoryError::InvalidQuantity);
         }
         let request_hash = request_hash(&serde_json::json!({ "request": req }))?;

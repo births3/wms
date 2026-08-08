@@ -128,7 +128,7 @@ impl PgWave4Repository {
                SET qty_locked = batch.qty_locked - released.qty,
                    updated_at = $3
               FROM (
-                    SELECT allocation.batch_id, SUM(allocation.allocated_qty)::BIGINT AS qty
+                    SELECT allocation.batch_id, SUM(allocation.allocated_qty) AS qty
                       FROM inventory_allocations allocation
                       JOIN outbound_wave_orders link
                         ON link.owner_id = allocation.owner_id

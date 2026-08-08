@@ -89,7 +89,7 @@ impl PgWave4Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<OutboundOrder>, Wave4RepositoryError> {
-        if req.lines.is_empty() || req.lines.iter().any(|line| line.planned_qty <= 0) {
+        if req.lines.is_empty() || req.lines.iter().any(|line| line.planned_qty <= wms_domain::Quantity::ZERO) {
             return Err(Wave4RepositoryError::InvalidQuantity);
         }
         let request_hash = request_hash(&serde_json::json!({ "request": req }))?;
@@ -288,6 +288,26 @@ impl PgWave4Repository {
                 return Err(Wave4RepositoryError::OrderAlreadyInWave);
             }
             let order = lock_outbound_order(&mut tx, ctx.owner_id, *order_id).await?;
+            let pending_cancel: bool = sqlx::query_scalar(
+                r#"SELECT EXISTS (
+                       SELECT 1
+                         FROM erp_order_cancel_commands command
+                         JOIN outbound_orders outbound
+                           ON outbound.owner_id=command.owner_id
+                          AND outbound.erp_bill_code=command.erp_bill_code
+                          AND outbound.erp_revision=command.revision
+                        WHERE outbound.owner_id=$1 AND outbound.id=$2
+                          AND command.order_type=2 AND command.status='pending'
+                   )"#,
+            )
+            .bind(ctx.owner_id)
+            .bind(order.id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            if pending_cancel {
+                return Err(Wave4RepositoryError::PendingErpCancel);
+            }
             let already_in_wave: bool = sqlx::query_scalar(
                 "SELECT EXISTS (SELECT 1 FROM outbound_wave_orders WHERE owner_id = $1 AND outbound_order_id = $2)",
             )
@@ -408,7 +428,7 @@ impl PgWave4Repository {
             });
         }
 
-        let planned_qty: i64 = sqlx::query_scalar(
+        let planned_qty: wms_domain::Quantity = sqlx::query_scalar(
             r#"
             SELECT planned_qty
               FROM outbound_order_lines
@@ -445,7 +465,7 @@ impl PgWave4Repository {
 
         let mut updated = load_outbound_order(&mut tx, ctx.owner_id, order_id).await?;
         let next_status = status_after_pick(&updated.lines);
-        let short_pick = updated.lines.iter().any(|line| line.short_pick_qty > 0);
+        let short_pick = updated.lines.iter().any(|line| line.short_pick_qty > wms_domain::Quantity::ZERO);
         let event_code = crate::outbound_state_rules::pick_transition_event(
             &order.status,
             next_status,
@@ -685,7 +705,7 @@ impl PgWave4Repository {
             .await
             .map_err(map_db_error)?
             .unwrap_or(order.warehouse_id);
-            for line in updated.lines.iter().filter(|line| line.reviewed_qty > 0) {
+            for line in updated.lines.iter().filter(|line| line.reviewed_qty > wms_domain::Quantity::ZERO) {
                 crate::task_engine::create_task_in_tx(
                     &mut tx,
                     ctx,

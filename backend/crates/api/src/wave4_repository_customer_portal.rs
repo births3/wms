@@ -30,7 +30,7 @@ async fn publish_customer_portal_order_snapshot(
     let Some((address_name, address_updated_at)) = address else {
         return Ok(());
     };
-    let lines: Vec<(Uuid, Uuid, String, String, String, i64)> = sqlx::query_as(
+    let lines: Vec<(Uuid, Uuid, String, String, String, wms_domain::Quantity)> = sqlx::query_as(
         r#"
         SELECT line.id,
                COALESCE(product.id, '00000000-0000-0000-0000-000000000000'::uuid),
