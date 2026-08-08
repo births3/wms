@@ -106,7 +106,8 @@ async fn outbound_ship_rolls_back_all_side_effects(pool: PgPool) {
         .expect_err("duplicate shipment should fail inside transaction");
     assert!(matches!(error, Wave4RepositoryError::DuplicateCode));
 
-    let state: (String, i64, i64, i64, i64, i64) = sqlx::query_as(
+    let state: (String, wms_domain::Quantity, wms_domain::Quantity, i64, i64, i64) =
+        sqlx::query_as(
         r#"
         SELECT
             (SELECT status FROM outbound_orders WHERE owner_id = $1 AND id = $2),
@@ -124,5 +125,15 @@ async fn outbound_ship_rolls_back_all_side_effects(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .expect("rollback state should be queryable");
-    assert_eq!(state, ("reviewed".to_string(), 0, 6, 0, 0, 0));
+    assert_eq!(
+        state,
+        (
+            "reviewed".to_string(),
+            wms_domain::Quantity::ZERO,
+            wms_domain::Quantity::from(6),
+            0,
+            0,
+            0
+        )
+    );
 }

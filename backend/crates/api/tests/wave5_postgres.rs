@@ -10,7 +10,7 @@ use wms_domain::{
     ConfirmContainerRecoveryRequest, CreateCrossdockPlanRequest, CreatePackJobRequest,
     CreatePackingStationRequest, CreateRetailReplenishmentSuggestionRequest,
     GenerateBillingStatementRequest, IngestTransitTemperatureRequest, PrintWaybillRequest,
-    ReceiveTmsDispatchRequest, WeighPackJobRequest,
+    Quantity, ReceiveTmsDispatchRequest, WeighPackJobRequest,
 };
 
 #[path = "support/wave5.rs"]
@@ -215,11 +215,11 @@ async fn wave5_owner_isolation(pool: PgPool) {
                 store_id: Uuid::new_v4(),
                 product_code: "P-W5-OWNER".to_string(),
                 period_key: "2026-W23".to_string(),
-                min_qty: 10,
-                max_qty: 40,
-                current_qty: 12,
-                in_transit_qty: 4,
-                daily_sales_avg: 3,
+                min_qty: Quantity::from(10),
+                max_qty: Quantity::from(40),
+                current_qty: Quantity::from(12),
+                in_transit_qty: Quantity::from(4),
+                daily_sales_avg: Quantity::from(3),
             },
             now,
             "wave5-owner-replenishment",
@@ -235,7 +235,7 @@ async fn wave5_owner_isolation(pool: PgPool) {
         period_start: "2026-06-01".to_string(),
         period_end: "2026-06-30".to_string(),
         charge_item: "packing_operation".to_string(),
-        quantity: 2,
+        quantity: Quantity::from(2),
         source_refs: vec![format!("packing_job:{}", pack_job.id)],
     };
     let charge = repo
@@ -243,7 +243,7 @@ async fn wave5_owner_isolation(pool: PgPool) {
         .await
         .expect("calculate charge")
         .value;
-    assert_eq!(charge.amount_cents, 250);
+    assert_eq!(charge.amount_cents, Quantity::from(250));
     let cross_owner_charge = repo
         .calculate_period_charges(&ctx_b, charge_req, now, "wave5-owner-cross-charge", None)
         .await
@@ -337,11 +337,11 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
                 store_id,
                 product_code: product_code.clone(),
                 period_key: "2026-W23".to_string(),
-                min_qty: 10,
-                max_qty: 40,
-                current_qty: 8,
-                in_transit_qty: 5,
-                daily_sales_avg: 4,
+                min_qty: Quantity::from(10),
+                max_qty: Quantity::from(40),
+                current_qty: Quantity::from(8),
+                in_transit_qty: Quantity::from(5),
+                daily_sales_avg: Quantity::from(4),
             },
             now,
             "wave5-chain-replenishment",
@@ -350,7 +350,7 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .await
         .expect("create replenishment suggestion")
         .value;
-    assert_eq!(suggestion.suggested_qty, 27);
+    assert_eq!(suggestion.suggested_qty, Quantity::from(27));
 
     let crossdock_request = CreateCrossdockPlanRequest {
         asn_id: Uuid::new_v4(),
@@ -555,7 +555,7 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
                 period_start: "2026-06-01".to_string(),
                 period_end: "2026-06-30".to_string(),
                 charge_item: "packing_operation".to_string(),
-                quantity: 1,
+                quantity: Quantity::from(1),
                 source_refs: vec![
                     format!("retail_suggestion:{}", suggestion.id),
                     format!("packing_job:{}", pack_job.id),
@@ -569,7 +569,7 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .await
         .expect("calculate billing charge")
         .value;
-    assert_eq!(charge.amount_cents, 125);
+    assert_eq!(charge.amount_cents, Quantity::from(125));
     let statement = repo
         .generate_billing_statement(
             &ctx,
@@ -586,7 +586,7 @@ async fn chain_store_replenishment_to_packing_tms_and_billing(pool: PgPool) {
         .await
         .expect("generate billing statement")
         .value;
-    assert_eq!(statement.total_amount_cents, 125);
+    assert_eq!(statement.total_amount_cents, Quantity::from(125));
     let confirmed = repo
         .confirm_billing_statement(
             &ctx,
@@ -676,7 +676,7 @@ async fn wave5_conflicts_and_billing_state_guards(pool: PgPool) {
                 period_start: "2026-06-01".to_string(),
                 period_end: "2026-06-30".to_string(),
                 charge_item: "packing_operation".to_string(),
-                quantity: 2,
+                quantity: Quantity::from(2),
                 source_refs: vec!["packing_job:guard".to_string()],
             },
             now,

@@ -149,7 +149,7 @@ async fn outbound_wave_can_cancel_before_picking_and_release_inventory(pool: PgP
         .value;
     assert_eq!(replayed.id, cancelled.id);
 
-    let state: (i64, String, String) = sqlx::query_as(
+    let state: (wms_domain::Quantity, String, String) = sqlx::query_as(
         "SELECT (SELECT qty_locked FROM inventory_batches WHERE owner_id = $1 AND product_code = $2), (SELECT status FROM outbound_orders WHERE owner_id = $1 AND id = $3), (SELECT status FROM outbound_waves WHERE owner_id = $1 AND id = $4)",
     )
     .bind(owner_id)
@@ -159,7 +159,14 @@ async fn outbound_wave_can_cancel_before_picking_and_release_inventory(pool: PgP
     .fetch_one(&pool)
     .await
     .expect("cancelled wave state should persist");
-    assert_eq!(state, (0, "confirmed".to_string(), "cancelled".to_string()));
+    assert_eq!(
+        state,
+        (
+            wms_domain::Quantity::ZERO,
+            "confirmed".to_string(),
+            "cancelled".to_string()
+        )
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

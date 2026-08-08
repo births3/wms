@@ -2,7 +2,7 @@ fn create_surplus_request(warehouse_id: Uuid, batch_id: Uuid) -> CreateStockSurp
     CreateStockSurplusOrderRequest {
         warehouse_id,
         batch_id,
-        quantity: 3,
+        quantity: Quantity::from(3),
         reason: StockSurplusReason::InventorySurplus,
         source: StockAdjustmentSource::Manual,
         external_ref: None,
@@ -70,7 +70,7 @@ async fn manual_surplus_is_numbered_executed_atomically_audited_and_idempotent(p
         outbox_count,
         execute_audit_count,
         execute_idempotency_count,
-    ): (i64, i64, i64, i64, String, i64, i64, i64) = sqlx::query_as(
+    ): (Quantity, i64, i64, Quantity, String, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT
           (SELECT qty_on_hand FROM inventory_batches WHERE id = $1),
@@ -90,10 +90,10 @@ async fn manual_surplus_is_numbered_executed_atomically_audited_and_idempotent(p
     .fetch_one(&pool)
     .await
     .expect("surplus evidence should load");
-    assert_eq!(qty_on_hand, 13);
+    assert_eq!(qty_on_hand, Quantity::from(13));
     assert_eq!(used_volume, 1300);
     assert_eq!(movement_count, 1);
-    assert_eq!(movement_delta, 3);
+    assert_eq!(movement_delta, Quantity::from(3));
     assert_eq!(execution_process, "报溢");
     assert_eq!(outbox_count, 1);
     assert_eq!(execute_audit_count, 1);
@@ -141,7 +141,7 @@ async fn surplus_putaway_rule_mismatch_rolls_back_inventory_and_location(pool: P
         .expect_err("temperature mismatch must block surplus putaway");
     assert_eq!(error, StockAdjustmentError::InvalidPutawayTarget);
 
-    let (quantity, used_volume, status, movement_count): (i64, i64, String, i64) =
+    let (quantity, used_volume, status, movement_count): (Quantity, i64, String, i64) =
         sqlx::query_as(
             r#"
             SELECT
@@ -156,7 +156,7 @@ async fn surplus_putaway_rule_mismatch_rolls_back_inventory_and_location(pool: P
         .fetch_one(&pool)
         .await
         .expect("rollback evidence should load");
-    assert_eq!(quantity, 10);
+    assert_eq!(quantity, Quantity::from(10));
     assert_eq!(used_volume, 1000);
     assert_eq!(status, "in_progress");
     assert_eq!(movement_count, 0);
@@ -404,7 +404,7 @@ async fn repeated_erp_surplus_reference_replays_and_cross_owner_read_is_forbidde
     assert_eq!(first.value.id, replay.value.id);
     assert!(first.replayed || replay.replayed);
 
-    request.quantity = 4;
+    request.quantity = Quantity::from(4);
     let conflict = repository
         .create_surplus_order(&auth, request, now, "sa-erp-surplus-create-3")
         .await

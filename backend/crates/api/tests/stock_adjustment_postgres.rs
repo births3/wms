@@ -12,7 +12,7 @@ use wms_api::{
     stock_adjustment_handlers::{stock_adjustment_router, StockAdjustmentAppState},
 };
 use wms_domain::{
-    CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, StockAdjustmentSource,
+    CreateStockLossOrderRequest, CreateStockSurplusOrderRequest, Quantity, StockAdjustmentSource,
     StockLossReason, StockSurplusReason,
 };
 
@@ -170,7 +170,7 @@ fn create_request(
     CreateStockLossOrderRequest {
         warehouse_id,
         batch_id,
-        quantity: 4,
+        quantity: Quantity::from(4),
         reason,
         recall_id: None,
         source: StockAdjustmentSource::Manual,
@@ -239,7 +239,7 @@ async fn manual_loss_is_numbered_executed_atomically_audited_and_idempotent(pool
         execute_audit_count,
         outbox_count,
         execute_idempotency_count,
-    ): (i64, i64, String, String, i64, i64, i64, i64) = sqlx::query_as(
+    ): (Quantity, i64, String, String, i64, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT
           (SELECT qty_on_hand FROM inventory_batches WHERE id = $1),
@@ -259,7 +259,7 @@ async fn manual_loss_is_numbered_executed_atomically_audited_and_idempotent(pool
     .fetch_one(&pool)
     .await
     .expect("execution evidence should load");
-    assert_eq!(qty_on_hand, 6);
+    assert_eq!(qty_on_hand, Quantity::from(6));
     assert_eq!(movement_count, 1);
     assert_eq!(movement_approval_source, "报损报溢单");
     assert_eq!(movement_approval_id, created.value.id.to_string());
@@ -410,7 +410,7 @@ async fn insufficient_inventory_rolls_back_loss_execution(pool: PgPool) {
     let ctx = ctx(owner_id, first_operator_id);
     let now = Utc::now();
     let mut excessive = create_request(warehouse_id, batch_id, StockLossReason::InventoryLoss);
-    excessive.quantity = 11;
+    excessive.quantity = Quantity::from(11);
     let create_error = repository
         .create_loss_order(&ctx, excessive, now, "sa-over-create-invalid")
         .await
@@ -418,7 +418,7 @@ async fn insufficient_inventory_rolls_back_loss_execution(pool: PgPool) {
     assert_eq!(create_error, StockAdjustmentError::QuantityExceeded);
 
     let mut request = create_request(warehouse_id, batch_id, StockLossReason::InventoryLoss);
-    request.quantity = 9;
+    request.quantity = Quantity::from(9);
     let created = repository
         .create_loss_order(&ctx, request, now, "sa-over-create-1")
         .await
@@ -439,7 +439,7 @@ async fn insufficient_inventory_rolls_back_loss_execution(pool: PgPool) {
         .expect_err("execution above available stock must fail");
     assert_eq!(error, StockAdjustmentError::QuantityExceeded);
 
-    let (quantity, status, movement_count): (i64, String, i64) = sqlx::query_as(
+    let (quantity, status, movement_count): (Quantity, String, i64) = sqlx::query_as(
         r#"
         SELECT
           (SELECT qty_on_hand FROM inventory_batches WHERE id = $1),
@@ -452,7 +452,7 @@ async fn insufficient_inventory_rolls_back_loss_execution(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .expect("rollback state should load");
-    assert_eq!(quantity, 5);
+    assert_eq!(quantity, Quantity::from(5));
     assert_eq!(status, "in_progress");
     assert_eq!(movement_count, 0);
 }
@@ -477,7 +477,7 @@ async fn repeated_erp_reference_does_not_create_duplicate_loss_order(pool: PgPoo
     assert_eq!(first.value.id, replay.value.id);
     assert!(first.replayed || replay.replayed);
 
-    request.quantity = 5;
+    request.quantity = Quantity::from(5);
     let conflict = repository
         .create_loss_order(&ctx, request, now, "sa-erp-create-3")
         .await
