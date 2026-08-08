@@ -11,8 +11,8 @@ use wms_domain::{
 use super::{
     fail_message,
     lifecycle::{
-        idempotency_key, payload_digest, prepare_message, record_convert_message, succeed_message,
-        InboundMetadata,
+        idempotency_key, prepare_message, record_convert_message, succeed_message,
+        validate_payload_digest, InboundMetadata,
     },
     map_parameter, map_parameter_error, response, validate_envelope, AuthContext,
     H8InboundAppState, H8InboundError, H8InboundResponse,
@@ -24,13 +24,17 @@ pub struct H8ProductMasterInboundRequest {
     pub external_ref: String,
     pub correlation_id: String,
     pub occurred_at: DateTime<Utc>,
-    pub product_code: String,
-    pub product_name: String,
+    pub payload_digest: String,
+    pub source_version: i64,
+    pub entity_id: i64,
+    pub op_type: String,
+    pub product_code: Option<String>,
+    pub product_name: Option<String>,
     pub approval_no: Option<String>,
-    pub spec: String,
+    pub spec: Option<String>,
     pub dosage_form: Option<String>,
     pub manufacturer: Option<String>,
-    pub special_drug_category: String,
+    pub special_drug_category: Option<String>,
     pub udi_code: Option<String>,
     pub electronic_regulatory_code: Option<String>,
     pub length_mm: Option<f64>,
@@ -38,8 +42,9 @@ pub struct H8ProductMasterInboundRequest {
     pub height_mm: Option<f64>,
     pub volume_cm3: Option<f64>,
     pub weight_g: Option<f64>,
+    #[serde(default)]
     pub packaging_levels: Vec<H8ProductPackagingLevelInput>,
-    pub storage_condition: String,
+    pub storage_condition: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -71,42 +76,47 @@ pub(super) async fn push_product_master(
             external_ref: body.external_ref.clone(),
             correlation_id: body.correlation_id.clone(),
             warehouse_id: None,
-            payload_digest: payload_digest(&body)?,
+            payload_digest: validate_payload_digest(&body.payload_digest)?,
         },
     )
     .await?;
     if prepared.message.sync_status == "succeeded" {
         return Ok(Json(response(prepared.message, true)?));
     }
-    let (request, mapping_traces, pending_mapping) = match product_request(
-        &state,
-        &ctx,
-        &body,
-        &prepared.connector_code,
-        idempotency_key,
-    )
-    .await
-    {
-        Ok(request) => request,
-        Err(error) => {
-            fail_message(&state, &ctx, prepared.message.id, &error).await?;
-            return Err(error);
+    let mapped = if body.op_type == "D" {
+        None
+    } else {
+        match product_request(
+            &state,
+            &ctx,
+            &body,
+            &prepared.connector_code,
+            idempotency_key,
+        )
+        .await
+        {
+            Ok(request) => Some(request),
+            Err(error) => {
+                fail_message(&state, &ctx, prepared.message.id, &error).await?;
+                return Err(error);
+            }
         }
     };
     prepared.message = record_convert_message(&state, &ctx, prepared.message).await?;
+    let (request, mapping_traces) = mapped
+        .map(|value| (Some(value.0), value.1))
+        .unwrap_or((None, Vec::new()));
     let outcome = match state
         .master_data
-        .create_product_with_mapping_traces_status(
+        .apply_erp_product_snapshot(
             &ctx,
+            body.entity_id,
+            body.source_version,
+            &body.op_type,
             request,
             mapping_traces,
-            if pending_mapping {
-                "pending_mapping"
-            } else {
-                "active"
-            },
+            "active",
             Utc::now(),
-            idempotency_key,
         )
         .await
     {
@@ -120,7 +130,9 @@ pub(super) async fn push_product_master(
     let replayed = prepared.replayed;
     prepared.message =
         succeed_message(&state, &ctx, prepared.message.id, &outcome.id.to_string()).await?;
-    Ok(Json(response(prepared.message, replayed)?))
+    let mut response = response(prepared.message, replayed)?;
+    response.ignored_old_version = outcome.ignored_old_version;
+    Ok(Json(response))
 }
 
 fn validate_request(
@@ -134,16 +146,36 @@ fn validate_request(
         &body.correlation_id,
         None,
     )?;
-    if body.product_code.trim().is_empty()
-        || body.product_name.trim().is_empty()
-        || body.spec.trim().is_empty()
-        || body.storage_condition.trim().is_empty()
-        || body.special_drug_category.trim().is_empty()
-        || body.packaging_levels.is_empty()
-        || body
-            .packaging_levels
-            .iter()
-            .any(|level| level.unit.trim().is_empty())
+    let snapshot_invalid = body.op_type != "D"
+        && (body
+            .product_code
+            .as_deref()
+            .is_none_or(|value| value.trim().is_empty())
+            || body
+                .product_name
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            || body
+                .spec
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            || body
+                .storage_condition
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            || body
+                .special_drug_category
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            || body.packaging_levels.is_empty()
+            || body
+                .packaging_levels
+                .iter()
+                .any(|level| level.unit.trim().is_empty()));
+    if body.entity_id <= 0
+        || body.source_version <= 0
+        || !matches!(body.op_type.as_str(), "I" | "U" | "D")
+        || snapshot_invalid
     {
         return Err(H8InboundError::Unprocessable(
             "required product master field is invalid".to_string(),
@@ -158,13 +190,28 @@ async fn product_request(
     body: &H8ProductMasterInboundRequest,
     connector_code: &str,
     idempotency_key: &str,
-) -> Result<(CreateProductRequest, Vec<ProductMappingTraceInput>, bool), H8InboundError> {
-    let specification = body.spec.trim().to_string();
+) -> Result<(CreateProductRequest, Vec<ProductMappingTraceInput>), H8InboundError> {
+    let product_code = body
+        .product_code
+        .as_deref()
+        .ok_or_else(|| H8InboundError::Unprocessable("product code is required".to_string()))?;
+    let product_name = body
+        .product_name
+        .as_deref()
+        .ok_or_else(|| H8InboundError::Unprocessable("product name is required".to_string()))?;
+    let specification = body
+        .spec
+        .as_deref()
+        .ok_or_else(|| H8InboundError::Unprocessable("spec is required".to_string()))?
+        .trim()
+        .to_string();
     let storage_condition = map_value(
         state,
         ctx,
         "storage_condition",
-        &body.storage_condition,
+        body.storage_condition.as_deref().ok_or_else(|| {
+            H8InboundError::Unprocessable("storage condition is required".to_string())
+        })?,
         body,
         connector_code,
         idempotency_key,
@@ -193,7 +240,9 @@ async fn product_request(
         state,
         ctx,
         "special_drug_category",
-        &body.special_drug_category,
+        body.special_drug_category.as_deref().ok_or_else(|| {
+            H8InboundError::Unprocessable("special drug category is required".to_string())
+        })?,
         body,
         connector_code,
         idempotency_key,
@@ -240,12 +289,14 @@ async fn product_request(
         }
     }
     if pending_mapping {
-        packaging_levels.clear();
+        return Err(H8InboundError::Unprocessable(
+            "required product parameter mapping is unresolved".to_string(),
+        ));
     }
     Ok((
         CreateProductRequest {
-            product_code: body.product_code.trim().to_string(),
-            product_name: body.product_name.trim().to_string(),
+            product_code: product_code.trim().to_string(),
+            product_name: product_name.trim().to_string(),
             approval_no: body.approval_no.clone(),
             spec: specification,
             dosage_form: dosage_form.map(|mapped| mapped.value),
@@ -267,7 +318,6 @@ async fn product_request(
             }),
         },
         mapping_traces,
-        pending_mapping,
     ))
 }
 
