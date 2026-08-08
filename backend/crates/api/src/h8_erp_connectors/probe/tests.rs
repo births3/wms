@@ -1,8 +1,39 @@
 use super::{
-    interface::required_interface_contracts,
+    interface::{
+        is_loopback_interface_host, required_interface_contracts, requires_control_column_updates,
+    },
     rest::{rest_curl_command, rest_url_probe, validate_rest_probe_endpoint},
     run_connection_probe,
 };
+
+#[test]
+fn interface_transport_allows_legacy_plaintext_only_over_loopback_tunnel() {
+    for host in ["localhost", "127.0.0.1", "::1"] {
+        assert!(is_loopback_interface_host(host));
+    }
+    for host in ["10.12.98.254", "sql.example.test"] {
+        assert!(!is_loopback_interface_host(host));
+    }
+}
+
+#[test]
+fn interface_update_scope_is_limited_to_inbound_main_records() {
+    for table in [
+        "x_wmsinter_GoodsInfo",
+        "x_wmsinter_InboundOrder",
+        "x_wmsinter_OrderCommand",
+        "x_wmsinter_InventoryPushHeader",
+    ] {
+        assert!(requires_control_column_updates(table));
+    }
+    for table in [
+        "x_wmsinter_InboundOrderItems",
+        "x_wmsinter_OrderFeedback",
+        "x_wmsinter_InventoryReceiveHeader",
+    ] {
+        assert!(!requires_control_column_updates(table));
+    }
+}
 use chrono::Utc;
 use std::{
     fs,
@@ -223,10 +254,19 @@ fn interface_contract_catalog_covers_declared_worker_tables() {
     connector.message_types = vec![
         "asn".into(),
         "outbound_order".into(),
-        "return_order".into(),
         "product_master".into(),
-        "product_change".into(),
+        "customer_master".into(),
+        "supplier_master".into(),
+        "inventory_seed_snapshot".into(),
+        "order_cancel".into(),
+        "order_status".into(),
+        "putaway_complete".into(),
+        "inventory_status".into(),
+        "stock_adjustment".into(),
+        "archive_revision".into(),
+        "reconciliation_diff".into(),
         "shipment_confirm".into(),
+        "inventory_snapshot".into(),
     ];
 
     let contracts = required_interface_contracts(&connector).expect("contracts");
@@ -248,6 +288,38 @@ fn interface_contract_catalog_covers_declared_worker_tables() {
                 .iter()
                 .all(|permission| matches!(*permission, "SELECT" | "INSERT" | "UPDATE"))
     }));
+}
+
+#[test]
+fn interface_contracts_require_v19_frozen_business_columns() {
+    let mut connector = connector("interface_table");
+    connector.directions = vec!["inbound".into(), "outbound".into()];
+    connector.message_types = vec![
+        "product_master".into(),
+        "outbound_order".into(),
+        "inventory_seed_snapshot".into(),
+        "inventory_snapshot".into(),
+    ];
+
+    let contracts = required_interface_contracts(&connector).expect("contracts");
+    let columns = |table| {
+        contracts
+            .iter()
+            .find(|contract| contract.table == table)
+            .expect("table contract")
+            .columns
+    };
+
+    for column in ["IsImport", "IsTCM", "SpecialCategory"] {
+        assert!(columns("x_wmsinter_GoodsInfo").contains(&column));
+    }
+    for column in ["RequiredShipAt", "ERPAddressID", "AddressCode"] {
+        assert!(columns("x_wmsinter_OutboundOrder").contains(&column));
+    }
+    for column in ["StallCode", "GoodsStatus"] {
+        assert!(columns("x_wmsinter_InventoryPushItems").contains(&column));
+    }
+    assert!(columns("x_wmsinter_InventoryReceiveItems").contains(&"GoodsStatus"));
 }
 
 #[test]

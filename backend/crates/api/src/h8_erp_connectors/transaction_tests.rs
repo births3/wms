@@ -1,4 +1,5 @@
 //! H8 ERP 连接状态切换的事务与错误边界回归测试。
+// @governance: skip-page-size 事务夹具与并发回滚用例共用私有测试辅助项，拆分只会增加 include 间接层。
 
 use axum::{
     body::{to_bytes, Body},
@@ -422,6 +423,61 @@ async fn count_idempotency(pool: &PgPool, owner_id: Uuid, key: &str) -> i64 {
     crate::idempotency::count_for_test(pool, owner_id, key)
         .await
         .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn route_resolve_accepts_owner_scoped_warehouse_code(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let connector_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1,$2,$2)")
+        .bind(owner_id)
+        .bind(format!("H8-ROUTE-{owner_id}"))
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1,$2,'WH001','WH001','normal','active')",
+    )
+    .bind(warehouse_id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        r#"INSERT INTO h8_erp_connectors (
+               id, owner_id, connector_code, connector_name, warehouse_ids, directions,
+               message_types, channel_mode, status, config_version, first_activated_at,
+               last_tested_version, last_tested_at, last_tested_succeeded
+           ) VALUES (
+               $1,$2,'V19-ROUTE','V19 Route',ARRAY[$3],ARRAY['inbound'],ARRAY['asn'],
+               'interface_table','active',1,now(),1,now(),true
+           )"#,
+    )
+    .bind(connector_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let mut request = Request::builder()
+        .uri("/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn&warehouse_code=WH001")
+        .body(Body::empty())
+        .unwrap();
+    request.extensions_mut().insert(AuthContext {
+        permissions: vec![super::state::H8_CONFIG_READ.into(), H8_CONFIG_WRITE.into()],
+        ..connector_admin(owner_id)
+    });
+    let response = h8_erp_connector_router(H8ErpConnectorAppState::with_postgres(pool))
+        .oneshot(request)
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: serde_json::Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(body["connector"]["id"], connector_id.to_string());
 }
 
 fn status_request(owner_id: Uuid, connector_id: Uuid, action: &str) -> Request<Body> {

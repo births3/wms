@@ -28,7 +28,7 @@ pub struct H8ReturnOrderInboundRequest {
     pub customer_id: Uuid,
     pub supplier_id: Option<Uuid>,
     pub product_code: String,
-    pub expected_qty: i64,
+    pub expected_qty: wms_domain::Quantity,
     pub expected_arrival_at: DateTime<Utc>,
     pub batch_no: String,
 }
@@ -129,7 +129,7 @@ fn validate_request(
         || body.customer_id.is_nil()
         || body.supplier_id.is_some_and(|id| id.is_nil())
         || body.product_code.trim().is_empty()
-        || body.expected_qty <= 0
+        || body.expected_qty <= wms_domain::Quantity::ZERO
         || body.batch_no.trim().is_empty()
     {
         return Err(H8InboundError::Unprocessable(
@@ -178,7 +178,10 @@ async fn canonical_command(
         "product_code".to_string(),
         Value::String(body.product_code.clone()),
     );
-    fields.insert("expected_qty".to_string(), Value::from(body.expected_qty));
+    fields.insert(
+        "expected_qty".to_string(),
+        Value::String(body.expected_qty.to_string()),
+    );
     fields.insert(
         "expected_arrival_at".to_string(),
         Value::String(body.expected_arrival_at.to_rfc3339()),

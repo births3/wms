@@ -71,6 +71,7 @@ struct RouteResolveQuery {
     direction: String,
     message_type: String,
     warehouse_id: Option<Uuid>,
+    warehouse_code: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -102,7 +103,31 @@ async fn resolve_connector_route(
     Query(q): Query<RouteResolveQuery>,
 ) -> Result<Json<RouteResolveResponse>, H8ErpConnectorHandlerError> {
     ctx.require_permission(H8_CONFIG_READ)?;
-    let mut warehouse_id = match (q.warehouse_id, ctx.warehouse_scope) {
+    let warehouse_code_id = match q.warehouse_code.as_deref().map(str::trim) {
+        Some(code) if !code.is_empty() => Some(
+            sqlx::query_scalar::<_, Uuid>(
+                "SELECT id FROM warehouses WHERE owner_id=$1 AND warehouse_code=$2 AND status='active'",
+            )
+            .bind(ctx.owner_id)
+            .bind(code)
+            .fetch_optional(state.audit_pool.as_ref().ok_or_else(|| {
+                H8ErpConnectorRepoError::Db("warehouse lookup requires database".into())
+            })?)
+            .await
+            .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))?
+            .ok_or(H8ErpConnectorError::NotFound)
+            .map_err(H8ErpConnectorRepoError::Domain)?,
+        ),
+        _ => None,
+    };
+    let requested_warehouse = match (q.warehouse_id, warehouse_code_id) {
+        (Some(id), Some(code_id)) if id != code_id => {
+            return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
+        }
+        (Some(id), _) | (_, Some(id)) => Some(id),
+        (None, None) => None,
+    };
+    let mut warehouse_id = match (requested_warehouse, ctx.warehouse_scope) {
         (Some(requested), Some(scope)) if requested != scope => {
             return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
         }

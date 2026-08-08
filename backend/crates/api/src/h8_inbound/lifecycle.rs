@@ -1,4 +1,5 @@
 use super::*;
+use sha2::{Digest, Sha256};
 
 pub(super) fn idempotency_key(headers: &HeaderMap) -> Result<&str, H8InboundError> {
     headers
@@ -19,6 +20,34 @@ pub(super) fn payload_digest<T: Serialize>(body: &T) -> Result<String, H8Inbound
                 .map_err(|error| H8InboundError::Internal(error.to_string()))?
         )
     ))
+}
+
+pub(super) fn validate_payload_digest(value: &str) -> Result<String, H8InboundError> {
+    let value = value.trim();
+    if value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(value.to_string())
+    } else {
+        Err(H8InboundError::Unprocessable(
+            "payload_digest must be 64 lowercase hex characters".to_string(),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_payload_digest;
+
+    #[test]
+    fn payload_digest_uses_publisher_canonical_digest() {
+        let digest = "a".repeat(64);
+        assert_eq!(validate_payload_digest(&digest).unwrap(), digest);
+        assert!(validate_payload_digest(&"A".repeat(64)).is_err());
+        assert!(validate_payload_digest("abc").is_err());
+    }
 }
 
 pub(super) struct InboundMetadata {

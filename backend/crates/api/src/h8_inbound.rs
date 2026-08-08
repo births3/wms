@@ -7,10 +7,9 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
-use sha2::{Digest, Sha256};
+use serde_json::Value;
 use utoipa::ToSchema;
 use uuid::Uuid;
 use wms_domain::{
@@ -32,15 +31,24 @@ use crate::{
     wave4_repository::{PgWave4Repository, Wave4RepositoryError},
 };
 
+mod inventory_seed;
 mod lifecycle;
+mod order_cancel;
+mod partner_master;
 mod product_change;
 mod product_master;
 mod return_order;
 
+use inventory_seed::push_inventory_seed_snapshot;
+pub use inventory_seed::{H8InventorySeedItemInput, H8InventorySeedSnapshotInboundRequest};
 use lifecycle::{
-    idempotency_key, payload_digest, prepare_message, record_convert_message, succeed_message,
-    InboundMetadata,
+    idempotency_key, prepare_message, record_convert_message, succeed_message,
+    validate_payload_digest, InboundMetadata,
 };
+use order_cancel::push_order_cancel;
+pub use order_cancel::H8OrderCancelInboundRequest;
+use partner_master::{push_customer_master, push_supplier_master};
+pub use partner_master::{H8CustomerMasterInboundRequest, H8SupplierMasterInboundRequest};
 use product_change::push_product_change;
 pub use product_change::{H8PhysicalDimensionsInput, H8ProductChangeInboundRequest};
 use product_master::push_product_master;
@@ -52,6 +60,11 @@ const ASN_PATH: &str = "/api/v1/integration/erp-messages/inbound/asn";
 const OUTBOUND_ORDER_PATH: &str = "/api/v1/integration/erp-messages/inbound/outbound_order";
 const PRODUCT_CHANGE_PATH: &str = "/api/v1/integration/erp-messages/inbound/product_change";
 const PRODUCT_MASTER_PATH: &str = "/api/v1/integration/erp-messages/inbound/product_master";
+const CUSTOMER_MASTER_PATH: &str = "/api/v1/integration/erp-messages/inbound/customer_master";
+const SUPPLIER_MASTER_PATH: &str = "/api/v1/integration/erp-messages/inbound/supplier_master";
+const INVENTORY_SEED_PATH: &str =
+    "/api/v1/integration/erp-messages/inbound/inventory_seed_snapshot";
+const ORDER_CANCEL_PATH: &str = "/api/v1/integration/erp-messages/inbound/order_cancel";
 const RETURN_ORDER_PATH: &str = "/api/v1/integration/erp-messages/inbound/return_order";
 const IDEMPOTENCY_HEADER: &str = "Idempotency-Key";
 
@@ -86,13 +99,28 @@ pub struct H8AsnInboundRequest {
     pub external_ref: String,
     pub correlation_id: String,
     pub occurred_at: DateTime<Utc>,
-    pub warehouse_id: Uuid,
-    pub receipt_no: String,
-    pub document_type: String,
-    pub supplier_id: Uuid,
+    pub payload_digest: String,
+    pub source_version: Option<i64>,
+    pub erp_bill_id: i64,
+    pub erp_bill_code: String,
+    pub revision: i32,
+    pub order_type: i32,
+    pub partner_type: Option<String>,
+    pub partner_code: Option<String>,
+    pub depot_code: String,
+    pub business_date: NaiveDate,
+    pub note_code: Option<String>,
+    pub lines: Vec<H8AsnLineInput>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H8AsnLineInput {
+    pub line_no: u32,
     pub product_code: String,
-    pub expected_qty: i64,
-    pub expected_arrival_at: DateTime<Utc>,
+    pub expected_qty: wms_domain::Quantity,
+    pub batch_no: Option<String>,
+    pub production_date: Option<NaiveDate>,
+    pub expiry_date: Option<NaiveDate>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -101,16 +129,30 @@ pub struct H8OutboundOrderInboundRequest {
     pub external_ref: String,
     pub correlation_id: String,
     pub occurred_at: DateTime<Utc>,
-    pub warehouse_id: Uuid,
-    pub wms_order_no: Option<String>,
-    pub document_type: String,
-    pub erp_order_no: Option<String>,
-    pub customer_id: Uuid,
-    pub delivery_address_id: Uuid,
+    pub payload_digest: String,
+    pub source_version: Option<i64>,
+    pub erp_bill_id: i64,
+    pub erp_bill_code: String,
+    pub revision: i32,
+    pub order_type: i32,
+    pub customer_code: String,
+    pub depot_code: String,
+    pub required_ship_at: DateTime<Utc>,
+    pub send_mode: Option<i32>,
+    pub erp_address_id: i64,
+    pub address_code: String,
+    pub contact_name: Option<String>,
+    pub contact_phone: Option<String>,
+    pub address: String,
+    pub lines: Vec<H8OutboundLineInput>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct H8OutboundLineInput {
+    pub line_no: u32,
     pub product_code: String,
     pub batch_no: String,
-    pub planned_qty: i64,
-    pub required_ship_at: Option<DateTime<Utc>>,
+    pub planned_qty: wms_domain::Quantity,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -119,6 +161,7 @@ pub struct H8InboundResponse {
     pub wms_resource_id: String,
     pub status: String,
     pub replayed: bool,
+    pub ignored_old_version: bool,
 }
 
 #[derive(Debug)]
@@ -127,13 +170,14 @@ enum H8InboundError {
     BadRequest(&'static str),
     Unprocessable(String),
     Conflict(&'static str),
+    OrderNotReady,
     Internal(String),
 }
 
 impl H8InboundError {
     fn error_class(&self) -> H8ErrorClass {
         match self {
-            Self::Internal(_) => H8ErrorClass::Retryable,
+            Self::Internal(_) | Self::OrderNotReady => H8ErrorClass::Retryable,
             Self::Auth(_) | Self::BadRequest(_) | Self::Unprocessable(_) | Self::Conflict(_) => {
                 H8ErrorClass::NonRetryable
             }
@@ -156,6 +200,11 @@ impl IntoResponse for H8InboundError {
             Self::BadRequest(message) => (StatusCode::BAD_REQUEST, "H8-400", message.to_string()),
             Self::Unprocessable(message) => (StatusCode::UNPROCESSABLE_ENTITY, "H8-422", message),
             Self::Conflict(message) => (StatusCode::CONFLICT, "H8-409", message.to_string()),
+            Self::OrderNotReady => (
+                StatusCode::TOO_EARLY,
+                "ORDER_NOT_READY",
+                "ERP order is not ready in WMS".to_string(),
+            ),
             Self::Internal(message) => {
                 tracing::error!(target: "h8.inbound", error = %message, "H8 inbound failed");
                 (
@@ -187,6 +236,10 @@ pub fn h8_inbound_router(state: H8InboundAppState) -> Router {
         .route(OUTBOUND_ORDER_PATH, post(push_outbound_order))
         .route(PRODUCT_CHANGE_PATH, post(push_product_change))
         .route(PRODUCT_MASTER_PATH, post(push_product_master))
+        .route(CUSTOMER_MASTER_PATH, post(push_customer_master))
+        .route(SUPPLIER_MASTER_PATH, post(push_supplier_master))
+        .route(INVENTORY_SEED_PATH, post(push_inventory_seed_snapshot))
+        .route(ORDER_CANCEL_PATH, post(push_order_cancel))
         .route(RETURN_ORDER_PATH, post(push_return_order))
         .with_state(state)
 }
@@ -198,7 +251,9 @@ async fn push_asn(
     Json(body): Json<H8AsnInboundRequest>,
 ) -> Result<Json<H8InboundResponse>, H8InboundError> {
     ctx.require_permission("m2.write")?;
-    validate_asn_request(&ctx, &body)?;
+    let warehouse_id = resolve_warehouse(&state, &ctx, &body.depot_code).await?;
+    validate_asn_request(&ctx, &body, warehouse_id)?;
+    let (document_type, supplier_id, partner_id) = resolve_asn_partner(&state, &ctx, &body).await?;
     let idempotency_key = idempotency_key(&headers)?;
     let mut prepared = prepare_message(
         &state,
@@ -209,68 +264,87 @@ async fn push_asn(
             schema_version: body.schema_version.clone(),
             external_ref: body.external_ref.clone(),
             correlation_id: body.correlation_id.clone(),
-            warehouse_id: Some(body.warehouse_id),
-            payload_digest: payload_digest(&body)?,
+            warehouse_id: Some(warehouse_id),
+            payload_digest: validate_payload_digest(&body.payload_digest)?,
         },
     )
     .await?;
     if prepared.message.sync_status == "succeeded" {
         return Ok(Json(response(prepared.message, true)?));
     }
-    let now = Utc::now();
-    let command = match canonical_asn(
-        &state,
-        &ctx,
-        &body,
-        idempotency_key,
-        prepared.connector_id,
-        prepared.config_version,
-        &prepared.connector_code,
-    )
-    .await
-    {
-        Ok(command) => command,
-        Err(error) => {
-            fail_message(&state, &ctx, prepared.message.id, &error).await?;
-            return Err(error);
-        }
-    };
-    let request = match receiving_request(&command) {
-        Ok(request) => request,
-        Err(error) => {
-            fail_message(&state, &ctx, prepared.message.id, &error).await?;
-            return Err(error);
-        }
-    };
     prepared.message = record_convert_message(&state, &ctx, prepared.message).await?;
-    let audit = AuditWriteRequest::from_auth_context(
-        &ctx,
-        "create",
-        "M2",
-        "receiving_order",
-        "pending",
-        None,
-    );
-    let outcome = match state
-        .wave3
-        .create_receiving_order_with_audit(&ctx, request, now, idempotency_key, audit)
-        .await
-    {
-        Ok(outcome) => outcome,
-        Err(error) => {
+    let now = Utc::now();
+    let mut resource_ids = Vec::with_capacity(body.lines.len());
+    let mut business_replayed = true;
+    for line in &body.lines {
+        let request = CreateReceivingOrderRequest {
+            receipt_no: format!("{}-{}", body.erp_bill_code, line.line_no),
+            document_type: document_type.to_string(),
+            supplier_id,
+            warehouse_id,
+            external_ref: Some(format!(
+                "{}:r{}:l{}",
+                body.erp_bill_code, body.revision, line.line_no
+            )),
+            expected_arrival_at: Some(now),
+            lines: vec![ReceivingOrderLine {
+                line_no: line.line_no,
+                product_id: None,
+                product_code: line.product_code.clone(),
+                expected_qty: line.expected_qty,
+                batch_no: line.batch_no.clone(),
+                production_date: line.production_date.map(|value| value.to_string()),
+                expiry_date: line.expiry_date.map(|value| value.to_string()),
+            }],
+        };
+        let audit = AuditWriteRequest::from_auth_context(
+            &ctx,
+            "create",
+            "M2",
+            "receiving_order",
+            "pending",
+            None,
+        );
+        let line_key = format!("{idempotency_key}:line:{}", line.line_no);
+        let outcome = match state
+            .wave3
+            .create_receiving_order_with_audit(&ctx, request, now, &line_key, audit)
+            .await
+        {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                let error = map_wave3_error(error);
+                fail_message(&state, &ctx, prepared.message.id, &error).await?;
+                return Err(error);
+            }
+        };
+        if let Err(error) = state
+            .wave3
+            .attach_erp_receiving_identity(
+                ctx.owner_id,
+                outcome.value.id,
+                body.erp_bill_id,
+                &body.erp_bill_code,
+                body.revision,
+                i32::try_from(line.line_no)
+                    .map_err(|_| H8InboundError::Unprocessable("line_no is invalid".to_string()))?,
+                body.partner_type.as_deref(),
+                partner_id,
+                body.partner_code.as_deref(),
+                &body.correlation_id,
+            )
+            .await
+        {
             let error = map_wave3_error(error);
             fail_message(&state, &ctx, prepared.message.id, &error).await?;
             return Err(error);
         }
-    };
-    prepared.message = succeed_message(
-        &state,
-        &ctx,
-        prepared.message.id,
-        &outcome.value.id.to_string(),
-    )
-    .await?;
-    Ok(Json(response(prepared.message, outcome.replayed)?))
+        business_replayed &= outcome.replayed;
+        resource_ids.push(outcome.value.id.to_string());
+    }
+    let resource_id = resource_ids.join(",");
+    prepared.message = succeed_message(&state, &ctx, prepared.message.id, &resource_id).await?;
+    Ok(Json(response(prepared.message, business_replayed)?))
 }
 
 async fn push_outbound_order(
@@ -280,7 +354,14 @@ async fn push_outbound_order(
     Json(body): Json<H8OutboundOrderInboundRequest>,
 ) -> Result<Json<H8InboundResponse>, H8InboundError> {
     ctx.require_permission("m4.write")?;
-    validate_outbound_order_request(&ctx, &body)?;
+    let warehouse_id = resolve_warehouse(&state, &ctx, &body.depot_code).await?;
+    validate_outbound_order_request(&ctx, &body, warehouse_id)?;
+    let customer_id = state
+        .master_data
+        .resolve_active_customer_id(ctx.owner_id, &body.customer_code)
+        .await
+        .map_err(map_master_data_error)?
+        .ok_or_else(|| H8InboundError::Unprocessable("customer_code is unknown".to_string()))?;
     let idempotency_key = idempotency_key(&headers)?;
     let mut prepared = prepare_message(
         &state,
@@ -291,37 +372,52 @@ async fn push_outbound_order(
             schema_version: body.schema_version.clone(),
             external_ref: body.external_ref.clone(),
             correlation_id: body.correlation_id.clone(),
-            warehouse_id: Some(body.warehouse_id),
-            payload_digest: payload_digest(&body)?,
+            warehouse_id: Some(warehouse_id),
+            payload_digest: validate_payload_digest(&body.payload_digest)?,
         },
     )
     .await?;
     if prepared.message.sync_status == "succeeded" {
         return Ok(Json(response(prepared.message, true)?));
     }
-    let command = match canonical_outbound_order(
-        &state,
-        &ctx,
-        &body,
-        idempotency_key,
-        prepared.connector_id,
-        prepared.config_version,
-        &prepared.connector_code,
-    )
-    .await
-    {
-        Ok(command) => command,
-        Err(error) => {
-            fail_message(&state, &ctx, prepared.message.id, &error).await?;
-            return Err(error);
-        }
-    };
-    let request = match outbound_order_request(&command) {
-        Ok(request) => request,
-        Err(error) => {
-            fail_message(&state, &ctx, prepared.message.id, &error).await?;
-            return Err(error);
-        }
+    let delivery_address_id = state
+        .master_data
+        .upsert_erp_customer_address(
+            ctx.owner_id,
+            customer_id,
+            body.erp_address_id,
+            &body.address_code,
+            &body.address,
+            body.contact_name.as_deref(),
+            body.contact_phone.as_deref(),
+            Utc::now(),
+        )
+        .await
+        .map_err(map_master_data_error)?;
+    let request = CreateOutboundOrderRequest {
+        document_type: outbound_document_type(body.order_type)?.to_string(),
+        wms_order_no: format!("{}-R{}", body.erp_bill_code, body.revision),
+        erp_order_no: Some(body.erp_bill_code.clone()),
+        invoice_no: None,
+        transport_mode_code: body.send_mode.map(|value| value.to_string()),
+        department_code: None,
+        sales_group_code: None,
+        order_group_no: None,
+        business_type_code: None,
+        customer_id,
+        delivery_address_id,
+        warehouse_id,
+        required_ship_at: Some(body.required_ship_at),
+        lines: body
+            .lines
+            .iter()
+            .map(|line| CreateOutboundOrderLineRequest {
+                line_no: line.line_no,
+                product_code: line.product_code.clone(),
+                batch_no: line.batch_no.clone(),
+                planned_qty: line.planned_qty,
+            })
+            .collect(),
     };
     prepared.message = record_convert_message(&state, &ctx, prepared.message).await?;
     let audit = AuditWriteRequest::from_auth_context(
@@ -344,6 +440,24 @@ async fn push_outbound_order(
             return Err(error);
         }
     };
+    if let Err(error) = state
+        .wave4
+        .attach_erp_outbound_identity(
+            ctx.owner_id,
+            outcome.value.id,
+            body.erp_bill_id,
+            &body.erp_bill_code,
+            body.revision,
+            body.order_type,
+            body.send_mode,
+            &body.correlation_id,
+        )
+        .await
+    {
+        let error = map_wave4_error(error);
+        fail_message(&state, &ctx, prepared.message.id, &error).await?;
+        return Err(error);
+    }
     prepared.message = succeed_message(
         &state,
         &ctx,
@@ -357,19 +471,25 @@ async fn push_outbound_order(
 fn validate_asn_request(
     ctx: &AuthContext,
     body: &H8AsnInboundRequest,
+    warehouse_id: Uuid,
 ) -> Result<(), H8InboundError> {
     validate_envelope(
         ctx,
         &body.schema_version,
         &body.external_ref,
         &body.correlation_id,
-        Some(body.warehouse_id),
+        Some(warehouse_id),
     )?;
-    if body.external_ref.trim().is_empty()
-        || body.receipt_no.trim().is_empty()
-        || body.document_type.trim().is_empty()
-        || body.product_code.trim().is_empty()
-        || body.expected_qty <= 0
+    if body.erp_bill_id <= 0
+        || body.erp_bill_code.trim().is_empty()
+        || body.revision <= 0
+        || body.depot_code.trim().is_empty()
+        || body.lines.is_empty()
+        || body.lines.iter().any(|line| {
+            line.line_no == 0
+                || line.product_code.trim().is_empty()
+                || line.expected_qty <= wms_domain::Quantity::ZERO
+        })
     {
         return Err(H8InboundError::Unprocessable(
             "required ASN field is invalid".to_string(),
@@ -381,20 +501,30 @@ fn validate_asn_request(
 fn validate_outbound_order_request(
     ctx: &AuthContext,
     body: &H8OutboundOrderInboundRequest,
+    warehouse_id: Uuid,
 ) -> Result<(), H8InboundError> {
     validate_envelope(
         ctx,
         &body.schema_version,
         &body.external_ref,
         &body.correlation_id,
-        Some(body.warehouse_id),
+        Some(warehouse_id),
     )?;
-    if body.document_type.trim().is_empty()
-        || body.customer_id.is_nil()
-        || body.delivery_address_id.is_nil()
-        || body.product_code.trim().is_empty()
-        || body.batch_no.trim().is_empty()
-        || body.planned_qty <= 0
+    if body.erp_bill_id <= 0
+        || body.erp_bill_code.trim().is_empty()
+        || body.revision <= 0
+        || body.customer_code.trim().is_empty()
+        || body.depot_code.trim().is_empty()
+        || body.erp_address_id <= 0
+        || body.address_code.trim().is_empty()
+        || body.address.trim().is_empty()
+        || body.lines.is_empty()
+        || body.lines.iter().any(|line| {
+            line.line_no == 0
+                || line.product_code.trim().is_empty()
+                || line.batch_no.trim().is_empty()
+                || line.planned_qty <= wms_domain::Quantity::ZERO
+        })
     {
         return Err(H8InboundError::Unprocessable(
             "required outbound order field is invalid".to_string(),
@@ -427,133 +557,81 @@ fn validate_envelope(
     Ok(())
 }
 
-async fn canonical_asn(
+async fn resolve_warehouse(
+    state: &H8InboundAppState,
+    ctx: &AuthContext,
+    depot_code: &str,
+) -> Result<Uuid, H8InboundError> {
+    state
+        .master_data
+        .resolve_active_warehouse_id(ctx.owner_id, depot_code)
+        .await
+        .map_err(map_master_data_error)?
+        .ok_or_else(|| H8InboundError::Unprocessable("depot_code is unknown".to_string()))
+}
+
+async fn resolve_asn_partner(
     state: &H8InboundAppState,
     ctx: &AuthContext,
     body: &H8AsnInboundRequest,
-    idempotency_key: &str,
-    connector_id: Uuid,
-    config_version: i64,
-    connector_code: &str,
-) -> Result<H8CanonicalInboundCommand, H8InboundError> {
-    let document_type = map_document_type(
-        state,
-        ctx,
-        &body.document_type,
-        &body.external_ref,
-        connector_code,
-        idempotency_key,
-    )
-    .await?;
-    let mut fields = Map::new();
-    fields.insert(
-        "receipt_no".to_string(),
-        Value::String(body.receipt_no.clone()),
-    );
-    fields.insert("document_type".to_string(), Value::String(document_type));
-    fields.insert(
-        "supplier_id".to_string(),
-        Value::String(body.supplier_id.to_string()),
-    );
-    fields.insert(
-        "product_code".to_string(),
-        Value::String(body.product_code.clone()),
-    );
-    fields.insert("expected_qty".to_string(), Value::from(body.expected_qty));
-    fields.insert(
-        "expected_arrival_at".to_string(),
-        Value::String(body.expected_arrival_at.to_rfc3339()),
-    );
-    Ok(H8CanonicalInboundCommand {
-        owner_id: ctx.owner_id,
-        warehouse_id: Some(body.warehouse_id),
-        message_type: "asn".to_string(),
-        external_ref: body.external_ref.clone(),
-        idempotency_key: idempotency_key.to_string(),
-        correlation_id: body.correlation_id.clone(),
-        connector_id,
-        config_version,
-        channel: "rest".to_string(),
-        fields,
-        occurred_at: body.occurred_at,
-    })
+) -> Result<(&'static str, Option<Uuid>, Option<Uuid>), H8InboundError> {
+    match body.order_type {
+        1 => {
+            if body.partner_type.as_deref() != Some("supplier") {
+                return Err(H8InboundError::Unprocessable(
+                    "purchase inbound requires supplier".to_string(),
+                ));
+            }
+            let code = body.partner_code.as_deref().ok_or_else(|| {
+                H8InboundError::Unprocessable("partner_code is required".to_string())
+            })?;
+            let id = state
+                .master_data
+                .resolve_active_supplier_id(ctx.owner_id, code)
+                .await
+                .map_err(map_master_data_error)?
+                .ok_or_else(|| {
+                    H8InboundError::Unprocessable("supplier code is unknown".to_string())
+                })?;
+            Ok(("purchase_inbound", Some(id), Some(id)))
+        }
+        2 => {
+            if body.partner_type.as_deref() != Some("customer") {
+                return Err(H8InboundError::Unprocessable(
+                    "sales return requires customer".to_string(),
+                ));
+            }
+            let code = body.partner_code.as_deref().ok_or_else(|| {
+                H8InboundError::Unprocessable("partner_code is required".to_string())
+            })?;
+            let id = state
+                .master_data
+                .resolve_active_customer_id(ctx.owner_id, code)
+                .await
+                .map_err(map_master_data_error)?
+                .ok_or_else(|| {
+                    H8InboundError::Unprocessable("customer code is unknown".to_string())
+                })?;
+            Ok(("sales_return", None, Some(id)))
+        }
+        3 if body.partner_type.is_none() && body.partner_code.is_none() => {
+            Ok(("other_inbound", None, None))
+        }
+        _ => Err(H8InboundError::Unprocessable(
+            "order_type or partner is invalid".to_string(),
+        )),
+    }
 }
 
-async fn canonical_outbound_order(
-    state: &H8InboundAppState,
-    ctx: &AuthContext,
-    body: &H8OutboundOrderInboundRequest,
-    idempotency_key: &str,
-    connector_id: Uuid,
-    config_version: i64,
-    connector_code: &str,
-) -> Result<H8CanonicalInboundCommand, H8InboundError> {
-    let document_type = map_document_type(
-        state,
-        ctx,
-        &body.document_type,
-        &body.external_ref,
-        connector_code,
-        idempotency_key,
-    )
-    .await?;
-    let mut fields = Map::new();
-    fields.insert(
-        "wms_order_no".to_string(),
-        Value::String(
-            body.wms_order_no
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("WMS-{}", body.external_ref)),
-        ),
-    );
-    fields.insert("document_type".to_string(), Value::String(document_type));
-    fields.insert(
-        "erp_order_no".to_string(),
-        Value::String(
-            body.erp_order_no
-                .as_deref()
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(str::to_string)
-                .unwrap_or_else(|| body.external_ref.clone()),
-        ),
-    );
-    fields.insert(
-        "customer_id".to_string(),
-        Value::String(body.customer_id.to_string()),
-    );
-    fields.insert(
-        "delivery_address_id".to_string(),
-        Value::String(body.delivery_address_id.to_string()),
-    );
-    fields.insert(
-        "product_code".to_string(),
-        Value::String(body.product_code.clone()),
-    );
-    fields.insert("batch_no".to_string(), Value::String(body.batch_no.clone()));
-    fields.insert("planned_qty".to_string(), Value::from(body.planned_qty));
-    fields.insert(
-        "required_ship_at".to_string(),
-        body.required_ship_at
-            .map(|value| Value::String(value.to_rfc3339()))
-            .unwrap_or(Value::Null),
-    );
-    Ok(H8CanonicalInboundCommand {
-        owner_id: ctx.owner_id,
-        warehouse_id: Some(body.warehouse_id),
-        message_type: "outbound_order".to_string(),
-        external_ref: body.external_ref.clone(),
-        idempotency_key: idempotency_key.to_string(),
-        correlation_id: body.correlation_id.clone(),
-        connector_id,
-        config_version,
-        channel: "rest".to_string(),
-        fields,
-        occurred_at: body.occurred_at,
-    })
+fn outbound_document_type(order_type: i32) -> Result<&'static str, H8InboundError> {
+    match order_type {
+        1 => Ok("sales_outbound"),
+        2 => Ok("sample_outbound"),
+        3 => Ok("other_outbound"),
+        _ => Err(H8InboundError::Unprocessable(
+            "order_type is invalid".to_string(),
+        )),
+    }
 }
 
 async fn map_document_type(
@@ -601,11 +679,13 @@ fn receiving_request(
     Ok(CreateReceivingOrderRequest {
         receipt_no: string("receipt_no")?,
         document_type: string("document_type")?,
-        supplier_id: Some(
-            string("supplier_id")?
-                .parse()
-                .map_err(|_| H8InboundError::Unprocessable("supplier_id is invalid".to_string()))?,
-        ),
+        supplier_id: command
+            .fields
+            .get("supplier_id")
+            .and_then(Value::as_str)
+            .map(str::parse)
+            .transpose()
+            .map_err(|_| H8InboundError::Unprocessable("supplier_id is invalid".to_string()))?,
         warehouse_id: command
             .warehouse_id
             .ok_or_else(|| H8InboundError::Unprocessable("warehouse_id is required".to_string()))?,
@@ -617,13 +697,9 @@ fn receiving_request(
             line_no: 1,
             product_id: None,
             product_code: string("product_code")?,
-            expected_qty: command
-                .fields
-                .get("expected_qty")
-                .and_then(Value::as_i64)
-                .ok_or_else(|| {
-                    H8InboundError::Unprocessable("expected_qty is invalid".to_string())
-                })?,
+            expected_qty: string("expected_qty")?.parse().map_err(|_| {
+                H8InboundError::Unprocessable("expected_qty is invalid".to_string())
+            })?,
             batch_no: command
                 .fields
                 .get("batch_no")
@@ -631,69 +707,6 @@ fn receiving_request(
                 .map(str::to_string),
             production_date: None,
             expiry_date: None,
-        }],
-    })
-}
-
-fn outbound_order_request(
-    command: &H8CanonicalInboundCommand,
-) -> Result<CreateOutboundOrderRequest, H8InboundError> {
-    let string = |field: &'static str| {
-        command
-            .fields
-            .get(field)
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| H8InboundError::Unprocessable(format!("{field} is invalid")))
-    };
-    let optional_string = |field: &'static str| {
-        command
-            .fields
-            .get(field)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string)
-    };
-    Ok(CreateOutboundOrderRequest {
-        document_type: string("document_type")?,
-        wms_order_no: string("wms_order_no")?,
-        erp_order_no: Some(string("erp_order_no")?),
-        invoice_no: optional_string("invoice_no"),
-        transport_mode_code: optional_string("transport_mode_code"),
-        department_code: optional_string("department_code"),
-        sales_group_code: optional_string("sales_group_code"),
-        order_group_no: optional_string("order_group_no"),
-        business_type_code: optional_string("business_type_code"),
-        customer_id: string("customer_id")?
-            .parse()
-            .map_err(|_| H8InboundError::Unprocessable("customer_id is invalid".to_string()))?,
-        warehouse_id: command
-            .warehouse_id
-            .ok_or_else(|| H8InboundError::Unprocessable("warehouse_id is required".to_string()))?,
-        delivery_address_id: string("delivery_address_id")?.parse().map_err(|_| {
-            H8InboundError::Unprocessable("delivery_address_id is invalid".to_string())
-        })?,
-        required_ship_at: command
-            .fields
-            .get("required_ship_at")
-            .and_then(Value::as_str)
-            .map(str::parse)
-            .transpose()
-            .map_err(|_| {
-                H8InboundError::Unprocessable("required_ship_at is invalid".to_string())
-            })?,
-        lines: vec![CreateOutboundOrderLineRequest {
-            line_no: 1,
-            product_code: string("product_code")?,
-            batch_no: string("batch_no")?,
-            planned_qty: command
-                .fields
-                .get("planned_qty")
-                .and_then(Value::as_i64)
-                .ok_or_else(|| {
-                    H8InboundError::Unprocessable("planned_qty is invalid".to_string())
-                })?,
         }],
     })
 }
@@ -731,6 +744,7 @@ fn response(message: H8ErpMessage, replayed: bool) -> Result<H8InboundResponse, 
             .ok_or_else(|| H8InboundError::Internal("missing WMS resource id".to_string()))?,
         status: message.sync_status,
         replayed,
+        ignored_old_version: false,
     })
 }
 

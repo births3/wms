@@ -126,7 +126,16 @@ fn warehouse_scope_for_request(
     allowed_warehouses: &[Uuid],
 ) -> Result<Option<Uuid>, ()> {
     let message_type = path.strip_prefix("/api/v1/integration/erp-messages/inbound/");
-    if matches!(message_type, Some("product_master" | "product_change")) {
+    if matches!(
+        message_type,
+        Some(
+            "product_master"
+                | "product_change"
+                | "customer_master"
+                | "supplier_master"
+                | "order_cancel"
+        )
+    ) {
         return if allowed_warehouses.is_empty() && !headers.contains_key(API_KEY_WAREHOUSE_HEADER) {
             Ok(None)
         } else {
@@ -163,6 +172,8 @@ fn permissions_for_scope(scope: &str) -> Vec<String> {
         "outbound:push" => ["m4.write"].as_slice(),
         "outbound:receipt" => [H8_RECEIPT_WRITE].as_slice(),
         "return:push" => ["m2.write"].as_slice(),
+        "inventory:seed" => ["m3.write"].as_slice(),
+        "order:command" => ["m2.write", "m4.write"].as_slice(),
         "tms:callback" => ["m10.write", "m5.write", "m-tc.write"].as_slice(),
         _ => &[],
     };
@@ -283,6 +294,10 @@ mod tests {
             ("return_order", "return:push"),
             ("product_master", "master-data:write"),
             ("product_change", "master-data:write"),
+            ("customer_master", "master-data:write"),
+            ("supplier_master", "master-data:write"),
+            ("inventory_seed_snapshot", "inventory:seed"),
+            ("order_cancel", "order:command"),
         ] {
             assert_eq!(
                 required_scope(&format!(
@@ -324,6 +339,14 @@ mod tests {
         assert_eq!(
             permissions_for_scope("return:push"),
             vec!["m2.write".to_string()]
+        );
+        assert_eq!(
+            permissions_for_scope("inventory:seed"),
+            vec!["m3.write".to_string()]
+        );
+        assert_eq!(
+            permissions_for_scope("order:command"),
+            vec!["m2.write".to_string(), "m4.write".to_string()]
         );
     }
 
