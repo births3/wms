@@ -443,7 +443,7 @@ pub fn new(pool: PgPool) -> Self {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<BillingChargeCalculation>, Wave5RepositoryError> {
-        if req.quantity < 0 || req.period_start.is_empty() || req.period_end.is_empty() {
+        if req.quantity < wms_domain::Quantity::ZERO || req.period_start.is_empty() || req.period_end.is_empty() {
             return Err(Wave5RepositoryError::InvalidInput);
         }
         let period_start = parse_billing_date(&req.period_start)?;
@@ -462,7 +462,7 @@ pub fn new(pool: PgPool) -> Self {
                 replayed: true,
             });
         }
-        let unit_price: i64 = sqlx::query_scalar(
+        let unit_price: wms_domain::Quantity = sqlx::query_scalar(
             r#"
             SELECT unit_price_cents
               FROM billing_rules

@@ -211,12 +211,12 @@ impl PgWave5Repository {
                 replayed: true,
             });
         }
-        let (selected_count, period_count, total): (i64, i64, Option<i64>) = sqlx::query_as(
+        let (selected_count, period_count, total): (i64, i64, Option<wms_domain::Quantity>) = sqlx::query_as(
             r#"
             SELECT
                 COUNT(*)::BIGINT,
                 COUNT(*) FILTER (WHERE period_start = $4 AND period_end = $5)::BIGINT,
-                SUM(amount_cents) FILTER (WHERE period_start = $4 AND period_end = $5)::BIGINT
+                SUM(amount_cents) FILTER (WHERE period_start = $4 AND period_end = $5)
               FROM billing_charge_calculations
              WHERE owner_id = $1 AND contract_id = $2 AND id = ANY($3)
             "#,
@@ -253,7 +253,7 @@ impl PgWave5Repository {
             .bind(req.contract_id)
             .bind(period_start)
             .bind(period_end)
-            .bind(total.unwrap_or(0))
+            .bind(total.unwrap_or(wms_domain::Quantity::ZERO))
             .bind(now)
             .fetch_one(&mut *tx)
             .await
