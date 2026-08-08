@@ -130,6 +130,11 @@ impl IntoResponse for Wave4HandlerError {
                 "W4-422",
                 "必填字段不能为空",
             ),
+            Wave4HandlerError::Repository(Wave4RepositoryError::ErpGoodsMappingIncomplete) => (
+                StatusCode::CONFLICT,
+                "M4_ERP_GOODS_MAPPING_INCOMPLETE",
+                "部分商品未完成 ERP 商品映射，请先同步主数据后再发货",
+            ),
             Wave4HandlerError::Repository(Wave4RepositoryError::RouteBindingUnavailable) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "H9_ROUTE_BINDING_UNAVAILABLE",

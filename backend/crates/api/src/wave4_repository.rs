@@ -110,6 +110,7 @@ pub enum Wave4RepositoryError {
     DualPersonApprovalRequired,
     MissingRejectReason,
     MissingRequiredField(&'static str),
+    ErpGoodsMappingIncomplete,
     InvalidDriver,
     InvalidSignatureAttachment,
     Audit(String),

@@ -1,3 +1,22 @@
+// @governance: skip-page-size 该文件是 wave4_repository 的事务切片，保留完整出库事务以便审计原子边界。
+#[derive(FromRow)]
+struct OutboundErpFeedbackRow {
+    erp_bill_code: String,
+    erp_revision: i32,
+    erp_correlation_id: String,
+}
+
+#[derive(FromRow)]
+struct OutboundErpFeedbackLine {
+    line_no: i32,
+    goods_id: i64,
+    product_code: String,
+    batch_no: String,
+    expected_amount: wms_domain::Quantity,
+    picked_amount: wms_domain::Quantity,
+    shipped_amount: wms_domain::Quantity,
+}
+
 impl PgWave4Repository {
 pub async fn ship_outbound_order(
         &self,
@@ -156,33 +175,122 @@ pub async fn ship_outbound_order(
         )
         .await?;
 
-        sqlx::query(
+        let erp = sqlx::query_as::<_, OutboundErpFeedbackRow>(
             r#"
-            INSERT INTO shipment_confirm_erp_feedback_outbox (
-                id, owner_id, shipment_id, outbound_order_id, payload
-            )
-            VALUES ($1, $2, $3, $4, $5)
+            SELECT erp_bill_code, erp_revision, erp_correlation_id
+              FROM outbound_orders
+             WHERE owner_id = $1 AND id = $2
+               AND erp_bill_code IS NOT NULL
+               AND erp_revision IS NOT NULL
+               AND erp_correlation_id IS NOT NULL
             "#,
         )
-        .bind(Uuid::new_v4())
         .bind(ctx.owner_id)
-        .bind(shipment_id)
         .bind(order_id)
-        .bind(serde_json::json!({
-            "warehouse_id": shipped.warehouse_id,
-            "shipment_id": shipment_id,
-            "outbound_order_id": shipped.id,
-            "wms_order_no": shipped.wms_order_no,
-            "erp_order_no": shipped.erp_order_no,
-            "carrier_type": req.delivery_provider_type,
-            "handover_to": handover_to,
-            "package_count": package_count,
-            "shipped_at": now,
-            "lines": shipped.lines,
-        }))
-        .execute(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(map_db_error)?;
+        if let Some(erp) = erp {
+            let lines = sqlx::query_as::<_, OutboundErpFeedbackLine>(
+                r#"
+                SELECT line.line_no, product.erp_goods_id AS goods_id,
+                       line.product_code, line.batch_no,
+                       line.planned_qty AS expected_amount,
+                       line.picked_qty AS picked_amount,
+                       line.shipped_qty AS shipped_amount
+                  FROM outbound_order_lines line
+                  JOIN products product
+                    ON product.owner_id = line.owner_id
+                   AND product.product_code = line.product_code
+                 WHERE line.owner_id = $1 AND line.outbound_order_id = $2
+                   AND product.erp_goods_id IS NOT NULL
+                 ORDER BY line.line_no
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(order_id)
+            .fetch_all(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+            if lines.len() != shipped.lines.len() {
+                return Err(Wave4RepositoryError::ErpGoodsMappingIncomplete);
+            }
+            let lines = lines
+                .into_iter()
+                .map(|line| {
+                    serde_json::json!({
+                        "line_no": line.line_no,
+                        "goods_id": line.goods_id,
+                        "product_code": line.product_code,
+                        "batch_no": line.batch_no,
+                        "expected_amount": format!("{:.4}", line.expected_amount),
+                        "picked_amount": format!("{:.4}", line.picked_amount),
+                        "shipped_amount": format!("{:.4}", line.shipped_amount),
+                    })
+                })
+                .collect::<Vec<_>>();
+            let carrier: Option<(String, String)> = if req.delivery_provider_type
+                == "third_party_express"
+            {
+                sqlx::query_as(
+                    r#"
+                    SELECT waybill.waybill_no, carrier.carrier_name
+                      FROM h5_express_waybills waybill
+                      JOIN h5_express_carriers carrier
+                        ON carrier.owner_id = waybill.owner_id
+                       AND carrier.carrier_code = waybill.carrier_code
+                     WHERE waybill.owner_id = $1
+                       AND waybill.outbound_order_id = $2
+                       AND waybill.status <> 'cancelled'
+                     ORDER BY waybill.created_at DESC
+                     LIMIT 1
+                    "#,
+                )
+                .bind(ctx.owner_id)
+                .bind(order_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(map_db_error)?
+            } else {
+                None
+            };
+            let (waybill_no, express_company) = carrier
+                .map(|(waybill, company)| (Some(waybill), Some(company)))
+                .unwrap_or((None, None));
+            sqlx::query(
+                r#"
+                INSERT INTO shipment_confirm_erp_feedback_outbox (
+                    id, owner_id, shipment_id, outbound_order_id, payload
+                )
+                VALUES ($1, $2, $3, $4, $5)
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(ctx.owner_id)
+            .bind(shipment_id)
+            .bind(order_id)
+            .bind(serde_json::json!({
+                "warehouse_id": shipped.warehouse_id,
+                "shipment_id": shipment_id,
+                "outbound_order_id": shipped.id,
+                "wms_order_no": shipped.wms_order_no,
+                "erp_bill_code": erp.erp_bill_code,
+                "revision": erp.erp_revision,
+                "correlation_id": erp.erp_correlation_id,
+                "line_count": lines.len(),
+                "waybill_no": waybill_no,
+                "express_company": express_company,
+                "ship_time": now,
+                "operator_name": ctx.actor_name,
+                "carrier_type": req.delivery_provider_type,
+                "handover_to": handover_to,
+                "package_count": package_count,
+                "lines": lines,
+            }))
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+        }
 
         store_idempotency_success(
             &mut tx,
@@ -579,14 +687,14 @@ pub async fn ship_outbound_order(
 struct OutboundAllocationRow {
     id: Uuid,
     batch_id: Uuid,
-    allocated_qty: i64,
+    allocated_qty: wms_domain::Quantity,
 }
 
 async fn append_outbound_inventory_movement(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     batch_id: Uuid,
-    qty_delta: i64,
+    qty_delta: wms_domain::Quantity,
     order_id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<(), Wave4RepositoryError> {
@@ -618,7 +726,7 @@ async fn allocate_inventory_for_outbound(
     line: &OutboundOrderLine,
     now: DateTime<Utc>,
 ) -> Result<(), Wave4RepositoryError> {
-    let candidates: Vec<(Uuid, i64)> = sqlx::query_as(
+    let candidates: Vec<(Uuid, wms_domain::Quantity)> = sqlx::query_as(
         r#"
         SELECT id, qty_on_hand - qty_locked AS available_qty
           FROM inventory_batches
@@ -649,7 +757,7 @@ async fn allocate_inventory_for_outbound(
     .fetch_all(&mut **tx)
     .await
     .map_err(map_db_error)?;
-    let available = candidates.iter().try_fold(0_i64, |total, (_, qty)| {
+    let available = candidates.iter().try_fold(wms_domain::Quantity::ZERO, |total, (_, qty)| {
         total
             .checked_add(*qty)
             .ok_or(Wave4RepositoryError::InvalidQuantity)
@@ -661,7 +769,7 @@ async fn allocate_inventory_for_outbound(
     let line_no = i32::try_from(line.line_no).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
     let mut remaining = line.planned_qty;
     for (batch_id, available_qty) in candidates {
-        if remaining == 0 {
+        if remaining == wms_domain::Quantity::ZERO {
             break;
         }
         let allocated_qty = available_qty.min(remaining);
@@ -738,7 +846,7 @@ async fn consume_inventory_allocation_for_outbound(
     if allocations.is_empty() {
         return Ok(false);
     }
-    let allocated_qty = allocations.iter().try_fold(0_i64, |total, allocation| {
+    let allocated_qty = allocations.iter().try_fold(wms_domain::Quantity::ZERO, |total, allocation| {
         total
             .checked_add(allocation.allocated_qty)
             .ok_or(Wave4RepositoryError::InvalidQuantity)
