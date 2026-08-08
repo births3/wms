@@ -5,12 +5,13 @@ use uuid::Uuid;
 
 use crate::common::PageMeta;
 use crate::receiving_outbound::ReceivingOrder;
+use crate::Quantity;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceiveReceivingOrderRequest {
-    pub actual_qty: i64,
-    pub shortage_qty: i64,
-    pub rejected_qty: i64,
+    pub actual_qty: Quantity,
+    pub shortage_qty: Quantity,
+    pub rejected_qty: Quantity,
     #[serde(default)]
     pub arrival_temperature_celsius: Option<f64>,
     #[serde(default)]
@@ -136,9 +137,9 @@ pub struct ReceivingOrderReceipt {
     pub id: Uuid,
     pub receiving_order_id: Uuid,
     pub owner_id: Uuid,
-    pub actual_qty: i64,
-    pub shortage_qty: i64,
-    pub rejected_qty: i64,
+    pub actual_qty: Quantity,
+    pub shortage_qty: Quantity,
+    pub rejected_qty: Quantity,
     pub arrival_temperature_celsius: Option<f64>,
     pub exception_note: Option<String>,
     pub details: Option<ReceivingReceiptDetails>,
@@ -148,8 +149,8 @@ pub struct ReceivingOrderReceipt {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct InspectReceivingOrderRequest {
     pub batch_no: String,
-    pub accepted_qty: i64,
-    pub rejected_qty: i64,
+    pub accepted_qty: Quantity,
+    pub rejected_qty: Quantity,
     pub production_date: String,
     pub expiry_date: String,
     pub quality_status: String,
@@ -165,7 +166,7 @@ pub struct InspectReceivingOrderRequest {
     pub label_check: Option<String>,
     /// 抽验数量。
     #[serde(default)]
-    pub sampling_qty: Option<i64>,
+    pub sampling_qty: Option<Quantity>,
     /// 批准文号核对值。
     #[serde(default)]
     pub approval_no: Option<String>,
@@ -177,13 +178,13 @@ pub struct ReceivingInspectionRecord {
     pub receiving_order_id: Uuid,
     pub owner_id: Uuid,
     pub batch_no: String,
-    pub accepted_qty: i64,
-    pub rejected_qty: i64,
+    pub accepted_qty: Quantity,
+    pub rejected_qty: Quantity,
     pub quality_status: String,
     #[serde(default)]
     pub quality_checks: Option<serde_json::Value>,
     #[serde(default)]
-    pub sampling_qty: Option<i64>,
+    pub sampling_qty: Option<Quantity>,
     #[serde(default)]
     pub approval_no: Option<String>,
     pub occurred_at: DateTime<Utc>,
@@ -221,7 +222,7 @@ pub struct ReceivingOrderPrintData {
 pub struct PutawayRequest {
     pub batch_no: String,
     pub product_code: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub location_id: Uuid,
     pub location_code: String,
     pub quality_status: String,
@@ -234,7 +235,7 @@ pub struct PutawayRequest {
 pub struct PutawayRecommendationQuery {
     pub product_code: String,
     pub batch_no: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub quality_status: String,
     pub limit: Option<u32>,
 }
@@ -256,7 +257,7 @@ pub struct PutawayRecommendationResponse {
     pub owner_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub quality_status: String,
     pub data: Vec<PutawayLocationRecommendation>,
 }
@@ -268,7 +269,7 @@ pub struct PutawayRecord {
     pub owner_id: Uuid,
     pub batch_no: String,
     pub product_code: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub location_id: Uuid,
     pub location_code: String,
     #[serde(default)]
@@ -287,8 +288,8 @@ pub struct InventoryBatch {
     pub batch_no: String,
     pub production_date: String,
     pub expiry_date: String,
-    pub qty_on_hand: i64,
-    pub qty_locked: i64,
+    pub qty_on_hand: Quantity,
+    pub qty_locked: Quantity,
     pub quality_status: String,
     pub location_id: Uuid,
     pub location_code: String,
@@ -339,7 +340,7 @@ pub struct PutawayInventoryRequest {
     pub batch_no: String,
     pub production_date: String,
     pub expiry_date: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub quality_status: String,
     pub location_id: Uuid,
     pub location_code: String,
@@ -359,7 +360,7 @@ pub struct ReceivingDashboardRow {
     pub created_at: DateTime<Utc>,
     pub status: String,
     pub order_count: i64,
-    pub expected_qty: i64,
+    pub expected_qty: Quantity,
     pub abnormal: bool,
 }
 
@@ -430,7 +431,7 @@ pub struct InventoryMovement {
     pub owner_id: Uuid,
     pub batch_id: Uuid,
     pub movement_type: String,
-    pub qty_delta: i64,
+    pub qty_delta: Quantity,
     pub source_document_type: String,
     pub source_document_id: Uuid,
     pub occurred_at: DateTime<Utc>,
@@ -501,7 +502,7 @@ pub struct LocationHistoryProductShare {
     pub product_code: String,
     pub product_name: Option<String>,
     pub event_count: i64,
-    pub total_qty_delta: i64,
+    pub total_qty_delta: Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

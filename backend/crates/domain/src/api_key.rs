@@ -5,12 +5,14 @@ use uuid::Uuid;
 
 use crate::common::PageMeta;
 
-pub const API_KEY_SCOPES: [&str; 6] = [
+pub const API_KEY_SCOPES: [&str; 8] = [
     "master-data:write",
     "inbound:push",
     "outbound:push",
     "outbound:receipt",
     "return:push",
+    "inventory:seed",
+    "order:command",
     "tms:callback",
 ];
 

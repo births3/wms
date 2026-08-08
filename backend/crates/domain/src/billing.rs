@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::Quantity;
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct BillingAccount {
     pub id: Uuid,
@@ -46,7 +48,7 @@ pub struct BillingRule {
     pub contract_id: Uuid,
     pub charge_item: String,
     pub unit: String,
-    pub unit_price_cents: i64,
+    pub unit_price_cents: Quantity,
     pub billing_cycle: String,
     pub effective_from: String,
     pub effective_to: String,
@@ -58,7 +60,7 @@ pub struct CreateBillingRuleRequest {
     pub contract_id: Uuid,
     pub charge_item: String,
     pub unit: String,
-    pub unit_price_cents: i64,
+    pub unit_price_cents: Quantity,
     pub billing_cycle: String,
     pub effective_from: String,
     pub effective_to: String,
@@ -110,7 +112,7 @@ pub fn validate_billing_rule_request(
     ) {
         return Err(BillingRuleValidationError::InvalidBillingCycle);
     }
-    if request.unit_price_cents < 0 {
+    if request.unit_price_cents < Quantity::ZERO {
         return Err(BillingRuleValidationError::InvalidRate);
     }
     let effective_from = NaiveDate::parse_from_str(&request.effective_from, "%Y-%m-%d")
@@ -131,8 +133,8 @@ pub struct BillingChargeCalculation {
     pub period_start: String,
     pub period_end: String,
     pub charge_item: String,
-    pub quantity: i64,
-    pub amount_cents: i64,
+    pub quantity: Quantity,
+    pub amount_cents: Quantity,
     pub source_refs: Vec<String>,
     pub status: String,
     pub created_at: DateTime<Utc>,
@@ -144,7 +146,7 @@ pub struct CalculateBillingChargesRequest {
     pub period_start: String,
     pub period_end: String,
     pub charge_item: String,
-    pub quantity: i64,
+    pub quantity: Quantity,
     pub source_refs: Vec<String>,
 }
 
@@ -156,7 +158,7 @@ pub struct BillingStatement {
     pub period_start: String,
     pub period_end: String,
     pub status: String,
-    pub total_amount_cents: i64,
+    pub total_amount_cents: Quantity,
     pub charge_ids: Vec<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

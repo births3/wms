@@ -6,6 +6,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::common::PageMeta;
+use crate::Quantity;
 
 /// 收货单明细。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -17,7 +18,7 @@ pub struct ReceivingOrderLine {
     /// 商品编码
     pub product_code: String,
     /// 预计数量
-    pub expected_qty: i64,
+    pub expected_qty: Quantity,
     /// 批号
     pub batch_no: Option<String>,
     /// 生产日期
@@ -78,7 +79,9 @@ pub fn validate_create_receiving_order_request(
     request: &CreateReceivingOrderRequest,
     now: DateTime<Utc>,
 ) -> Result<(), ReceivingOrderRequestValidationError> {
-    if request.supplier_id.is_none() {
+    if request.document_type == RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND
+        && request.supplier_id.is_none()
+    {
         return Err(ReceivingOrderRequestValidationError::MissingSupplier);
     }
 
@@ -144,7 +147,7 @@ pub struct CreateOutboundOrderLineRequest {
     pub line_no: u32,
     pub product_code: String,
     pub batch_no: String,
-    pub planned_qty: i64,
+    pub planned_qty: Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -152,11 +155,11 @@ pub struct OutboundOrderLine {
     pub line_no: u32,
     pub product_code: String,
     pub batch_no: String,
-    pub planned_qty: i64,
-    pub picked_qty: i64,
-    pub reviewed_qty: i64,
-    pub shipped_qty: i64,
-    pub short_pick_qty: i64,
+    pub planned_qty: Quantity,
+    pub picked_qty: Quantity,
+    pub reviewed_qty: Quantity,
+    pub shipped_qty: Quantity,
+    pub short_pick_qty: Quantity,
 }
 
 pub const REVIEW_MODE_PACKING_STATION: &str = "packing_station";
@@ -167,7 +170,7 @@ pub const REVIEW_MODE_PDA_LOOSE: &str = "pda_loose";
 pub struct ReviewOutboundOrderLineRequest {
     pub line_no: u32,
     pub product_code: String,
-    pub reviewed_qty: i64,
+    pub reviewed_qty: Quantity,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -185,8 +188,8 @@ pub enum ReviewValidationError {
     InvalidQuantity(u32),
     QuantityMismatch {
         line_no: u32,
-        expected: i64,
-        actual: i64,
+        expected: Quantity,
+        actual: Quantity,
     },
 }
 
@@ -238,10 +241,10 @@ pub fn validate_review_submission(
                 reviewed_line.line_no,
             ));
         }
-        if order_line.picked_qty < 0
+        if order_line.picked_qty < Quantity::ZERO
             || order_line.picked_qty > order_line.planned_qty
             || order_line.short_pick_qty != order_line.planned_qty - order_line.picked_qty
-            || reviewed_line.reviewed_qty < 0
+            || reviewed_line.reviewed_qty < Quantity::ZERO
             || reviewed_line.reviewed_qty > order_line.picked_qty
         {
             return Err(ReviewValidationError::InvalidQuantity(
@@ -341,7 +344,7 @@ pub struct OutboundWaveListResponse {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompletePickTaskRequest {
     pub line_no: u32,
-    pub picked_qty: i64,
+    pub picked_qty: Quantity,
     pub exception_code: Option<String>,
     pub exception_note: Option<String>,
 }
@@ -544,7 +547,7 @@ pub struct CreatePurchaseReturnRequest {
     pub reason: String,
     pub warehouse_id: Uuid,
     pub product_code: String,
-    pub qty: i64,
+    pub qty: Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -567,7 +570,7 @@ pub struct PurchaseReturnOrder {
     pub approval_source: String,
     pub status: String,
     pub product_code: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub reject_reason: Option<String>,
     pub shipped_at: Option<DateTime<Utc>>,
     pub shipped_by: Option<Uuid>,
@@ -606,7 +609,7 @@ mod tests {
                 line_no: 1,
                 product_id: None,
                 product_code: "P-001".to_string(),
-                expected_qty: 10,
+                expected_qty: 10.into(),
                 batch_no: None,
                 production_date: None,
                 expiry_date: None,
@@ -747,7 +750,7 @@ mod tests {
             line_no: 2,
             product_id: None,
             product_code: "P-001".to_string(),
-            expected_qty: 5,
+            expected_qty: 5.into(),
             batch_no: Some("B-002".to_string()),
             production_date: None,
             expiry_date: None,
@@ -772,7 +775,7 @@ mod tests {
             line_no: 2,
             product_id: None,
             product_code: "P-002".to_string(),
-            expected_qty: 5,
+            expected_qty: 5.into(),
             batch_no: None,
             production_date: None,
             expiry_date: None,
@@ -798,7 +801,7 @@ mod tests {
             line_no: 2,
             product_id: None,
             product_code: "P-001".to_string(),
-            expected_qty: 5,
+            expected_qty: 5.into(),
             batch_no: Some("B-002".to_string()),
             production_date: None,
             expiry_date: None,
@@ -868,15 +871,18 @@ mod tests {
             line_no: 1,
             product_code: "P-001".to_string(),
             batch_no: "B-001".to_string(),
-            planned_qty: 10,
-            picked_qty: 8,
-            reviewed_qty: 0,
-            shipped_qty: 0,
-            short_pick_qty: 2,
+            planned_qty: 10.into(),
+            picked_qty: 8.into(),
+            reviewed_qty: 0.into(),
+            shipped_qty: 0.into(),
+            short_pick_qty: 2.into(),
         }
     }
 
-    fn review_request(reviewer_id: Uuid, reviewed_qty: i64) -> ReviewOutboundOrderRequest {
+    fn review_request(
+        reviewer_id: Uuid,
+        reviewed_qty: impl Into<Quantity>,
+    ) -> ReviewOutboundOrderRequest {
         ReviewOutboundOrderRequest {
             reviewer_id,
             review_mode: REVIEW_MODE_PDA_LOOSE.to_string(),
@@ -884,7 +890,7 @@ mod tests {
             lines: vec![ReviewOutboundOrderLineRequest {
                 line_no: 1,
                 product_code: "P-001".to_string(),
-                reviewed_qty,
+                reviewed_qty: reviewed_qty.into(),
             }],
         }
     }
@@ -909,18 +915,18 @@ mod tests {
             validate_review_submission(&[outbound_line()], &request, reviewer_id, &[]),
             Err(ReviewValidationError::QuantityMismatch {
                 line_no: 1,
-                expected: 8,
-                actual: 7,
+                expected: 8.into(),
+                actual: 7.into(),
             })
         );
 
-        request.lines[0].reviewed_qty = 9;
+        request.lines[0].reviewed_qty = 9.into();
         assert_eq!(
             validate_review_submission(&[outbound_line()], &request, reviewer_id, &[]),
             Err(ReviewValidationError::InvalidQuantity(1))
         );
 
-        request.lines[0].reviewed_qty = 8;
+        request.lines[0].reviewed_qty = 8.into();
         request.lines[0].product_code = "P-WRONG".to_string();
         assert_eq!(
             validate_review_submission(&[outbound_line()], &request, reviewer_id, &[]),
@@ -943,7 +949,7 @@ mod tests {
     fn review_rejects_inconsistent_short_pick_quantity() {
         let reviewer_id = Uuid::new_v4();
         let mut line = outbound_line();
-        line.short_pick_qty = 1;
+        line.short_pick_qty = 1.into();
 
         assert_eq!(
             validate_review_submission(&[line], &review_request(reviewer_id, 8), reviewer_id, &[],),

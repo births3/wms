@@ -3,12 +3,14 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::Quantity;
+
 use crate::common::PageMeta;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct RelocateInventoryRequest {
     pub batch_id: Uuid,
-    pub qty: i64,
+    pub qty: Quantity,
     pub to_location_id: Uuid,
     pub to_location_code: String,
     #[serde(default)]
@@ -26,7 +28,7 @@ pub struct InventoryRelocation {
     pub batch_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub from_location_id: Uuid,
     pub from_location_code: String,
     pub to_location_id: Uuid,
@@ -97,7 +99,7 @@ pub struct InventoryAbcClassification {
     pub product_code: String,
     pub abc_class: String,
     pub score: f64,
-    pub outbound_qty: i64,
+    pub outbound_qty: Quantity,
     pub period_start: NaiveDate,
     pub period_end: NaiveDate,
     pub source: String,
@@ -129,7 +131,7 @@ pub struct ShippedCustomerHint {
     pub customer_id: Uuid,
     pub order_id: Uuid,
     pub wms_order_no: Option<String>,
-    pub shipped_qty: i64,
+    pub shipped_qty: Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

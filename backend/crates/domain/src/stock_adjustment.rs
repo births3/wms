@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::Quantity;
+
 use crate::DualPersonPolicy;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -161,7 +163,7 @@ impl TryFrom<&str> for StockAdjustmentStatus {
 pub struct CreateStockLossOrderRequest {
     pub warehouse_id: Uuid,
     pub batch_id: Uuid,
-    pub quantity: i64,
+    pub quantity: Quantity,
     pub reason: StockLossReason,
     pub recall_id: Option<String>,
     pub source: StockAdjustmentSource,
@@ -173,7 +175,7 @@ pub struct CreateStockLossOrderRequest {
 pub struct CreateStockSurplusOrderRequest {
     pub warehouse_id: Uuid,
     pub batch_id: Uuid,
-    pub quantity: i64,
+    pub quantity: Quantity,
     pub reason: StockSurplusReason,
     pub source: StockAdjustmentSource,
     pub external_ref: Option<String>,
@@ -211,7 +213,7 @@ pub struct StockLossOrder {
     pub batch_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
-    pub quantity: i64,
+    pub quantity: Quantity,
     pub reason: StockLossReason,
     pub recall_id: Option<String>,
     pub source: StockAdjustmentSource,
@@ -239,7 +241,7 @@ pub struct StockSurplusOrder {
     pub batch_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
-    pub quantity: i64,
+    pub quantity: Quantity,
     pub reason: StockSurplusReason,
     pub source: StockAdjustmentSource,
     pub external_ref: Option<String>,

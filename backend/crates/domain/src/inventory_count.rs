@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::common::PageMeta;
+use crate::{common::PageMeta, Quantity};
 
 pub const INVENTORY_COUNT_TYPE_CYCLE: &str = "cycle";
 pub const INVENTORY_COUNT_TYPE_FULL: &str = "full";
@@ -19,7 +19,7 @@ pub struct CreateInventoryCountRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct SubmitInventoryCountLineRequest {
-    pub physical_qty: i64,
+    pub physical_qty: Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -38,9 +38,9 @@ pub struct InventoryCountLine {
     pub location_code: String,
     pub product_code: String,
     pub batch_no: String,
-    pub book_qty: i64,
-    pub physical_qty: Option<i64>,
-    pub variance_qty: Option<i64>,
+    pub book_qty: Quantity,
+    pub physical_qty: Option<Quantity>,
+    pub variance_qty: Option<Quantity>,
     pub variance_type: Option<String>,
 }
 
@@ -83,20 +83,20 @@ pub enum InventoryCountValidationError {
 /// 默认阈值：单行 |差异| / 账面 > 10%（账面为 0 且有差异视为超阈值）。
 pub const INVENTORY_COUNT_VARIANCE_RATIO_BPS: i64 = 1000; // 10% = 1000 基点
 
-pub fn line_exceeds_variance_threshold(book_qty: i64, variance_qty: i64) -> bool {
+pub fn line_exceeds_variance_threshold(book_qty: Quantity, variance_qty: Quantity) -> bool {
     let abs_var = variance_qty.abs();
-    if abs_var == 0 {
+    if abs_var.is_zero() {
         return false;
     }
-    if book_qty <= 0 {
+    if book_qty <= Quantity::ZERO {
         return true;
     }
-    abs_var.saturating_mul(10_000) > book_qty.saturating_mul(INVENTORY_COUNT_VARIANCE_RATIO_BPS)
+    abs_var * Quantity::from(10_000) > book_qty * Quantity::from(INVENTORY_COUNT_VARIANCE_RATIO_BPS)
 }
 
 pub fn count_requires_elevated_approval<I>(lines: I) -> bool
 where
-    I: IntoIterator<Item = (i64, i64)>,
+    I: IntoIterator<Item = (Quantity, Quantity)>,
 {
     lines
         .into_iter()
@@ -114,8 +114,8 @@ pub fn validate_count_type(value: &str) -> Result<(), InventoryCountValidationEr
     }
 }
 
-pub fn validate_physical_quantity(value: i64) -> Result<(), InventoryCountValidationError> {
-    if value >= 0 {
+pub fn validate_physical_quantity(value: Quantity) -> Result<(), InventoryCountValidationError> {
+    if value >= Quantity::ZERO {
         Ok(())
     } else {
         Err(InventoryCountValidationError::InvalidPhysicalQuantity)
@@ -151,9 +151,9 @@ pub fn validate_approval_for_variance(
     Ok(())
 }
 
-pub fn calculate_variance(book_qty: i64, physical_qty: i64) -> (i64, &'static str) {
+pub fn calculate_variance(book_qty: Quantity, physical_qty: Quantity) -> (Quantity, &'static str) {
     let variance = physical_qty - book_qty;
-    let kind = match variance.cmp(&0) {
+    let kind = match variance.cmp(&Quantity::ZERO) {
         std::cmp::Ordering::Greater => "gain",
         std::cmp::Ordering::Less => "loss",
         std::cmp::Ordering::Equal => "none",
@@ -167,10 +167,10 @@ mod tests {
 
     #[test]
     fn variance_threshold_detects_over_ten_percent() {
-        assert!(!line_exceeds_variance_threshold(100, 10));
-        assert!(line_exceeds_variance_threshold(100, 11));
-        assert!(line_exceeds_variance_threshold(0, 1));
-        assert!(!line_exceeds_variance_threshold(0, 0));
+        assert!(!line_exceeds_variance_threshold(100.into(), 10.into()));
+        assert!(line_exceeds_variance_threshold(100.into(), 11.into()));
+        assert!(line_exceeds_variance_threshold(0.into(), 1.into()));
+        assert!(!line_exceeds_variance_threshold(0.into(), 0.into()));
     }
 
     #[test]

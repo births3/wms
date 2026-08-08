@@ -11,16 +11,20 @@ use crate::common::PageMeta;
 pub const H8_CHANNEL_MODES: [&str; 3] = ["rest", "interface_table", "rest_primary_table_fallback"];
 pub const H8_DIRECTIONS: [&str; 2] = ["inbound", "outbound"];
 /// 连接路由消息类型：与 US-H8-002 受控目录一致（入站 ∪ 出站）。
-pub const H8_MESSAGE_TYPES: [&str; 12] = crate::h8_erp_message::H8_CATALOG_MESSAGE_TYPES;
+pub const H8_MESSAGE_TYPES: [&str; 17] = crate::h8_erp_message::H8_CATALOG_MESSAGE_TYPES;
 pub const H8_CONNECTOR_STATUSES: [&str; 3] = ["testing", "active", "disabled"];
 
 /// 入站 API Key scope（按消息类型最小授权）。
 pub fn inbound_scope_for_message_type(message_type: &str) -> Option<&'static str> {
     match message_type {
         "asn" => Some("inbound:push"),
-        "product_master" | "product_change" => Some("master-data:write"),
+        "product_master" | "product_change" | "customer_master" | "supplier_master" => {
+            Some("master-data:write")
+        }
         "outbound_order" => Some("outbound:push"),
         "return_order" => Some("return:push"),
+        "inventory_seed_snapshot" => Some("inventory:seed"),
+        "order_cancel" => Some("order:command"),
         _ => None,
     }
 }
@@ -56,13 +60,23 @@ pub const H8_INFLIGHT_RUNNING: &str = "running";
 pub const H8_INFLIGHT_PAUSED: &str = "paused";
 
 /// AC7：接口表通道对象清单（探测时校验实际表、必需列与最小权限，不写业务单据）。
-pub const H8_INTERFACE_TABLE_REQUIRED_OBJECTS: [&str; 6] = [
-    "if_in_asn",
-    "if_in_outbound_order",
-    "if_in_return_order",
-    "if_in_product_master",
-    "if_in_product_change",
-    "if_out_message",
+pub const H8_INTERFACE_TABLE_REQUIRED_OBJECTS: [&str; 16] = [
+    "x_wmsinter_GoodsInfo",
+    "x_wmsinter_CustomerInfo",
+    "x_wmsinter_SupplierInfo",
+    "x_wmsinter_InboundOrder",
+    "x_wmsinter_InboundOrderItems",
+    "x_wmsinter_OutboundOrder",
+    "x_wmsinter_OutboundOrderItems",
+    "x_wmsinter_OrderFeedback",
+    "x_wmsinter_OrderCommand",
+    "x_wmsinter_InboundFeedback",
+    "x_wmsinter_OutboundFeedback",
+    "x_wmsinter_WmsEvent",
+    "x_wmsinter_InventoryPushHeader",
+    "x_wmsinter_InventoryPushItems",
+    "x_wmsinter_InventoryReceiveHeader",
+    "x_wmsinter_InventoryReceiveItems",
 ];
 
 /// AC5/7：启用或测试时相对已 active 连接的路由重叠检查。
@@ -1100,13 +1114,27 @@ mod tests {
     }
 
     #[test]
-    fn interface_table_required_objects_declared() {
-        assert_eq!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.len(), 6);
-        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_asn"));
-        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_outbound_order"));
-        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_return_order"));
-        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_product_master"));
-        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_in_product_change"));
-        assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&"if_out_message"));
+    fn interface_table_required_objects_match_erp_wms_v19() {
+        assert_eq!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.len(), 16);
+        for table in [
+            "x_wmsinter_GoodsInfo",
+            "x_wmsinter_CustomerInfo",
+            "x_wmsinter_SupplierInfo",
+            "x_wmsinter_InboundOrder",
+            "x_wmsinter_InboundOrderItems",
+            "x_wmsinter_OutboundOrder",
+            "x_wmsinter_OutboundOrderItems",
+            "x_wmsinter_OrderFeedback",
+            "x_wmsinter_OrderCommand",
+            "x_wmsinter_InboundFeedback",
+            "x_wmsinter_OutboundFeedback",
+            "x_wmsinter_WmsEvent",
+            "x_wmsinter_InventoryPushHeader",
+            "x_wmsinter_InventoryPushItems",
+            "x_wmsinter_InventoryReceiveHeader",
+            "x_wmsinter_InventoryReceiveItems",
+        ] {
+            assert!(H8_INTERFACE_TABLE_REQUIRED_OBJECTS.contains(&table));
+        }
     }
 }

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
+use crate::Quantity;
+
 use crate::PageMeta;
 
 pub const TASK_STATUS_PENDING_RELEASE: &str = "pending_release";
@@ -110,8 +112,8 @@ pub struct WarehouseTask {
     pub product_code: String,
     pub batch_id: Option<Uuid>,
     pub batch_no: Option<String>,
-    pub planned_qty: i64,
-    pub actual_qty: Option<i64>,
+    pub planned_qty: Quantity,
+    pub actual_qty: Option<Quantity>,
     pub source_location_id: Option<Uuid>,
     pub source_location_code: Option<String>,
     pub target_location_id: Option<Uuid>,
@@ -152,7 +154,7 @@ pub struct CreateWarehouseTaskRequest {
     pub product_code: String,
     pub batch_id: Option<Uuid>,
     pub batch_no: Option<String>,
-    pub planned_qty: i64,
+    pub planned_qty: Quantity,
     pub source_location_id: Option<Uuid>,
     pub source_location_code: Option<String>,
     pub target_location_id: Option<Uuid>,
@@ -184,7 +186,7 @@ pub enum TaskTransitionAction {
 pub struct TransitionWarehouseTaskRequest {
     pub action: TaskTransitionAction,
     pub assignee_user_id: Option<Uuid>,
-    pub actual_qty: Option<i64>,
+    pub actual_qty: Option<Quantity>,
     pub exception_code: Option<String>,
     pub exception_note: Option<String>,
 }

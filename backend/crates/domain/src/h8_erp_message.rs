@@ -9,17 +9,22 @@ use crate::common::PageMeta;
 
 // ── US-H8-002 受控消息目录 ──────────────────────────────────────────────
 
-/// 首批入站：ASN、出库订单、退货申请、商品主数据、商品主数据变更。
-pub const H8_INBOUND_MESSAGE_TYPES: [&str; 5] = [
+/// H8 入站目录；v1.9 在既有 REST 类型上新增客户、供应商、期初库存和取消命令。
+pub const H8_INBOUND_MESSAGE_TYPES: [&str; 9] = [
     "asn",
     "outbound_order",
     "return_order",
     "product_master",
     "product_change",
+    "customer_master",
+    "supplier_master",
+    "inventory_seed_snapshot",
+    "order_cancel",
 ];
 
-/// 首批出站：入库完成、库存状态、报损报溢、档案补录、对账差异、发货确认、库存快照。
-pub const H8_OUTBOUND_MESSAGE_TYPES: [&str; 7] = [
+/// ERP-WMS v1.9 出站：订单状态/结果、库存事件和库存快照。
+pub const H8_OUTBOUND_MESSAGE_TYPES: [&str; 8] = [
+    "order_status",
     "putaway_complete",
     "inventory_status",
     "stock_adjustment",
@@ -30,12 +35,17 @@ pub const H8_OUTBOUND_MESSAGE_TYPES: [&str; 7] = [
 ];
 
 /// 连接配置与路由共用的完整受控目录（入站 ∪ 出站）。
-pub const H8_CATALOG_MESSAGE_TYPES: [&str; 12] = [
+pub const H8_CATALOG_MESSAGE_TYPES: [&str; 17] = [
     "asn",
     "outbound_order",
     "return_order",
     "product_master",
     "product_change",
+    "customer_master",
+    "supplier_master",
+    "inventory_seed_snapshot",
+    "order_cancel",
+    "order_status",
     "putaway_complete",
     "inventory_status",
     "stock_adjustment",
@@ -86,9 +96,13 @@ pub enum H8MessageError {
 pub fn inbound_scope_for_catalog_type(message_type: &str) -> Option<&'static str> {
     match message_type {
         "asn" => Some("inbound:push"),
-        "product_master" | "product_change" => Some("master-data:write"),
+        "product_master" | "product_change" | "customer_master" | "supplier_master" => {
+            Some("master-data:write")
+        }
         "outbound_order" => Some("outbound:push"),
         "return_order" => Some("return:push"),
+        "inventory_seed_snapshot" => Some("inventory:seed"),
+        "order_cancel" => Some("order:command"),
         _ => None,
     }
 }
@@ -614,11 +628,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catalog_covers_story_inbound_and_outbound() {
-        assert_eq!(H8_INBOUND_MESSAGE_TYPES.len(), 5);
-        assert_eq!(H8_OUTBOUND_MESSAGE_TYPES.len(), 7);
-        assert_eq!(H8_CATALOG_MESSAGE_TYPES.len(), 12);
-        assert!(is_inbound_message_type("asn"));
+    fn catalog_matches_erp_wms_v19() {
+        assert_eq!(H8_INBOUND_MESSAGE_TYPES.len(), 9);
+        assert_eq!(H8_OUTBOUND_MESSAGE_TYPES.len(), 8);
+        assert_eq!(H8_CATALOG_MESSAGE_TYPES.len(), 17);
+        assert!(is_inbound_message_type("customer_master"));
+        assert!(is_inbound_message_type("supplier_master"));
+        assert!(is_inbound_message_type("inventory_seed_snapshot"));
+        assert!(is_inbound_message_type("order_cancel"));
+        assert!(is_outbound_message_type("order_status"));
+        assert!(is_inbound_message_type("return_order"));
+        assert!(is_inbound_message_type("product_change"));
         assert!(is_outbound_message_type("shipment_confirm"));
         assert!(!is_inbound_message_type("shipment_confirm"));
         assert!(validate_message_type_in_catalog("free_text").is_err());

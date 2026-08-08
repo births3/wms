@@ -4,6 +4,8 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::Quantity;
+
 use crate::common::PageMeta;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -221,12 +223,12 @@ pub struct RetailReplenishmentSuggestion {
     pub store_id: Uuid,
     pub product_code: String,
     pub period_key: String,
-    pub min_qty: i64,
-    pub max_qty: i64,
-    pub current_qty: i64,
-    pub in_transit_qty: i64,
-    pub daily_sales_avg: i64,
-    pub suggested_qty: i64,
+    pub min_qty: Quantity,
+    pub max_qty: Quantity,
+    pub current_qty: Quantity,
+    pub in_transit_qty: Quantity,
+    pub daily_sales_avg: Quantity,
+    pub suggested_qty: Quantity,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }
@@ -236,11 +238,11 @@ pub struct CreateRetailReplenishmentSuggestionRequest {
     pub store_id: Uuid,
     pub product_code: String,
     pub period_key: String,
-    pub min_qty: i64,
-    pub max_qty: i64,
-    pub current_qty: i64,
-    pub in_transit_qty: i64,
-    pub daily_sales_avg: i64,
+    pub min_qty: Quantity,
+    pub max_qty: Quantity,
+    pub current_qty: Quantity,
+    pub in_transit_qty: Quantity,
+    pub daily_sales_avg: Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -251,7 +253,7 @@ pub struct CrossdockPlan {
     pub outbound_order_id: Uuid,
     pub store_id: Uuid,
     pub product_code: String,
-    pub qty: i64,
+    pub qty: Quantity,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }
@@ -262,7 +264,7 @@ pub struct CreateCrossdockPlanRequest {
     pub outbound_order_id: Uuid,
     pub store_id: Uuid,
     pub product_code: String,
-    pub qty: i64,
+    pub qty: Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

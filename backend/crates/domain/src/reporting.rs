@@ -34,7 +34,7 @@ pub struct GspLedgerRow {
     pub occurred_at: Option<DateTime<Utc>>,
     pub product_code: Option<String>,
     pub batch_no: Option<String>,
-    pub quantity_delta: Option<i64>,
+    pub quantity_delta: Option<crate::Quantity>,
     pub document_type: Option<String>,
     pub document_no: Option<String>,
     pub approval_source: Option<String>,
