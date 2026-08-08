@@ -55,8 +55,9 @@ pub(super) async fn apply_approved_action_in_tx(
     let quantity = liaison
         .business_payload
         .get("quantity")
-        .and_then(serde_json::Value::as_i64)
-        .filter(|value| *value > 0)
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| value.parse::<wms_domain::Quantity>().ok())
+        .filter(|value| *value > wms_domain::Quantity::ZERO)
         .ok_or(QualityLiaisonError::BusinessActionInvalid)?;
     let reason = liaison
         .business_payload
@@ -117,7 +118,7 @@ async fn quarantine_inventory_batches(
     if batch_ids.is_empty() {
         return Ok(());
     }
-    type InventoryStatusRow = (Uuid, String, String, String, Uuid, i64);
+    type InventoryStatusRow = (Uuid, String, String, String, Uuid, wms_domain::Quantity);
     let batches = sqlx::query_as::<_, InventoryStatusRow>(
         r#"
         SELECT id, product_code, batch_no, quality_status, location_id, qty_on_hand
@@ -314,8 +315,9 @@ async fn publish_archive_revision_in_tx(
         "field_name": field_name,
         "current_value": liaison.business_payload.get("current_value"),
         "new_value": new_value,
-        "photo_evidence_urls": photos,
-        "approved_at": now,
+        "photo_urls": photos,
+        "operator_id": liaison.approved_by.unwrap_or(liaison.created_by),
+        "submitted_at": now,
     });
     sqlx::query(
         r#"

@@ -23,8 +23,14 @@ pub enum OutboundOrderError {
     ShortPickNotReplenished,
 }
 
-pub fn short_pick_qty(planned_qty: i64, picked_qty: i64) -> Result<i64, OutboundOrderError> {
-    if planned_qty <= 0 || picked_qty < 0 || picked_qty > planned_qty {
+pub fn short_pick_qty(
+    planned_qty: wms_domain::Quantity,
+    picked_qty: wms_domain::Quantity,
+) -> Result<wms_domain::Quantity, OutboundOrderError> {
+    if planned_qty <= wms_domain::Quantity::ZERO
+        || picked_qty < wms_domain::Quantity::ZERO
+        || picked_qty > planned_qty
+    {
         return Err(OutboundOrderError::InvalidQuantity);
     }
     Ok(planned_qty - picked_qty)
@@ -38,10 +44,9 @@ pub fn all_lines_reviewed_for_ship(lines: &[OutboundOrderLine]) -> Result<(), Ou
     if lines.is_empty() {
         return Err(OutboundOrderError::EmptyLines);
     }
-    if lines
-        .iter()
-        .any(|line| line.reviewed_qty != line.planned_qty || line.short_pick_qty > 0)
-    {
+    if lines.iter().any(|line| {
+        line.reviewed_qty != line.planned_qty || line.short_pick_qty > wms_domain::Quantity::ZERO
+    }) {
         return Err(OutboundOrderError::ShortPickNotReplenished);
     }
     Ok(())
@@ -56,10 +61,9 @@ pub fn status_after_pick(lines: &[OutboundOrderLine]) -> &'static str {
 }
 
 pub fn status_after_review(lines: &[OutboundOrderLine]) -> &'static str {
-    if lines
-        .iter()
-        .all(|line| line.reviewed_qty == line.planned_qty && line.short_pick_qty == 0)
-    {
+    if lines.iter().all(|line| {
+        line.reviewed_qty == line.planned_qty && line.short_pick_qty == wms_domain::Quantity::ZERO
+    }) {
         OUTBOUND_STATUS_REVIEWED
     } else {
         OUTBOUND_STATUS_REVIEWED_SHORT
@@ -76,7 +80,11 @@ mod tests {
         OUTBOUND_STATUS_PICKED, OUTBOUND_STATUS_PICKED_SHORT,
     };
 
-    fn line(planned_qty: i64, picked_qty: i64, reviewed_qty: i64) -> OutboundOrderLine {
+    fn line(
+        planned_qty: wms_domain::Quantity,
+        picked_qty: wms_domain::Quantity,
+        reviewed_qty: wms_domain::Quantity,
+    ) -> OutboundOrderLine {
         OutboundOrderLine {
             line_no: 1,
             product_code: "P-001".to_string(),
@@ -84,23 +92,23 @@ mod tests {
             planned_qty,
             picked_qty,
             reviewed_qty,
-            shipped_qty: 0,
+            shipped_qty: wms_domain::Quantity::ZERO,
             short_pick_qty: planned_qty - picked_qty,
         }
     }
 
     #[test]
     fn short_pick_can_continue_but_cannot_ship_until_replenished() {
-        let short = vec![line(10, 8, 8)];
+        let short = vec![line(10.into(), 8.into(), 8.into())];
 
-        assert_eq!(short_pick_qty(10, 8), Ok(2));
+        assert_eq!(short_pick_qty(10.into(), 8.into()), Ok(2.into()));
         assert_eq!(status_after_pick(&short), OUTBOUND_STATUS_PICKED_SHORT);
         assert!(matches!(
             all_lines_reviewed_for_ship(&short),
             Err(OutboundOrderError::ShortPickNotReplenished)
         ));
 
-        let replenished = vec![line(10, 10, 10)];
+        let replenished = vec![line(10.into(), 10.into(), 10.into())];
         assert_eq!(status_after_pick(&replenished), OUTBOUND_STATUS_PICKED);
         assert_eq!(all_lines_reviewed_for_ship(&replenished), Ok(()));
     }
