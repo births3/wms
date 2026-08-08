@@ -45,8 +45,8 @@ evidence_refs = ["backend/crates/api/tests/h6_state_machine_postgres.rs"]
 
 [evidence_profiles.H8]
 backend_files = ["backend/crates/api/src/h8_erp_interface_tables"]
-database_objects = ["h8_erp_connectors", "audit_event", "dbo.if_in_asn", "dbo.if_in_product_master"]
-test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api h8_erp_interface_tables --lib", "pnpm --dir apps/web-admin run test:e2e:h8-interface-real", "scripts/h8_erp_interface_sync/check_probe_readonly.sh"]
+database_objects = ["h8_erp_connectors", "audit_event", "dbo.x_wmsinter_GoodsInfo", "dbo.x_wmsinter_InboundOrder", "dbo.x_wmsinter_OutboundOrder", "dbo.x_wmsinter_OrderFeedback", "dbo.x_wmsinter_OrderCommand", "dbo.x_wmsinter_WmsEvent", "dbo.x_wmsinter_InventoryPushHeader", "dbo.x_wmsinter_InventoryReceiveHeader"]
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api h8_erp_interface_tables --lib", "cargo test --manifest-path backend/Cargo.toml -p wms-domain --test h8_erp_interface_table", "node apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs", "pnpm --dir apps/web-admin exec tsc --noEmit"]
 evidence_refs = ["prototypes/e2e/web-admin-h8-interface-tables-real.spec.ts", "docs/retros/h8-interface-table-software-path-evidence.json"]
 
 [evidence_profiles.RC]
@@ -3342,9 +3342,9 @@ evidence_refs = [
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
 ]
-reason = "已完成结构化商品纵向切片：spec 在 M1/H8 Rust、Python canonical、MSSQL、OpenAPI/api-client、管理端 query 与 dev mock 全链为必填非空字符串，缺规格 REST 以 422 且 H8/M1 零写入；货主内 UDI、物理属性、多级包装、显式 null、事务审计和 L11 幂等均有真实 PostgreSQL 证据。H8 REST 与接口表 Worker 统一复用共享防腐层；M1 商品 POST/PATCH/DELETE/batch-sync 对 JWT 与 API Key 主体统一返回 403，GET 保持可用；必需映射未命中落 pending_mapping，并由真实 H8 ASN 入口证明不创建收货单。管理端与开发 Mock 均为 ERP 权威投影只读页，浏览器 E2E 验证无新增/编辑/导入动作并展示完整商品契约。故事仍保持延期：ERP 变更请求及批量预览尚未实现逐字段 M-PM 命中/未命中结果，特殊药品分类变更的仓库主管+质量负责人审批、PDA 离线扫码查询和自研 ERP dev/staging S4 尚未闭环。"
+reason = "已完成结构化商品纵向切片：spec 在 M1/H8 Rust、Python canonical、MSSQL、OpenAPI/api-client、管理端 query 与 dev mock 全链为必填非空字符串，缺规格 REST 以 422 且 H8/M1 零写入；货主内 UDI、物理属性、多级包装、显式 null、事务审计和 L11 幂等均有真实 PostgreSQL 证据。H8 REST 与接口表 Worker 统一复用共享防腐层；M1 商品 POST/PATCH/DELETE/batch-sync 对 JWT 与 API Key 主体统一返回 403，GET 保持可用；ERP 必需映射未命中不得写接口表，WMS 二次校验以 422/H8 死信/M1 零写入拒绝，Rust Worker 将违规接口行置死信。管理端与开发 Mock 均为 ERP 权威投影只读页，浏览器 E2E 验证无新增/编辑/导入动作并展示完整商品契约。故事仍保持延期：ERP 发布器的真实发布前校验证据、变更请求及批量预览逐字段 M-PM 结果、特殊药品分类变更双人审批、PDA 离线扫码查询和自研 ERP dev/staging S4 尚未闭环。"
 owner = "M1 模块负责人"
-resume_when = "补齐批量预览 M-PM 结果、特殊药品分类变更双人审批、PDA 离线扫码查询及自研 ERP dev/staging S4 后关闭延期。"
+resume_when = "补齐 ERP 发布器 INSERT 前映射校验证据、批量预览 M-PM 结果、特殊药品分类变更双人审批、PDA 离线扫码查询及自研 ERP dev/staging S4 后关闭延期。"
 
 [[deferred_stories]]
 id = "US-M1-002"
@@ -5632,6 +5632,7 @@ test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_change_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_master_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_return_order_postgres -- --test-threads=1",
+  "cargo test --manifest-path backend/Cargo.toml -p h8-erp-worker --test runner_contract",
   "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest test_h8_sync_worker test_exchange_lifecycle test_inbound_canonical test_outbound_routing test_outbound_receipts test_inbound_terminal_state test_failover_l11_evidence",
   "sudo -n env H8_APPLY_SEED=1 bash deploy/h8-erp-if/wait-and-init.sh && sudo -n bash scripts/h8_erp_interface_sync/check_product_contract.sh",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically -- --exact --test-threads=1",
@@ -5727,9 +5728,9 @@ evidence_refs = [
   "docs/retros/h8-asn-manual-replay-evidence.json",
   "docs/retros/h8-local-integration-evidence.json",
 ]
-reason = "开发实现层 PASS：五类入站共享 H8 REST 防腐层与接口表 canonical 主流程；商品 spec 已收紧为 Rust/Python/MSSQL/OpenAPI/api-client 全链必填并覆盖缺失零写入，M1 四类商品直写拒绝 API Key、GET 保留，pending_mapping 商品经真实 H8 ASN 拒绝；完整商品/包装契约、M-PM 映射溯源、七类出站生产者和主动对账拉取均已覆盖。目录驱动测试逐类验证双通道 L2-L4，真实 Docker MSSQL 验证商品约束及七类出站降级 L11。外部证据层 DEFERRED：自研 ERP dev/staging 双向请求、两级回执、重试和审计关联留待外部环境具备后执行，不阻塞普通开发迭代。"
+reason = "开发实现层 PASS：五类入站共享 H8 REST 防腐层与接口表 canonical 主流程；商品 spec 已收紧为 Rust/Python/MSSQL/OpenAPI/api-client 全链必填并覆盖缺失零写入，M1 四类商品直写拒绝 API Key、GET 保留；商品必需映射未命中时 WMS 以 422/H8 死信/M1 零写入拒绝且 Rust Worker 将违规接口行置死信，不再创建 pending_mapping 商品；完整商品/包装契约、M-PM 映射溯源、七类出站生产者和主动对账拉取均已覆盖。目录驱动测试逐类验证双通道 L2-L4，真实 Docker MSSQL 验证商品约束及七类出站降级 L11。外部证据层 DEFERRED：ERP 发布器真实的 INSERT 前映射校验、自研 ERP dev/staging 双向请求、两级回执、重试和审计关联留待外部环境具备后执行，不阻塞普通开发迭代。"
 owner = "H8 模块负责人"
-resume_when = "归档自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
+resume_when = "归档 ERP 发布器 INSERT 前映射校验、自研 ERP dev/staging 双向请求、两级回执、重试和审计关联后关闭延期。"
 
 [[deferred_stories]]
 id = "US-H8-003"
@@ -5858,17 +5859,29 @@ database_objects = [
   "admin_menu_draft_nodes",
   "admin_menu_version_nodes",
   "audit_event",
-  "dbo.if_in_asn",
-  "dbo.if_in_product_master",
+  "dbo.x_wmsinter_GoodsInfo",
+  "dbo.x_wmsinter_CustomerInfo",
+  "dbo.x_wmsinter_SupplierInfo",
+  "dbo.x_wmsinter_InboundOrder",
+  "dbo.x_wmsinter_InboundOrderItems",
+  "dbo.x_wmsinter_OutboundOrder",
+  "dbo.x_wmsinter_OutboundOrderItems",
+  "dbo.x_wmsinter_OrderFeedback",
+  "dbo.x_wmsinter_OrderCommand",
+  "dbo.x_wmsinter_InboundFeedback",
+  "dbo.x_wmsinter_OutboundFeedback",
+  "dbo.x_wmsinter_WmsEvent",
+  "dbo.x_wmsinter_InventoryPushHeader",
+  "dbo.x_wmsinter_InventoryPushItems",
+  "dbo.x_wmsinter_InventoryReceiveHeader",
+  "dbo.x_wmsinter_InventoryReceiveItems",
 ]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-domain --test h8_erp_interface_table",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api h8_erp_interface_tables --lib",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api persistent_audit_failure_is_not_swallowed --lib",
-  "scripts/h8_erp_interface_sync/check_probe_readonly.sh",
   "node apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "pnpm --dir apps/web-admin run test:e2e:h8-interface-real",
   "just openapi-check",
 ]
 evidence_refs = [

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "0f81a6cd456b5fa297b8f758bef611f8d1bc7888",
-  "generatedAt": "2026-08-02T17:45:27.867Z",
+  "gitCommitHash": "d0b9767c4d8deee475c48eba70105a1adb040904",
+  "generatedAt": "2026-08-07T03:14:53.690Z",
   "files": {
     ".agents/skills/wms-execution-retrospective/SKILL.md": {
       "filePath": ".agents/skills/wms-execution-retrospective/SKILL.md",
@@ -2087,7 +2087,7 @@
     },
     "apps/web-admin/dev-mocks/erp-interface-table-dev-mock.ts": {
       "filePath": "apps/web-admin/dev-mocks/erp-interface-table-dev-mock.ts",
-      "contentHash": "f4549dd361df027d464d0b7ff3810fbf686484addd0c28181e2609448a5b016e",
+      "contentHash": "7c9c688f7d6190c3c41e2bc83987b3aa8b059c7de4f54ecaeacd52e6459a3ca4",
       "functions": [
         {
           "name": "filteredRows",
@@ -2136,7 +2136,7 @@
       "exports": [
         "handleH8ErpInterfaceTableDevMock"
       ],
-      "totalLines": 225,
+      "totalLines": 217,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/dev-mocks/erp-message-dev-mock.ts": {
@@ -4000,7 +4000,7 @@
     },
     "apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs": {
       "filePath": "apps/web-admin/self-checks/h8-erp-interface-table-slice-self-check.mjs",
-      "contentHash": "e4ca26f0573f68d64d8cca8c1438c11ff15a765e632f52b34603f58d78adcaf0",
+      "contentHash": "6e03c0a0ed62882e89fad305a2a8f3ebaa9010e633282dd1dddd5f405d3c0564",
       "functions": [
         {
           "name": "read",
@@ -4027,7 +4027,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 89,
+      "totalLines": 92,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs": {
@@ -13153,7 +13153,7 @@
     },
     "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx": {
       "filePath": "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx",
-      "contentHash": "fd32a558be7bc3b07154584ffd356c667731b65111339a2ef11d00655810293e",
+      "contentHash": "01d20e3f67187d9c3b21a03661db60dc14b04fad5e066b16ad7b5da998ff977c",
       "functions": [
         {
           "name": "statusLabel",
@@ -13227,7 +13227,7 @@
           ],
           "returnType": "QueryPanelValue",
           "exported": false,
-          "lineCount": 14
+          "lineCount": 11
         },
         {
           "name": "isApplicable",
@@ -13237,13 +13237,23 @@
           ],
           "returnType": "boolean",
           "exported": false,
-          "lineCount": 8
+          "lineCount": 15
+        },
+        {
+          "name": "queryErrorMessage",
+          "params": [
+            "error",
+            "fallback"
+          ],
+          "returnType": "string",
+          "exported": false,
+          "lineCount": 3
         },
         {
           "name": "ErpInterfaceTablePage",
           "params": [],
           "exported": true,
-          "lineCount": 132
+          "lineCount": 124
         }
       ],
       "classes": [],
@@ -13304,7 +13314,7 @@
         "h8ErpInterfaceTableCoreQueryFieldKeys",
         "ErpInterfaceTablePage"
       ],
-      "totalLines": 456,
+      "totalLines": 461,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/src/pages/config-center/ErpMessageLogPage.tsx": {
@@ -21508,7 +21518,7 @@
     },
     "apps/web-admin/src/pages/page-query-core-fields.json": {
       "filePath": "apps/web-admin/src/pages/page-query-core-fields.json",
-      "contentHash": "1a8d473e398eec5941c91f28f38ebcc3c877b9b145263477a24b931c0cfeba1f",
+      "contentHash": "3ab278f523d75783f560cce884118146c497e7dd78013ddaabaf8a0d3990d51b",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -47860,7 +47870,7 @@
     },
     "backend/crates/api/src/h8_erp_interface_tables/audit.rs": {
       "filePath": "backend/crates/api/src/h8_erp_interface_tables/audit.rs",
-      "contentHash": "ba70990c1414b903eb8cbc7e4876aa3cc9451192e940bd5dfa138e9fe86c42a3",
+      "contentHash": "4c489033f52d1a5b8c9185a2c680b896800bfcd4b1f83f316d0f33b4225b54b6",
       "functions": [
         {
           "name": "write_query_audit",
@@ -48030,7 +48040,7 @@
     },
     "backend/crates/api/src/h8_erp_interface_tables/handlers.rs": {
       "filePath": "backend/crates/api/src/h8_erp_interface_tables/handlers.rs",
-      "contentHash": "4b4a6d2474dc19e54778ff106fde203ce2772704b272b6fc42c589d9cab1b99e",
+      "contentHash": "505a12836be5e8cf83c0b62efb8b8a94c69e579ae9154417ecb64022c134d4a6",
       "functions": [
         {
           "name": "h8_erp_interface_table_router",
@@ -48082,7 +48092,7 @@
           ],
           "returnType": "Result<Json<H8ErpInterfaceTableDetail>, H8InterfaceTableHandlerError>",
           "exported": false,
-          "lineCount": 96
+          "lineCount": 77
         },
         {
           "name": "ensure_connector_supported",
@@ -48112,7 +48122,7 @@
           ],
           "returnType": "Result<(), H8InterfaceTableHandlerError>",
           "exported": false,
-          "lineCount": 28
+          "lineCount": 30
         },
         {
           "name": "validate_query",
@@ -48230,7 +48240,7 @@
       "exports": [
         "h8_erp_interface_table_router"
       ],
-      "totalLines": 423,
+      "totalLines": 458,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/h8_erp_interface_tables/mod.rs": {
@@ -48259,7 +48269,7 @@
     },
     "backend/crates/api/src/h8_erp_interface_tables/repository.rs": {
       "filePath": "backend/crates/api/src/h8_erp_interface_tables/repository.rs",
-      "contentHash": "ba02f1a39e8057a25fae543d7f99363dc04e3f5d3171f1865e0a5b78db0b2ebb",
+      "contentHash": "9cd4a44b0b566c34c3e6aa4039eac63cd81de55d2e7cc8e9b2366607d4d3a912",
       "functions": [
         {
           "name": "with_rows",
@@ -48294,25 +48304,43 @@
           "lineCount": 26
         },
         {
+          "name": "v19_table_contract",
+          "params": [
+            "table_key"
+          ],
+          "returnType": "Option<&'static V19TableContract>",
+          "exported": false,
+          "lineCount": 5
+        },
+        {
           "name": "pool_for",
           "params": [
             "connector"
           ],
           "returnType": "Result<Pool, H8InterfaceTableRepoError>",
           "exported": false,
-          "lineCount": 48
+          "lineCount": 50
         },
         {
           "name": "query_rows",
           "params": [
             "connector",
             "query",
-            "actor_warehouse_scope",
+            "_actor_warehouse_scope",
             "row_id"
           ],
           "returnType": "Result<(Vec<H8ErpInterfaceTableRow>, u64), H8InterfaceTableRepoError>",
           "exported": false,
-          "lineCount": 195
+          "lineCount": 167
+        },
+        {
+          "name": "is_loopback_probe_host",
+          "params": [
+            "host"
+          ],
+          "returnType": "bool",
+          "exported": false,
+          "lineCount": 6
         },
         {
           "name": "list",
@@ -48335,7 +48363,7 @@
           ],
           "returnType": "Result<H8ErpInterfaceTableDetail, H8InterfaceTableRepoError>",
           "exported": false,
-          "lineCount": 34
+          "lineCount": 33
         },
         {
           "name": "projection_for",
@@ -48343,21 +48371,22 @@
             "table_key",
             "detail_mode"
           ],
-          "returnType": "&'static str",
+          "returnType": "Option<String>",
           "exported": false,
-          "lineCount": 10
+          "lineCount": 32
         },
         {
           "name": "map_row",
           "params": [
             "row",
             "connector_id",
+            "owner_id",
             "table_key",
             "detail_mode"
           ],
           "returnType": "Result<H8ErpInterfaceTableRow, H8InterfaceTableRepoError>",
           "exported": false,
-          "lineCount": 42
+          "lineCount": 35
         },
         {
           "name": "product_master_business_fields",
@@ -48368,7 +48397,35 @@
           ],
           "returnType": "Vec<H8ErpInterfaceTableField>",
           "exported": false,
-          "lineCount": 40
+          "lineCount": 33
+        },
+        {
+          "name": "utc_datetime",
+          "params": [
+            "row",
+            "column"
+          ],
+          "returnType": "Option<DateTime<Utc>>",
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "handelflag_for_status",
+          "params": [
+            "status"
+          ],
+          "returnType": "Option<i32>",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "handelflag_status",
+          "params": [
+            "handelflag"
+          ],
+          "returnType": "&'static str",
+          "exported": false,
+          "lineCount": 12
         },
         {
           "name": "safe_packaging_levels",
@@ -48377,7 +48434,7 @@
           ],
           "returnType": "Option<String>",
           "exported": false,
-          "lineCount": 46
+          "lineCount": 49
         },
         {
           "name": "detail_from_row",
@@ -48434,6 +48491,19 @@
           "lineCount": 5
         },
         {
+          "name": "V19TableContract",
+          "methods": [],
+          "properties": [
+            "table_key",
+            "primary_key",
+            "primary_key_is_text",
+            "business_key",
+            "has_handelflag"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
           "name": "MssqlH8InterfaceTableRepository",
           "methods": [
             "pool_for",
@@ -48459,13 +48529,13 @@
           "source": "chrono",
           "specifiers": [
             "DateTime",
+            "NaiveDateTime",
             "Utc"
           ]
         },
         {
           "source": "deadpool_tiberius_rustls",
           "specifiers": [
-            "tiberius_rustls::Query",
             "Manager",
             "Pool"
           ]
@@ -48474,6 +48544,7 @@
           "source": "std",
           "specifiers": [
             "collections::HashMap",
+            "net::IpAddr",
             "sync::Mutex",
             "time::Duration"
           ]
@@ -48520,7 +48591,7 @@
         "with_rows",
         "MssqlH8InterfaceTableRepository"
       ],
-      "totalLines": 701,
+      "totalLines": 794,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/h8_erp_interface_tables/state.rs": {
@@ -106005,7 +106076,7 @@
     },
     "backend/crates/domain/src/h8_erp_interface_table.rs": {
       "filePath": "backend/crates/domain/src/h8_erp_interface_table.rs",
-      "contentHash": "0c3d74a897c66c786696c3fde31a4ac82b9ed2e51c7ea3b6b27ccbf6e9128b29",
+      "contentHash": "aaf30d0dcc45e1cb3d866bed219646c7a86e250817837d135615850fb035b237",
       "functions": [
         {
           "name": "interface_table_spec",
@@ -106035,7 +106106,7 @@
           "params": [],
           "returnType": "Result<(), H8InterfaceTableQueryError>",
           "exported": true,
-          "lineCount": 54
+          "lineCount": 65
         },
         {
           "name": "enforce_interface_table_scope",
@@ -106269,7 +106340,7 @@
         "enforce_interface_table_scope",
         "redacted_payload_summary"
       ],
-      "totalLines": 317,
+      "totalLines": 388,
       "hasStructuralAnalysis": true
     },
     "backend/crates/domain/src/h8_erp_message.rs": {
@@ -113386,13 +113457,13 @@
     },
     "backend/crates/domain/tests/h8_erp_interface_table.rs": {
       "filePath": "backend/crates/domain/tests/h8_erp_interface_table.rs",
-      "contentHash": "e0acce481edfdb37583e22be47b4a2fe0f4156271380268cfa88e9333af0cd7f",
+      "contentHash": "127af91fa2e8c60179ea483adee4f721c87d48cf09fa1e6d978960265cbff86c",
       "functions": [
         {
           "name": "allowlist_and_table_specific_status_filters_are_enforced",
           "params": [],
           "exported": false,
-          "lineCount": 52
+          "lineCount": 61
         },
         {
           "name": "scope_is_intersection_and_non_warehouse_tables_require_owner_wide_actor",
@@ -113442,7 +113513,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 153,
+      "totalLines": 162,
       "hasStructuralAnalysis": true
     },
     "backend/crates/openapi-export/Cargo.toml": {
@@ -171489,6 +171560,64 @@
       "imports": [],
       "exports": [],
       "totalLines": 49487,
+      "hasStructuralAnalysis": true
+    },
+    "backend/crates/api/src/h8_erp_interface_tables/repository_tests.rs": {
+      "filePath": "backend/crates/api/src/h8_erp_interface_tables/repository_tests.rs",
+      "contentHash": "3802c66343cb1f43158f3e8b412b02437c98f77b5d490fec0b490dc6b180f7b0",
+      "functions": [
+        {
+          "name": "loopback_probe_uses_legacy_sql_server_transport",
+          "params": [],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "projections_only_reference_columns_present_in_each_interface_table",
+          "params": [],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "product_master_projection_separates_list_summary_from_detail_fields",
+          "params": [],
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "v19_handelflag_maps_without_collapsing_technical_and_business_completion",
+          "params": [],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "packaging_summary_keeps_only_whitelisted_fields",
+          "params": [],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "packaging_summary_rejects_oversized_safe_output",
+          "params": [],
+          "exported": false,
+          "lineCount": 19
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "super",
+          "specifiers": [
+            "handelflag_status",
+            "is_loopback_probe_host",
+            "projection_for",
+            "safe_packaging_levels",
+            "v19_table_contract"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 93,
       "hasStructuralAnalysis": true
     }
   }
