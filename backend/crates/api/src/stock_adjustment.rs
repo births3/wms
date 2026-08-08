@@ -80,7 +80,7 @@ struct StockLossOrderRow {
     batch_id: Uuid,
     product_code: String,
     batch_no: String,
-    quantity: i64,
+    quantity: wms_domain::Quantity,
     reason_code: String,
     recall_id: Option<String>,
     source: String,
@@ -214,7 +214,7 @@ impl PgStockAdjustmentRepository {
         if !warehouse_exists {
             return Err(StockAdjustmentError::NotFound);
         }
-        let batch: Option<(String, String, i64)> = sqlx::query_as(
+        let batch: Option<(String, String, wms_domain::Quantity)> = sqlx::query_as(
             "SELECT product_code, batch_no, qty_on_hand - qty_locked FROM inventory_batches WHERE owner_id = $1 AND id = $2",
         )
         .bind(ctx.owner_id)

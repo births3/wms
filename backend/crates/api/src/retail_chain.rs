@@ -15,18 +15,18 @@ impl RetailChainService {
     pub fn suggested_qty(
         &self,
         req: &CreateRetailReplenishmentSuggestionRequest,
-    ) -> Result<i64, RetailChainError> {
-        if req.min_qty < 0
-            || req.max_qty <= 0
+    ) -> Result<wms_domain::Quantity, RetailChainError> {
+        if req.min_qty < wms_domain::Quantity::ZERO
+            || req.max_qty <= wms_domain::Quantity::ZERO
             || req.min_qty > req.max_qty
-            || req.current_qty < 0
-            || req.in_transit_qty < 0
-            || req.daily_sales_avg < 0
+            || req.current_qty < wms_domain::Quantity::ZERO
+            || req.in_transit_qty < wms_domain::Quantity::ZERO
+            || req.daily_sales_avg < wms_domain::Quantity::ZERO
         {
             return Err(RetailChainError::InvalidWatermark);
         }
         let available = req.current_qty + req.in_transit_qty;
-        Ok((req.max_qty - available).max(0))
+        Ok((req.max_qty - available).max(wms_domain::Quantity::ZERO))
     }
 
     pub fn validate_crossdock(
@@ -36,7 +36,7 @@ impl RetailChainService {
         if req.asn_id.is_nil()
             || req.outbound_order_id.is_nil()
             || req.store_id.is_nil()
-            || req.qty <= 0
+            || req.qty <= wms_domain::Quantity::ZERO
             || req.product_code.trim().is_empty()
         {
             return Err(RetailChainError::InvalidCrossdockQty);
@@ -60,22 +60,22 @@ mod tests {
                 store_id: Uuid::new_v4(),
                 product_code: "P-001".to_string(),
                 period_key: "2026-W23".to_string(),
-                min_qty: 10,
-                max_qty: 50,
-                current_qty: 12,
-                in_transit_qty: 8,
-                daily_sales_avg: 3,
+                min_qty: 10.into(),
+                max_qty: 50.into(),
+                current_qty: 12.into(),
+                in_transit_qty: 8.into(),
+                daily_sales_avg: 3.into(),
             })
             .expect("valid");
 
-        assert_eq!(qty, 30);
+        assert_eq!(qty, 30.into());
     }
 
     #[test]
     fn invalid_crossdock_qty_is_rejected() {
         let service = RetailChainService;
         assert_eq!(
-            service.validate_crossdock(&crossdock_request_with(|request| request.qty = 0)),
+            service.validate_crossdock(&crossdock_request_with(|request| request.qty = 0.into())),
             Err(RetailChainError::InvalidCrossdockQty)
         );
     }
@@ -127,7 +127,7 @@ mod tests {
             outbound_order_id: Uuid::new_v4(),
             store_id: Uuid::new_v4(),
             product_code: "P-001".to_string(),
-            qty: 1,
+            qty: 1.into(),
         }
     }
 

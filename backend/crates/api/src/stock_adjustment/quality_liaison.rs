@@ -16,7 +16,7 @@ use super::*;
 pub(crate) struct ApprovedStockLossRequest {
     pub warehouse_id: Uuid,
     pub batch_id: Uuid,
-    pub quantity: i64,
+    pub quantity: wms_domain::Quantity,
     pub reason: StockLossReason,
     pub recall_id: Option<String>,
     pub quality_liaison_id: Uuid,
@@ -53,7 +53,7 @@ pub(crate) async fn create_approved_stock_loss_order_in_tx(
     if !warehouse_exists {
         return Err(StockAdjustmentError::NotFound);
     }
-    let batch: Option<(String, String, i64)> = sqlx::query_as(
+    let batch: Option<(String, String, wms_domain::Quantity)> = sqlx::query_as(
         "SELECT product_code, batch_no, qty_on_hand - qty_locked FROM inventory_batches WHERE owner_id = $1 AND id = $2",
     )
     .bind(ctx.owner_id)

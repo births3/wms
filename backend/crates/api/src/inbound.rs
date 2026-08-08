@@ -204,7 +204,10 @@ impl ReceivingOrderStore {
         req: ReceiveReceivingOrderRequest,
         now: DateTime<Utc>,
     ) -> Result<ReceivingOrderReceipt, ReceivingOrderError> {
-        if req.actual_qty < 0 || req.shortage_qty < 0 || req.rejected_qty < 0 {
+        if req.actual_qty < wms_domain::Quantity::ZERO
+            || req.shortage_qty < wms_domain::Quantity::ZERO
+            || req.rejected_qty < wms_domain::Quantity::ZERO
+        {
             return Err(ReceivingOrderError::InvalidQuantity);
         }
 
@@ -226,7 +229,7 @@ impl ReceivingOrderStore {
             .lines
             .iter()
             .map(|line| line.expected_qty)
-            .sum::<i64>();
+            .sum::<wms_domain::Quantity>();
         if req.actual_qty > expected_qty {
             return Err(ReceivingOrderError::OverReceiptNotAllowed);
         }
@@ -281,13 +284,13 @@ impl ReceivingOrderStore {
             .lines
             .iter()
             .map(|line| line.expected_qty)
-            .sum::<i64>();
+            .sum::<wms_domain::Quantity>();
         let receipt = ReceivingOrderReceipt {
             id: Uuid::new_v4(),
             receiving_order_id: id,
             owner_id: ctx.owner_id,
-            actual_qty: 0,
-            shortage_qty: 0,
+            actual_qty: wms_domain::Quantity::ZERO,
+            shortage_qty: wms_domain::Quantity::ZERO,
             rejected_qty: expected_qty,
             arrival_temperature_celsius: None,
             exception_note: Some(req.reason),
@@ -308,13 +311,15 @@ impl ReceivingOrderStore {
         today: NaiveDate,
         now: DateTime<Utc>,
     ) -> Result<ReceivingInspectionRecord, ReceivingOrderError> {
-        if req.accepted_qty < 0 || req.rejected_qty < 0 {
+        if req.accepted_qty < wms_domain::Quantity::ZERO
+            || req.rejected_qty < wms_domain::Quantity::ZERO
+        {
             return Err(ReceivingOrderError::InvalidQuantity);
         }
         let inspected_qty = req
             .accepted_qty
             .checked_add(req.rejected_qty)
-            .filter(|qty| *qty > 0)
+            .filter(|qty| *qty > wms_domain::Quantity::ZERO)
             .ok_or(ReceivingOrderError::InvalidQuantity)?;
         let expiry_date = NaiveDate::parse_from_str(&req.expiry_date, "%Y-%m-%d")
             .map_err(|_| ReceivingOrderError::BatchExpired)?;
@@ -329,7 +334,7 @@ impl ReceivingOrderStore {
             .receipts
             .values()
             .filter(|receipt| receipt.receiving_order_id == id && receipt.owner_id == ctx.owner_id)
-            .try_fold(0_i64, |total, receipt| {
+            .try_fold(wms_domain::Quantity::ZERO, |total, receipt| {
                 total.checked_add(receipt.actual_qty)
             })
             .ok_or(ReceivingOrderError::InvalidQuantity)?;
@@ -339,7 +344,7 @@ impl ReceivingOrderStore {
             .filter(|inspection| {
                 inspection.receiving_order_id == id && inspection.owner_id == ctx.owner_id
             })
-            .try_fold(0_i64, |total, inspection| {
+            .try_fold(wms_domain::Quantity::ZERO, |total, inspection| {
                 total
                     .checked_add(inspection.accepted_qty)
                     .and_then(|total| total.checked_add(inspection.rejected_qty))
@@ -383,7 +388,7 @@ impl ReceivingOrderStore {
                     && inspection.owner_id == ctx.owner_id
                     && inspection.batch_no == req.batch_no
             })
-            .try_fold(0_i64, |total, inspection| {
+            .try_fold(wms_domain::Quantity::ZERO, |total, inspection| {
                 total
                     .checked_add(inspection.accepted_qty)
                     .and_then(|total| total.checked_add(inspection.rejected_qty))
@@ -487,7 +492,7 @@ impl ReceivingOrderStore {
             .receipts
             .values()
             .filter(|receipt| receipt.receiving_order_id == id && receipt.owner_id == ctx.owner_id)
-            .try_fold(0_i64, |total, receipt| {
+            .try_fold(wms_domain::Quantity::ZERO, |total, receipt| {
                 total.checked_add(receipt.actual_qty)
             })
             .ok_or(ReceivingOrderError::InvalidQuantity)?;
@@ -497,13 +502,13 @@ impl ReceivingOrderStore {
             .filter(|inspection| {
                 inspection.receiving_order_id == id && inspection.owner_id == ctx.owner_id
             })
-            .try_fold(0_i64, |total, inspection| {
+            .try_fold(wms_domain::Quantity::ZERO, |total, inspection| {
                 total
                     .checked_add(inspection.accepted_qty)
                     .and_then(|total| total.checked_add(inspection.rejected_qty))
             })
             .ok_or(ReceivingOrderError::InvalidQuantity)?;
-        if received_qty <= 0 || inspected_qty != received_qty {
+        if received_qty <= wms_domain::Quantity::ZERO || inspected_qty != received_qty {
             return Err(ReceivingOrderError::QuantityClosureMismatch);
         }
         let all_lines_inspected = self
@@ -568,7 +573,7 @@ impl ReceivingOrderStore {
         req: PutawayRequest,
         now: DateTime<Utc>,
     ) -> Result<PutawayRecord, ReceivingOrderError> {
-        if req.qty <= 0 {
+        if req.qty <= wms_domain::Quantity::ZERO {
             return Err(ReceivingOrderError::InvalidQuantity);
         }
         let order = self

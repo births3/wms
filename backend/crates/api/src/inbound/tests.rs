@@ -25,7 +25,7 @@ fn line() -> ReceivingOrderLine {
         line_no: 1,
         product_id: None,
         product_code: "P-001".to_string(),
-        expected_qty: 10,
+        expected_qty: 10.into(),
         batch_no: None,
         production_date: None,
         expiry_date: None,
@@ -236,9 +236,9 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
         &ctx,
         created.id,
         ReceiveReceivingOrderRequest {
-            actual_qty: 8,
-            shortage_qty: 1,
-            rejected_qty: 0,
+            actual_qty: 8.into(),
+            shortage_qty: 1.into(),
+            rejected_qty: wms_domain::Quantity::ZERO,
             arrival_temperature_celsius: None,
             exception_note: None,
             details: Some(ReceivingReceiptDetails {
@@ -269,9 +269,9 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
             &ctx,
             created.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 2,
-                rejected_qty: 0,
+                actual_qty: 8.into(),
+                shortage_qty: 2.into(),
+                rejected_qty: wms_domain::Quantity::ZERO,
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
@@ -293,7 +293,7 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
             now,
         )
         .expect("closed receipt");
-    assert_eq!(receipt.actual_qty, 8);
+    assert_eq!(receipt.actual_qty, 8.into());
 
     store
         .inspect(
@@ -301,8 +301,8 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
             created.id,
             InspectReceivingOrderRequest {
                 batch_no: "B202606".to_string(),
-                accepted_qty: 8,
-                rejected_qty: 0,
+                accepted_qty: 8.into(),
+                rejected_qty: wms_domain::Quantity::ZERO,
                 production_date: "2026-01-01".to_string(),
                 expiry_date: "2028-01-01".to_string(),
                 quality_status: "qualified".to_string(),
@@ -312,7 +312,7 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
                 package_check: Some("完好".to_string()),
                 instruction_check: Some("有".to_string()),
                 label_check: Some("清晰".to_string()),
-                sampling_qty: Some(1),
+                sampling_qty: Some(1.into()),
                 approval_no: None,
             },
             chrono::NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date"),
@@ -397,7 +397,7 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
             PutawayRequest {
                 batch_no: "B202606".to_string(),
                 product_code: "P-001".to_string(),
-                qty: 8,
+                qty: 8.into(),
                 location_id: Uuid::new_v4(),
                 location_code: "A-01-01".to_string(),
                 quality_status: "qualified".to_string(),
@@ -406,7 +406,7 @@ fn receiving_workflow_enforces_quantity_closure_and_dual_signature() {
             now,
         )
         .expect("putaway");
-    assert_eq!(putaway.qty, 8);
+    assert_eq!(putaway.qty, 8.into());
     assert_eq!(
         store.get(&ctx, created.id).expect("get").status,
         "completed"
@@ -442,9 +442,9 @@ fn receiving_inspection_cannot_exceed_actual_receipt_or_sign_early() {
             &ctx,
             created.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 2,
-                rejected_qty: 0,
+                actual_qty: 8.into(),
+                shortage_qty: 2.into(),
+                rejected_qty: wms_domain::Quantity::ZERO,
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
@@ -472,8 +472,8 @@ fn receiving_inspection_cannot_exceed_actual_receipt_or_sign_early() {
         created.id,
         InspectReceivingOrderRequest {
             batch_no: "B-GATE".to_string(),
-            accepted_qty: 9,
-            rejected_qty: 0,
+            accepted_qty: 9.into(),
+            rejected_qty: wms_domain::Quantity::ZERO,
             production_date: "2026-01-01".to_string(),
             expiry_date: "2028-01-01".to_string(),
             quality_status: "qualified".to_string(),
@@ -483,7 +483,7 @@ fn receiving_inspection_cannot_exceed_actual_receipt_or_sign_early() {
             package_check: Some("完好".to_string()),
             instruction_check: Some("有".to_string()),
             label_check: Some("清晰".to_string()),
-            sampling_qty: Some(1),
+            sampling_qty: Some(1.into()),
             approval_no: None,
         },
         chrono::NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date"),
@@ -500,8 +500,8 @@ fn receiving_inspection_cannot_exceed_actual_receipt_or_sign_early() {
             created.id,
             InspectReceivingOrderRequest {
                 batch_no: "B-GATE".to_string(),
-                accepted_qty: 4,
-                rejected_qty: 0,
+                accepted_qty: 4.into(),
+                rejected_qty: wms_domain::Quantity::ZERO,
                 production_date: "2026-01-01".to_string(),
                 expiry_date: "2028-01-01".to_string(),
                 quality_status: "qualified".to_string(),
@@ -511,7 +511,7 @@ fn receiving_inspection_cannot_exceed_actual_receipt_or_sign_early() {
                 package_check: Some("完好".to_string()),
                 instruction_check: Some("有".to_string()),
                 label_check: Some("清晰".to_string()),
-                sampling_qty: Some(1),
+                sampling_qty: Some(1.into()),
                 approval_no: None,
             },
             chrono::NaiveDate::from_ymd_opt(2026, 6, 4).expect("valid date"),
@@ -570,7 +570,7 @@ fn receiving_order_reject_accepts_receiving_status_and_closes_order() {
         )
         .expect("reject receiving order");
 
-    assert_eq!(receipt.rejected_qty, 10);
+    assert_eq!(receipt.rejected_qty, 10.into());
     assert_eq!(
         store.get(&ctx, created.id).expect("get").status,
         "closed_rejected"

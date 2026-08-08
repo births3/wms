@@ -13,7 +13,7 @@ pub(super) fn validate_receiving_order_lines(
         return Err(ReceivingOrderError::EmptyLines);
     }
     for line in lines {
-        if line.line_no == 0 || line.expected_qty <= 0 {
+        if line.line_no == 0 || line.expected_qty <= wms_domain::Quantity::ZERO {
             return Err(ReceivingOrderError::InvalidQuantity);
         }
         let has_batch = line
@@ -46,7 +46,7 @@ mod tests {
             line_no: 1,
             product_id: None,
             product_code: "P-M2-001".to_string(),
-            expected_qty: 1,
+            expected_qty: 1.into(),
             batch_no: batch_no.map(str::to_string),
             production_date: None,
             expiry_date: None,

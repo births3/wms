@@ -563,7 +563,7 @@ impl PgStockAdjustmentRepository {
 fn validate_surplus_create_request(
     request: &CreateStockSurplusOrderRequest,
 ) -> Result<(), StockAdjustmentError> {
-    if request.quantity <= 0
+    if request.quantity <= wms_domain::Quantity::ZERO
         || request.source == StockAdjustmentSource::Erp
             && request
                 .external_ref
