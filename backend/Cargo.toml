@@ -4,6 +4,7 @@ members = [
     "crates/domain",
     "crates/api",
     "crates/customer-portal-api",
+    "crates/h8-erp-worker",
     "crates/openapi-export",
 ]
 
@@ -20,7 +21,7 @@ aws-sdk-s3 = "=1.127.0"
 aws-types = "=1.3.14"
 bcrypt = "0.19.2"
 chrono = { version = "0.4", features = ["serde"] }
-deadpool-tiberius-rustls = { version = "0.1.12", default-features = false, features = ["rustls", "tds73", "chrono"] }
+deadpool-tiberius-rustls = { version = "0.1.12", default-features = false, features = ["rustls", "tds73", "chrono", "rust_decimal"] }
 hex = "0.4"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 jsonwebtoken = "9"
@@ -32,12 +33,13 @@ redis = { version = "0.27", features = ["aio", "tokio-comp"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate"] }
+rust_decimal = { version = "1", features = ["serde-str"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate", "rust_decimal"] }
 tokio = { version = "1", features = ["fs", "macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 tracing = "0.1"
 tower = { version = "0.5", features = ["util"] }
-utoipa = { version = "4.2", features = ["chrono", "uuid"] }
+utoipa = { version = "4.2", features = ["chrono", "uuid", "decimal"] }
 uuid = { version = "1.10", features = ["serde", "v4"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 

@@ -1,0 +1,18 @@
+FROM rust:1.91-bookworm AS builder
+WORKDIR /app
+
+COPY backend/Cargo.toml backend/Cargo.lock ./backend/
+COPY backend/crates ./backend/crates
+WORKDIR /app/backend
+RUN cargo build --release --bin h8-erp-worker && \
+    cp /app/backend/target/release/h8-erp-worker /tmp/h8-erp-worker
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --system wms && useradd --system --gid wms --home-dir /app wms
+WORKDIR /app
+COPY --from=builder /tmp/h8-erp-worker /app/h8-erp-worker
+USER wms:wms
+ENTRYPOINT ["/app/h8-erp-worker"]
