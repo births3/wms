@@ -36,6 +36,9 @@ class Settings:
     worker_id: str
     worker_version: str
     heartbeat_ttl_seconds: int
+    owner_code: str
+    lease_minutes: int = 5
+    api_key: str | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -69,6 +72,11 @@ class Settings:
                     "H8_HEARTBEAT_TTL_SEC", str(max(15, int(poll_interval * 3)))
                 )
             ),
+            # 与 API 侧一致 fail-fast：缺 H8_OWNER_CODE 时启动即失败，
+            # 不允许静默默认值导致认领/回写错误租户的数据。
+            owner_code=env("H8_OWNER_CODE"),
+            lease_minutes=int(os.environ.get("H8_LEASE_MINUTES", "5")),
+            api_key=os.environ.get("WMS_API_KEY") or None,
         )
 
 

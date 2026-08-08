@@ -163,6 +163,7 @@ impl MssqlRepository {
         batch_size: u32,
         worker_id: &str,
         lease_minutes: u32,
+        owner_code: &str,
     ) -> Result<Vec<ClaimedUnit>, WorkerError> {
         let mut connection = self
             .pool
@@ -176,6 +177,7 @@ impl MssqlRepository {
             statement.bind(i32::try_from(batch_size).unwrap_or(i32::MAX));
             statement.bind(worker_id.to_owned());
             statement.bind(i32::try_from(lease_minutes).unwrap_or(i32::MAX));
+            statement.bind(owner_code.to_owned());
             let rows = statement
                 .query(&mut *connection)
                 .await
@@ -287,9 +289,10 @@ DECLARE @claimed TABLE (id {pk_sql});
 ;WITH claimable AS (
     SELECT TOP (@P1) {pk}
       FROM dbo.{table} WITH (UPDLOCK, READPAST, ROWLOCK)
-     WHERE handelflag = 0
-        OR (handelflag = 3 AND next_retry_at <= SYSUTCDATETIME())
-        OR (handelflag = 2 AND lease_until < SYSUTCDATETIME())
+     WHERE OwnerCode = @P4
+       AND (handelflag = 0
+         OR (handelflag = 3 AND next_retry_at <= SYSUTCDATETIME())
+         OR (handelflag = 2 AND lease_until < SYSUTCDATETIME()))
      ORDER BY inserttime, {pk}
 )
 UPDATE source

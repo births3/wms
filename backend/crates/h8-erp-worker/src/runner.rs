@@ -76,6 +76,7 @@ pub async fn run_once(
                 settings.bootstrap.batch_size,
                 &settings.bootstrap.worker_id,
                 settings.bootstrap.lease_minutes,
+                &settings.bootstrap.owner_code,
             )
             .await?;
         let _ = control

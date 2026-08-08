@@ -9,6 +9,7 @@ fn claim_statement_uses_atomic_lease_and_stable_order() {
     let sql = claim_statement(contract);
 
     assert!(sql.contains("FROM dbo.x_wmsinter_InboundOrder WITH (UPDLOCK, READPAST, ROWLOCK)"));
+    assert!(sql.contains("OwnerCode = @P4"));
     assert!(sql.contains("handelflag = 0"));
     assert!(sql.contains("handelflag = 3 AND next_retry_at <= SYSUTCDATETIME()"));
     assert!(sql.contains("handelflag = 2 AND lease_until < SYSUTCDATETIME()"));

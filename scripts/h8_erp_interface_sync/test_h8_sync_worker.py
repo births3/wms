@@ -62,6 +62,7 @@ def settings(config_version: int = 1) -> Settings:
         connector_config_version=config_version,
         worker_id="worker-test",
         worker_version="test-1",
+        owner_code="ZBPF7",
         heartbeat_ttl_seconds=15,
     )
 

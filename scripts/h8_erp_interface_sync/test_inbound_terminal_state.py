@@ -24,6 +24,7 @@ def settings() -> sync_worker.Settings:
         connector_config_version=1,
         worker_id="worker-test",
         worker_version="test-1",
+        owner_code="ZBPF7",
         heartbeat_ttl_seconds=15,
     )
 
