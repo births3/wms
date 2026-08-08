@@ -7,6 +7,10 @@
 > “双通道”表示本地可分别验证两种通道，不表示生产双写；生产按 US-H8-001 选择唯一
 > 路由，主备切换沿用同一 Idempotency-Key。
 
+> **v1.9 提醒**：`deploy/docker-compose.h8-erp-if.yml` 与下方 2026-07 历史证据仍是旧
+> `if_*` 软件资产，不能验证当前 Rust Worker 或 US-H8-004。v1.9 联调使用 ERP 提供的
+> `x_wmsinter_*` 版本化 DDL（当前为 `zbpf7_test`），不得把两套表混跑。
+
 ## 1. 启动接口库（通道 B）与容器 ERP 厂商（通道 A）
 
 ```bash
@@ -55,8 +59,8 @@ export WMS_ENCRYPTION_PREVIOUS_MASTER_KEYS='{"v1":"至少 32 字节的旧主密�
 # 出站生产路由来自 H8 ERP 连接配置：channel_mode + api_base_url。
 # Worker 不接受 --transport，也不读取全局首条 active 连接；每条 outbox 按
 # 货主、可用 warehouse_id、outbound 和 message_type 调 route-resolve。
-# rest_primary_table_fallback：REST 连续失败（H8_HTTP_MAX_ATTEMPTS，默认 2）后
-# 以同一 Idempotency-Key 写入 if_out_message，不双写。
+# 历史 rest_primary_table_fallback 说明见旧 if_* 证据；当前 Rust Worker
+# 仅接受 interface_table，避免与 v1.9 x_wmsinter_* 通道混用。
 ```
 
 非本机 REST 连接测试只允许 HTTPS，目标 `host:port` 必须精确出现在
@@ -71,45 +75,56 @@ export WMS_ENCRYPTION_PREVIOUS_MASTER_KEYS='{"v1":"至少 32 字节的旧主密�
 权限：`mpm.execute`、`m2.write`、`m4.write`、商品写和 `h8.erp_connector.write`；迁移 `202607230002_mpm_persistent_mapping.sql` 会登记 `mpm.execute`，缺权限时重登刷新 JWT。
 扩展 outbox：`202607180005_h8_erp_outbox_extensions.sql`。
 
+### 2.1 H8 接口表探查凭据
+
+探查 API 不得回退使用 Worker 写账号。SQL Server DBA 需创建独立登录并加入已授予 16 张
+v1.9 接口表 SELECT、显式拒绝 DML 的 `r_wms_probe_readonly` 角色：
+
+```sql
+CREATE LOGIN wms_probe_test WITH PASSWORD = '<由 Secret 管理器生成的独立密码>', CHECK_POLICY = ON;
+USE zbpf7_test;
+CREATE USER wms_probe_test FOR LOGIN wms_probe_test;
+EXEC sp_addrolemember N'r_wms_probe_readonly', N'wms_probe_test';
+```
+
+随后在 H8 连接中配置 `interface_probe_db_username=wms_probe_test` 和独立 probe secret alias，
+并把该 alias 注入 **WMS API** 的 `WMS_H8_SECRET_ALIASES`。只注入 Worker alias、连接仍引用
+无法解析的旧 probe alias 时，页面会返回“接口表读取失败”；禁止用 Worker 密码补齐 probe
+alias。API 还必须配置当前单货主接口码 `H8_OWNER_CODE=ZBPF7`。
+
 ## 3. 入站类型（通道 B 接口表 → WMS API）
 
 | type | 表 | API |
 |------|-----|-----|
-| asn | if_in_asn | POST receiving-orders |
-| outbound_order | if_in_outbound_order | POST outbound/orders |
-| product_master | if_in_product_master | POST products |
-| return_order | if_in_return_order | POST receiving-orders sales_return（必填 batch_no、supplier_id） |
-| product_change | if_in_product_change | POST `/api/v1/integration/erp-messages/inbound/product_change`；携带 `liaison_id + asn_id` 时再 POST 档案同步回执 |
+| product_master | `x_wmsinter_GoodsInfo` | H8 `product_master` |
+| customer_master | `x_wmsinter_CustomerInfo` | H8 `customer_master` |
+| supplier_master | `x_wmsinter_SupplierInfo` | H8 `supplier_master` |
+| asn | `x_wmsinter_InboundOrder` + `InboundOrderItems` | H8 `asn` |
+| outbound_order | `x_wmsinter_OutboundOrder` + `OutboundOrderItems` | H8 `outbound_order` |
+| order_cancel | `x_wmsinter_OrderCommand` | H8 `order_cancel` |
+| inventory_seed_snapshot | `x_wmsinter_InventoryPushHeader` + `InventoryPushItems` | H8 `inventory_seed_snapshot` |
 
-`product_change.field_name=physical_dimensions` 时，`new_value` 必须是包含
-`length_mm`、`width_mm`、`height_mm` 三个正数的 JSON 对象；三个尺寸作为一个原子变更，
-不接受单字段更新。其他受支持字段继续使用标量 `new_value`。接口表 Worker 与 REST 入站
-都进入同一 H8 防腐层，不再直接调用 M1 商品 PATCH。
+`product_master` 的储存条件、特殊药品分类和全部包装单位必须由 ERP 发布器在 INSERT 前完成受控映射；未命中数据留在 ERP 发布失败队列，不得进入接口表。WMS 共享 H8 入口仍执行二次校验：违规行返回 422，H8 消息置死信且 M1 零写入；Rust Worker 将该接口行置 `handelflag=4`，不得生成 `pending_mapping` 商品。
 
-档案补录回执为 `POST /api/v1/quality-liaisons/{id}/archive-sync-callback`。Worker 只在
-M1 商品幂等更新成功后调用；服务端校验档案出站已成功、审批载荷、商品实际值、
-货主/仓库和 ASN 状态，同一事务将 M-QL 改为 `landed`、ASN 恢复 `inspecting`。
-重试复用 `{product_change_idempotency_key}:archive-closeout`，不重复转移或写审计。
+档案补录不再使用旧 `if_in_product_change`：WMS 通过 `x_wmsinter_WmsEvent`
+`archive_revision` 上报，ERP 修正后以原 `CorrelationID` 发布新版 `GoodsInfo`。
 
 ## 4. 出站类型（WMS outbox → B 或 A）
 
-| outbox 表 | event_type | 回调 path（通道 A） |
-|-----------|------------|---------------------|
-| receiving_putaway_erp_feedback_outbox | inbound_putaway_completed | /inbound-complete |
-| inventory_status_erp_feedback_outbox | inventory_status_changed | /inventory-status |
-| stock_adjustment_erp_feedback_outbox | stock_loss/surplus_completed | /stock-adjustment |
-| archive_revision_erp_feedback_outbox | archive_revision | /archive-revision |
-| reconciliation_erp_feedback_outbox | reconciliation_diff | /reconciliation-diff |
-| shipment_confirm_erp_feedback_outbox | shipment_confirm | /shipment-confirm |
-| inventory_snapshot_erp_feedback_outbox | inventory_snapshot | /inventory-snapshot |
+| outbox 表 | event_type | 通道 B 目标 | 回调 path（通道 A） |
+|-----------|------------|-------------|---------------------|
+| receiving_putaway_erp_feedback_outbox | inbound_putaway_completed / order_status | `InboundFeedback` / `OrderFeedback` | /inbound-complete |
+| inventory_status_erp_feedback_outbox | inventory_status_changed | `WmsEvent` | /inventory-status |
+| stock_adjustment_erp_feedback_outbox | stock_loss/surplus_completed | `WmsEvent` | /stock-adjustment |
+| archive_revision_erp_feedback_outbox | archive_revision | `WmsEvent` | /archive-revision |
+| reconciliation_erp_feedback_outbox | reconciliation_diff | `WmsEvent` | /reconciliation-diff |
+| shipment_confirm_erp_feedback_outbox | shipment_confirm | `OutboundFeedback` + `OrderFeedback` | /shipment-confirm |
+| inventory_snapshot_erp_feedback_outbox | inventory_snapshot | `InventoryReceiveHeader` + `InventoryReceiveItems` | /inventory-snapshot |
 
 档案补录 outbox：`max_attempts=5`、失败退避 5 分钟、`deadline_at` 默认 24h，超时/超次 → `dead`。
 
-通道 B 写入 `if_out_message` 后，ERP 可确认：
-
-```bash
-python3 scripts/h8_erp_interface_sync/ack_if_out.py --all
-```
+通道 B 发布主记录时置 `handelflag=0`；ERP 业务事务提交后置 5。Rust Worker 只根据对应
+`x_wmsinter_*` 业务回执确认出站，不再读取或写入旧 `if_out_message`。
 
 通道 A 的 ERP 业务回执调用
 `POST /api/v1/integration/erp-messages/{message_id}/receipt`，使用具备
@@ -132,9 +147,9 @@ Worker 启动后向「H8 ERP 消息 / Worker 状态」上报实例、版本、�
 `H8_MSSQL_*`、Docker 容器名或全局 MSSQL 默认值覆盖连接配置；历史版本的在途消息按其
 既有 `connector_config_version` 排空，新版本由新 Worker 实例承接。
 
-Worker 主机必须安装 `sqlcmd`，并使用快照中的 `tcp:host,port` 直连 MSSQL；Worker
-不执行 `docker exec`。本运行手册中的 Docker、SA 密码和初始化变量仅用于开发接口库
-建库/证据准备，不是生产 Worker 的传输配置。
+Rust Worker 使用 Tiberius 连接快照中的 `host:port`，无需安装 `sqlcmd`，也不执行
+`docker exec`。本运行手册中的 Docker、SA 密码和初始化变量仅用于开发接口库建库/证据
+准备，不是生产 Worker 的传输配置。
 
 每批认领前读取当前连接 + 方向的暂停控制；暂停时不触碰 MSSQL 待处理行，在途批次继续完成。
 恢复或暂停到期后继续认领。心跳失败只告警，不中断已经在途的业务处理。
@@ -145,22 +160,30 @@ Worker 主机必须安装 `sqlcmd`，并使用快照中的 `tcp:host,port` 直�
 密钥缺失或错误时禁止启用/解密，不得把数据库加密错误返回前端。
 
 ```bash
-# 双向 + 接口表出站
-python3 scripts/h8_erp_interface_sync/sync_worker.py --once
+# 单轮联调
+cargo run --manifest-path backend/Cargo.toml -p h8-erp-worker -- --once
 
-# 连接配置为 REST 后仅跑出站
-python3 scripts/h8_erp_interface_sync/channel_a_callback_mock.py --port 18091 &
-# 在 H8 ERP 连接中配置 api_base_url=http://127.0.0.1:18091
-python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction out
+# staging 常驻；restart=unless-stopped，前端「H8 ERP 消息 / Worker 状态」可查看心跳
+docker compose --env-file deploy/env/staging.env \
+  -f deploy/docker-compose.staging.yml up -d --build h8-erp-worker-staging
 
-# 入站指定类型
-python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction in --types product_change
-
-# H-SCH 每 5 分钟按“一个 Worker/连接/货主令牌”触发一次；规则决定是否到期
-python3 scripts/h8_erp_interface_sync/sync_worker.py --once --reconcile-due
+# 容器状态与日志
+docker compose --env-file deploy/env/staging.env \
+  -f deploy/docker-compose.staging.yml ps h8-erp-worker-staging
+docker compose --env-file deploy/env/staging.env \
+  -f deploy/docker-compose.staging.yml logs --tail=100 h8-erp-worker-staging
 ```
 
-`--reconcile-due` 先以本轮唯一 Idempotency-Key 调用 `POST /api/v1/reconciliation/claims`。
+常驻服务只实现冻结的 `interface_table` 路由；连接切换为 REST 或
+`rest_primary_table_fallback` 时会受控拒绝，不会静默双写。Python 脚本保留为历史验收资产，
+不得与 Rust Worker 同时运行和竞争 outbox。
+
+### REST 主动对账拉取（不属于 v1.9 接口表 Worker）
+
+以下能力不在冻结的 v1.9 纯接口表通道中，Rust 常驻 Worker 不执行。需要启用时应单独治理并
+实现 Rust 调度器，禁止重新启动历史 Python Worker 与接口表 Worker 并行竞争。
+
+主动对账调度器应先以本轮唯一 Idempotency-Key 调用 `POST /api/v1/reconciliation/claims`。
 `WMS_API_TOKEN` 必须来自持有 service-only `rc.reconciliation.ingest` 的货主级服务账号；
 仓库主管的 `rc.reconciliation.execute` 不能认领窗口、续租、上报 Worker 失败或提交快照。
 服务端只认领当前 JWT 货主，并要求存在 active、outbound、owner-wide
@@ -196,73 +219,41 @@ H-SCH 不持有跨货主超级令牌，也不自行计算周期；每个货主�
 以 WMS 为准生成的 `reconciliation_erp_feedback_outbox` 最多自动尝试 5 次；耗尽后标记
 dead 并创建 H4 运维通知，不再无限重试。
 
-单测：`cd scripts/h8_erp_interface_sync && python3 -m unittest test_h8_sync_worker test_exchange_lifecycle test_outbound_routing test_outbound_receipts test_reconciliation_pull -v`
+单测：`cargo test --manifest-path backend/Cargo.toml -p h8-erp-worker`
 
-### ASN 入站闭环样本
+### v1.9 入站闭环样本
 
-初始化脚本提供独立的 `DEMO-ASN-FLOW-001`，引用 E2E 库中真实存在的货主、仓库、
-供应商和商品，不占用 US-H8-004 只读探查固定样本。启动 WMS API 并取得令牌后执行：
+在 `zbpf7_test` 以头明细同事务发布一张可验收单据。启动 WMS API 并取得令牌后执行：
 
 ```bash
 export H8_BATCH_SIZE=1
-python3 scripts/h8_erp_interface_sync/sync_worker.py --once --direction in --types asn
+cargo run --manifest-path backend/Cargo.toml -p h8-erp-worker -- --once
 ```
 
-验收必须同时确认：接口行由 `pending` 经 Worker 认领后变为 `success`；
-`wms_resource_id` 指向唯一的 M2 `receiving_orders`；H2 存在 receive、convert、
-business_api、receipt 审计；通过消息重放 API 对同一消息填写原因并确认后，Worker
-应自动以原 Idempotency-Key 将既有终态接口行恢复为 `pending`、接管消息并重放，
-不得人工修改接口表；M2 单据数量仍为 1 且资源 ID 不变。证据见
-`docs/retros/h8-asn-inbound-flow-evidence.json`。
-
-### ASN 死信与人工重放切片
-
-用不存在的供应商引用准备独立 ASN，并设置 `H8_MAX_RETRY=1` 后运行同一 Worker：接口表与
-H8 消息必须同时进入 `dead`，H8 留下 `h8_exchange_final_failure`、`h8_message_dead`
-和 dead 尝试记录。随后由外部 ERP 更正供应商引用但不修改 `sync_status`，管理员调用既有
-重放 API（原因 + 二次确认）；Worker 必须以原 Idempotency-Key 自动把原接口行恢复为
-`pending`、认领并完成业务调用。最终必须同时断言：
-
-- H8 使用同一消息 ID、连接 ID、连接编码、配置版本和通道，状态为 `succeeded`；
-- MSSQL 原行状态为 `success`，`retry_count` 保留且资源 ID 指向 M2 单据；
-- M2 同一 `external_ref` 只有一张收货单；
-- H2 具备失败、死信、重放、认领和成功回执的完整关联动作。
-
-定向自动化命令：
-
-```bash
-cd scripts/h8_erp_interface_sync
-python3 -m unittest test_inbound_terminal_state test_h8_sync_worker test_exchange_lifecycle -v
-cargo test --manifest-path ../../backend/Cargo.toml -p wms-api \
-  inbound_lifecycle_persists_failure_retry_and_success_status --lib -- --nocapture
-```
-
-本地真实运行记录见 `docs/retros/h8-asn-manual-replay-evidence.json`；它只证明 V2 软件切片，
-不替代客户 ERP dev/staging 的 V4 故障恢复证据。
+验收必须同时确认：头表按 0→2→1→5 推进，H8 持久接收后产生
+`OrderFeedback(FeedbackType=1)`，业务对象只创建一次；明细只读且不被独立认领。非法载荷
+按 v1.9 错误码进入 3/4，不得人工修改业务载荷。旧 `DEMO-ASN-*`、`success` 状态和
+`wms_resource_id` 证据只属于历史 `if_*` 切片。
 
 ## 6. 验收
 
 | ID | 检查 |
 |----|------|
-| B 入站 | asn/outbound/product/return/product_change → success |
-| B 出站 | outbox → if_out_message pending → ack → acked |
-| A 出站 | mock `/_dump` 收到 archive/recon/shipment 等 path |
-| 档案重试 | 超 max/deadline 变 dead |
+| B 入站 | 7 类 v1.9 主记录按 0→2→1/5，子记录不独立认领 |
+| B 出站 | outbox → 对应 `x_wmsinter_*` 主记录 0 → ERP 业务提交 5 |
+| 完成屏障 | 明细先发布并处理为 5，最后发布 `OrderFeedback(2/6)` |
+| 只读探查 | 独立 probe 账号可 SELECT，DML 全拒绝 |
 
-主备降级 L11 使用真实 Docker MSSQL 运行，并显式开启证据写入：
+当前 Rust Worker 的最小回归：
 
 ```bash
-sudo -n bash deploy/h8-erp-if/wait-and-init.sh
-sudo -n env PYTHONPATH=scripts/h8_erp_interface_sync \
-  python3 scripts/h8_erp_interface_sync/run_failover_l11_evidence.py --record
+cargo test --manifest-path backend/Cargo.toml -p h8-erp-worker
 ```
 
-通过条件是同一业务键连续两次从 REST 降级到接口表后，
-`interface_row_count` 仍为 `1`，且证据中的 `cleanup` 为
-`deleted acceptance row`。证据写入
-`docs/retros/h8-failover-l11-evidence.json`；该 V2 证据不替代客户正式 ERP S4。
+旧 `run_failover_l11_evidence.py` 与 `h8-failover-l11-evidence.json` 只证明历史 `if_*`
+V2，不替代 v1.9 实库或客户正式 ERP S4。
 
-### 本机记录（2026-07-18 补全）
+### 历史本机记录（2026-07-18）
 
 - 通道 A：archive_revision / reconciliation_diff / shipment_confirm → HTTP mock succeeded
 - 通道 B：inventory_snapshot → if_out；ack_if_out → acked

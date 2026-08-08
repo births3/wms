@@ -122,6 +122,8 @@ services:
       - WMS_REDIS_URL=redis://redis-staging:6379/0
       - WMS_FEATURE_FLAGS_FILE=/app/deploy/feature_flags.toml
       - WMS_JWT_SECRET=${WMS_JWT_SECRET}
+      - WMS_H8_SECRET_ALIASES=${WMS_H8_SECRET_ALIASES}
+      - H8_OWNER_CODE=${H8_OWNER_CODE:-ZBPF7}
       - WMS_HFILE_ENDPOINT=http://minio-staging:9000
       - WMS_HFILE_ACCESS_KEY=${WMS_HFILE_ACCESS_KEY}
       - WMS_HFILE_SECRET_KEY=${WMS_HFILE_SECRET_KEY}
@@ -137,6 +139,38 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  h8-erp-worker-staging:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile.h8-erp-worker
+    image: wms-h8-erp-worker-staging:${WMS_VERSION:-latest}
+    pull_policy: build
+    depends_on:
+      wms-api-staging:
+        condition: service_healthy
+    environment:
+      - WMS_API_BASE=http://wms-api-staging:8080
+      - WMS_API_TOKEN=${WMS_H8_WORKER_API_TOKEN}
+      - WMS_DB_URL=postgres://wms_staging:${WMS_STAGING_DB_PASSWORD}@postgres-staging:5432/wms_staging
+      - WMS_H8_SECRET_ALIASES=${WMS_H8_SECRET_ALIASES}
+      - H8_CONNECTOR_ID=${H8_CONNECTOR_ID}
+      - H8_OWNER_CODE=${H8_OWNER_CODE:-ZBPF7}
+      - H8_WORKER_ID=${H8_WORKER_ID:-h8-erp-worker-staging}
+      - H8_WORKER_VERSION=${WMS_VERSION:-latest}
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "/app/h8-erp-worker", "--healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
 
 volumes:
   postgres_staging_data:

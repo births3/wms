@@ -18,7 +18,7 @@ US-H8-001 只冻结 ERP 连接的配置与安全接入规则；US-H8-002 负责 
 | US-H8-001 | 连接配置、测通、启停 |
 | US-H8-002 | 报文语义 / Worker 管线 |
 | US-H8-003 | WMS 内消息日志与重放（PostgreSQL） |
-| US-H8-004 | ERP 接口库接口表只读探查（MSSQL `if_*`） |
+| US-H8-004 | ERP 接口库接口表只读探查（MSSQL `x_wmsinter_*` v1.9） |
 
 ### 能力分层与通用性边界
 
@@ -128,7 +128,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 2. **三级边界**：业务模块只提交或接收 WMS canonical 命令/事件；H8 负责路由、幂等和 ERP↔WMS 语义转换；REST/接口表适配器只处理协议、连接和 ERP DTO。ERP DTO 不得进入 M1/M2/M3/M4 domain。
 3. **入站链路**：入站消息依次完成 H1 认证与最小 scope、货主/仓库范围、有效连接唯一路由、幂等、`schema_version` 校验、必填字段校验、M-PM 字段规整和 WMS 业务 API 调用；商品 `spec` 在 REST DTO、接口表 canonical 和 WMS 命令中均为必填非空字符串，缺失时不得创建 H8 消息或 M1 商品；业务事务提交成功后才能返回业务成功结果，技术接收不得冒充业务成功。
 4. **出站链路**：业务模块在自身事务内写入 outbox；H8 认领消息后解析唯一有效连接和通道，把 canonical 事件转换为 ERP 报文并发送；技术接收后进入 `awaiting_receipt`，业务成功回执后进入 `acked`。业务模块不得直接调用 ERP URL 或写 ERP 接口表。
-5. **字段规整**：外部编码、单位、状态和自由文本在进入业务 API 前必须通过 M-PM；找不到有效映射时记录可定位的失败结果，不得把原始外部值写入受控业务字段。
+5. **字段规整**：外部编码、单位、状态和自由文本在进入业务 API 前必须通过 M-PM；ERP 商品发布器对必需受控字段找不到有效映射时必须在 INSERT 前失败，不得写接口表。WMS 对违规消息再次校验，以 422 不可重试错误拒绝、H8 置死信并保持 M1 零写入，不得创建 `pending_mapping` 商品。
 6. **配置与契约版本绑定**：每次处理记录实际使用的连接、配置版本、通道、消息类型和 `schema_version`；消息开始处理后不得因连接配置变化静默切换语义。Worker 必须以消息绑定的 `config_version` 不可变传输快照为事实源，REST/MSSQL 端点、账号和 secret alias 都从该快照解析；历史消息始终按历史版本重试，切换后旧版本必须排空才能删除旧 secret alias。不支持的 `schema_version` 作为不可重试错误明确拒绝，禁止按最新版猜测解析。
 7. **幂等语义**：入站和出站至少按货主、消息类型、外部业务标识和 Idempotency-Key 判定重复；重复请求返回原结果，不重复创建业务单据、outbox 或 H2 审计业务事件。
 8. **投递与回执保证**：H8 使用“至少一次投递 + WMS 业务幂等”，不得宣称跨 WMS 与 ERP 的分布式 exactly-once。消息发送方生成 Idempotency-Key（入站 ERP、出站 WMS）；通道切换、超时重试和人工重放保持原键。REST 出站回执使用 `outbound:receipt` scope，接口表回执由 Worker 的连接身份提交；技术接收后长期无业务回执时按原键重试，明确拒绝或重试耗尽进入 `dead`。
@@ -281,7 +281,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 
 **我要** 在管理端基于某个已配置的 H8 连接，只读查询该连接绑定的 MSSQL 接口库中的受控接口表
 
-**以便** 在不登录 ERP 库、不依赖 DBA、不修改接口表行的前提下，确认 ERP 是否写入、行是否仍为 `pending`、Worker 是否回写 `success/failed`、出站是否被 ERP 认领
+**以便** 在不登录 ERP 库、不修改接口表行的前提下，确认 ERP/WMS 是否写入、主记录当前处于待处理、处理中、技术接收、可重试失败、死信或业务提交状态
 
 ### 产品决策（已确认）
 
@@ -297,31 +297,34 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 ### 与相邻故事的边界
 
 1. **依赖 US-H8-001**：仅当连接通道模式为 `interface_table` 或 `rest_primary_table_fallback`，存在 `interface_db_host/port/name`，且探查凭据 `interface_probe_db_username` / `interface_probe_db_password_alias` 成对配置并可解析时可用；纯 `rest` 或未配置探查凭据的连接不提供数据查询（选择项灰显并说明原因）。**配置状态** `testing` / `active` / `disabled` **均可探查**（排障需要）；`disabled`/`testing` 在 UI 上可黄条提示，不得因状态拒绝只读查询。不强制「最近连接测试成功」。
-2. **不等于 US-H8-003**：003 查询 WMS PostgreSQL 消息/尝试并支持重放；004 查询 ERP 接口库原始行且**只读**。详情可提供按 `idempotency_key` / `wms_resource_id` 跳转 003 的检索链接；链接目标不存在或无权限时仅提示，**不阻塞** 004。
+2. **不等于 US-H8-003**：003 查询 WMS PostgreSQL 消息/尝试并支持重放；004 查询 ERP 接口库原始行且**只读**。详情可提供按 `idempotency_key` 跳转 003 的检索链接；链接目标不存在或无权限时仅提示，**不阻塞** 004。
 3. **不等于通用 DB 浏览器**：禁止任意 SQL、任意 schema/表名、任意导出。
 4. **无写副作用**：不在本故事内提供改 `sync_status`、手工 INSERT/DELETE 接口表行；纠错仍走 002 Worker / 003 重放 / ERP 侧作业。
 
 ### 表白名单与消息目录映射
 
-`table_key` 等于物理表名（无自由表名）。首批与 `deploy/h8-erp-if/init` 及 US-H8-002 目录对齐；新增消息类型时必须同步扩展本表与 OpenAPI 枚举。
+`table_key` 等于物理表名（无自由表名）。当前白名单与 ERP-WMS 接口文档 v1.9 冻结版对齐；TransferOrder、ExceptionLog、ApiLog 首期不建表，因此不进入白名单。新增消息类型时必须同步扩展本表与 OpenAPI 枚举。
 
 | `table_key`（物理表） | 方向 | 关联消息/用途摘要 | 适用过滤列 |
 |---|---|---|---|
-| `if_in_asn` | 入站 | ASN / 采购入库 | `external_doc_no`、`external_ref`、`warehouse_id`、`idempotency_key`、`sync_status` |
-| `if_in_outbound_order` | 入站 | 出库订单 | 同上 |
-| `if_in_return_order` | 入站 | 销退申请 | `external_doc_no`、`external_ref`、`warehouse_id`、`idempotency_key`、`sync_status` |
-| `if_in_product_master` | 入站 | 商品主数据 | `external_doc_no`、`idempotency_key`、`sync_status`（**无** `warehouse_id`） |
-| `if_in_product_change` | 入站 | 商品主数据变更 / 档案补录回写 | 同上（**无** `warehouse_id`） |
-| `if_out_message` | 出站 | 通道 B 出站报文 | `source_outbox_id`、`event_type`、`idempotency_key`、`sync_status`（**无** `external_doc_no` / 通常无业务 `warehouse_id` 列） |
+| `x_wmsinter_GoodsInfo` / `CustomerInfo` / `SupplierInfo` | ERP→WMS | 商品、客户、供应商主数据 | `idempotency_key`、`sync_status` |
+| `x_wmsinter_InboundOrder` / `InboundOrderItems` | ERP→WMS | 入库单头与只读明细 | `external_doc_no`、`idempotency_key`；仅头表支持 `sync_status` |
+| `x_wmsinter_OutboundOrder` / `OutboundOrderItems` | ERP→WMS | 出库单头与只读明细 | `external_doc_no`、`idempotency_key`；仅头表支持 `sync_status` |
+| `x_wmsinter_OrderCommand` | ERP→WMS | 订单取消命令 | `external_doc_no`、`idempotency_key`、`sync_status` |
+| `x_wmsinter_OrderFeedback` | WMS→ERP | 订单状态、完成屏障与取消回执 | `external_doc_no`、`idempotency_key`、`sync_status` |
+| `x_wmsinter_InboundFeedback` / `OutboundFeedback` | WMS→ERP | 入库、出库明细反馈 | `external_doc_no`、`idempotency_key`、`sync_status` |
+| `x_wmsinter_WmsEvent` | WMS→ERP | WMS 统一事件 | `event_type`、`idempotency_key`、`sync_status` |
+| `x_wmsinter_InventoryPushHeader` / `InventoryPushItems` | ERP→WMS | ERP 库存快照头与只读明细 | `idempotency_key`；仅头表支持 `sync_status` |
+| `x_wmsinter_InventoryReceiveHeader` / `InventoryReceiveItems` | WMS→ERP | WMS 库存快照头与只读明细 | `idempotency_key`；仅头表支持 `sync_status` |
 
 **`sync_status` 词表（接口表，勿与 US-H8-003 的 `succeeded` 混用）**：
 
 | 表类型 | 允许值 |
 |---|---|
-| 入站 `if_in_*` | `pending`、`processing`、`success`、`failed`、`dead` |
-| 出站 `if_out_message` | 上表 + `acked` |
+| 可认领主记录 | `pending`(0)、`awaiting_receipt`(1)、`processing`(2)、`failed`(3)、`dead`(4)、`acked`(5) |
+| 只读子记录 | 不支持状态过滤；列表统一显示 `readonly` |
 
-任一 `sync_status` 对当前 `table_key` 非法（例如入站表传 `pending,acked`）必须返回 **400**，禁止静默忽略非法值。对当前表不适用的可选过滤字段（如对 `if_out_message` 传 `external_doc_no`）同样 **400**；前端按所选表隐藏不适用控件。
+任一 `sync_status` 对当前 `table_key` 非法（例如对子记录传状态）必须返回 **400**，禁止静默忽略非法值。对当前表不适用的可选过滤字段同样 **400**；前端按所选表隐藏不适用控件。
 
 ### 验收标准
 
@@ -334,15 +337,15 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
    - 列表 `GET /api/v1/h8/erp-interface-tables/rows`
    - 详情 `GET /api/v1/h8/erp-interface-tables/rows/{row_id}`（**query 必填** `connector_id` + `table_key`；详情身份 = `connector_id` + `table_key` + `row_id`，禁止仅靠 UUID 跨表定位）
    - 仅接受结构化过滤；服务端参数化 SELECT。契约与实现须可证明**无** `UPDATE`/`INSERT`/`DELETE` 接口表路径。
-7. **核心/更多查询**：核心为连接、接口表、`sync_status`、时间范围；`sync_status` 使用公共 `QueryPanel` 多选控件，多个状态按“或”查询，API 用逗号分隔且每个值精确匹配。更多为按表适用的业务键（见映射表）。时间过滤默认落在 **`updated_at`**（便于发现长期 `pending`）；默认最近 7 天，跨度 ≤ 31 天；缺省时间窗由服务端补齐，无界查询 **400**。其他字段首版不做模糊匹配，避免全表扫描。
-8. **列表字段**：至少展示主键 `id`、业务键摘要（入站 `external_doc_no` / 出站 `source_outbox_id`）、`sync_status`、`retry_count`、`last_error` 摘要、`idempotency_key`、`created_at`/`updated_at`；入站表另展示可空 `wms_resource_id`，`if_out_message` 不虚构该列。选择 `if_in_product_master` 时改用商品业务列，默认展示外部单号、货主 ID、商品编码、商品名称、规格、同步状态、重试次数和更新时间，不能只显示控制列。完整 `payload_json` 不进列表。
-9. **详情**：Dialog 只展示服务端表级白名单字段和生成的 `payload_summary`；摘要按 UTF-8 截断至 4096 字节。`if_in_product_master` 详情按商品信息、药品与监管、物流与包装、同步追踪分区，覆盖商品编码/名称/规格、批准文号、剂型、生产厂家、特殊药品分类、储存条件、UDI/电子监管码、尺寸重量、契约版本和控制字段；包装层级以表格展示包装单位、基础单位换算、是否基础单位和是否默认单位。列表与详情 API 均不得返回原始 `payload_json`，包装 JSON 只允许经服务端字段白名单校验后作为 `packaging_levels` 返回，解析输入不超过 1 MiB、返回摘要不超过 4096 字节，超限只返回中文省略标记。首版不提供原文查看；确有原文排障需求时另立故事和权限。无编辑、无改 `sync_status` 或写操作控件。列表行与同键详情字段必须一致。
-10. **货主与仓库隔离**：强制当前货主；表有 `owner_id` 时 SQL 必须 `owner_id = 当前货主`。表有 `warehouse_id` 时：SQL 必须落在 **调用主体授权仓库 ∩ 连接 `warehouse_ids` 白名单**（连接白名单为空表示该货主全部仓，仍受主体仓权约束）。表无 `warehouse_id` 时，只有系统管理员或具备货主全仓数据范围的主体可查询，其他主体返回 403；审计过滤摘要须标明「无仓列」。跨货主数据不得返回。
+7. **核心/更多查询**：核心为连接、接口表、`sync_status`、时间范围；子记录隐藏 `sync_status`。多个状态按“或”查询。更多查询只保留按表适用的 `external_doc_no`（映射 `ERPBillCode`）、`event_type`（映射 `EventType`）和 `idempotency_key`。时间过滤固定落在 **`inserttime`**；默认最近 7 天，跨度 ≤ 31 天；缺省时间窗由服务端补齐，无界查询 **400**。
+8. **列表字段**：至少展示主键、业务键摘要、状态、重试次数、错误摘要、幂等键、写入时间和处理时间；不存在的 WMS UUID 字段不得虚构。选择 `x_wmsinter_GoodsInfo` 时改用商品业务列，默认展示 ERP 货主编码、商品编码、名称、规格、状态、重试次数和更新时间。接口表没有原始 `payload_json`，列表不得拼装或返回原始业务载荷。
+9. **详情**：Dialog 只展示服务端表级白名单字段和生成的 `payload_summary`；摘要按 UTF-8 截断至 4096 字节。`x_wmsinter_GoodsInfo` 详情按商品信息、药品与监管、物流与包装、同步追踪分区，展示 v1.9 实际存在的商品编码/名称/规格、批准文号、生产厂家、特殊药品分类、存储条件、PackagingJson 包装层级、契约版本和控制字段；不得虚构剂型、UDI、重量或尺寸。包装 JSON 只允许经服务端字段白名单校验后作为 `packaging_levels` 返回，解析输入不超过 1 MiB、返回摘要不超过 4096 字节。首版无原文查看、编辑、改状态或其他写操作。
+10. **货主与仓库隔离**：当前单货主接口通过部署配置 `H8_OWNER_CODE` 强制 SQL `OwnerCode = 配置值`；当前 v1.9 表没有 WMS `owner_id` / `warehouse_id` UUID。只有系统管理员或具备货主全仓数据范围的主体可查询，且连接 `warehouse_ids` 必须为空；仓库级主体或带仓库白名单的连接返回 403，禁止把 `DepotCode` 猜测映射为 WMS 仓库 UUID。多货主启用前必须补充每连接 OwnerCode 映射契约。
 11. **分页、超时与限流**：强制分页，`page_size` ≤ 100；列表不得无界导出。单次外部查询复用 ADR-0018 超时策略，API 复用 H3 已认证端点限流，超限返回 429；不新增 H8 私有 QPS 配置。**不得**为降噪合并或省略 H2 审计事件。
 12. **审计**：每次列表与详情查询写入 H2 append-only 审计，记录操作者、货主、`connector_id`、`table_key`、过滤摘要、结果行数或是否命中；不记录密码、完整 payload。
 13. **账号权限（软件路径）**：Docker 和生产探查都必须使用与 Worker 写账号分离的 **SELECT-only** 专用账号。Docker 初始化需创建该账号；验收必须证明 `SELECT` 成功且 `INSERT`、`UPDATE`、`DELETE` 均被数据库拒绝，未满足时不得关闭软件路径。
-14. **页面证据**：登记页面级查询配置；真实浏览器 E2E 至少覆盖：有权限选连接与表并看到列表、同时选择两个 `sync_status` 并验证并集结果、打开详情、无权限 403/隐藏入口、只读无写按钮；查询区、表头、状态与详情字段使用中文业务文案。商品主数据使用 V2 的 `DEMO-PM-001`，断言列表显示 `DEMO-P-001`、中文商品名称与规格，详情显示批准文号、厂家、储存条件、监管标识和“片/盒”包装层级，并单独留下真实截图。质量矩阵登记 `e2e_checks` / `e2e_screenshots`。
-15. **软件路径完成条件**：在 `deploy/docker-compose.h8-erp-if.yml` 启动的 MSSQL 接口库上，用演示/种子行（至少断言 `external_doc_no` 如 `DEMO-ASN-001` / `DEMO-PM-001` 与 `sync_status=pending` 可见）完成 API 单测或集成测 + 真实浏览器 E2E + 权限/审计单测 + SELECT-only 账号 DML 拒绝测试 + `gov-t1` 相关门禁后，可关闭本故事**软件路径**并在验收记录标记 `SOFTWARE_PATH_PASS`。客户正式接口库只读账号联调为可选增强，**不是**本故事软件路径关闭的必要条件。
+14. **页面证据**：登记页面级查询配置；真实浏览器 E2E 至少覆盖：有权限选连接与 v1.9 表并看到列表、同时选择两个 `sync_status` 并验证并集结果、子记录不显示状态过滤、打开详情、无权限 403/隐藏入口、只读无写按钮；查询区、表头、状态与详情字段使用中文业务文案。商品主数据断言真实 GoodsCode、中文名称和规格，详情只展示 v1.9 实际字段与 PackagingJson 包装层级。质量矩阵登记 `e2e_checks` / `e2e_screenshots`。
+15. **软件路径完成条件**：在 MSSQL v1.9 接口库上，用 `x_wmsinter_GoodsInfo` 与至少一组头/明细种子完成 API 单测或集成测 + 真实浏览器 E2E + 权限/审计单测 + 独立 SELECT-only 账号 DML 拒绝测试 + `gov-t1` 相关门禁后，可关闭当前 v1.9 **软件路径**。旧 `if_*` Docker 证据仅作为历史版本证据，不替代 v1.9 白名单与真实字段验证。
 16. **非目标**：不做通用数据库浏览器；不做接口表行编辑/补单；不替代 003 监控与重放；不把 ERP DTO 放入业务 domain 聚合。
 
 ### 页面设计契约
@@ -351,8 +354,8 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|
 | 页面类型 | 列表型 |
 | 主信息载体 | 页面上方公共 `QueryPanel`；主体公共 `DataGrid` |
-| 核心查询 | 连接、接口表、`sync_status` 多选、时间范围（`updated_at`），首屏一行可见 |
-| 更多查询 | 按所选 `table_key` 动态显示适用字段：`external_doc_no` / `external_ref` / `source_outbox_id` / `idempotency_key` / `warehouse_id` / `event_type`，默认折叠 |
+| 核心查询 | 连接、接口表、主记录 `sync_status` 多选、时间范围（`inserttime`），首屏一行可见 |
+| 更多查询 | 按所选 `table_key` 动态显示 `external_doc_no` / `idempotency_key` / `event_type`，默认折叠 |
 | 标准动作入口 | 页头或 DataGrid 提供刷新、字段显示和视图；首版禁止无界导出 |
 | 私有动作入口 | 行内「详情」；首版无「重放」「改状态」 |
 | 详情展示方式 | Dialog 展示对象信息、控制列、错误摘要与服务端脱敏、限长的 payload 摘要；商品主数据按四区展示并将包装层级渲染为表格；可选跳转 003 |
@@ -366,7 +369,7 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 | `table_key` | 必填；受控枚举（上表白名单） |
 | `row_id` | 详情必填；与 `connector_id`+`table_key` 联合定位 |
 | `sync_status` | 可选；一个或多个精确状态，多个值以逗号分隔并按“或”查询；任一值不属于当前表允许值则 400 |
-| `time_from` / `time_to` | 过滤列固定为 `updated_at`；默认最近 7 天；跨度 ≤ 31 天 |
+| `time_from` / `time_to` | API 字段名沿用既有契约；v1.9 查询语义固定过滤 `inserttime`；默认最近 7 天；跨度 ≤ 31 天 |
 | `page` / `page_size` | 分页；`page_size` ≤ 100 |
 | 业务键过滤 | 仅接受当前表适用列；精确匹配；不适用列 400 |
 
@@ -391,15 +394,15 @@ REST/接口表通道。跨 ERP、快递、冷链、TMS、监管平台等外部�
 |---|---|
 | L1 单元 | `table_key` 白名单、owner/仓过滤、单值/多值 `sync_status`、混入非法状态/不适用列 400、禁止 SQL 拼接 |
 | L2 API 契约 | 列表/详情 OpenAPI（含 `row_id` 联合键）、统一错误、api-client 同步 |
-| L3 业务流程 | Docker 种子 `DEMO-ASN-001` pending + `DEMO-ASN-002` failed → 双值多选返回并集 → 详情字段一致；`DEMO-PM-001` 列表核心商品字段与详情包装层级可见 |
-| L4 错误路径 | 连接不可达、只读凭据缺失、secret 不可解析、未知表、入站+`acked`、跨货主、无仓表的仓库级主体、无界时间窗、超时、429 |
+| L3 业务流程 | v1.9 主记录 pending + dead → 双值多选返回并集 → 详情字段一致；GoodsInfo 列表核心商品字段与详情包装层级可见 |
+| L4 错误路径 | 连接不可达、只读凭据缺失、secret 不可解析、未知表、子记录带状态、跨货主、仓库级主体、连接含仓库白名单、无界时间窗、超时、429 |
 | L5 数据一致 | 同键列表与详情一致；跳转 003 失败不破坏 004 |
 | L7 性能 | `page_size=100` 多表白名单 smoke；超时上限可触发 |
 | L8 权限 | 持有 `h8.erp_interface_table.read` 可查；仅 connector.read 不可查；无权限、跨货主和无仓表的仓库级主体均 403 |
 | 契约一致性 | OpenAPI 与生成的 api-client 类型同步；首个正式版本前不建立兼容基线 |
 | L10 可观测性 | 查询耗时、超时和 429 可观测；列表/详情各产生 H2 事件（含过滤摘要） |
 | 安全专项 | 密码不回显；API 与审计无原始 payload；SELECT-only 账号的 DML 被数据库拒绝 |
-| 软件路径证据 | `docker compose -f deploy/docker-compose.h8-erp-if.yml` + DEMO 种子断言 + SELECT-only 否定测试 + Playwright + 单测日志 |
+| 软件路径证据 | MSSQL v1.9 `x_wmsinter_*` 种子断言 + 独立 SELECT-only 否定测试 + Playwright + 单测日志 |
 
 ---
 
@@ -501,8 +504,15 @@ H8 复用现有 V0–V4、L1–L11 和环境分层，不新增另一套状态模
 | 2026-07-23 | 六十六轮开发环境软件缺口收口 | 复现旧持久 MSSQL 开发卷缺少完整商品列后，为初始化脚本补充可重入结构升级，并用真实容器验证特殊药品分类、UDI/监管码、物理属性、`schema_version`、结构化包装 JSON 与约束。目录驱动测试逐类覆盖五类接口表入站 canonical 主流程，以及七类出站 REST、接口表和 REST 失败降级；真实 MSSQL 对七类出站逐类重复降级，均保持一行且清理验收数据。开发实现层改为 `PASS`，仅客户正式 ERP dev/staging 的 V4 外部证据保持延期。 |
 | 2026-07-24 | 六十七轮接口表商品内容验收 | US-H8-004 商品主数据列表增加外部单号、货主、商品编码、名称、规格和同步摘要；详情按四区展示药监、储存、物理属性、包装层级和同步追踪。后端只返回表级白名单 `business_fields`，包装层级丢弃未知键且格式异常受控降级，原始 `payload_json` 继续禁止。真实 PostgreSQL + MSSQL E2E 使用 `DEMO-PM-001` 验证列表、中文详情、“片/盒”包装表格和截图；同时以表级 DataGrid 存储键与重挂载修复切表后沿用旧列配置的问题。 |
 | 2026-07-26 | 六十八轮安全与运行快照复审 | REST 探测白名单收紧为精确 `host:port`，覆盖省略 HTTPS 端口、IPv6、仅主机/通配符/同主机异端口拒绝；`outbound:receipt` 只映射 `h8.erp_receipt.write`。接口表 Worker 启动时读取当前连接及不可变版本快照，MSSQL 端点/账号/secret alias 不再接受环境默认或 Docker 容器覆盖，使用本机 `sqlcmd` 直连；历史配置版本在途消息按原绑定排空。复审同时修复 M-RC H8 回执推进缺独立审计的问题。开发实现层测试通过，V4 外部证据状态不变。 |
+| 2026-08-07 | 六十九轮 v1.9 探查勘误 | 按 ERP-WMS v1.9 冻结版将 US-H8-004 切换为 16 张 `x_wmsinter_*` 白名单、`handelflag` 六态与只读子记录语义；查询固定按 `OwnerCode` 和 `inserttime`，拒绝无法执行仓库 UUID 隔离的主体/连接；商品详情只展示真实字段。`zbpf7_test` 已临时用 Worker 账号读通，但独立 SELECT-only probe 登录仍待 DBA 完成，因此只记 `TEST_ONLY_PROBE_PASS`。 |
 
-## 验收记录（US-H8-004 软件切片）
+## v1.9 探查勘误与当前证据（2026-08-07）
+
+- 当前实现白名单、字段投影和 `handelflag` 状态已切换到 16 张 `x_wmsinter_*` 表；领域/API 单测与管理端 self-check、TypeScript 类型检查通过。
+- `zbpf7_test` 已确认 16 张表可由现有管理账号读取，并已创建 `r_wms_probe_readonly` 数据库角色，角色对 16 张表具有 SELECT 且显式 DENY INSERT/UPDATE/DELETE。
+- 独立 SQL 登录/用户尚未由服务器级 DBA 创建；`zbpf7_test` 当前按联调决定临时复用 `wms_worker_test` 完成页面读通，仅记为 `TEST_ONLY_PROBE_PASS`。该账号不是 SELECT-only，不能关闭 AC13/15，也不得把下方 2026-07-22 旧 `if_*` Docker 证据冒充为 v1.9 独立只读验收。
+
+## 验收记录（US-H8-004 历史软件切片）
 
 - 故事：`US-H8-004`
 - 验收日期：`2026-07-22`
@@ -633,7 +643,7 @@ H8 复用现有 V0–V4、L1–L11 和环境分层，不新增另一套状态模
 - V2（H8-ASN-REST-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_asn_postgres -- --test-threads=1`，覆盖 M-PM→M2→H8 成功状态、同键重放、变载荷冲突、冻结连接 API Key 绑定，以及 `pending_mapping` 商品经真实 ASN 入口拒绝且无收货单/幂等业务写入
 - V2（H8-OUTBOUND-REST-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_outbound_order_postgres -- --test-threads=1`，覆盖 M-PM→M4→H8 成功状态、单据/明细唯一、同键重放、业务提交后 processing 恢复、并发同键单消息/单资源、变载荷冲突、错误 scope 与未映射单据类型写入前拒绝
 - V2（H8-RETURN-REST-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_return_order_postgres -- --test-threads=1`，覆盖 M-PM→M2→H8 成功状态、原批号落库、供应方回退、同键重放、变载荷冲突、冻结连接 API Key 绑定、缺失原批号与未映射单据类型写入前拒绝
-- V2（H8-PRODUCT-REST-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_master_postgres -- --test-threads=1`，覆盖货主级唯一路由、货主全仓 API Key、M-PM→M1→H8 成功状态、规格必填零写入、储存条件/剂型规整、同键重放、变载荷冲突与仓库受限身份拒绝
+- V2（H8-PRODUCT-REST-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_master_postgres -- --test-threads=1`，覆盖货主级唯一路由、货主全仓 API Key、M-PM→M1→H8 成功状态、规格必填零写入、必需映射未命中 422/H8 死信/M1 零写入、储存条件/剂型规整、同键重放、变载荷冲突与仓库受限身份拒绝
 - V2（H8-PRODUCT-CHANGE-REST-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test h8_inbound_product_change_postgres -- --test-threads=1`，覆盖货主内商品编码定位、剂型/商品状态 M-PM→M1→H8 成功状态、同键重放、变载荷冲突、未知储存条件写入前拒绝，以及档案补录 M1 更新后 M-QL `landed` / M2 `inspecting` 闭环
 - V2（M2-PUTAWAY-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_smart_putaway_postgres smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically -- --exact --test-threads=1`
 - V2（M3-STATUS-PG）：`cargo test --manifest-path backend/Cargo.toml -p wms-api --test m3_ops_closeout_postgres status_change_enqueues_erp_outbox_and_process_succeeds -- --exact --test-threads=1`
@@ -664,7 +674,7 @@ H8 复用现有 V0–V4、L1–L11 和环境分层，不新增另一套状态模
 - `PASS`：`product_master` 已覆盖规格、特殊药品分类源值、UDI/电子监管码、物理属性和结构化包装；储存条件、剂型、特殊药品分类及每层包装单位经 M-PM 后写 M1，并保存规则 ID、源系统、源原值和目标值。
 - `PASS`：规格已收紧为 Rust/Python/MSSQL/OpenAPI/api-client 全链必填非空字符串；缺失规格的 REST 请求返回 422 且 H8 消息、商品、审计和幂等均零写入。
 - `PASS`：商品 API Key 只能经 H8 两条入站写路径进入；M1 `POST` / `PATCH` / `DELETE` / `batch-sync` 共用内部写入 guard，表驱动 PostgreSQL HTTP 测试证明四条直写均 403、商品不变而 `GET` 仍可查询。
-- `PASS`：`product_change` 的接口表 Worker 已改为调用共享 H8 REST，不再在 Worker 规整后直接 PATCH M1；包装整体替换、映射溯源、审计及同键重放由真实 PostgreSQL 测试证明。
+- `PASS`：`product_change` 的接口表 Worker 已改为调用共享 H8 REST，不再在 Worker 规整后直接 PATCH M1；商品主数据必需映射未命中时共享入口返回 422、H8 死信且 M1 零写入，Rust Worker 将违规接口行置死信；包装整体替换、映射溯源、审计及同键重放由真实 PostgreSQL 测试证明。
 - `PASS`：接口表 `product_master` DTO/Worker 与共享 REST 完整字段对齐，Python canonical/Worker 41 项测试通过。
 - `PASS`：按 ADR-0038 重建 Docker MSSQL 开发库后，当前初始化基线可重复创建全部商品列、非空约束和包装 JSON 校验；`DEMO-PM-001` 完整字段与两级包装通过真实 SQL 验证。旧结构升级不属于首个正式版本前的软件承诺。
 - `PASS`：五类接口表入站及七类出站的目录驱动 L2–L4/L11 软件证据已补齐；仅自研 ERP dev/staging S4 归外部证据层延期。
