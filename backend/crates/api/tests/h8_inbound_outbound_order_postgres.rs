@@ -59,6 +59,21 @@ async fn seed_context(pool: &PgPool, owner_id: Uuid, api_key_id: Uuid, warehouse
     .expect("seed connector");
 }
 
+async fn bind_erp_address(
+    pool: &PgPool,
+    address_id: Uuid,
+    erp_address_id: i64,
+    address_code: &str,
+) {
+    sqlx::query("UPDATE customer_addresses SET erp_address_id=$2, address_code=$3 WHERE id=$1")
+        .bind(address_id)
+        .bind(erp_address_id)
+        .bind(address_code)
+        .execute(pool)
+        .await
+        .expect("bind ERP address identity");
+}
+
 fn request(body: &Value, idempotency_key: &str) -> Request<Body> {
     Request::builder()
         .method("POST")
@@ -90,21 +105,34 @@ async fn outbound_order_rest_maps_persists_and_replays_one_business_resource(poo
     let customer_id = Uuid::new_v4();
     let delivery_address_id =
         seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, Utc::now()).await;
+    let address_code = format!("ADDR-{}", &Uuid::new_v4().to_string()[..8]);
+    bind_erp_address(&pool, delivery_address_id, 8101, &address_code).await;
+    let erp_bill_code = format!("ERP-O-{}", &Uuid::new_v4().to_string()[..8]);
+    let correlation_id = format!("corr-{}", Uuid::new_v4());
     let body = json!({
         "schema_version": "1",
         "external_ref": external_ref,
-        "correlation_id": format!("corr-{}", Uuid::new_v4()),
+        "correlation_id": correlation_id,
         "occurred_at": Utc::now(),
-        "warehouse_id": warehouse_id,
-        "wms_order_no": format!("H8-O-{}", &Uuid::new_v4().to_string()[..8]),
-        "document_type": "销售出库",
-        "erp_order_no": format!("ERP-O-{}", &Uuid::new_v4().to_string()[..8]),
-        "customer_id": customer_id,
-        "delivery_address_id": delivery_address_id,
-        "product_code": "H8-OUT-P-001",
-        "batch_no": "H8-OUT-B-001",
-        "planned_qty": 2,
-        "required_ship_at": Utc::now() + Duration::days(1)
+        "payload_digest": "a".repeat(64),
+        "source_version": null,
+        "erp_bill_id": 9101,
+        "erp_bill_code": erp_bill_code,
+        "revision": 1,
+        "order_type": 1,
+        "customer_code": format!("H9-CUS-{}", &customer_id.to_string()[..8]),
+        "depot_code": format!("H8-WH-{}", &warehouse_id.to_string()[..8]),
+        "required_ship_at": Utc::now() + Duration::days(1),
+        "send_mode": 1,
+        "erp_address_id": 8101,
+        "address_code": address_code,
+        "contact_name": "测试收货人",
+        "contact_phone": "13800000009",
+        "address": "浙江省杭州市拱墅区测试地址",
+        "lines": [
+            {"line_no": 1, "product_code": "H8-OUT-P-001", "batch_no": "H8-OUT-B-001", "planned_qty": "2.0000"},
+            {"line_no": 2, "product_code": "H8-OUT-P-002", "batch_no": "H8-OUT-B-002", "planned_qty": "1.5000"}
+        ]
     });
 
     let first = app
@@ -169,7 +197,8 @@ async fn outbound_order_rest_maps_persists_and_replays_one_business_resource(poo
     assert_eq!(recovered["replayed"], true);
 
     let mut changed = body.clone();
-    changed["planned_qty"] = Value::from(3);
+    changed["payload_digest"] = Value::from("b".repeat(64));
+    changed["lines"][0]["planned_qty"] = Value::from("3.0000");
     let conflict = app
         .oneshot(request(&changed, &idempotency_key))
         .await
@@ -193,25 +222,34 @@ async fn outbound_order_rest_maps_persists_and_replays_one_business_resource(poo
     let evidence: (i64, i64, String, String) = sqlx::query_as(
         r#"
         SELECT
-            (SELECT COUNT(*) FROM outbound_orders WHERE owner_id = $1 AND erp_order_no = $2),
+            (SELECT COUNT(*) FROM outbound_orders WHERE owner_id = $1 AND erp_bill_code = $2 AND erp_revision = 1),
             (SELECT COUNT(*) FROM outbound_order_lines l
                JOIN outbound_orders o ON o.id = l.outbound_order_id AND o.owner_id = l.owner_id
-              WHERE o.owner_id = $1 AND o.erp_order_no = $2),
-            (SELECT document_type FROM outbound_orders WHERE owner_id = $1 AND erp_order_no = $2),
+              WHERE o.owner_id = $1 AND o.erp_bill_code = $2 AND o.erp_revision = 1),
+            (SELECT document_type FROM outbound_orders WHERE owner_id = $1 AND erp_bill_code = $2 AND erp_revision = 1),
             (SELECT sync_status FROM h8_erp_messages
               WHERE owner_id = $1 AND message_type = 'outbound_order' AND external_ref = $3)
         "#,
     )
     .bind(owner_id)
-    .bind(body["erp_order_no"].as_str().expect("ERP order number"))
+    .bind(body["erp_bill_code"].as_str().expect("ERP order number"))
     .bind(&external_ref)
     .fetch_one(&pool)
     .await
     .expect("load outbound evidence");
     assert_eq!(
         evidence,
-        (1, 1, "sales_outbound".to_string(), "succeeded".to_string())
+        (1, 2, "sales_outbound".to_string(), "succeeded".to_string())
     );
+    let stored_correlation: String = sqlx::query_scalar(
+        "SELECT erp_correlation_id FROM outbound_orders WHERE owner_id = $1 AND erp_bill_code = $2",
+    )
+    .bind(owner_id)
+    .bind(body["erp_bill_code"].as_str().expect("ERP order number"))
+    .fetch_one(&pool)
+    .await
+    .expect("load ERP correlation id");
+    assert_eq!(stored_correlation, correlation_id);
     let lifecycle_actions: Vec<String> = sqlx::query_scalar(
         r#"SELECT action FROM audit_event
             WHERE owner_id=$1 AND resource_type='h8_erp_message' AND resource_id=$2
@@ -238,7 +276,7 @@ async fn outbound_order_rest_maps_persists_and_replays_one_business_resource(poo
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn outbound_order_rest_rejects_unmapped_document_type_before_business_write(pool: PgPool) {
+async fn outbound_order_rest_rejects_invalid_order_type_before_business_write(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let api_key_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
@@ -252,21 +290,32 @@ async fn outbound_order_rest_rejects_unmapped_document_type_before_business_writ
         warehouse_scope: Some(warehouse_id),
     };
     let external_ref = format!("ERP-OUT-{}", Uuid::new_v4());
+    let customer_id = Uuid::new_v4();
+    let delivery_address_id =
+        seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, Utc::now()).await;
+    let address_code = format!("ADDR-{}", &Uuid::new_v4().to_string()[..8]);
+    bind_erp_address(&pool, delivery_address_id, 8102, &address_code).await;
     let body = json!({
         "schema_version": "1",
         "external_ref": external_ref,
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
-        "warehouse_id": warehouse_id,
-        "wms_order_no": null,
-        "document_type": format!("未知出库类型-{}", Uuid::new_v4()),
-        "erp_order_no": null,
-        "customer_id": Uuid::new_v4(),
-        "delivery_address_id": Uuid::new_v4(),
-        "product_code": "H8-OUT-P-INVALID",
-        "batch_no": "H8-OUT-B-INVALID",
-        "planned_qty": 1,
-        "required_ship_at": null
+        "payload_digest": "a".repeat(64),
+        "source_version": null,
+        "erp_bill_id": 9102,
+        "erp_bill_code": format!("ERP-O-{}", &Uuid::new_v4().to_string()[..8]),
+        "revision": 1,
+        "order_type": 99,
+        "customer_code": format!("H9-CUS-{}", &customer_id.to_string()[..8]),
+        "depot_code": format!("H8-WH-{}", &warehouse_id.to_string()[..8]),
+        "required_ship_at": Utc::now() + Duration::days(1),
+        "send_mode": 1,
+        "erp_address_id": 8102,
+        "address_code": address_code,
+        "contact_name": null,
+        "contact_phone": null,
+        "address": "测试地址",
+        "lines": [{"line_no": 1, "product_code": "H8-OUT-P-INVALID", "batch_no": "H8-OUT-B-INVALID", "planned_qty": "1.0000"}]
     });
 
     let response = h8_inbound_router(H8InboundAppState::with_postgres(pool.clone()))
@@ -276,22 +325,13 @@ async fn outbound_order_rest_rejects_unmapped_document_type_before_business_writ
         .expect("unmapped request should respond");
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
 
-    let evidence: (i64, String, i64) = sqlx::query_as(
-        r#"
-        SELECT
-            (SELECT COUNT(*) FROM outbound_orders WHERE owner_id = $1),
-            (SELECT sync_status FROM h8_erp_messages
-              WHERE owner_id = $1 AND message_type = 'outbound_order' AND external_ref = $2),
-            (SELECT COUNT(*) FROM audit_event
-              WHERE owner_id = $1 AND module = 'H8' AND action = 'h8_message_dead')
-        "#,
-    )
-    .bind(owner_id)
-    .bind(&external_ref)
-    .fetch_one(&pool)
-    .await
-    .expect("load rejection evidence");
-    assert_eq!(evidence, (0, "dead".to_string(), 1));
+    let outbound_orders: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM outbound_orders WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_one(&pool)
+            .await
+            .expect("load rejection evidence");
+    assert_eq!(outbound_orders, 0);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -315,21 +355,30 @@ async fn concurrent_same_outbound_order_returns_one_message_and_business_resourc
     let customer_id = Uuid::new_v4();
     let delivery_address_id =
         seed_outbound_route_binding(&pool, owner_id, warehouse_id, customer_id, Utc::now()).await;
+    let address_code = format!("ADDR-{}", &Uuid::new_v4().to_string()[..8]);
+    bind_erp_address(&pool, delivery_address_id, 8103, &address_code).await;
+    let erp_bill_code = format!("ERP-O-{}", &Uuid::new_v4().to_string()[..8]);
     let body = json!({
         "schema_version": "1",
         "external_ref": external_ref,
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
-        "warehouse_id": warehouse_id,
-        "wms_order_no": null,
-        "document_type": "销售出库",
-        "erp_order_no": null,
-        "customer_id": customer_id,
-        "delivery_address_id": delivery_address_id,
-        "product_code": "H8-OUT-P-CONCURRENT",
-        "batch_no": "H8-OUT-B-CONCURRENT",
-        "planned_qty": 1,
-        "required_ship_at": null
+        "payload_digest": "a".repeat(64),
+        "source_version": null,
+        "erp_bill_id": 9103,
+        "erp_bill_code": erp_bill_code,
+        "revision": 1,
+        "order_type": 1,
+        "customer_code": format!("H9-CUS-{}", &customer_id.to_string()[..8]),
+        "depot_code": format!("H8-WH-{}", &warehouse_id.to_string()[..8]),
+        "required_ship_at": Utc::now() + Duration::days(1),
+        "send_mode": 1,
+        "erp_address_id": 8103,
+        "address_code": address_code,
+        "contact_name": null,
+        "contact_phone": null,
+        "address": "测试地址",
+        "lines": [{"line_no": 1, "product_code": "H8-OUT-P-CONCURRENT", "batch_no": "H8-OUT-B-CONCURRENT", "planned_qty": "1.0000"}]
     });
 
     let (first, second) = tokio::join!(
@@ -356,10 +405,11 @@ async fn concurrent_same_outbound_order_returns_one_message_and_business_resourc
     assert_eq!(first["wms_resource_id"], second["wms_resource_id"]);
 
     let counts: (i64, i64) = sqlx::query_as(
-        "SELECT (SELECT COUNT(*) FROM h8_erp_messages WHERE owner_id = $1 AND external_ref = $2), (SELECT COUNT(*) FROM outbound_orders WHERE owner_id = $1 AND erp_order_no = $2)",
+        "SELECT (SELECT COUNT(*) FROM h8_erp_messages WHERE owner_id = $1 AND external_ref = $2), (SELECT COUNT(*) FROM outbound_orders WHERE owner_id = $1 AND erp_bill_code = $3)",
     )
     .bind(owner_id)
     .bind(&external_ref)
+    .bind(&erp_bill_code)
     .fetch_one(&pool)
     .await
     .expect("load concurrent evidence");

@@ -77,6 +77,10 @@ async fn product_master_rest_rejects_missing_spec_without_writes(pool: PgPool) {
         "external_ref": format!("ERP-PM-{}", Uuid::new_v4()),
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
+        "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_version": 1,
+        "entity_id": 1001,
+        "op_type": "I",
         "product_code": product_code,
         "product_name": "H8 缺规格商品",
         "special_drug_category": "普通药品",
@@ -125,6 +129,10 @@ async fn product_master_business_validation_failure_enters_dead_with_audit(pool:
         "external_ref": external_ref,
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
+        "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_version": 1,
+        "entity_id": 1002,
+        "op_type": "I",
         "product_code": product_code,
         "product_name": "H8 非法包装商品",
         "spec": "10mg*30片",
@@ -181,6 +189,10 @@ async fn product_master_rest_maps_persists_and_replays_one_resource(pool: PgPool
         "external_ref": external_ref,
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
+        "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_version": 1,
+        "entity_id": 1003,
+        "op_type": "I",
         "product_code": product_code,
         "product_name": "H8 REST 商品",
         "approval_no": "国药准字 H8",
@@ -235,6 +247,9 @@ async fn product_master_rest_maps_persists_and_replays_one_resource(pool: PgPool
 
     let mut changed = body.clone();
     changed["product_name"] = Value::String("不同商品".to_string());
+    changed["payload_digest"] = Value::String(
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+    );
     let conflict = app
         .oneshot(request(&changed, &idempotency_key))
         .await
@@ -252,7 +267,7 @@ async fn product_master_rest_maps_persists_and_replays_one_resource(pool: PgPool
                 (SELECT COALESCE(warehouse_id::text, 'owner-level') FROM h8_erp_messages
                   WHERE owner_id = $1 AND message_type = 'product_master' AND external_ref = $3),
                 (SELECT COUNT(*) FROM audit_event
-                  WHERE owner_id = $1 AND action = 'create_product'),
+                  WHERE owner_id = $1 AND action = 'apply_erp_master_snapshot'),
                 (SELECT COUNT(*) FROM idempotency_request
                   WHERE owner_id = $1 AND idempotency_key = $4),
                 (SELECT COUNT(*) FROM h8_erp_messages
@@ -275,7 +290,7 @@ async fn product_master_rest_maps_persists_and_replays_one_resource(pool: PgPool
             "succeeded".to_string(),
             "owner-level".to_string(),
             1,
-            1,
+            0,
             1,
         )
     );
@@ -346,7 +361,7 @@ async fn product_master_rest_maps_persists_and_replays_one_resource(pool: PgPool
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn product_master_rest_persists_unmapped_storage_as_pending_product(pool: PgPool) {
+async fn product_master_rest_rejects_required_unmapped_values_without_product_write(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let api_key_id = Uuid::new_v4();
     seed_context(&pool, owner_id, api_key_id).await;
@@ -360,6 +375,10 @@ async fn product_master_rest_persists_unmapped_storage_as_pending_product(pool: 
         "external_ref": external_ref,
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
+        "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_version": 1,
+        "entity_id": 1004,
+        "op_type": "I",
         "product_code": product_code,
         "product_name": "H8 未映射商品",
         "approval_no": null,
@@ -378,34 +397,19 @@ async fn product_master_rest_persists_unmapped_storage_as_pending_product(pool: 
         .oneshot(request(&body, &format!("h8-product-{}", Uuid::new_v4())))
         .await
         .expect("request should respond");
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
 
-    let evidence: (
-        Uuid,
-        String,
-        i64,
-        String,
-        Option<String>,
-        Option<String>,
-        i64,
-        i64,
-    ) = sqlx::query_as(
+    let evidence: (String, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT
-            product.id,
             (SELECT sync_status FROM h8_erp_messages
               WHERE owner_id = $1 AND message_type = 'product_master' AND external_ref = $3),
             (SELECT COUNT(*) FROM parameter_mapping_queue
               WHERE owner_id = $1 AND source_record_id = $3),
-            product.status,
-            product.storage_condition,
-            product.special_drug_category,
-            (SELECT COUNT(*) FROM product_packaging_levels
-              WHERE owner_id = $1 AND product_id = product.id),
+            (SELECT COUNT(*) FROM products
+              WHERE owner_id = $1 AND product_code = $2),
             (SELECT COUNT(*) FROM product_mapping_traces
-              WHERE owner_id = $1 AND product_id = product.id AND target_value IS NULL)
-          FROM products product
-         WHERE product.owner_id = $1 AND product.product_code = $2
+              WHERE owner_id = $1)
         "#,
     )
     .bind(owner_id)
@@ -413,30 +417,16 @@ async fn product_master_rest_persists_unmapped_storage_as_pending_product(pool: 
     .bind(&external_ref)
     .fetch_one(&pool)
     .await
-    .expect("load pending product evidence");
-    assert_eq!(evidence.1, "succeeded");
-    assert_eq!(evidence.2, 3);
-    assert_eq!(evidence.3, "pending_mapping");
-    assert_eq!(evidence.4, None);
-    assert_eq!(evidence.5, None);
-    assert_eq!(evidence.6, 0);
-    assert_eq!(evidence.7, 3);
-    let asn_eligible: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM products WHERE owner_id = $1 AND product_code = $2 AND status = 'active')",
-    )
-    .bind(owner_id)
-    .bind(&product_code)
-    .fetch_one(&pool)
-    .await
-    .expect("ASN eligibility should query");
-    assert!(
-        !asn_eligible,
-        "pending product must not be eligible for ASN"
-    );
+    .expect("load rejected product evidence");
+    assert_eq!(evidence, ("dead".to_string(), 3, 0, 0));
 
     let mut mapped_body = body;
     mapped_body["external_ref"] = json!(format!("ERP-PM-{}", Uuid::new_v4()));
     mapped_body["correlation_id"] = json!(format!("corr-{}", Uuid::new_v4()));
+    mapped_body["payload_digest"] =
+        json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    mapped_body["source_version"] = json!(2);
+    mapped_body["op_type"] = json!("U");
     mapped_body["storage_condition"] = json!("常温");
     mapped_body["special_drug_category"] = json!("普通药品");
     mapped_body["packaging_levels"][0]["unit"] = json!("盒");
@@ -447,19 +437,19 @@ async fn product_master_rest_persists_unmapped_storage_as_pending_product(pool: 
             &format!("h8-product-activate-{}", Uuid::new_v4()),
         ))
         .await
-        .expect("mapped replay should activate pending product");
+        .expect("mapped replacement should create product");
     assert_eq!(activated.status(), StatusCode::OK);
 
-    let activated_evidence: (Uuid, String, String, String, i64, i64) = sqlx::query_as(
+    let activated_evidence: (String, String, String, i64, i64) = sqlx::query_as(
         r#"
-        SELECT product.id, product.status, product.storage_condition,
+        SELECT product.status, product.storage_condition,
                product.special_drug_category,
                (SELECT COUNT(*) FROM product_packaging_levels
                  WHERE owner_id = $1 AND product_id = product.id),
                (SELECT COUNT(*) FROM audit_event
                  WHERE owner_id = $1
                    AND resource_id = product.id::text
-                   AND action = 'activate_pending_mapping_product')
+                   AND action = 'apply_erp_master_snapshot')
           FROM products product
          WHERE product.owner_id = $1 AND product.product_code = $2
         "#,
@@ -468,11 +458,10 @@ async fn product_master_rest_persists_unmapped_storage_as_pending_product(pool: 
     .bind(&product_code)
     .fetch_one(&pool)
     .await
-    .expect("load activated pending product");
+    .expect("load mapped product");
     assert_eq!(
         activated_evidence,
         (
-            evidence.0,
             "active".to_string(),
             "normal".to_string(),
             "none".to_string(),
@@ -495,6 +484,10 @@ async fn product_master_rest_keeps_unmapped_dosage_form_active_with_trace(pool: 
         "external_ref": external_ref,
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
+        "payload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_version": 1,
+        "entity_id": 1005,
+        "op_type": "I",
         "product_code": product_code,
         "product_name": "H8 未映射剂型商品",
         "approval_no": null,

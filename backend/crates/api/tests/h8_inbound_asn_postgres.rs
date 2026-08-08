@@ -3,7 +3,7 @@ use axum::{
     http::{Request, StatusCode},
     Extension,
 };
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use tower::ServiceExt;
@@ -119,18 +119,31 @@ async fn asn_rest_maps_persists_and_replays_one_business_resource(pool: PgPool) 
     let app = h8_inbound_router(state.clone()).layer(Extension(ctx));
     let external_ref = format!("ERP-ASN-{}", &Uuid::new_v4().to_string()[..8]);
     let idempotency_key = format!("h8-asn-{}", Uuid::new_v4());
+    let correlation_id = format!("corr-{}", Uuid::new_v4());
     let body = json!({
         "schema_version": "1",
         "external_ref": external_ref,
-        "correlation_id": format!("corr-{}", Uuid::new_v4()),
+        "correlation_id": correlation_id,
         "occurred_at": Utc::now(),
-        "warehouse_id": warehouse_id,
-        "receipt_no": format!("H8-R-{}", &Uuid::new_v4().to_string()[..8]),
-        "document_type": "采购入库",
-        "supplier_id": supplier_id,
-        "product_code": product_code,
-        "expected_qty": 2,
-        "expected_arrival_at": Utc::now() + Duration::days(1)
+        "payload_digest": "a".repeat(64),
+        "source_version": null,
+        "erp_bill_id": 9001,
+        "erp_bill_code": external_ref,
+        "revision": 1,
+        "order_type": 1,
+        "partner_type": "supplier",
+        "partner_code": format!("H8-SUP-{}", &supplier_id.to_string()[..8]),
+        "depot_code": format!("H8-WH-{}", &warehouse_id.to_string()[..8]),
+        "business_date": Utc::now().date_naive(),
+        "note_code": null,
+        "lines": [{
+            "line_no": 1,
+            "product_code": product_code,
+            "expected_qty": "2.0000",
+            "batch_no": null,
+            "production_date": null,
+            "expiry_date": null
+        }]
     });
 
     let first = app
@@ -166,7 +179,8 @@ async fn asn_rest_maps_persists_and_replays_one_business_resource(pool: PgPool) 
     assert_eq!(replay["wms_resource_id"], first["wms_resource_id"]);
 
     let mut changed = body.clone();
-    changed["expected_qty"] = Value::from(3);
+    changed["payload_digest"] = Value::from("b".repeat(64));
+    changed["lines"][0]["expected_qty"] = Value::from("3.0000");
     let conflict = app
         .oneshot(request(&changed, &idempotency_key))
         .await
@@ -188,7 +202,7 @@ async fn asn_rest_maps_persists_and_replays_one_business_resource(pool: PgPool) 
     assert_eq!(denied.status(), StatusCode::FORBIDDEN);
 
     let receiving_orders: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM receiving_orders WHERE owner_id = $1 AND external_ref = $2",
+        "SELECT COUNT(*) FROM receiving_orders WHERE owner_id = $1 AND erp_bill_code = $2 AND erp_revision = 1",
     )
     .bind(owner_id)
     .bind(&external_ref)
@@ -197,7 +211,7 @@ async fn asn_rest_maps_persists_and_replays_one_business_resource(pool: PgPool) 
     .expect("count receiving orders");
     assert_eq!(receiving_orders, 1);
     let document_type: String = sqlx::query_scalar(
-        "SELECT document_type FROM receiving_orders WHERE owner_id = $1 AND external_ref = $2",
+        "SELECT document_type FROM receiving_orders WHERE owner_id = $1 AND erp_bill_code = $2 AND erp_revision = 1",
     )
     .bind(owner_id)
     .bind(&external_ref)
@@ -205,6 +219,15 @@ async fn asn_rest_maps_persists_and_replays_one_business_resource(pool: PgPool) 
     .await
     .expect("load mapped document type");
     assert_eq!(document_type, "purchase_inbound");
+    let stored_correlation: String = sqlx::query_scalar(
+        "SELECT erp_correlation_id FROM receiving_orders WHERE owner_id = $1 AND erp_bill_code = $2",
+    )
+    .bind(owner_id)
+    .bind(&external_ref)
+    .fetch_one(&pool)
+    .await
+    .expect("load ERP correlation id");
+    assert_eq!(stored_correlation, correlation_id);
     let message_status: String = sqlx::query_scalar(
         "SELECT sync_status FROM h8_erp_messages WHERE owner_id = $1 AND message_type = 'asn' AND external_ref = $2",
     )
@@ -268,13 +291,25 @@ async fn asn_rest_rejects_pending_mapping_product_without_business_writes(pool: 
         "external_ref": external_ref,
         "correlation_id": format!("corr-{}", Uuid::new_v4()),
         "occurred_at": Utc::now(),
-        "warehouse_id": warehouse_id,
-        "receipt_no": format!("H8-R-PENDING-{}", &Uuid::new_v4().to_string()[..8]),
-        "document_type": "采购入库",
-        "supplier_id": supplier_id,
-        "product_code": product_code,
-        "expected_qty": 2,
-        "expected_arrival_at": Utc::now() + Duration::days(1)
+        "payload_digest": "c".repeat(64),
+        "source_version": null,
+        "erp_bill_id": 9002,
+        "erp_bill_code": external_ref,
+        "revision": 1,
+        "order_type": 1,
+        "partner_type": "supplier",
+        "partner_code": format!("H8-SUP-{}", &supplier_id.to_string()[..8]),
+        "depot_code": format!("H8-WH-{}", &warehouse_id.to_string()[..8]),
+        "business_date": Utc::now().date_naive(),
+        "note_code": null,
+        "lines": [{
+            "line_no": 1,
+            "product_code": product_code,
+            "expected_qty": "2.0000",
+            "batch_no": null,
+            "production_date": null,
+            "expiry_date": null
+        }]
     });
     let response = h8_inbound_router(H8InboundAppState::with_postgres(pool.clone()))
         .layer(Extension(AuthContext {

@@ -134,24 +134,26 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
     assert_eq!(created.value.lines.len(), 1);
     assert_eq!(created.value.lines[0].inventory_batch_id, batch_id);
     // 盲盘在实盘提交前不得回显账面数量
-    assert_eq!(created.value.lines[0].book_qty, 0);
+    assert_eq!(created.value.lines[0].book_qty, 0.into());
 
     let submitted = repository
         .submit_inventory_count_line_with_audit(
             &keeper,
             created.value.id,
             created.value.lines[0].id,
-            SubmitInventoryCountLineRequest { physical_qty: 6 },
+            SubmitInventoryCountLineRequest {
+                physical_qty: 6.into(),
+            },
             Utc::now(),
             "m3-count-submit-1",
             None,
         )
         .await
         .expect("blind count should be submitted");
-    assert_eq!(submitted.value.variance_qty, Some(-2));
+    assert_eq!(submitted.value.variance_qty, Some((-2).into()));
     assert_eq!(submitted.value.variance_type.as_deref(), Some("loss"));
 
-    let qty_before_approval: i64 = sqlx::query_scalar(
+    let qty_before_approval: wms_domain::Quantity = sqlx::query_scalar(
         "SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $1 AND id = $2",
     )
     .bind(owner_id)
@@ -159,7 +161,7 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
     .fetch_one(&pool)
     .await
     .expect("read quantity before approval");
-    assert_eq!(qty_before_approval, 10);
+    assert_eq!(qty_before_approval, 10.into());
 
     let approved = repository
         .approve_inventory_count_with_audit(
@@ -178,7 +180,7 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
         .expect("count should be approved");
     assert_eq!(approved.value.status, "approved");
 
-    let qty_after_approval: i64 = sqlx::query_scalar(
+    let qty_after_approval: wms_domain::Quantity = sqlx::query_scalar(
         "SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $1 AND id = $2",
     )
     .bind(owner_id)
@@ -186,9 +188,9 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
     .fetch_one(&pool)
     .await
     .expect("read quantity after approval");
-    assert_eq!(qty_after_approval, 8);
+    assert_eq!(qty_after_approval, 8.into());
 
-    let movement: (i64, String) = sqlx::query_as(
+    let movement: (wms_domain::Quantity, String) = sqlx::query_as(
         "SELECT qty_delta, source_document_type FROM inventory_movements WHERE owner_id = $1 AND batch_id = $2 AND movement_type = 'inventory_count_adjustment'",
     )
     .bind(owner_id)
@@ -196,7 +198,7 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
     .fetch_one(&pool)
     .await
     .expect("count adjustment movement");
-    assert_eq!(movement, (-2, "inventory_count".to_string()));
+    assert_eq!(movement, ((-2).into(), "inventory_count".to_string()));
 
     let snapshot: (String, serde_json::Value, String) = sqlx::query_as(
         "SELECT snapshot_no, payload, status FROM inventory_snapshot_erp_feedback_outbox WHERE owner_id = $1",
@@ -205,11 +207,16 @@ async fn inventory_count_blind_submission_approves_atomic_adjustment_and_replays
     .fetch_one(&pool)
     .await
     .expect("approved count should publish inventory snapshot");
-    assert_eq!(snapshot.0, format!("{}:{warehouse_id}", created.value.id));
+    assert_eq!(snapshot.0.len(), 32);
     assert_eq!(snapshot.1["warehouse_id"], warehouse_id.to_string());
     assert_eq!(snapshot.1["count_id"], created.value.id.to_string());
-    assert_eq!(snapshot.1["lines"][0]["qty_on_hand"], 8);
-    assert_eq!(snapshot.1["lines"][0]["qty_available"], 6);
+    assert_eq!(snapshot.1["snapshot_id"], snapshot.0);
+    assert_eq!(snapshot.1["lines"][0]["row_no"], 1);
+    assert_eq!(snapshot.1["lines"][0]["goods_status"], "qualified");
+    assert_eq!(snapshot.1["lines"][0]["wms_amount"], "8.0000");
+    assert_eq!(snapshot.1["lines"][0]["wms_pickable"], "6.0000");
+    assert_eq!(snapshot.1["lines"][0]["wms_allocated"], "2.0000");
+    assert_eq!(snapshot.1["lines"][0]["wms_frozen"], "0.0000");
     assert_eq!(snapshot.2, "pending");
 
     let replay = repository
@@ -284,7 +291,9 @@ async fn inventory_snapshot_failure_rolls_back_count_approval(pool: PgPool) {
             &keeper,
             created.value.id,
             created.value.lines[0].id,
-            SubmitInventoryCountLineRequest { physical_qty: 6 },
+            SubmitInventoryCountLineRequest {
+                physical_qty: 6.into(),
+            },
             Utc::now(),
             "m3-count-rollback-submit",
             None,
@@ -313,7 +322,7 @@ async fn inventory_snapshot_failure_rolls_back_count_approval(pool: PgPool) {
         .await
         .expect_err("outbox failure must reject count approval");
     assert!(matches!(error, Wave3RepositoryError::Database(_)));
-    let state: (String, i64, i64, i64, i64, i64) = sqlx::query_as(
+    let state: (String, wms_domain::Quantity, i64, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT count_sheet.status, batch.qty_on_hand,
           (SELECT COUNT(*) FROM inventory_movements movement
@@ -339,7 +348,10 @@ async fn inventory_snapshot_failure_rolls_back_count_approval(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .expect("rolled back count state should query");
-    assert_eq!(state, ("pending_approval".to_string(), 10, 0, 0, 0, 0));
+    assert_eq!(
+        state,
+        ("pending_approval".to_string(), 10.into(), 0, 0, 0, 0)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

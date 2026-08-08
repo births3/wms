@@ -180,7 +180,7 @@ async fn create_read_order(
                 line_no: 1,
                 product_code: format!("P-{wms_order_no}"),
                 batch_no: format!("B-{wms_order_no}"),
-                planned_qty: 6,
+                planned_qty: 6.into(),
             }],
         },
         now,
@@ -341,7 +341,7 @@ async fn outbound_order_reads_are_owner_scoped_filterable_and_include_lines(pool
                 lines: vec![ReviewOutboundOrderLineRequest {
                     line_no: 1,
                     product_code: "P-WMS-R-READ-001".to_string(),
-                    reviewed_qty: 6,
+                    reviewed_qty: 6.into(),
                 }],
             },
             now,

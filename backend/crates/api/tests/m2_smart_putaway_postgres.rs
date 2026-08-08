@@ -14,6 +14,7 @@ struct Fixture {
     order_id: Uuid,
     same_product_location_id: Uuid,
     same_product_location_code: String,
+    other_location_id: Uuid,
 }
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -98,7 +99,7 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
     }
 
     sqlx::query(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 'M2-P-001', 'M2 test product', '1 unit', 'normal', 10, 'active')",
+        "INSERT INTO products (id, owner_id, erp_goods_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 1001, 'M2-P-001', 'M2 test product', '1 unit', 'normal', 10, 'active')",
     )
     .bind(product_id)
     .bind(owner_id)
@@ -116,7 +117,7 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
     .expect("existing same-product inventory should seed");
 
     sqlx::query(
-        "INSERT INTO receiving_orders (id, owner_id, receipt_no, document_type, warehouse_id, status, expected_arrival_at) VALUES ($1, $2, 'M2-ASN-001', 'purchase_inbound', $3, 'putaway', $4)",
+        "INSERT INTO receiving_orders (id, owner_id, receipt_no, document_type, warehouse_id, erp_bill_id, erp_bill_code, erp_revision, erp_line_no, erp_correlation_id, status, expected_arrival_at) VALUES ($1, $2, 'M2-ASN-001', 'purchase_inbound', $3, 9001, 'ERP-M2-001', 1, 1, 'corr-m2-001', 'putaway', $4)",
     )
     .bind(order_id)
     .bind(owner_id)
@@ -151,6 +152,7 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
         order_id,
         same_product_location_id,
         same_product_location_code: "M2-LOC-SAME".to_string(),
+        other_location_id,
     }
 }
 
@@ -162,7 +164,7 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     let query = PutawayRecommendationQuery {
         product_code: "M2-P-001".to_string(),
         batch_no: "M2-BATCH-001".to_string(),
-        qty: 4,
+        qty: 4.into(),
         quality_status: STATUS_QUALIFIED.to_string(),
         limit: Some(5),
     };
@@ -186,7 +188,7 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     let request = PutawayRequest {
         batch_no: "M2-BATCH-001".to_string(),
         product_code: "M2-P-001".to_string(),
-        qty: 4,
+        qty: 4.into(),
         location_id: fixture.same_product_location_id,
         location_code: fixture.same_product_location_code,
         quality_status: STATUS_QUALIFIED.to_string(),
@@ -226,7 +228,7 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     assert!(!first.replayed);
     assert!(replay.replayed);
     assert_eq!(first.value.putaway.id, replay.value.putaway.id);
-    let state: (i64, i64, i64, String) = sqlx::query_as(
+    let state: (i64, wms_domain::Quantity, i64, String) = sqlx::query_as(
         "SELECT (SELECT used_volume_cm3 FROM warehouse_locations WHERE id = $1), (SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $2 AND product_code = 'M2-P-001' AND batch_no = 'M2-BATCH-001'), (SELECT COUNT(*) FROM receiving_putaways WHERE receiving_order_id = $3), (SELECT status FROM receiving_orders WHERE id = $3)",
     )
     .bind(fixture.same_product_location_id)
@@ -235,7 +237,7 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     .fetch_one(&pool)
     .await
     .expect("putaway state should be readable");
-    assert_eq!(state, (50, 4, 1, "putaway".to_string()));
+    assert_eq!(state, (50, 4.into(), 1, "putaway".to_string()));
 
     let lpn: Option<String> = sqlx::query_scalar(
         "SELECT lpn_code FROM receiving_putaways WHERE receiving_order_id = $1 AND owner_id = $2",
@@ -265,15 +267,20 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     .await
     .expect("putaway outbox, audit, and idempotency evidence");
     assert_eq!(evidence, (1, 1, 1));
-    let routed_warehouse_matches: bool = sqlx::query_scalar(
-        "SELECT payload->>'warehouse_id' = (SELECT warehouse_id::text FROM receiving_orders WHERE id = $1) FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $2",
+    let feedback_payload: serde_json::Value = sqlx::query_scalar(
+        "SELECT payload FROM receiving_putaway_erp_feedback_outbox WHERE owner_id = $1",
     )
-    .bind(fixture.order_id)
     .bind(fixture.owner_id)
     .fetch_one(&pool)
     .await
-    .expect("putaway outbox should retain warehouse route identity");
-    assert!(routed_warehouse_matches);
+    .expect("putaway outbox should contain the v1.9 feedback payload");
+    assert_eq!(feedback_payload["erp_bill_code"], "ERP-M2-001");
+    assert_eq!(feedback_payload["revision"], 1);
+    assert_eq!(feedback_payload["line_no"], 1);
+    assert_eq!(feedback_payload["goods_id"], 1001);
+    assert_eq!(feedback_payload["expected_amount"], "10.0000");
+    assert_eq!(feedback_payload["actual_amount"], "4.0000");
+    assert_eq!(feedback_payload["correlation_id"], "corr-m2-001");
     let processed = repository
         .process_putaway_erp_feedback_outbox(Utc::now(), 10)
         .await
@@ -287,6 +294,35 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     .await
     .expect("putaway erp outbox succeeded");
     assert_eq!(succeeded, 1);
+
+    repository
+        .putaway_receiving_order_and_inventory_with_audit(
+            &ctx,
+            fixture.order_id,
+            PutawayRequest {
+                batch_no: "M2-BATCH-001".to_string(),
+                product_code: "M2-P-001".to_string(),
+                qty: 6.into(),
+                location_id: fixture.other_location_id,
+                location_code: "M2-LOC-OTHER".to_string(),
+                quality_status: STATUS_QUALIFIED.to_string(),
+                lpn_code: Some("LPN-M2-PUT-002".to_string()),
+            },
+            Utc::now(),
+            "m2-putaway-idem-2",
+            None,
+        )
+        .await
+        .expect("final putaway should publish completion barrier");
+    let barrier: serde_json::Value = sqlx::query_scalar(
+        "SELECT payload FROM receiving_putaway_erp_feedback_outbox WHERE owner_id=$1 AND event_type='order_status'",
+    )
+    .bind(fixture.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("completion barrier should exist");
+    assert_eq!(barrier["feedback_type"], 2);
+    assert_eq!(barrier["result_count"], 2);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -297,7 +333,7 @@ async fn smart_putaway_rejects_cross_owner_invalid_state_and_invalid_quantity(po
     let base_query = || PutawayRecommendationQuery {
         product_code: "M2-P-001".to_string(),
         batch_no: "M2-BATCH-001".to_string(),
-        qty: 1,
+        qty: 1.into(),
         quality_status: STATUS_QUALIFIED.to_string(),
         limit: Some(5),
     };
@@ -315,7 +351,7 @@ async fn smart_putaway_rejects_cross_owner_invalid_state_and_invalid_quantity(po
                 &ctx,
                 fixture.order_id,
                 PutawayRecommendationQuery {
-                    qty: 0,
+                    qty: 0.into(),
                     ..base_query()
                 },
             )
@@ -328,7 +364,7 @@ async fn smart_putaway_rejects_cross_owner_invalid_state_and_invalid_quantity(po
                 &ctx,
                 fixture.order_id,
                 PutawayRecommendationQuery {
-                    qty: 11,
+                    qty: 11.into(),
                     ..base_query()
                 },
             )

@@ -13,7 +13,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         .expect("valid time");
     seed_outbound_inventory(&pool, owner_id, "P-OUT-001", "B-OUT-001", 10, now).await;
     sqlx::query(
-        "INSERT INTO products (id, owner_id, product_code, product_name, specification, storage_condition, special_drug_category, status) VALUES ($1, $2, 'P-OUT-001', '出库复核策略商品', '1 unit', 'normal', 'none', 'active')",
+        "INSERT INTO products (id, owner_id, erp_goods_id, product_code, product_name, specification, storage_condition, special_drug_category, status) VALUES ($1, $2, 1001, 'P-OUT-001', '出库复核策略商品', '1 unit', 'normal', 'none', 'active')",
     )
     .bind(Uuid::new_v4())
     .bind(owner_id)
@@ -94,7 +94,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                     line_no: 1,
                     product_code: "P-OUT-001".to_string(),
                     batch_no: "B-OUT-001".to_string(),
-                    planned_qty: 10,
+                    planned_qty: 10.into(),
                 }],
             },
             now,
@@ -105,6 +105,18 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         .expect("outbound order should be created")
         .value;
     assert_eq!(order.status, "confirmed");
+    repo.attach_erp_outbound_identity(
+        owner_id,
+        order.id,
+        9101,
+        "ERP-SO-001",
+        1,
+        1,
+        Some(1),
+        "corr-m4-001",
+    )
+    .await
+    .expect("attach ERP outbound identity");
 
     let wave = repo
         .create_outbound_wave(
@@ -124,7 +136,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
 
     let mte_pick_tasks: Vec<(String, String, String, i64)> = sqlx::query_as(
         r#"
-        SELECT task_type_code, status, product_code, planned_qty
+        SELECT task_type_code, status, product_code, planned_qty::BIGINT
           FROM warehouse_tasks
          WHERE owner_id = $1
            AND source_doc_type = 'outbound_order'
@@ -150,7 +162,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     let locked: (i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT
-            (SELECT qty_locked FROM inventory_batches
+            (SELECT qty_locked::BIGINT FROM inventory_batches
               WHERE owner_id = $1 AND product_code = 'P-OUT-001' AND batch_no = 'B-OUT-001'),
             (SELECT COALESCE(SUM(allocated_qty), 0)::BIGINT FROM inventory_allocations
               WHERE owner_id = $1 AND outbound_order_id = $2 AND status = 'locked'),
@@ -171,7 +183,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
             order.id,
             CompletePickTaskRequest {
                 line_no: 1,
-                picked_qty: 8,
+                picked_qty: 8.into(),
                 exception_code: Some("SHORT_PICK".to_string()),
                 exception_note: Some("零拣位不足，等待补拣".to_string()),
             },
@@ -196,7 +208,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                 lines: vec![ReviewOutboundOrderLineRequest {
                     line_no: 1,
                     product_code: "P-OUT-001".to_string(),
-                    reviewed_qty: 8,
+                    reviewed_qty: 8.into(),
                 }],
             },
             now,
@@ -221,7 +233,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                 lines: vec![ReviewOutboundOrderLineRequest {
                     line_no: 1,
                     product_code: "P-OUT-001".to_string(),
-                    reviewed_qty: 7,
+                    reviewed_qty: 7.into(),
                 }],
             },
             now,
@@ -235,16 +247,16 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         Wave4RepositoryError::ReviewValidation(
             wms_domain::ReviewValidationError::QuantityMismatch {
                 line_no: 1,
-                expected: 8,
-                actual: 7,
+                expected,
+                actual,
             }
-        )
+        ) if expected == 8.into() && actual == 7.into()
     ));
     let unchanged = repo
         .get_outbound_order(&reviewer_ctx, order.id)
         .await
         .expect("rejected review should leave the order readable");
-    assert_eq!(unchanged.lines[0].reviewed_qty, 0);
+    assert_eq!(unchanged.lines[0].reviewed_qty, 0.into());
 
     let missing_second = repo
         .review_outbound_order(
@@ -257,7 +269,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                 lines: vec![ReviewOutboundOrderLineRequest {
                     line_no: 1,
                     product_code: "P-OUT-001".to_string(),
-                    reviewed_qty: 8,
+                    reviewed_qty: 8.into(),
                 }],
             },
             now,
@@ -282,7 +294,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                 lines: vec![ReviewOutboundOrderLineRequest {
                     line_no: 1,
                     product_code: "P-OUT-001".to_string(),
-                    reviewed_qty: 8,
+                    reviewed_qty: 8.into(),
                 }],
             },
             now,
@@ -332,7 +344,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
 
     let replenished_request = CompletePickTaskRequest {
         line_no: 1,
-        picked_qty: 10,
+        picked_qty: 10.into(),
         exception_code: None,
         exception_note: Some("补拣补齐".to_string()),
     };
@@ -376,7 +388,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         lines: vec![ReviewOutboundOrderLineRequest {
             line_no: 1,
             product_code: "P-OUT-001".to_string(),
-            reviewed_qty: 10,
+            reviewed_qty: 10.into(),
         }],
     };
     let missing_approval = repo
@@ -448,7 +460,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     assert_eq!(review_replay.value.id, reviewed.value.id);
     let loading_task: (String, String, String, i64) = sqlx::query_as(
         r#"
-        SELECT task_type_code, status, product_code, planned_qty
+        SELECT task_type_code, status, product_code, planned_qty::BIGINT
           FROM warehouse_tasks
          WHERE owner_id = $1
            AND source_doc_type = 'outbound_order'
@@ -552,7 +564,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         .expect("replenished order can ship")
         .value;
     assert_eq!(shipped.status, "shipped");
-    assert_eq!(shipped.lines[0].shipped_qty, 10);
+    assert_eq!(shipped.lines[0].shipped_qty, 10.into());
     let shipment = shipped
         .shipment
         .as_ref()
@@ -634,11 +646,18 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     assert_eq!(shipment_outbox.1["outbound_order_id"], order.id.to_string());
     assert_eq!(shipment_outbox.1["wms_order_no"], order.wms_order_no);
     assert_eq!(shipment_outbox.1["package_count"], 1);
+    assert_eq!(shipment_outbox.1["erp_bill_code"], "ERP-SO-001");
+    assert_eq!(shipment_outbox.1["revision"], 1);
+    assert_eq!(shipment_outbox.1["correlation_id"], "corr-m4-001");
+    assert_eq!(shipment_outbox.1["line_count"], 1);
+    assert_eq!(shipment_outbox.1["lines"][0]["goods_id"], 1001);
+    assert_eq!(shipment_outbox.1["lines"][0]["expected_amount"], "10.0000");
+    assert_eq!(shipment_outbox.1["lines"][0]["shipped_amount"], "10.0000");
 
     let counts: (i64, i64, i64, i64) = sqlx::query_as(
         r#"
         SELECT
-            (SELECT qty_on_hand FROM inventory_batches
+            (SELECT qty_on_hand::BIGINT FROM inventory_batches
               WHERE owner_id = $1 AND product_code = 'P-OUT-001' AND batch_no = 'B-OUT-001'),
             (SELECT COALESCE(SUM(qty_delta), 0)::BIGINT FROM inventory_movements
               WHERE owner_id = $1 AND source_document_type = 'outbound_order'),
@@ -673,7 +692,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     );
     assert_eq!(
         review_diff["after"]["lines"][0]["reviewed_qty"],
-        serde_json::json!(10)
+        serde_json::json!("10")
     );
     assert!(review_diff["after"]["strategy_rule_id"].is_string());
     assert_eq!(
@@ -720,7 +739,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     let consumed: (i64, i64) = sqlx::query_as(
         r#"
         SELECT
-            (SELECT qty_locked FROM inventory_batches
+            (SELECT qty_locked::BIGINT FROM inventory_batches
               WHERE owner_id = $1 AND product_code = 'P-OUT-001' AND batch_no = 'B-OUT-001'),
             (SELECT COUNT(*) FROM inventory_allocations
               WHERE owner_id = $1 AND outbound_order_id = $2 AND status = 'consumed')
