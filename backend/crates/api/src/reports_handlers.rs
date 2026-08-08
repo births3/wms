@@ -211,7 +211,7 @@ async fn gsp_outbound_ledger_handler(
         SELECT s.shipped_at AS occurred_at,
                l.product_code,
                l.batch_no,
-               (-1 * COALESCE(l.planned_qty, 0))::BIGINT AS quantity_delta,
+               -1 * COALESCE(l.planned_qty, 0) AS quantity_delta,
                o.status AS document_type,
                o.wms_order_no AS document_no
           FROM outbound_shipments s
@@ -288,7 +288,7 @@ struct InboundLedgerSqlRow {
     occurred_at: Option<chrono::DateTime<Utc>>,
     product_code: Option<String>,
     batch_no: Option<String>,
-    quantity_delta: Option<i64>,
+    quantity_delta: Option<wms_domain::Quantity>,
     document_type: Option<String>,
     document_no: Option<String>,
 }
@@ -298,7 +298,7 @@ struct OutboundLedgerSqlRow {
     occurred_at: Option<chrono::DateTime<Utc>>,
     product_code: Option<String>,
     batch_no: Option<String>,
-    quantity_delta: Option<i64>,
+    quantity_delta: Option<wms_domain::Quantity>,
     document_type: Option<String>,
     document_no: Option<String>,
 }

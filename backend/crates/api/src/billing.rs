@@ -159,7 +159,7 @@ impl BillingStore {
         req: CalculateBillingChargesRequest,
         now: DateTime<Utc>,
     ) -> Result<BillingChargeCalculation, BillingError> {
-        if req.quantity < 0 {
+        if req.quantity < wms_domain::Quantity::ZERO {
             return Err(BillingError::InvalidQuantity);
         }
         let period_start = parse_date(&req.period_start)?;
@@ -289,7 +289,7 @@ mod tests {
                     contract_id: contract.id,
                     charge_item: "inbound_operation".to_string(),
                     unit: "order".to_string(),
-                    unit_price_cents: 100,
+                    unit_price_cents: 100.into(),
                     billing_cycle: "monthly".to_string(),
                     effective_from: "2026-06-01".to_string(),
                     effective_to: "2026-06-30".to_string(),
@@ -298,7 +298,7 @@ mod tests {
             )
             .expect("rule");
 
-        assert_eq!(rule.unit_price_cents, 100);
+        assert_eq!(rule.unit_price_cents, 100.into());
         assert_eq!(store.list_accounts(&ctx_a).len(), 1);
         assert!(store.list_accounts(&ctx_b).is_empty());
     }
@@ -340,7 +340,7 @@ mod tests {
                 contract_id: contract.id,
                 charge_item: "storage".to_string(),
                 unit: "pallet_day".to_string(),
-                unit_price_cents: -1,
+                unit_price_cents: (-1).into(),
                 billing_cycle: "monthly".to_string(),
                 effective_from: "2026-06-01".to_string(),
                 effective_to: "2026-06-30".to_string(),
@@ -404,7 +404,7 @@ mod tests {
                     contract_id: contract.id,
                     charge_item: "storage".to_string(),
                     unit: "pallet_day".to_string(),
-                    unit_price_cents: 100,
+                    unit_price_cents: 100.into(),
                     billing_cycle: "monthly".to_string(),
                     effective_from: "2026-06-01".to_string(),
                     effective_to: "2026-06-30".to_string(),
@@ -419,7 +419,7 @@ mod tests {
                 contract_id: contract.id,
                 charge_item: "storage".to_string(),
                 unit: "pallet_day".to_string(),
-                unit_price_cents: 110,
+                unit_price_cents: 110.into(),
                 billing_cycle: "monthly".to_string(),
                 effective_from: "2026-06-15".to_string(),
                 effective_to: "2026-07-15".to_string(),
@@ -438,7 +438,7 @@ mod tests {
                     contract_id: contract.id,
                     charge_item: "storage".to_string(),
                     unit: "pallet_day".to_string(),
-                    unit_price_cents: 120,
+                    unit_price_cents: 120.into(),
                     billing_cycle: "monthly".to_string(),
                     effective_from: "2026-07-01".to_string(),
                     effective_to: "2026-07-31".to_string(),
@@ -446,7 +446,7 @@ mod tests {
                 now,
             )
             .expect("next window");
-        assert_eq!(next_window.unit_price_cents, 120);
+        assert_eq!(next_window.unit_price_cents, 120.into());
     }
 
     #[test]
@@ -488,7 +488,7 @@ mod tests {
                     contract_id: contract.id,
                     charge_item: "packing_operation".to_string(),
                     unit: "job".to_string(),
-                    unit_price_cents: 125,
+                    unit_price_cents: 125.into(),
                     billing_cycle: "monthly".to_string(),
                     effective_from: "2026-06-01".to_string(),
                     effective_to: "2026-06-30".to_string(),
@@ -505,13 +505,13 @@ mod tests {
                     period_start: "2026-06-01".to_string(),
                     period_end: "2026-06-30".to_string(),
                     charge_item: "packing_operation".to_string(),
-                    quantity: 4,
+                    quantity: 4.into(),
                     source_refs: vec!["packing_job:W5-001".to_string()],
                 },
                 now,
             )
             .expect("charge");
-        assert_eq!(charge.amount_cents, 500);
+        assert_eq!(charge.amount_cents, 500.into());
         assert_eq!(charge.source_refs, vec!["packing_job:W5-001"]);
 
         let cross_owner = store.calculate_period_charges(
@@ -521,7 +521,7 @@ mod tests {
                 period_start: "2026-06-01".to_string(),
                 period_end: "2026-06-30".to_string(),
                 charge_item: "packing_operation".to_string(),
-                quantity: 4,
+                quantity: 4.into(),
                 source_refs: vec![],
             },
             now,

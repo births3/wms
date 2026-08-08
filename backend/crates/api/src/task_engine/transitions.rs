@@ -312,7 +312,7 @@ async fn ensure_default_task_group_in_tx(
 struct ResolvedTransition {
     status: String,
     assignee_user_id: Option<Uuid>,
-    actual_qty: Option<i64>,
+    actual_qty: Option<wms_domain::Quantity>,
     exception_code: Option<String>,
     exception_note: Option<String>,
     priority: i32,

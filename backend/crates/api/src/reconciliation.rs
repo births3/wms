@@ -37,7 +37,7 @@ use validation::{map_stock_adjustment, normalize_request};
 pub struct ErpInventorySnapshotItem {
     pub product_code: String,
     pub batch_no: String,
-    pub qty_on_hand: i64,
+    pub qty_on_hand: wms_domain::Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -54,9 +54,9 @@ pub struct ReconciliationItem {
     pub id: Uuid,
     pub product_code: String,
     pub batch_no: String,
-    pub wms_qty: i64,
-    pub erp_qty: i64,
-    pub difference_qty: i64,
+    pub wms_qty: wms_domain::Quantity,
+    pub erp_qty: wms_domain::Quantity,
+    pub difference_qty: wms_domain::Quantity,
     pub difference_type: String,
     pub resolution_status: String,
     pub stock_adjustment_order_ids: Vec<Uuid>,
@@ -66,7 +66,7 @@ pub struct ReconciliationItem {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReconciliationInventoryAllocation {
     pub inventory_batch_id: Uuid,
-    pub quantity: i64,
+    pub quantity: wms_domain::Quantity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -127,7 +127,7 @@ pub struct PgReconciliationRepository {
 struct WmsStockRow {
     product_code: String,
     batch_no: String,
-    qty: i64,
+    qty: wms_domain::Quantity,
 }
 
 impl PgReconciliationRepository {
@@ -200,7 +200,7 @@ impl PgReconciliationRepository {
         }
 
         let wms_rows = sqlx::query_as::<_, WmsStockRow>(
-            "SELECT product_code, batch_no, SUM(qty_on_hand)::BIGINT AS qty
+            "SELECT product_code, batch_no, SUM(qty_on_hand) AS qty
                FROM inventory_batches
               WHERE owner_id = $1
               GROUP BY product_code, batch_no",
@@ -211,12 +211,15 @@ impl PgReconciliationRepository {
         .map_err(db)?;
         let mut quantities = std::collections::BTreeMap::new();
         for row in wms_rows {
-            quantities.insert((row.product_code, row.batch_no), (row.qty, 0));
+            quantities.insert(
+                (row.product_code, row.batch_no),
+                (row.qty, wms_domain::Quantity::ZERO),
+            );
         }
         for item in &req.items {
             quantities
                 .entry((item.product_code.trim().into(), item.batch_no.trim().into()))
-                .or_insert((0, 0))
+                .or_insert((wms_domain::Quantity::ZERO, wms_domain::Quantity::ZERO))
                 .1 = item.qty_on_hand;
         }
 
@@ -225,11 +228,12 @@ impl PgReconciliationRepository {
         let mut counts = [0_i32; 3];
         for ((product_code, batch_no), (wms_qty, erp_qty)) in quantities {
             let difference_qty = wms_qty - erp_qty;
-            let (difference_type, resolution_status, count_index) = match difference_qty.cmp(&0) {
-                std::cmp::Ordering::Equal => ("matched", "matched", 0),
-                std::cmp::Ordering::Greater => ("wms_more", "open", 1),
-                std::cmp::Ordering::Less => ("erp_more", "open", 2),
-            };
+            let (difference_type, resolution_status, count_index) =
+                match difference_qty.cmp(&wms_domain::Quantity::ZERO) {
+                    std::cmp::Ordering::Equal => ("matched", "matched", 0),
+                    std::cmp::Ordering::Greater => ("wms_more", "open", 1),
+                    std::cmp::Ordering::Less => ("erp_more", "open", 2),
+                };
             counts[count_index] += 1;
             let item = ReconciliationItem {
                 id: Uuid::new_v4(),
@@ -486,7 +490,7 @@ impl PgReconciliationRepository {
         allocations.sort_by_key(|allocation| allocation.inventory_batch_id);
         if allocations
             .iter()
-            .any(|allocation| allocation.quantity <= 0)
+            .any(|allocation| allocation.quantity <= wms_domain::Quantity::ZERO)
             || allocations
                 .windows(2)
                 .any(|pair| pair[0].inventory_batch_id == pair[1].inventory_batch_id)
@@ -524,9 +528,11 @@ impl PgReconciliationRepository {
             return Err(ReconciliationError::InvalidRequest);
         }
         if !allocations.is_empty()
-            && allocations.iter().try_fold(0_i64, |sum, allocation| {
-                sum.checked_add(allocation.quantity)
-            }) != Some(item.difference_qty.abs())
+            && allocations
+                .iter()
+                .map(|allocation| allocation.quantity)
+                .sum::<wms_domain::Quantity>()
+                != item.difference_qty.abs()
         {
             return Err(ReconciliationError::InvalidRequest);
         }
@@ -649,7 +655,7 @@ impl PgReconciliationRepository {
         ctx: &AuthContext,
         item: &ReconciliationItem,
         batch_id: Uuid,
-        quantity: i64,
+        quantity: wms_domain::Quantity,
         now: DateTime<Utc>,
     ) -> Result<Uuid, ReconciliationError> {
         let warehouse_id: Uuid = sqlx::query_scalar(
@@ -675,7 +681,7 @@ impl PgReconciliationRepository {
         let repository = PgStockAdjustmentRepository::new(self.pool.clone());
         let external_ref = format!("reconciliation:{}:{batch_id}", item.id);
         let derived_key = format!("rc-msa:{}:{batch_id}", item.id);
-        let order_id = if item.difference_qty > 0 {
+        let order_id = if item.difference_qty > wms_domain::Quantity::ZERO {
             repository
                 .create_loss_order_in_tx(
                     tx,
@@ -697,7 +703,7 @@ impl PgReconciliationRepository {
                 .map_err(map_stock_adjustment)?
                 .value
                 .id
-        } else if item.difference_qty < 0 {
+        } else if item.difference_qty < wms_domain::Quantity::ZERO {
             repository
                 .create_surplus_order_in_tx(
                     tx,
@@ -756,9 +762,9 @@ struct ReconciliationItemRow {
     id: Uuid,
     product_code: String,
     batch_no: String,
-    wms_qty: i64,
-    erp_qty: i64,
-    difference_qty: i64,
+    wms_qty: wms_domain::Quantity,
+    erp_qty: wms_domain::Quantity,
+    difference_qty: wms_domain::Quantity,
     difference_type: String,
     resolution_status: String,
     stock_adjustment_order_ids: Vec<Uuid>,

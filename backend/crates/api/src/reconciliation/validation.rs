@@ -17,7 +17,7 @@ pub(super) fn normalize_request(
         || request.items.iter().any(|item| {
             item.product_code.trim().is_empty()
                 || item.batch_no.trim().is_empty()
-                || item.qty_on_hand < 0
+                || item.qty_on_hand < wms_domain::Quantity::ZERO
         })
     {
         return Err(ReconciliationError::InvalidRequest);

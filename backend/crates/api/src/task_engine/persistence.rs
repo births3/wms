@@ -56,7 +56,7 @@ fn normalize_create_request(
         normalized_optional_text(request.source_location_code.as_deref(), 128)?;
     request.target_location_code =
         normalized_optional_text(request.target_location_code.as_deref(), 128)?;
-    if request.planned_qty <= 0 {
+    if request.planned_qty <= wms_domain::Quantity::ZERO {
         return Err(TaskEngineError::Validation(
             "planned_qty must be positive".to_string(),
         ));
@@ -368,7 +368,7 @@ async fn append_task_event(
     from_status: Option<&str>,
     to_status: &str,
     assignee_user_id: Option<Uuid>,
-    actual_qty: Option<i64>,
+    actual_qty: Option<wms_domain::Quantity>,
     exception_code: Option<&str>,
     exception_note: Option<&str>,
     now: DateTime<Utc>,
