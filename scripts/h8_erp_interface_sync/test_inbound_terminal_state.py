@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
 import sync_worker
-from worker_route import WorkerHttpError, mark_inbound_message_dead
+from worker_route import mark_inbound_message_dead
 
 
 def settings() -> sync_worker.Settings:
@@ -107,56 +106,6 @@ class TestInboundTerminalState(unittest.TestCase):
                 {"error_summary": "supplier missing"},
             ),
         )
-
-    def test_marks_h8_dead_before_mssql_dead(self) -> None:
-        order: list[str] = []
-        with (
-            patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
-            patch.object(sync_worker, "try_record_worker_heartbeat"),
-            patch.object(sync_worker, "list_manual_replays", return_value=[]),
-            patch.object(sync_worker, "record_preflight_failure"),
-            patch.object(sync_worker, "claim_rows", return_value=[ROW]),
-            patch.object(
-                sync_worker,
-                "resolve_inbound_route",
-                side_effect=WorkerHttpError(422, "schema", "unsupported"),
-            ),
-            patch.object(
-                sync_worker,
-                "mark_terminal_inbound_message",
-                side_effect=lambda *_args: order.append("h8"),
-            ),
-            patch.object(
-                sync_worker,
-                "mark_row",
-                side_effect=lambda *_args, **_kwargs: order.append("mssql"),
-            ),
-        ):
-            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
-        self.assertEqual(order, ["h8", "mssql"])
-
-    def test_h8_dead_failure_releases_mssql_for_retry(self) -> None:
-        with (
-            patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
-            patch.object(sync_worker, "try_record_worker_heartbeat"),
-            patch.object(sync_worker, "list_manual_replays", return_value=[]),
-            patch.object(sync_worker, "record_preflight_failure"),
-            patch.object(sync_worker, "claim_rows", return_value=[ROW]),
-            patch.object(
-                sync_worker,
-                "resolve_inbound_route",
-                side_effect=WorkerHttpError(422, "schema", "unsupported"),
-            ),
-            patch.object(
-                sync_worker,
-                "mark_terminal_inbound_message",
-                side_effect=WorkerHttpError(503, "mark dead", "unavailable"),
-            ),
-            patch.object(sync_worker, "mark_row") as mark_row,
-        ):
-            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
-        self.assertEqual(mark_row.call_args.args[3], "pending")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,13 +10,15 @@ class TestFailoverL11Evidence(unittest.TestCase):
         row_counts: dict[str, int] = {}
 
         def fake_sqlcmd(_settings, sql):
-            for source in OUTBOX_SOURCES:
-                table = source["table"]
-                if f"source_outbox_table = N'{table}'" not in sql:
-                    continue
-                if "IF NOT EXISTS" in sql:
+            for table in [
+                "x_wmsinter_InboundFeedback",
+                "x_wmsinter_OrderFeedback",
+                "x_wmsinter_WmsEvent",
+                "x_wmsinter_InventoryReceiveHeader",
+            ]:
+                if f"INSERT INTO dbo.{table}" in sql:
                     row_counts[table] = 1
-                if "SELECT COUNT(1)" in sql:
+                if f"FROM dbo.{table}" in sql and "SELECT COUNT(1)" in sql:
                     return str(row_counts.get(table, 0))
             return ""
 
@@ -39,7 +41,7 @@ class TestFailoverL11Evidence(unittest.TestCase):
 
         def fake_sqlcmd(_settings, sql):
             nonlocal row_count
-            if "IF NOT EXISTS" in sql:
+            if "INSERT INTO dbo." in sql:
                 row_count = 1
             if "SELECT COUNT(1)" in sql:
                 return str(row_count)

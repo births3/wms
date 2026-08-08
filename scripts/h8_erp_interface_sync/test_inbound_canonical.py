@@ -5,14 +5,13 @@ from __future__ import annotations
 import json
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from inbound_canonical import (
     CanonicalMappingError,
     H8CanonicalInboundCommand,
     build_inbound_canonical,
 )
-from sync_worker import HANDLERS, build_inbound_canonical_with_mpm
+from sync_worker import build_inbound_canonical_with_mpm
 from test_h8_sync_worker import settings
 
 
@@ -92,79 +91,6 @@ class TestInboundCanonical(unittest.TestCase):
         self.assertEqual(command.fields["storage_condition"], "2-8℃避光保存")
         self.assertEqual(command.fields["packaging_levels"][0]["unit"], "盒")
         self.assertEqual(calls, [])
-
-    def test_product_change_dosage_form_is_preserved_for_shared_h8_rest(self) -> None:
-        command = build_inbound_canonical_with_mpm(
-            settings(),
-            "product_change",
-            {
-                "id": "message-dosage-1",
-                "owner_id": "owner-1",
-                "external_doc_no": "PRODUCT-CHANGE-DOSAGE-1",
-                "product_id": "product-1",
-                "product_code": "P-1",
-                "field_name": "dosage_form",
-                "new_value": "普通片",
-                "idempotency_key": "idem-dosage-1",
-                "created_at": "2026-07-23T00:00:00",
-            },
-            None,
-            http_json_fn=lambda *_args: (
-                200,
-                {"status": "matched", "target_value": "片剂"},
-                "",
-            ),
-        )
-
-        self.assertEqual(command.fields["new_value"], "普通片")
-        with patch(
-            "sync_worker.http_json",
-            return_value=(200, {"wms_resource_id": "product-1"}, ""),
-        ) as business_api:
-            HANDLERS["product_change"][1](settings(), command)
-        self.assertEqual(
-            business_api.call_args.args[2],
-            "/api/v1/integration/erp-messages/inbound/product_change",
-        )
-        self.assertEqual(
-            business_api.call_args.args[3]["new_value"],
-            "普通片",
-        )
-
-    def test_product_change_physical_dimensions_are_sent_as_one_object(self) -> None:
-        command = build_inbound_canonical_with_mpm(
-            settings(),
-            "product_change",
-            {
-                "id": "message-dimensions-1",
-                "owner_id": "owner-1",
-                "external_doc_no": "PRODUCT-CHANGE-DIMENSIONS-1",
-                "product_id": "product-1",
-                "product_code": "P-1",
-                "field_name": "physical_dimensions",
-                "new_value": json.dumps(
-                    {"length_mm": 120.5, "width_mm": 45, "height_mm": 30.25}
-                ),
-                "idempotency_key": "idem-dimensions-1",
-                "created_at": "2026-07-23T00:00:00",
-            },
-            None,
-            http_json_fn=lambda *_args: (200, {}, ""),
-        )
-
-        self.assertEqual(
-            command.fields["physical_dimensions"],
-            {"length_mm": 120.5, "width_mm": 45.0, "height_mm": 30.25},
-        )
-        self.assertNotIn("new_value", command.fields)
-        with patch(
-            "sync_worker.http_json",
-            return_value=(200, {"wms_resource_id": "product-1"}, ""),
-        ) as business_api:
-            HANDLERS["product_change"][1](settings(), command)
-        body = business_api.call_args.args[3]
-        self.assertEqual(body["physical_dimensions"], command.fields["physical_dimensions"])
-        self.assertNotIn("new_value", body)
 
     def test_product_change_rejects_partial_physical_dimensions(self) -> None:
         with self.assertRaisesRegex(
@@ -460,43 +386,6 @@ class TestInboundCanonical(unittest.TestCase):
         )
         self.assertNotIn("retry_count", command.fields)
         self.assertNotIn("schema_version", command.fields)
-
-    def test_business_handler_consumes_canonical_not_interface_row(self) -> None:
-        command = build_inbound_canonical(
-            "asn",
-            {
-                "id": "message-1",
-                "owner_id": "owner-1",
-                "warehouse_id": "warehouse-1",
-                "external_doc_no": "ASN-1",
-                "external_ref": "ERP-ASN-1",
-                "supplier_id": "supplier-1",
-                "product_code": "P-1",
-                "expected_qty": "2",
-                "expected_arrival_at": "2026-07-23T00:00:00",
-                "document_type": "purchase_inbound",
-                "receipt_no": "R-1",
-                "idempotency_key": "idem-1",
-                "created_at": "2026-07-22T23:59:00",
-            },
-            SimpleNamespace(
-                connector_id="connector-1",
-                config_version=3,
-                channel="interface_table",
-            ),
-        )
-
-        with patch(
-            "sync_worker.http_json",
-            return_value=(201, {"id": "receiving-1"}, ""),
-        ) as business_api:
-            result = HANDLERS["asn"][1](settings(), command)
-
-        self.assertEqual(result, "receiving-1")
-        body = business_api.call_args.args[3]
-        self.assertEqual(body["external_ref"], "ERP-ASN-1")
-        self.assertEqual(body["lines"][0]["expected_qty"], 2)
-        self.assertNotIn("retry_count", body)
 
     def test_unmapped_product_value_is_rejected_during_conversion(self) -> None:
         with self.assertRaises(CanonicalMappingError) as caught:

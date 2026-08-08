@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import json
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import worker_mssql
 from channel_failover import (
@@ -42,6 +43,7 @@ from worker_route import (
     sanitize_worker_error,
 )
 from worker_mssql import claim_rows, requeue_replay_row
+from v19_contract import payload_digest
 
 
 def settings(config_version: int = 1) -> Settings:
@@ -64,24 +66,81 @@ def settings(config_version: int = 1) -> Settings:
     )
 
 
+def v19_goods_row(*, retry_count: int = 0) -> dict:
+    row = {
+        "seqid": 7,
+        "GoodsID": 1001,
+        "GoodsCode": "P-1",
+        "GoodsName": "药品一",
+        "Spec": "10mg*30片",
+        "License": "国药准字H20260001",
+        "ProduceCorp": "测试药业",
+        "SpecialCategory": "普通药品",
+        "Deposite": "阴凉",
+        "PackagingJson": json.dumps(
+            [
+                {
+                    "unit": "盒",
+                    "ratio_to_base": 1,
+                    "is_base": True,
+                    "is_default": True,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+        "opType": "I",
+        "OwnerCode": "ZBPF7",
+        "SchemaVersion": "1",
+        "IdempotencyKey": "idem-product-1",
+        "CorrelationID": "corr-product-1",
+        "SourceVersion": 1,
+        "retry_count": retry_count,
+        "inserttime": "2026-08-05T00:00:00.000Z",
+    }
+    row["PayloadDigest"] = payload_digest("x_wmsinter_GoodsInfo", row)
+    return row
+
+
 class TestInboundCorePipeline(unittest.TestCase):
-    def test_sqlcmd_json_output_uses_unbounded_text_without_header_conflict(
+    def test_http_json_uses_bound_api_key_only_for_inbound_business_calls(self) -> None:
+        import sync_worker
+
+        current = settings()
+        current.api_key = "wms_connector_secret"
+        response = MagicMock(status=200)
+        response.read.return_value = b"{}"
+        response.__enter__.return_value = response
+
+        with patch.object(sync_worker.urllib.request, "urlopen", return_value=response) as urlopen:
+            sync_worker.http_json(
+                current,
+                "POST",
+                "/api/v1/integration/erp-messages/inbound/supplier_master",
+                {},
+                "idem-1",
+            )
+            inbound = urlopen.call_args.args[0]
+            sync_worker.http_json(
+                current,
+                "GET",
+                f"/api/v1/config/erp-connectors/{current.connector_id}",
+                None,
+                "idem-2",
+            )
+            bootstrap = urlopen.call_args.args[0]
+
+        self.assertEqual(inbound.get_header("X-wms-api-key"), "wms_connector_secret")
+        self.assertIsNone(inbound.get_header("Authorization"))
+        self.assertEqual(bootstrap.get_header("Authorization"), "Bearer token")
+        self.assertIsNone(bootstrap.get_header("X-wms-api-key"))
+
+    def test_legacy_sql_executor_uses_in_process_tds_without_password_argv(
         self,
     ) -> None:
-        completed = type(
-            "Completed",
-            (),
-            {"returncode": 0, "stdout": "[]", "stderr": ""},
-        )()
-        with patch.object(worker_mssql.subprocess, "run", return_value=completed) as run:
-            self.assertEqual(worker_mssql.sqlcmd_query(settings(), "SELECT 1"), "[]")
+        with patch.object(worker_mssql, "mssql_execute") as execute:
+            self.assertEqual(worker_mssql.sqlcmd_query(settings(), "SELECT 1"), "")
 
-        command = run.call_args.args[0]
-        self.assertEqual(command[0], "sqlcmd")
-        self.assertEqual(command[command.index("-S") + 1], "tcp:localhost,1433")
-        self.assertEqual(command[command.index("-y") + 1], "0")
-        self.assertEqual(command[command.index("-w") + 1], "65535")
-        self.assertNotIn("-h", command)
+        execute.assert_called_once_with(settings(), "SELECT 1")
 
     def test_runtime_settings_are_frozen_from_connector_snapshot_and_secret_alias(
         self,
@@ -141,166 +200,15 @@ class TestInboundCorePipeline(unittest.TestCase):
             ],
         )
 
-    def test_each_interface_table_message_runs_shared_canonical_pipeline(self) -> None:
-        import sync_worker
-
-        row = {
-            "id": "row-1",
-            "owner_id": "owner-1",
-            "warehouse_id": "warehouse-1",
-            "external_doc_no": "ERP-1",
-            "external_ref": "ERP-1",
-            "receipt_no": "R-1",
-            "document_type": "purchase_inbound",
-            "supplier_id": "supplier-1",
-            "customer_id": "customer-1",
-            "expected_arrival_at": "2026-07-23T00:00:00Z",
-            "product_id": "product-1",
-            "product_code": "P-1",
-            "product_name": "药品一",
-            "spec": "10mg*30片",
-            "special_drug_category": "普通药品",
-            "storage_condition": "normal",
-            "packaging_json": json.dumps(
-                [
-                    {
-                        "unit": "盒",
-                        "ratio_to_base": 1,
-                        "is_base": True,
-                        "is_default": True,
-                        "sort_order": 1,
-                    }
-                ],
-                ensure_ascii=False,
-            ),
-            "expected_qty": "1",
-            "planned_qty": "1",
-            "batch_no": "B-1",
-            "required_ship_at": "2026-07-23T00:00:00Z",
-            "field_name": "spec",
-            "new_value": "10mg",
-            "schema_version": "1",
-            "idempotency_key": "idem-1",
-            "retry_count": "0",
-            "created_at": "2026-07-23T00:00:00Z",
-        }
-        expected_paths = {
-            "asn": "/api/v1/inbound/receiving-orders",
-            "outbound_order": "/api/v1/outbound/orders",
-            "product_master": (
-                "/api/v1/integration/erp-messages/inbound/product_master"
-            ),
-            "return_order": "/api/v1/inbound/receiving-orders",
-            "product_change": (
-                "/api/v1/integration/erp-messages/inbound/product_change"
-            ),
-        }
-
-        for message_type, (table, _handler) in HANDLERS.items():
-            with self.subTest(message_type=message_type):
-                binding = RouteBinding(
-                    connector_id=settings().connector_id,
-                    connector_code="SELF-ERP",
-                    config_version=1,
-                    channel="interface_table",
-                    message_type=message_type,
-                )
-                api_paths: list[str] = []
-
-                def business_http(_settings, _method, path, _body, _key):
-                    api_paths.append(path)
-                    if message_type in ("product_master", "product_change"):
-                        return 200, {"wms_resource_id": "resource-1"}, ""
-                    return 201, {"id": "resource-1"}, ""
-
-                def pipeline(
-                    worker_settings,
-                    actual_type,
-                    actual_row,
-                    handler,
-                    converter,
-                    **kwargs,
-                ):
-                    command = converter(
-                        actual_type, actual_row, kwargs["route_binding"]
-                    )
-                    return handler(worker_settings, command), object()
-
-                with (
-                    patch.object(
-                        sync_worker, "get_worker_claim_decision", return_value=True
-                    ),
-                    patch.object(sync_worker, "try_record_worker_heartbeat"),
-                    patch.object(sync_worker, "list_manual_replays", return_value=[]),
-                    patch.object(
-                        sync_worker, "claim_rows", return_value=[row]
-                    ) as claim,
-                    patch.object(
-                        sync_worker, "resolve_inbound_route", return_value=binding
-                    ),
-                    patch.object(
-                        sync_worker,
-                        "build_inbound_canonical_with_mpm",
-                        side_effect=lambda _settings, kind, source, route: (
-                            build_inbound_canonical(kind, source, route)
-                        ),
-                    ),
-                    patch.object(
-                        sync_worker, "run_inbound_pipeline", side_effect=pipeline
-                    ),
-                    patch.object(sync_worker, "http_json", side_effect=business_http),
-                    patch.object(sync_worker, "mark_row") as mark,
-                ):
-                    self.assertEqual(
-                        sync_worker.process_once(settings(), [message_type], False),
-                        1,
-                    )
-
-                claim.assert_called_once_with(settings(), table)
-                self.assertEqual(api_paths, [expected_paths[message_type]])
-                mark.assert_called_once_with(
-                    settings(), table, row["id"], "success", wms_id="resource-1"
-                )
-
     def test_product_handler_posts_complete_shared_h8_rest_contract(self) -> None:
         import sync_worker
 
-        command = build_inbound_canonical(
+        row = sync_worker._runtime_row(
+            "x_wmsinter_GoodsInfo", v19_goods_row()
+        )
+        command = sync_worker.build_v19_inbound_canonical(
             "product_master",
-            {
-                "id": "row-product-1",
-                "owner_id": "owner-1",
-                "external_doc_no": "ERP-PM-1",
-                "idempotency_key": "idem-product-1",
-                "schema_version": "1",
-                "created_at": "2026-07-23T00:00:00",
-                "product_code": "P-1",
-                "product_name": "药品一",
-                "spec": "10mg*30片",
-                "dosage_form": "薄膜衣片",
-                "manufacturer": "测试药业",
-                "special_drug_category": "普通药品",
-                "storage_condition": "2-8℃避光保存",
-                "udi_code": "06912345678901",
-                "electronic_regulatory_code": "REG-001",
-                "length_mm": "120",
-                "width_mm": "80",
-                "height_mm": "50",
-                "volume_cm3": "",
-                "weight_g": "350.5",
-                "packaging_json": json.dumps(
-                    [
-                        {
-                            "unit": "盒",
-                            "ratio_to_base": 1,
-                            "is_base": True,
-                            "is_default": True,
-                            "sort_order": 1,
-                        }
-                    ],
-                    ensure_ascii=False,
-                ),
-            },
+            row,
             RouteBinding(
                 connector_id=settings().connector_id,
                 connector_code="SELF-ERP",
@@ -367,13 +275,8 @@ class TestInboundCorePipeline(unittest.TestCase):
             "id": "message-1",
             "idempotency_key": "idem-1",
         }
-        row = {
-            "id": "row-1",
-            "external_doc_no": "ASN-1",
-            "idempotency_key": "idem-1",
-            "schema_version": "1",
-            "retry_count": "1",
-        }
+        row = v19_goods_row(retry_count=1)
+        replay_message["idempotency_key"] = row["IdempotencyKey"]
         order: list[str] = []
         with (
             patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
@@ -406,30 +309,37 @@ class TestInboundCorePipeline(unittest.TestCase):
                     connector_code="SELF-ERP",
                     config_version=1,
                     channel="interface_table",
-                    message_type="asn",
+                    message_type="product_master",
                 ),
             ),
             patch.object(
                 sync_worker,
-                "run_inbound_pipeline",
-                return_value=("wms-1", object()),
-            ) as pipeline,
+                "http_json",
+                return_value=(200, {"wms_resource_id": "wms-1"}, ""),
+            ),
             patch.object(sync_worker, "mark_row"),
         ):
-            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
+            self.assertEqual(
+                sync_worker.process_once(settings(), ["product_master"], False), 1
+            )
 
         self.assertEqual(order, ["requeue", "claim", "process"])
-        list_replays.assert_called_once_with(settings(), "asn")
-        self.assertTrue(callable(pipeline.call_args.args[4]))
+        list_replays.assert_called_once_with(settings(), "product_master")
 
     def test_requeue_replay_row_restores_terminal_row_with_original_key(self) -> None:
-        with patch("worker_mssql.sqlcmd_query", return_value="ready") as query:
-            self.assertTrue(requeue_replay_row(settings(), "if_in_asn", "idem-'1"))
+        with patch(
+            "worker_mssql.mssql_query",
+            return_value=[{"IdempotencyKey": "idem-'1"}],
+        ) as query:
+            self.assertTrue(
+                requeue_replay_row(
+                    settings(), "x_wmsinter_InboundOrder", "idem-'1"
+                )
+            )
         sql = query.call_args.args[1]
-        self.assertIn("sync_status = N'pending'", sql)
-        self.assertIn("retry_count < 1", sql)
-        self.assertIn("idem-''1", sql)
-        self.assertIn("N'failed', N'dead', N'success'", sql)
+        self.assertIn("handelflag = 0", sql)
+        self.assertIn("handelflag IN (3, 4)", sql)
+        self.assertEqual(query.call_args.args[2], ("ZBPF7", "idem-'1"))
 
     def test_missing_manual_replay_row_does_not_claim_message(self) -> None:
         import sync_worker
@@ -443,7 +353,9 @@ class TestInboundCorePipeline(unittest.TestCase):
             patch.object(sync_worker, "requeue_replay_row", return_value=False),
             patch.object(sync_worker, "claim_manual_replay") as claim,
         ):
-            sync_worker.prepare_manual_replays(settings(), "asn", "if_in_asn")
+            sync_worker.prepare_manual_replays(
+                settings(), "asn", "x_wmsinter_InboundOrder"
+            )
         claim.assert_not_called()
 
     def test_retry_rejects_snapshot_that_does_not_match_original_binding(self) -> None:
@@ -505,6 +417,8 @@ class TestInboundCorePipeline(unittest.TestCase):
 
         def fake_http(_settings, method, path, body, _idem):
             calls.append(path)
+            if method == "POST":
+                return 200, {"wms_resource_id": "wms-1"}, ""
             self.assertEqual(method, "GET")
             self.assertIsNone(body)
             if "/versions/2" in path:
@@ -516,7 +430,7 @@ class TestInboundCorePipeline(unittest.TestCase):
                         "config_version": 2,
                         "warehouse_ids": [],
                         "directions": ["inbound"],
-                        "message_types": ["asn"],
+                        "message_types": ["product_master"],
                         "channel_mode": "interface_table",
                     },
                     "",
@@ -530,7 +444,7 @@ class TestInboundCorePipeline(unittest.TestCase):
                             "connector_code": "SELF-ERP",
                             "config_version": 2,
                             "direction": "inbound",
-                            "message_type": "asn",
+                            "message_type": "product_master",
                             "schema_version": "1",
                             "channel": "interface_table",
                         }
@@ -539,14 +453,7 @@ class TestInboundCorePipeline(unittest.TestCase):
                 "",
             )
 
-        row = {
-            "id": "row-1",
-            "external_doc_no": "ASN-1",
-            "external_ref": "ERP ASN/1",
-            "idempotency_key": "idem-1",
-            "schema_version": "1",
-            "retry_count": "1",
-        }
+        row = v19_goods_row(retry_count=1)
         with (
             patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
             patch.object(sync_worker, "try_record_worker_heartbeat"),
@@ -556,20 +463,23 @@ class TestInboundCorePipeline(unittest.TestCase):
             patch.object(sync_worker, "resolve_inbound_route") as resolve_current,
             patch.object(
                 sync_worker,
-                "run_inbound_pipeline",
-                return_value=("wms-1", object()),
-            ) as pipeline,
+                "build_v19_inbound_canonical",
+                wraps=sync_worker.build_v19_inbound_canonical,
+            ) as build,
             patch.object(sync_worker, "mark_row"),
         ):
-            self.assertEqual(sync_worker.process_once(settings(2), ["asn"], False), 1)
+            self.assertEqual(
+                sync_worker.process_once(settings(2), ["product_master"], False),
+                1,
+            )
 
         resolve_current.assert_not_called()
-        binding = pipeline.call_args.kwargs["route_binding"]
+        binding = build.call_args.args[2]
         self.assertEqual(binding.config_version, 2)
         self.assertIn("direction=inbound", calls[0])
-        self.assertIn("message_type=asn", calls[0])
-        self.assertIn("external_ref=ERP+ASN%2F1", calls[0])
-        self.assertIn("idempotency_key=idem-1", calls[0])
+        self.assertIn("message_type=product_master", calls[0])
+        self.assertIn("external_ref=P-1", calls[0])
+        self.assertIn("idempotency_key=idem-product-1", calls[0])
         self.assertIn("created_from=1970-01-01T00%3A00%3A00Z", calls[0])
         self.assertIn(f"/{settings().connector_id}/versions/2", calls[1])
 
@@ -601,54 +511,14 @@ class TestInboundCorePipeline(unittest.TestCase):
         self.assertFalse(is_retryable_worker_error(caught.exception))
 
     def test_each_inbound_business_api_uses_shared_error_classification(self) -> None:
-        row = {
-            "id": "row-1",
-            "owner_id": "owner-1",
-            "idempotency_key": "idem-1",
-            "external_doc_no": "ERP-1",
-            "external_ref": "ERP-1",
-            "receipt_no": "R-1",
-            "document_type": "purchase_inbound",
-            "supplier_id": "supplier-1",
-            "customer_id": "customer-1",
-            "warehouse_id": "warehouse-1",
-            "expected_arrival_at": "2026-07-23T00:00:00Z",
-            "product_id": "product-1",
-            "product_code": "P-1",
-            "product_name": "药品一",
-            "spec": "10mg*30片",
-            "special_drug_category": "普通药品",
-            "storage_condition": "normal",
-            "packaging_json": json.dumps(
-                [
-                    {
-                        "unit": "盒",
-                        "ratio_to_base": 1,
-                        "is_base": True,
-                        "is_default": True,
-                        "sort_order": 1,
-                    }
-                ],
-                ensure_ascii=False,
-            ),
-            "expected_qty": "1",
-            "planned_qty": "1",
-            "batch_no": "B-1",
-            "required_ship_at": "2026-07-23T00:00:00Z",
-            "field_name": "spec",
-            "new_value": "10mg",
-        }
-        binding = RouteBinding(
-            connector_id=settings().connector_id,
-            connector_code="SELF-ERP",
-            config_version=1,
-            channel="interface_table",
-            message_type="asn",
-        )
         for status, expected_retryable in ((503, True), (422, False)):
             for message_type, (_table, handler) in HANDLERS.items():
                 with self.subTest(message_type=message_type, status=status):
-                    command = build_inbound_canonical(message_type, row, binding)
+                    command = SimpleNamespace(
+                        message_type=message_type,
+                        idempotency_key="idem-1",
+                        fields={"request_body": {}},
+                    )
                     with patch(
                         "sync_worker.http_json",
                         return_value=(status, None, '{"token":"response-secret"}'),
@@ -660,63 +530,6 @@ class TestInboundCorePipeline(unittest.TestCase):
                         expected_retryable,
                     )
                     self.assertNotIn("response-secret", str(caught.exception))
-
-    def test_archive_product_change_closes_quality_liaison_after_m1_update(
-        self,
-    ) -> None:
-        row = {
-            "id": "row-archive-1",
-            "owner_id": "owner-1",
-            "external_doc_no": "ARCHIVE-1",
-            "idempotency_key": "idem-archive-1",
-            "product_id": "11111111-1111-1111-1111-111111111111",
-            "product_code": "P-ARCHIVE-001",
-            "field_name": "approval_number",
-            "new_value": "NEW-001",
-            "liaison_id": "22222222-2222-2222-2222-222222222222",
-            "asn_id": "33333333-3333-3333-3333-333333333333",
-        }
-        command = build_inbound_canonical(
-            "product_change",
-            row,
-            RouteBinding(
-                connector_id=settings().connector_id,
-                connector_code="SELF-ERP",
-                config_version=1,
-                channel="interface_table",
-                message_type="product_change",
-            ),
-        )
-        calls: list[tuple[str, str, dict | None, str]] = []
-
-        def fake_http(_settings, method, path, body, idempotency_key):
-            calls.append((method, path, body, idempotency_key))
-            return 200, {"wms_resource_id": row["product_id"]}, ""
-
-        with patch("sync_worker.http_json", side_effect=fake_http):
-            resource_id = HANDLERS["product_change"][1](settings(), command)
-
-        self.assertEqual(resource_id, row["product_id"])
-        self.assertEqual(
-            calls[0][1],
-            "/api/v1/integration/erp-messages/inbound/product_change",
-        )
-        self.assertEqual(
-            calls[0][2],
-            {
-                "schema_version": "1",
-                "external_ref": "ARCHIVE-1",
-                "correlation_id": "row-archive-1",
-                "occurred_at": "",
-                "product_id": row["product_id"],
-                "product_code": "P-ARCHIVE-001",
-                "field_name": "approval_number",
-                "new_value": "NEW-001",
-                "liaison_id": row["liaison_id"],
-                "asn_id": row["asn_id"],
-            },
-        )
-        self.assertEqual(calls[0][3], "idem-archive-1")
 
     def test_worker_error_summary_redacts_credentials(self) -> None:
         summary = sanitize_worker_error(
@@ -834,19 +647,11 @@ class TestInboundCorePipeline(unittest.TestCase):
     def test_non_retryable_route_error_enters_dead_immediately(self) -> None:
         import sync_worker
 
-        row = {
-            "id": "row-1",
-            "external_doc_no": "ASN-1",
-            "idempotency_key": "idem-1",
-            "schema_version": "1",
-            "retry_count": "0",
-        }
+        row = v19_goods_row()
         with (
             patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
             patch.object(sync_worker, "try_record_worker_heartbeat"),
             patch.object(sync_worker, "list_manual_replays", return_value=[]),
-            patch.object(sync_worker, "record_preflight_failure") as preflight_audit,
-            patch.object(sync_worker, "mark_terminal_inbound_message") as mark_dead,
             patch.object(sync_worker, "claim_rows", return_value=[row]),
             patch.object(
                 sync_worker,
@@ -855,36 +660,31 @@ class TestInboundCorePipeline(unittest.TestCase):
             ),
             patch.object(sync_worker, "mark_row") as mark,
         ):
-            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
+            self.assertEqual(
+                sync_worker.process_once(settings(), ["product_master"], False), 1
+            )
         self.assertEqual(mark.call_args.args[3], "dead")
         self.assertEqual(mark.call_args.kwargs["retry_count"], 1)
-        preflight_audit.assert_called_once()
-        mark_dead.assert_called_once()
 
-    def test_preflight_audit_failure_releases_claim_for_retry(self) -> None:
+    def test_invalid_schema_version_enters_dead_without_route_lookup(self) -> None:
         import sync_worker
 
-        row = {
-            "id": "row-1",
-            "external_doc_no": "ASN-1",
-            "idempotency_key": "idem-1",
-            "schema_version": "999",
-            "retry_count": "0",
-        }
+        row = v19_goods_row()
+        row["SchemaVersion"] = "999"
+        row["PayloadDigest"] = payload_digest("x_wmsinter_GoodsInfo", row)
         with (
             patch.object(sync_worker, "get_worker_claim_decision", return_value=True),
             patch.object(sync_worker, "try_record_worker_heartbeat"),
             patch.object(sync_worker, "list_manual_replays", return_value=[]),
-            patch.object(
-                sync_worker,
-                "record_preflight_failure",
-                side_effect=WorkerHttpError(503, "audit", "unavailable"),
-            ),
             patch.object(sync_worker, "claim_rows", return_value=[row]),
+            patch.object(sync_worker, "resolve_inbound_route") as route,
             patch.object(sync_worker, "mark_row") as mark,
         ):
-            self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 1)
-        self.assertEqual(mark.call_args.args[3], "pending")
+            self.assertEqual(
+                sync_worker.process_once(settings(), ["product_master"], False), 1
+            )
+        route.assert_not_called()
+        self.assertEqual(mark.call_args.args[3], "dead")
         self.assertEqual(mark.call_args.kwargs["retry_count"], 1)
 
     def test_paused_connector_does_not_claim_mssql_rows(self) -> None:
@@ -898,38 +698,17 @@ class TestInboundCorePipeline(unittest.TestCase):
             self.assertEqual(sync_worker.process_once(settings(), ["asn"], False), 0)
         claim.assert_not_called()
 
-    def test_claim_rows_parses_interface_table_output(self) -> None:
-        raw = json.dumps([{
-            "id": "row-1",
-            "external_doc_no": "ASN|1",
-            "owner_id": "owner-1",
-            "warehouse_id": "warehouse-1",
-            "supplier_id": "supplier-1",
-            "product_code": "P-1",
-            "expected_qty": "2",
-            "expected_arrival_at": "2026-07-22T10:00:00",
-            "document_type": "purchase_inbound",
-            "external_ref": "ERP-1",
-            "receipt_no": "R-1",
-            "schema_version": "1",
-            "idempotency_key": "idem-1",
-            "retry_count": "0",
-            "created_at": "2026-07-22T09:59:00",
-        }])
-        with patch("worker_mssql.sqlcmd_query", return_value=raw) as query:
-            rows = claim_rows(settings(), "if_in_asn")
+    def test_claim_rows_uses_v19_lease_protocol(self) -> None:
+        claimed = [{"seqid": 1, "IdempotencyKey": "idem-1"}]
+        with patch("worker_mssql.mssql_query", return_value=claimed) as query:
+            rows = claim_rows(settings(), "x_wmsinter_GoodsInfo")
         sql = query.call_args.args[1]
-        self.assertIn("DATEADD(MILLISECOND", sql)
-        self.assertIn("retry_count = 1 THEN 1000", sql)
-        self.assertIn("retry_count = 4 THEN 8000", sql)
-        self.assertIn("ELSE 16000", sql)
-        self.assertIn("UNICODE(LEFT(idempotency_key, 1))", sql)
-        self.assertIn("% 4001", sql)
-        self.assertIn("last_error IS NULL", sql)
-        self.assertIn("FOR JSON PATH", sql)
-        self.assertEqual(rows[0]["external_doc_no"], "ASN|1")
-        self.assertEqual(rows[0]["schema_version"], "1")
-        self.assertEqual(rows[0]["created_at"], "2026-07-22T09:59:00")
+        self.assertIn("handelflag = 0", sql)
+        self.assertIn("handelflag = 3 AND next_retry_at <= SYSUTCDATETIME()", sql)
+        self.assertIn("handelflag = 2 AND lease_until < SYSUTCDATETIME()", sql)
+        self.assertIn("ORDER BY inserttime, seqid", sql)
+        self.assertNotIn("FOR JSON PATH", sql)
+        self.assertEqual(rows, claimed)
 
     def test_worker_runtime_calls_include_binding_and_claim_count(self) -> None:
         calls: list[tuple[str, str, dict | None]] = []
@@ -958,25 +737,36 @@ class TestInboundCorePipeline(unittest.TestCase):
 
 
 class TestInsertIfOutSql(unittest.TestCase):
-    def test_idempotent_insert_contains_source_unique(self) -> None:
+    def test_order_status_writes_v19_order_feedback_without_legacy_table(self) -> None:
         row = OutboxRow(
             table="receiving_putaway_erp_feedback_outbox",
             id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             owner_id="11111111-1111-1111-1111-111111111111",
-            event_type="inbound_putaway_completed",
-            payload={"qty": 1, "note": "it's ok"},
+            event_type="order_status",
+            payload={
+                "erp_bill_code": "RK-1",
+                "revision": 1,
+                "order_type": 1,
+                "feedback_type": 100,
+                "command_id": "cmd-1",
+                "result_code": None,
+                "result_message": "it's cancelled",
+                "correlation_id": "corr-1",
+                "feedback_time": "2026-08-05T12:00:00.000Z",
+            },
             external_ref="rcv-1",
             attempt_count=1,
             max_attempts=5,
             deadline_at=None,
             callback_path="/inbound-complete",
         )
-        sql = insert_if_out_sql(row)
-        self.assertIn("if_out_message", sql)
-        self.assertIn("source_outbox_table", sql)
-        self.assertIn("inbound_putaway_completed", sql)
-        self.assertIn("it''s ok", sql)  # MSSQL escape
-        self.assertIn("out:receiving_putaway_erp_feedback_outbox:", sql)
+        sql = insert_if_out_sql(row, owner_code="ZBPF7")
+        self.assertIn("x_wmsinter_OrderFeedback", sql)
+        self.assertNotIn("if_out_message", sql)
+        self.assertIn("it''s cancelled", sql)
+        self.assertIn(row.id, sql)
+        self.assertNotIn(f"out:{row.table}:{row.id}", sql)
+        self.assertNotIn("UPDATE dbo.x_wmsinter_OrderFeedback", sql)
 
     def test_escape_mssql(self) -> None:
         self.assertEqual(sql_escape_mssql("a'b"), "a''b")
@@ -1001,15 +791,24 @@ class TestPayloadJson(unittest.TestCase):
             id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             owner_id="11111111-1111-1111-1111-111111111111",
             event_type="inventory_status_changed",
-            payload={"reason": "a|b", "qty": 1},
+            payload={
+                "depot_code": "WH001",
+                "product_code": "P1",
+                "batch_no": "B|1",
+                "to_status": "合格",
+                "qty": "1.0000",
+                "occur_time": "2026-08-05T12:00:00.000Z",
+            },
             external_ref="x",
             attempt_count=1,
             max_attempts=5,
             deadline_at=None,
             callback_path="/inventory-status",
         )
-        sql = insert_if_out_sql(row)
-        self.assertIn("a|b", sql)
+        sql = insert_if_out_sql(row, owner_code="ZBPF7")
+        self.assertIn("x_wmsinter_WmsEvent", sql)
+        self.assertNotIn("if_out_message", sql)
+        self.assertIn("B|1", sql)
         self.assertNotIn(
             "\n  INSERT", sql.split("IF NOT EXISTS")[0]
         )  # payload line compact

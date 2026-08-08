@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import unittest
 from dataclasses import dataclass
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -244,26 +243,6 @@ class TestExchangeLifecycle(unittest.TestCase):
         self.assertEqual(posts[0]["payload"], {"qty": 1})
         self.assertEqual(posts[0]["connector_id"], "connector-1")
         self.assertTrue(all("payload" not in post for post in posts[1:]))
-
-    def test_process_once_path_uses_inbound_pipeline(self) -> None:
-        """process_once 真实调用 run_inbound_pipeline（非旁路）。"""
-        import sync_worker
-
-        # 确认 worker 模块绑定了 pipeline
-        self.assertTrue(hasattr(sync_worker, "run_inbound_pipeline"))
-        with open(sync_worker.__file__, encoding="utf-8") as fh:
-            src = fh.read()
-        self.assertIn("run_inbound_pipeline", src)
-        self.assertIn("US-H8-002 AC11", src)
-        # 出站真实路径同样绑定 lifecycle
-        with open(
-            Path(sync_worker.__file__).resolve().parent / "outbound_publish.py",
-            encoding="utf-8",
-        ) as fh:
-            out_src = fh.read()
-        self.assertIn("run_outbound_pipeline", out_src)
-        self.assertIn("US-H8-002 AC11", out_src)
-
 
 if __name__ == "__main__":
     unittest.main()

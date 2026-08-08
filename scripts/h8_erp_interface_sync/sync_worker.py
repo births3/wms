@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# @governance: skip-page-size Worker 的认领、路由、处理与终态回写共用单一租约状态机，需整体审计。
 """H8 ERP 接口表同步 Worker（独立进程）。
 
 双向：
@@ -8,6 +9,7 @@
 环境变量：
   WMS_API_BASE           默认 http://127.0.0.1:8080
   WMS_API_TOKEN          Bearer token（启动时读取不可变连接快照，必填）
+  WMS_API_KEY            连接绑定的 WMS API Key（入站业务调用必填）
   WMS_H8_SECRET_ALIASES  secret alias 到真实凭据的本机映射
   H8_CONNECTOR_ID        本 Worker 唯一绑定的 H8 连接 UUID（必填）
   H8_WORKER_ID           默认主机名-PID
@@ -29,6 +31,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -36,7 +39,6 @@ from typing import Any, Callable
 _sys_path = str(Path(__file__).resolve().parent)
 if _sys_path not in sys.path:
     sys.path.insert(0, _sys_path)
-from exchange_lifecycle import record_preflight_failure, run_inbound_pipeline  # noqa: E402
 from inbound_canonical import (  # noqa: E402
     CanonicalMappingError,
     H8CanonicalInboundCommand,
@@ -67,12 +69,14 @@ from worker_route import (  # noqa: E402
     validate_row_schema_version,
 )
 from worker_mssql import (  # noqa: E402
+    TABLE_CONTRACTS,
     claim_rows,
     mark_row,
     requeue_replay_row,
     sqlcmd_query,
 )
 from worker_settings import Settings, load_runtime_settings  # noqa: E402
+from v19_contract import ContractError, validate_published_unit  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +99,11 @@ def http_json(
     }
     if body is not None:
         headers["Content-Type"] = "application/json"
-    if settings.api_token:
+    if settings.api_key and path.startswith(
+        "/api/v1/integration/erp-messages/inbound/"
+    ):
+        headers["x-wms-api-key"] = settings.api_key
+    elif settings.api_token:
         headers["Authorization"] = f"Bearer {settings.api_token}"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
@@ -234,7 +242,7 @@ def try_record_worker_heartbeat(
         )
     except Exception as exc:  # noqa: BLE001 — 监控失败不得中断在途业务
         summary = sanitize_worker_error(
-            str(exc), (settings.api_token, settings.mssql_password)
+            str(exc), (settings.api_token, settings.api_key, settings.mssql_password)
         )
         print(
             f"[h8] heartbeat warn: {summary}",
@@ -245,6 +253,221 @@ def try_record_worker_heartbeat(
 # ---------------------------------------------------------------------------
 # Handlers
 # ---------------------------------------------------------------------------
+
+
+def _utc_text(value: Any) -> str:
+    text = value.isoformat(timespec="milliseconds") if hasattr(value, "isoformat") else str(value)
+    return text.replace("+00:00", "Z") if text.endswith("+00:00") else text.rstrip("Z") + "Z"
+
+
+def _runtime_row(table: str, row: dict[str, Any]) -> dict[str, Any]:
+    """给 H8 路由补运行别名；原始 v1.9 字段保留给摘要校验。"""
+    external_fields = {
+        "x_wmsinter_GoodsInfo": "GoodsCode",
+        "x_wmsinter_CustomerInfo": "ClientCode",
+        "x_wmsinter_SupplierInfo": "SupplierCode",
+        "x_wmsinter_InboundOrder": "ERPBillCode",
+        "x_wmsinter_OutboundOrder": "ERPBillCode",
+        "x_wmsinter_OrderCommand": "CommandID",
+        "x_wmsinter_InventoryPushHeader": "SnapshotID",
+    }
+    runtime = dict(row)
+    pk = TABLE_CONTRACTS[table]["pk"]
+    external = row.get(external_fields[table]) or row[pk]
+    runtime.update(
+        {
+            "id": str(row[pk]),
+            "owner_id": str(row["OwnerCode"]),
+            "external_doc_no": str(external),
+            "external_ref": str(external),
+            "idempotency_key": str(row["IdempotencyKey"]),
+            "schema_version": str(row["SchemaVersion"]),
+            "correlation_id": str(row["CorrelationID"]),
+            "created_at": _utc_text(row["inserttime"]),
+            "warehouse_code": str(row.get("DepotCode") or ""),
+        }
+    )
+    return runtime
+
+
+def build_v19_inbound_canonical(
+    message_type: str,
+    row: dict[str, Any],
+    binding: Any | None,
+) -> H8CanonicalInboundCommand:
+    envelope = {
+        "schema_version": row["SchemaVersion"],
+        "external_ref": row["external_ref"],
+        "correlation_id": row["CorrelationID"],
+        "occurred_at": row["created_at"],
+        "payload_digest": row["PayloadDigest"],
+        "source_version": int(row["SourceVersion"])
+        if row.get("SourceVersion") is not None
+        else None,
+    }
+    if message_type == "product_master":
+        packaging = json.loads(row["PackagingJson"]) if row.get("PackagingJson") else []
+        for index, level in enumerate(packaging, 1):
+            level.setdefault("sort_order", index)
+        body = envelope | {
+            "entity_id": row["GoodsID"],
+            "op_type": row["opType"],
+            "product_code": row.get("GoodsCode"),
+            "product_name": row.get("GoodsName"),
+            "approval_no": row.get("License"),
+            "spec": row.get("Spec"),
+            "manufacturer": row.get("ProduceCorp"),
+            "special_drug_category": row.get("SpecialCategory"),
+            "storage_condition": row.get("Deposite"),
+            "packaging_levels": packaging,
+        }
+    elif message_type == "customer_master":
+        body = envelope | {
+            "entity_id": row["ClientID"],
+            "op_type": row["opType"],
+            "customer_code": row.get("ClientCode"),
+            "customer_name": row.get("ClientName"),
+            "customer_type": row.get("CorpType"),
+            "address": row.get("Address"),
+            "contact_name": row.get("LinkMan"),
+            "contact_phone": row.get("LinkPhone"),
+            "delivery_address": row.get("DepotAddr"),
+            "delivery_contact": row.get("DepotMan"),
+            "delivery_phone": row.get("DepotCall"),
+            "delivery_mode": row.get("SendWay"),
+            "stop_send": bool(row.get("StopSend")),
+        }
+    elif message_type == "supplier_master":
+        body = envelope | {
+            "entity_id": row["SupplierID"],
+            "op_type": row["opType"],
+            "supplier_code": row.get("SupplierCode"),
+            "supplier_name": row.get("SupplierName"),
+            "address": row.get("Address"),
+            "contact_name": row.get("LinkMan"),
+            "contact_phone": row.get("LinkPhone"),
+        }
+    elif message_type == "asn":
+        body = envelope | {
+            "erp_bill_id": row["ERPBillID"],
+            "erp_bill_code": row["ERPBillCode"],
+            "revision": row["Revision"],
+            "order_type": row["OrderType"],
+            "partner_type": row.get("PartnerType"),
+            "partner_code": row.get("PartnerCode"),
+            "depot_code": row["DepotCode"],
+            "business_date": str(row["BusiDate"]),
+            "note_code": row.get("NoteCode"),
+            "lines": [
+                {
+                    "line_no": item["LineNo"],
+                    "product_code": item["GoodsCode"],
+                    "expected_qty": f"{item['Amount']:.4f}",
+                    "batch_no": item.get("BatchNo"),
+                    "production_date": str(item["ProduceDate"]) if item.get("ProduceDate") else None,
+                    "expiry_date": str(item["ValidDate"]) if item.get("ValidDate") else None,
+                }
+                for item in row.get("_items", [])
+            ],
+        }
+    elif message_type == "outbound_order":
+        body = envelope | {
+            "erp_bill_id": row["ERPBillID"],
+            "erp_bill_code": row["ERPBillCode"],
+            "revision": row["Revision"],
+            "order_type": row["OrderType"],
+            "customer_code": row.get("ClientCode"),
+            "depot_code": row["DepotCode"],
+            "required_ship_at": _utc_text(row["RequiredShipAt"]),
+            "send_mode": row.get("SendMode"),
+            "erp_address_id": row["ERPAddressID"],
+            "address_code": row["AddressCode"],
+            "contact_name": row.get("LinkMan"),
+            "contact_phone": row.get("LinkCall"),
+            "address": row["Address"],
+            "lines": [
+                {
+                    "line_no": item["LineNo"],
+                    "product_code": item["GoodsCode"],
+                    "batch_no": item["BatchNo"],
+                    "planned_qty": f"{item['Amount']:.4f}",
+                }
+                for item in row.get("_items", [])
+            ],
+        }
+    elif message_type == "order_cancel":
+        body = envelope | {
+            "command_id": row["CommandID"],
+            "command_type": row["CommandType"],
+            "erp_bill_code": row["ERPBillCode"],
+            "revision": row["Revision"],
+            "order_type": row["OrderType"],
+            "memo": row.get("Memo"),
+        }
+    elif message_type == "inventory_seed_snapshot":
+        body = envelope | {
+            "snapshot_id": row["SnapshotID"],
+            "depot_code": row["DepotCode"],
+            "push_type": row["PushType"],
+            "push_time": _utc_text(row["PushTime"]),
+            "items": [
+                {
+                    "row_no": item["RowNo"],
+                    "product_code": item["GoodsCode"],
+                    "batch_no": item["BatchNo"],
+                    "expiry_date": str(item["ValidDate"]) if item.get("ValidDate") else None,
+                    "location_code": item.get("StallCode"),
+                    "goods_status": item.get("GoodsStatus"),
+                    "quantity": f"{item['RealAmount']:.4f}",
+                }
+                for item in row.get("_items", [])
+            ],
+        }
+    else:
+        raise CanonicalMappingError(f"unsupported message_type {message_type}")
+    return H8CanonicalInboundCommand(
+        owner_id=row["owner_id"],
+        warehouse_id=None,
+        message_type=message_type,
+        external_ref=row["external_ref"],
+        idempotency_key=row["idempotency_key"],
+        correlation_id=row["correlation_id"],
+        connector_id=binding.connector_id if binding else None,
+        config_version=binding.config_version if binding else None,
+        channel=binding.channel if binding else "interface_table",
+        fields={"request_body": body},
+        occurred_at=row["created_at"],
+    )
+
+
+def _handle_v19(
+    settings: Settings,
+    command: H8CanonicalInboundCommand,
+) -> str:
+    body = command.fields["request_body"]
+    status, parsed, raw = http_json(
+        settings,
+        "POST",
+        f"/api/v1/integration/erp-messages/inbound/{command.message_type}",
+        body,
+        command.idempotency_key,
+    )
+    if status in (200, 201) and isinstance(parsed, dict):
+        resource = parsed.get("wms_resource_id") or parsed.get("id")
+        if resource:
+            command.fields["ignored_old_version"] = bool(
+                parsed.get("ignored_old_version")
+            )
+            return str(resource)
+    code = str(parsed.get("code")) if isinstance(parsed, dict) and parsed.get("code") else None
+    raise WorkerHttpError(status, f"H8 {command.message_type} API", raw, code)
+
+
+def _order_not_ready_timed_out(value: Any) -> bool:
+    inserted = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if inserted.tzinfo is None:
+        inserted = inserted.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - inserted).total_seconds() >= 30 * 60
 
 
 def handle_asn(settings: Settings, command: H8CanonicalInboundCommand) -> str:
@@ -418,11 +641,13 @@ def handle_product_change(
 HANDLERS: dict[
     str, tuple[str, Callable[[Settings, H8CanonicalInboundCommand], str]]
 ] = {
-    "asn": ("if_in_asn", handle_asn),
-    "outbound_order": ("if_in_outbound_order", handle_outbound),
-    "product_master": ("if_in_product_master", handle_product),
-    "return_order": ("if_in_return_order", handle_return),
-    "product_change": ("if_in_product_change", handle_product_change),
+    "product_master": ("x_wmsinter_GoodsInfo", _handle_v19),
+    "customer_master": ("x_wmsinter_CustomerInfo", _handle_v19),
+    "supplier_master": ("x_wmsinter_SupplierInfo", _handle_v19),
+    "asn": ("x_wmsinter_InboundOrder", _handle_v19),
+    "outbound_order": ("x_wmsinter_OutboundOrder", _handle_v19),
+    "order_cancel": ("x_wmsinter_OrderCommand", _handle_v19),
+    "inventory_seed_snapshot": ("x_wmsinter_InventoryPushHeader", _handle_v19),
 }
 
 
@@ -434,11 +659,6 @@ def process_once(
 ) -> int:
     processed = 0
     heartbeat_directions = heartbeat_directions or ["inbound"]
-
-    def canonical_converter(
-        message_type: str, row: dict[str, str], binding: Any | None
-    ) -> H8CanonicalInboundCommand:
-        return build_inbound_canonical_with_mpm(settings, message_type, row, binding)
 
     for type_name in types:
         table, handler = HANDLERS[type_name]
@@ -454,7 +674,8 @@ def process_once(
                 prepare_manual_replays(settings, type_name, table)
             except Exception as exc:  # noqa: BLE001 — 未接管重放前不得认领接口行
                 summary = sanitize_worker_error(
-                    str(exc), (settings.api_token, settings.mssql_password)
+                    str(exc),
+                    (settings.api_token, settings.api_key, settings.mssql_password),
                 )
                 print(f"[h8] manual replay warn: {summary}", flush=True)
                 continue
@@ -463,25 +684,20 @@ def process_once(
             try_record_worker_heartbeat(settings, heartbeat_directions, len(rows))
         for row in rows:
             processed += 1
-            row_id = row["id"]
+            row_id = row[TABLE_CONTRACTS[table]["pk"]]
+            row = _runtime_row(table, row)
             retry = int(row.get("retry_count") or "0")
             print(
                 f"[h8] claim {type_name} id={row_id} doc={row.get('external_doc_no')}",
                 flush=True,
             )
             if dry_run:
-                # 认领已置 processing：释放回 pending；仍走 lifecycle receive/convert 审计
                 try:
-                    run_inbound_pipeline(
-                        settings,
-                        type_name,
-                        row,
-                        handler,
-                        canonical_converter,
-                        dry_run=True,
-                    )
-                except Exception as life_exc:  # noqa: BLE001
-                    print(f"[h8] lifecycle dry-run warn: {life_exc}", flush=True)
+                    validate_published_unit(table, row)
+                    validate_row_schema_version(row)
+                    build_v19_inbound_canonical(type_name, row, None)
+                except Exception as dry_run_exc:  # noqa: BLE001
+                    print(f"[h8] dry-run validation warn: {dry_run_exc}", flush=True)
                 mark_row(
                     settings,
                     table,
@@ -493,13 +709,13 @@ def process_once(
                 print(f"[h8] dry-run release {type_name} id={row_id}", flush=True)
                 continue
             try:
-                pipeline_started = False
+                validate_published_unit(table, row)
                 validate_row_schema_version(row)
                 binding = (
                     resolve_existing_inbound_binding(
                         settings, type_name, row, http_json_fn=http_json
                     )
-                    if retry > 0
+                    if retry > 0 or row.get("error_code") == "ORDER_NOT_READY"
                     else None
                 )
                 if binding is None:
@@ -510,50 +726,34 @@ def process_once(
                         "route binding",
                         f"resolved connector {binding.connector_id} differs from worker binding",
                     )
-                # US-H8-002 AC11：真实路径 emit receive→convert→business_api→receipt
-                pipeline_started = True
-                wms_id, _life = run_inbound_pipeline(
-                    settings,
-                    type_name,
-                    row,
-                    handler,
-                    canonical_converter,
-                    route_binding=binding,
-                    dry_run=False,
-                )
-                mark_row(settings, table, row_id, "success", wms_id=wms_id)
+                command = build_v19_inbound_canonical(type_name, row, binding)
+                wms_id = handler(settings, command)
+                ignored = bool(command.fields.get("ignored_old_version"))
+                if ignored:
+                    mark_row(
+                        settings,
+                        table,
+                        row_id,
+                        "accepted",
+                        error="旧版本已忽略",
+                    )
+                else:
+                    mark_row(settings, table, row_id, "success")
                 print(f"[h8] success {type_name} -> {wms_id}", flush=True)
             except Exception as exc:  # noqa: BLE001 — worker 边界
                 error = exc
-                if not pipeline_started:
-                    try:
-                        record_preflight_failure(
-                            settings,
-                            type_name,
-                            row,
-                            settings.connector_id,
-                        )
-                    except Exception as audit_exc:  # noqa: BLE001 — 释放认领后重试审计
-                        error = audit_exc
-                retry += 1
+                error_code = getattr(error, "code", None)
+                order_not_ready = type_name == "order_cancel" and error_code == "ORDER_NOT_READY"
+                if not order_not_ready:
+                    retry += 1
                 retryable = is_retryable_worker_error(error)
                 error_summary = sanitize_worker_error(
-                    str(error), (settings.api_token, settings.mssql_password)
+                    str(error),
+                    (settings.api_token, settings.api_key, settings.mssql_password),
                 )
-                next_status = (
-                    "pending" if retryable and retry < settings.max_retry else "dead"
+                next_status = "dead" if order_not_ready and _order_not_ready_timed_out(row["inserttime"]) else (
+                    "retry" if retryable and retry < settings.max_retry else "dead"
                 )
-                if next_status == "dead":
-                    try:
-                        mark_terminal_inbound_message(
-                            settings, type_name, row, error_summary
-                        )
-                    except Exception as state_exc:  # noqa: BLE001 — 两端终态必须一致
-                        next_status = "pending"
-                        error_summary = sanitize_worker_error(
-                            str(state_exc),
-                            (settings.api_token, settings.mssql_password),
-                        )
                 mark_row(
                     settings,
                     table,
@@ -561,6 +761,7 @@ def process_once(
                     next_status,
                     error=error_summary,
                     retry_count=retry,
+                    error_code=error_code,
                 )
                 print(f"[h8] error {type_name}: {error_summary}", flush=True)
         if not dry_run:
@@ -588,8 +789,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--types",
-        default="asn,outbound_order,product_master,return_order,product_change",
-        help="入站类型：asn,outbound_order,product_master,return_order,product_change",
+        default=(
+            "product_master,customer_master,supplier_master,asn,outbound_order,"
+            "order_cancel,inventory_seed_snapshot"
+        ),
+        help="v1.9 ERP→WMS 主记录类型",
     )
     parser.add_argument("--reconcile-owner", help="一次性主动拉取该货主的 ERP 库存快照")
     parser.add_argument("--reconcile-window", help="对账时间窗口幂等键")

@@ -15,6 +15,7 @@ from outbound_publish import (
     OUTBOX_SOURCES,
     OutboxRow,
     claim_wms_outbox,
+    effective_message_type,
     mark_wms_outbox,
     process_outbound_once,
     requeue_wms_outbox,
@@ -56,6 +57,27 @@ def binding(channel_mode: str = "rest") -> RouteBinding:
 
 
 class TestOutboundRoute(unittest.TestCase):
+    def test_order_status_uses_row_event_type_for_shared_outbox(self) -> None:
+        source = next(
+            item
+            for item in OUTBOX_SOURCES
+            if item["table"] == "receiving_putaway_erp_feedback_outbox"
+        )
+        row = OutboxRow(
+            table=source["table"],
+            id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            owner_id=OWNER_ID,
+            event_type="order_status",
+            payload={},
+            external_ref="RK-1",
+            attempt_count=1,
+            max_attempts=5,
+            deadline_at=None,
+            callback_path=source["callback_path"],
+        )
+
+        self.assertEqual(effective_message_type(source, row), "order_status")
+
     def test_retry_loads_frozen_outbound_binding_instead_of_current_route(self) -> None:
         calls: list[str] = []
 
@@ -298,6 +320,8 @@ class TestOutboundClaimScope(unittest.TestCase):
         self.assertIn("h8_erp_connectors", claim_sql)
         self.assertIn(CONNECTOR_ID, claim_sql)
         self.assertIn("putaway_complete", claim_sql)
+        self.assertIn("o.event_type = 'order_status'", claim_sql)
+        self.assertIn("THEN 'order_status'", claim_sql)
         self.assertIn("unnest(warehouse_ids)", claim_sql)
         self.assertIn("o.payload ->> 'warehouse_id'", claim_sql)
         self.assertIn("FROM h8_erp_messages message", claim_sql)
@@ -306,6 +330,8 @@ class TestOutboundClaimScope(unittest.TestCase):
             claim_sql,
         )
         self.assertIn("message.connector_id", claim_sql)
+        self.assertIn("detail.status <> 'succeeded'", claim_sql)
+        self.assertIn("detail.event_type = 'inbound_putaway_completed'", claim_sql)
 
     def test_archive_fifth_failure_has_no_future_retry(self) -> None:
         with patch.object(outbound_publish, "psql_query") as query:
@@ -613,6 +639,11 @@ class TestOutboundProcessRoute(unittest.TestCase):
                         patch.object(
                             outbound_publish, "http_callback_publish"
                         ) as callback,
+                        patch.object(
+                            outbound_publish,
+                            "insert_if_out_sql",
+                            return_value=f"{source['table']} {source['message_type']}",
+                        ),
                         patch.object(outbound_publish, "mark_wms_outbox") as mark,
                         patch(
                             "exchange_lifecycle.run_outbound_pipeline",

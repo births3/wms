@@ -31,9 +31,12 @@ class RouteBinding:
 
 
 class WorkerHttpError(RuntimeError):
-    def __init__(self, status: int, operation: str, detail: str) -> None:
+    def __init__(
+        self, status: int, operation: str, detail: str, code: str | None = None
+    ) -> None:
         super().__init__(f"{operation} HTTP {status}: {sanitize_worker_error(detail)}")
         self.status = status
+        self.code = code
 
 
 def sanitize_worker_error(raw: str, secrets: tuple[str | None, ...] = ()) -> str:
@@ -233,6 +236,9 @@ def resolve_inbound_route(
     warehouse_id = (row.get("warehouse_id") or "").strip()
     if warehouse_id:
         query["warehouse_id"] = warehouse_id
+    warehouse_code = (row.get("warehouse_code") or "").strip()
+    if warehouse_code:
+        query["warehouse_code"] = warehouse_code
     path = "/api/v1/config/erp-connectors/route-resolve?" + urllib.parse.urlencode(
         query
     )
