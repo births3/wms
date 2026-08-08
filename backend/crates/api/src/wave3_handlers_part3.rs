@@ -246,7 +246,8 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Repository(Wave3RepositoryError::IdempotencyConflict)
             | Wave3HandlerError::Repository(Wave3RepositoryError::BillingRuleConflict)
             | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountAlreadyActive)
-            | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountLineAlreadySubmitted) => {
+            | Wave3HandlerError::Repository(Wave3RepositoryError::InventoryCountLineAlreadySubmitted)
+            | Wave3HandlerError::Repository(Wave3RepositoryError::PendingErpCancel) => {
                 (StatusCode::CONFLICT, "W3-409", "资源重复")
             }
             Wave3HandlerError::Receiving(ReceivingOrderError::UnauthorizedSigner)
@@ -507,13 +508,23 @@ async fn list_receiving_dashboard_handler(
         repository.list_receiving_dashboard(&ctx, &query).await?
     } else {
         let rows = state.inbound_store.lock().await.list(&ctx);
-        let mut grouped =
-            std::collections::BTreeMap::<String, (i64, i64, chrono::DateTime<Utc>)>::new();
+        let mut grouped = std::collections::BTreeMap::<
+            String,
+            (i64, wms_domain::Quantity, chrono::DateTime<Utc>),
+        >::new();
         for row in rows {
             let created_at = row.created_at;
-            let entry = grouped.entry(row.status).or_insert((0, 0, created_at));
+            let entry = grouped.entry(row.status).or_insert((
+                0,
+                wms_domain::Quantity::ZERO,
+                created_at,
+            ));
             entry.0 += 1;
-            entry.1 += row.lines.iter().map(|line| line.expected_qty).sum::<i64>();
+            entry.1 += row
+                .lines
+                .iter()
+                .map(|line| line.expected_qty)
+                .sum::<wms_domain::Quantity>();
             entry.2 = entry.2.max(created_at);
         }
         grouped

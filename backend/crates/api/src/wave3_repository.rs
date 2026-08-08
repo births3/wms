@@ -37,6 +37,8 @@ mod erp_outbox;
 mod expiry;
 mod integrations;
 mod inventory_count;
+mod inventory_seed;
+pub use inventory_seed::{ErpInventorySeedItem, ErpInventorySeedSnapshot};
 mod maintenance;
 mod mappings;
 mod putaway;
@@ -115,6 +117,7 @@ pub enum Wave3RepositoryError {
     InvalidReason,
     MissingRequiredField(String),
     TemperatureExcursionRequiresDisposition,
+    PendingErpCancel,
     SupplierQualificationExpired,
     MissingApprovalSource,
     RecallAlreadyActive,
@@ -182,7 +185,7 @@ struct ReceivingOrderLineRow {
     line_no: i32,
     product_id: Option<Uuid>,
     product_code: String,
-    expected_qty: i64,
+    expected_qty: wms_domain::Quantity,
     batch_no: Option<String>,
     production_date: Option<NaiveDate>,
     expiry_date: Option<NaiveDate>,
@@ -193,9 +196,9 @@ struct ReceivingOrderReceiptRow {
     id: Uuid,
     receiving_order_id: Uuid,
     owner_id: Uuid,
-    actual_qty: i64,
-    shortage_qty: i64,
-    rejected_qty: i64,
+    actual_qty: wms_domain::Quantity,
+    shortage_qty: wms_domain::Quantity,
+    rejected_qty: wms_domain::Quantity,
     arrival_temperature_celsius: Option<f64>,
     exception_note: Option<String>,
     receiving_details: Option<sqlx::types::Json<ReceivingReceiptDetails>>,
@@ -208,8 +211,8 @@ struct ReceivingInspectionRow {
     receiving_order_id: Uuid,
     owner_id: Uuid,
     batch_no: String,
-    accepted_qty: i64,
-    rejected_qty: i64,
+    accepted_qty: wms_domain::Quantity,
+    rejected_qty: wms_domain::Quantity,
     quality_status: String,
     occurred_at: DateTime<Utc>,
 }
@@ -240,8 +243,8 @@ struct InventoryBatchRow {
     batch_no: String,
     production_date: NaiveDate,
     expiry_date: NaiveDate,
-    qty_on_hand: i64,
-    qty_locked: i64,
+    qty_on_hand: wms_domain::Quantity,
+    qty_locked: wms_domain::Quantity,
     quality_status: String,
     location_id: Uuid,
     location_code: String,

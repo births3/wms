@@ -120,9 +120,9 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
             &authorized,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 10,
-                shortage_qty: 0,
-                rejected_qty: 0,
+                actual_qty: 10.into(),
+                shortage_qty: wms_domain::Quantity::ZERO,
+                rejected_qty: wms_domain::Quantity::ZERO,
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
@@ -150,8 +150,8 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
 
     let inspect_req = InspectReceivingOrderRequest {
         batch_no: "B202606".to_string(),
-        accepted_qty: 10,
-        rejected_qty: 0,
+        accepted_qty: 10.into(),
+        rejected_qty: wms_domain::Quantity::ZERO,
         production_date: "2026-01-01".to_string(),
         expiry_date: "2028-01-01".to_string(),
         quality_status: crate::inventory::STATUS_QUALIFIED.to_string(),
@@ -161,7 +161,7 @@ async fn postgres_inspect_and_sign_handlers_write_idempotency_and_audit(pool: Pg
                 package_check: Some("完好".to_string()),
                 instruction_check: Some("有".to_string()),
                 label_check: Some("清晰".to_string()),
-                sampling_qty: Some(1),
+                sampling_qty: Some(1.into()),
                 approval_no: None,
             };
     let Json(inspection) = inspect_receiving_order_handler(

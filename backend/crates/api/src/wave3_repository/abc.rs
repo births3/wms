@@ -1,4 +1,5 @@
 use super::*;
+use rust_decimal::prelude::ToPrimitive;
 use wms_domain::{
     InventoryAbcClassification, InventoryAbcListResponse, InventoryAbcQuery,
     OverrideInventoryAbcRequest, PageMeta, RecomputeInventoryAbcRequest,
@@ -11,7 +12,7 @@ struct AbcRow {
     product_code: String,
     abc_class: String,
     score: f64,
-    outbound_qty: i64,
+    outbound_qty: wms_domain::Quantity,
     period_start: chrono::NaiveDate,
     period_end: chrono::NaiveDate,
     source: String,
@@ -74,9 +75,9 @@ impl PgWave3Repository {
         let days = req.period_days.unwrap_or(30).clamp(7, 366);
         let period_end = now.date_naive();
         let period_start = period_end - chrono::Duration::days(days);
-        let stats: Vec<(String, i64)> = sqlx::query_as(
+        let stats: Vec<(String, wms_domain::Quantity)> = sqlx::query_as(
             r#"
-            SELECT product_code, COALESCE(SUM(ABS(qty_delta)), 0)::BIGINT
+            SELECT product_code, COALESCE(SUM(ABS(qty_delta)), 0)
               FROM inventory_movements m
               JOIN inventory_batches b ON b.id = m.batch_id AND b.owner_id = m.owner_id
              WHERE m.owner_id = $1
@@ -94,8 +95,8 @@ impl PgWave3Repository {
 
         let mut ranked = stats;
         ranked.sort_by(|a, b| b.1.cmp(&a.1));
-        let total: i64 = ranked.iter().map(|(_, qty)| *qty).sum();
-        let mut cumulative = 0i64;
+        let total: wms_domain::Quantity = ranked.iter().map(|(_, qty)| *qty).sum();
+        let mut cumulative = wms_domain::Quantity::ZERO;
         let mut tx = self.begin().await?;
         sqlx::query(
             r#"
@@ -111,8 +112,11 @@ impl PgWave3Repository {
 
         for (product_code, outbound_qty) in ranked {
             cumulative += outbound_qty;
-            let ratio = if total > 0 {
-                cumulative as f64 / total as f64
+            let ratio = if total > wms_domain::Quantity::ZERO {
+                cumulative
+                    .checked_div(total)
+                    .and_then(|value| value.to_f64())
+                    .ok_or(Wave3RepositoryError::InvalidQuantity)?
             } else {
                 1.0
             };
@@ -123,7 +127,9 @@ impl PgWave3Repository {
             } else {
                 "C"
             };
-            let score = outbound_qty as f64;
+            let score = outbound_qty
+                .to_f64()
+                .ok_or(Wave3RepositoryError::InvalidQuantity)?;
             sqlx::query(
                 r#"
                 INSERT INTO inventory_abc_classifications (

@@ -4,11 +4,11 @@ impl PgWave3Repository {
         ctx: &AuthContext,
         query: &ReceivingDashboardQuery,
     ) -> Result<Vec<ReceivingDashboardRow>, Wave3RepositoryError> {
-        let rows: Vec<(String, i64, i64, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
+        let rows: Vec<(String, i64, wms_domain::Quantity, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
             r#"
             SELECT orders.status,
                    COUNT(DISTINCT orders.id)::BIGINT,
-                   COALESCE(SUM(lines.expected_qty), 0)::BIGINT,
+                   COALESCE(SUM(lines.expected_qty), 0),
                    MAX(orders.created_at)
               FROM receiving_orders orders
               LEFT JOIN receiving_order_lines lines

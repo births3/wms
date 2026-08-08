@@ -349,7 +349,7 @@ fn validate_receiving_order_lines(
     }
 
     for line in lines {
-        if line.line_no == 0 || line.expected_qty <= 0 {
+        if line.line_no == 0 || line.expected_qty <= wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
         let has_batch = line

@@ -9,20 +9,20 @@ impl PgWave3Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<ReceivingInspectionRecord>, Wave3RepositoryError> {
-        if req.accepted_qty < 0 || req.rejected_qty < 0 {
+        if req.accepted_qty < wms_domain::Quantity::ZERO || req.rejected_qty < wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
         let inspected_qty = req
             .accepted_qty
             .checked_add(req.rejected_qty)
-            .filter(|qty| *qty > 0)
+            .filter(|qty| *qty > wms_domain::Quantity::ZERO)
             .ok_or(Wave3RepositoryError::InvalidQuantity)?;
         if req.batch_no.trim().is_empty() {
             return Err(Wave3RepositoryError::InvalidBatchPolicy);
         }
         let quality_checks = validate_inspection_quality_checks(&req)?;
-        let sampling_qty = req.sampling_qty.unwrap_or(0);
-        if sampling_qty <= 0 {
+        let sampling_qty = req.sampling_qty.unwrap_or(wms_domain::Quantity::ZERO);
+        if sampling_qty <= wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::MissingRequiredField(
                 "sampling_qty".to_string(),
             ));
@@ -64,16 +64,16 @@ impl PgWave3Repository {
             });
         }
 
-        let received_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(actual_qty), 0)::BIGINT FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
+        let received_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(actual_qty), 0) FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        let total_previous_inspected_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
+        let total_previous_inspected_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0) FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
@@ -180,8 +180,8 @@ impl PgWave3Repository {
                 return Err(Wave3RepositoryError::DrugInspectionUnqualifiedBlocked);
             }
         }
-        let previous_inspected_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2 AND batch_no = $3",
+        let previous_inspected_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0) FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2 AND batch_no = $3",
         )
         .bind(id)
         .bind(ctx.owner_id)
@@ -539,23 +539,23 @@ impl PgWave3Repository {
             None
         };
 
-        let received_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(actual_qty), 0)::BIGINT FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
+        let received_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(actual_qty), 0) FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        let inspected_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
+        let inspected_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty + rejected_qty), 0) FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        if received_qty <= 0 || inspected_qty != received_qty {
+        if received_qty <= wms_domain::Quantity::ZERO || inspected_qty != received_qty {
             return Err(Wave3RepositoryError::QuantityClosureMismatch);
         }
         let incomplete_lines: i64 = sqlx::query_scalar(

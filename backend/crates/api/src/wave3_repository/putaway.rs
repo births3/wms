@@ -1,4 +1,5 @@
 use super::*;
+use rust_decimal::prelude::ToPrimitive;
 use serde_json::Value;
 
 #[derive(FromRow)]
@@ -316,7 +317,7 @@ impl PgWave3Repository {
         receiving_order_id: Uuid,
         query: PutawayRecommendationQuery,
     ) -> Result<PutawayRecommendationResponse, Wave3RepositoryError> {
-        if query.qty <= 0 || query.limit == Some(0) {
+        if query.qty <= wms_domain::Quantity::ZERO || query.limit == Some(0) {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
@@ -382,8 +383,9 @@ impl PgWave3Repository {
             return Err(Wave3RepositoryError::NotFound);
         }
 
-        let (accepted_qty, putaway_qty): (i64, i64) = sqlx::query_as(
-            r#"
+        let (accepted_qty, putaway_qty): (wms_domain::Quantity, wms_domain::Quantity) =
+            sqlx::query_as(
+                r#"
             SELECT
                 COALESCE((
                     SELECT SUM(accepted_qty)
@@ -391,7 +393,7 @@ impl PgWave3Repository {
                      WHERE receiving_order_id = $1
                        AND owner_id = $2
                        AND batch_no = $3
-                ), 0)::BIGINT,
+                ), 0),
                 COALESCE((
                     SELECT SUM(qty)
                       FROM receiving_putaways
@@ -399,17 +401,17 @@ impl PgWave3Repository {
                        AND owner_id = $2
                        AND product_code = $4
                        AND batch_no = $3
-                ), 0)::BIGINT
+                ), 0)
             "#,
-        )
-        .bind(receiving_order_id)
-        .bind(ctx.owner_id)
-        .bind(&query.batch_no)
-        .bind(&query.product_code)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(map_db_error)?;
-        if accepted_qty <= 0 {
+            )
+            .bind(receiving_order_id)
+            .bind(ctx.owner_id)
+            .bind(&query.batch_no)
+            .bind(&query.product_code)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+        if accepted_qty <= wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::NotFound);
         }
         let remaining_qty = accepted_qty
@@ -428,10 +430,7 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?
         .ok_or(Wave3RepositoryError::NotFound)?;
-        let unit_volume_cm3 = product_unit_volume_cm3(product.volume_cm3)?;
-        let required_volume_cm3 = unit_volume_cm3
-            .checked_mul(query.qty)
-            .ok_or(Wave3RepositoryError::InvalidQuantity)?;
+        let required_volume_cm3 = product_required_volume_cm3(product.volume_cm3, query.qty)?;
         let quality_color =
             resolve_quality_color(&mut tx, ctx.owner_id, &query.quality_status, Utc::now()).await?;
 
@@ -567,6 +566,29 @@ pub(super) fn product_unit_volume_cm3(
         .filter(|value| *value < i64::MAX as f64)
         .ok_or(Wave3RepositoryError::InvalidProductVolume)?;
     Ok(value as i64)
+}
+
+pub(super) fn product_required_volume_cm3(
+    volume_cm3: Option<f64>,
+    qty: wms_domain::Quantity,
+) -> Result<i64, Wave3RepositoryError> {
+    wms_domain::Quantity::from(product_unit_volume_cm3(volume_cm3)?)
+        .checked_mul(qty)
+        .and_then(|value| value.ceil().to_i64())
+        .ok_or(Wave3RepositoryError::InvalidQuantity)
+}
+
+#[cfg(test)]
+mod decimal_volume_tests {
+    use super::*;
+
+    #[test]
+    fn fractional_quantity_reserves_rounded_up_volume() {
+        assert_eq!(
+            product_required_volume_cm3(Some(10.0), "1.25".parse().unwrap()).unwrap(),
+            13
+        );
+    }
 }
 
 /// 按策略 `rule_priority` 比较库位；未配置时按 enabled_rules 回退。

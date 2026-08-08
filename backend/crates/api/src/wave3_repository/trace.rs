@@ -15,7 +15,7 @@ struct InventoryMovementRow {
     owner_id: Uuid,
     batch_id: Uuid,
     movement_type: String,
-    qty_delta: i64,
+    qty_delta: wms_domain::Quantity,
     source_document_type: String,
     source_document_id: Uuid,
     occurred_at: DateTime<Utc>,
@@ -412,7 +412,7 @@ fn build_product_shares(movements: &[InventoryMovement]) -> Vec<LocationHistoryP
                 product_code,
                 product_name: movement.product_name.clone(),
                 event_count: 0,
-                total_qty_delta: 0,
+                total_qty_delta: wms_domain::Quantity::ZERO,
             });
         entry.event_count += 1;
         entry.total_qty_delta += movement.qty_delta;

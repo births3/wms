@@ -231,10 +231,10 @@ impl PgWave3Repository {
         let Some(batch_no) = batch_no else {
             return Err(Wave3RepositoryError::NotFound);
         };
-        let rows: Vec<(Uuid, Uuid, Option<String>, i64)> = match sqlx::query_as(
+        let rows: Vec<(Uuid, Uuid, Option<String>, wms_domain::Quantity)> = match sqlx::query_as(
             r#"
             SELECT order_row.customer_id, order_row.id, order_row.wms_order_no,
-                   COALESCE(line.shipped_qty, line.planned_qty, 0)::BIGINT
+                   COALESCE(line.shipped_qty, line.planned_qty, 0)
               FROM outbound_order_lines line
               JOIN outbound_orders order_row
                 ON order_row.id = line.order_id AND order_row.owner_id = line.owner_id

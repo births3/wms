@@ -108,7 +108,7 @@ impl PgWave3Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<ReceivingOrderReceipt>, Wave3RepositoryError> {
-        if req.actual_qty < 0 || req.shortage_qty < 0 || req.rejected_qty < 0 {
+        if req.actual_qty < wms_domain::Quantity::ZERO || req.shortage_qty < wms_domain::Quantity::ZERO || req.rejected_qty < wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
         let request_hash = request_hash(&serde_json::json!({
@@ -128,14 +128,34 @@ impl PgWave3Repository {
         }
 
         let order = lock_receiving_order(&mut tx, ctx.owner_id, id).await?;
+        let pending_cancel: bool = sqlx::query_scalar(
+            r#"SELECT EXISTS (
+                   SELECT 1
+                     FROM erp_order_cancel_commands command
+                     JOIN receiving_orders receiving
+                       ON receiving.owner_id=command.owner_id
+                      AND receiving.erp_bill_code=command.erp_bill_code
+                      AND receiving.erp_revision=command.revision
+                    WHERE receiving.owner_id=$1 AND receiving.id=$2
+                      AND command.order_type=1 AND command.status='pending'
+               )"#,
+        )
+        .bind(ctx.owner_id)
+        .bind(order.id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        if pending_cancel {
+            return Err(Wave3RepositoryError::PendingErpCancel);
+        }
         if order.status != "released" {
             return Err(Wave3RepositoryError::InvalidStatus {
                 expected: "released".to_string(),
                 actual: order.status,
             });
         }
-        let expected_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(expected_qty), 0)::BIGINT FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
+        let expected_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(expected_qty), 0) FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
@@ -304,8 +324,8 @@ impl PgWave3Repository {
                 actual: order.status,
             });
         }
-        let expected_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(expected_qty), 0)::BIGINT FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
+        let expected_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(expected_qty), 0) FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
@@ -317,8 +337,8 @@ impl PgWave3Repository {
             id: Uuid::new_v4(),
             receiving_order_id: id,
             owner_id: ctx.owner_id,
-            actual_qty: 0,
-            shortage_qty: 0,
+            actual_qty: wms_domain::Quantity::ZERO,
+            shortage_qty: wms_domain::Quantity::ZERO,
             rejected_qty: expected_qty,
             arrival_temperature_celsius: None,
             exception_note: Some(reason.clone()),

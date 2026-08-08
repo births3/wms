@@ -1,12 +1,52 @@
 use super::*;
 
+impl PgWave3Repository {
+    pub async fn attach_erp_receiving_identity(
+        &self,
+        owner_id: Uuid,
+        order_id: Uuid,
+        erp_bill_id: i64,
+        erp_bill_code: &str,
+        revision: i32,
+        line_no: i32,
+        partner_type: Option<&str>,
+        partner_id: Option<Uuid>,
+        partner_code: Option<&str>,
+        correlation_id: &str,
+    ) -> Result<(), Wave3RepositoryError> {
+        sqlx::query(
+            r#"
+            UPDATE receiving_orders
+               SET erp_bill_id=$3, erp_bill_code=$4, erp_revision=$5, erp_line_no=$6,
+                   partner_type=$7, partner_id=$8, partner_code=$9,
+                   erp_correlation_id=$10
+             WHERE owner_id=$1 AND id=$2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(order_id)
+        .bind(erp_bill_id)
+        .bind(erp_bill_code)
+        .bind(revision)
+        .bind(line_no)
+        .bind(partner_type)
+        .bind(partner_id)
+        .bind(partner_code)
+        .bind(correlation_id)
+        .execute(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+        Ok(())
+    }
+}
+
 #[derive(FromRow)]
 struct PutawayTaskLine {
     line_no: i32,
     product_id: Option<Uuid>,
     product_code: String,
     batch_no: Option<String>,
-    planned_qty: i64,
+    planned_qty: wms_domain::Quantity,
 }
 
 pub(super) async fn create_putaway_tasks_for_receiving_order(
@@ -21,7 +61,7 @@ pub(super) async fn create_putaway_tasks_for_receiving_order(
                line.product_id,
                line.product_code,
                line.batch_no,
-               COALESCE(SUM(inspection.accepted_qty), 0)::BIGINT AS planned_qty
+               COALESCE(SUM(inspection.accepted_qty), 0) AS planned_qty
           FROM receiving_order_lines line
           JOIN receiving_inspections inspection
             ON inspection.owner_id = line.owner_id

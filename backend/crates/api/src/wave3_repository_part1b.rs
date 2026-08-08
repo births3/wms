@@ -1,3 +1,15 @@
+#[derive(FromRow)]
+struct InboundErpFeedbackRow {
+    erp_bill_code: String,
+    erp_revision: i32,
+    erp_line_no: i32,
+    erp_correlation_id: String,
+    expected_qty: wms_domain::Quantity,
+    production_date: Option<NaiveDate>,
+    expiry_date: Option<NaiveDate>,
+    erp_goods_id: i64,
+}
+
 impl PgWave3Repository {
 pub async fn putaway_receiving_order_and_inventory(
         &self,
@@ -29,7 +41,7 @@ pub async fn putaway_receiving_order_and_inventory(
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<PutawayInventoryCommit>, Wave3RepositoryError> {
-        if req.qty <= 0 {
+        if req.qty <= wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
         let request_hash = request_hash(&serde_json::json!({
@@ -68,10 +80,8 @@ pub async fn putaway_receiving_order_and_inventory(
             .await
             .map_err(map_db_error)?
             .ok_or(Wave3RepositoryError::NotFound)?;
-        let unit_volume_cm3 = putaway::product_unit_volume_cm3(product_volume_cm3)?;
-        let required_volume_cm3 = unit_volume_cm3
-            .checked_mul(req.qty)
-            .ok_or(Wave3RepositoryError::InvalidQuantity)?;
+        let required_volume_cm3 =
+            putaway::product_required_volume_cm3(product_volume_cm3, req.qty)?;
 
         let (
             location_status,
@@ -151,8 +161,8 @@ pub async fn putaway_receiving_order_and_inventory(
         let expiry_date = line
             .expiry_date
             .ok_or_else(|| Wave3RepositoryError::InvalidDate("expiry_date".to_string()))?;
-        let accepted_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(accepted_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2 AND batch_no = $3",
+        let accepted_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty), 0) FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2 AND batch_no = $3",
         )
         .bind(id)
         .bind(ctx.owner_id)
@@ -160,7 +170,7 @@ pub async fn putaway_receiving_order_and_inventory(
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        if accepted_qty <= 0 {
+        if accepted_qty <= wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::NotFound);
         }
         let quality_status_matches: bool = sqlx::query_scalar(
@@ -186,8 +196,8 @@ pub async fn putaway_receiving_order_and_inventory(
         if !quality_status_matches {
             return Err(Wave3RepositoryError::InvalidQualityStatus);
         }
-        let existing_putaway_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(qty), 0)::BIGINT FROM receiving_putaways WHERE receiving_order_id = $1 AND owner_id = $2 AND product_code = $3 AND batch_no = $4",
+        let existing_putaway_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(qty), 0) FROM receiving_putaways WHERE receiving_order_id = $1 AND owner_id = $2 AND product_code = $3 AND batch_no = $4",
         )
         .bind(id)
         .bind(ctx.owner_id)
@@ -357,37 +367,75 @@ pub async fn putaway_receiving_order_and_inventory(
         .await
         .map_err(map_db_error)?;
 
-        // M2 上架完成 → ERP 反馈 outbox（本地闭环标记；外部投递仍待 S4）
-        sqlx::query(
+        let erp_feedback = sqlx::query_as::<_, InboundErpFeedbackRow>(
             r#"
-            INSERT INTO receiving_putaway_erp_feedback_outbox (
-                id, owner_id, putaway_id, receiving_order_id, batch_id,
-                event_type, payload, status, attempt_count, next_attempt_at,
-                created_at, updated_at
-            ) VALUES (
-                $1, $2, $3, $4, $5, 'inbound_putaway_completed', $6,
-                'pending', 0, $7, $7, $7
-            )
+            SELECT receiving.erp_bill_code, receiving.erp_revision,
+                   receiving.erp_line_no, receiving.erp_correlation_id,
+                   line.expected_qty, line.production_date, line.expiry_date,
+                   product.erp_goods_id
+              FROM receiving_orders receiving
+              JOIN receiving_order_lines line
+                ON line.owner_id = receiving.owner_id
+               AND line.receiving_order_id = receiving.id
+               AND line.line_no = receiving.erp_line_no
+              JOIN products product
+                ON product.owner_id = line.owner_id
+               AND product.product_code = line.product_code
+             WHERE receiving.owner_id = $1 AND receiving.id = $2
+               AND receiving.erp_bill_code IS NOT NULL
+               AND receiving.erp_revision IS NOT NULL
+               AND receiving.erp_line_no IS NOT NULL
+               AND receiving.erp_correlation_id IS NOT NULL
+               AND product.erp_goods_id IS NOT NULL
             "#,
         )
-        .bind(Uuid::new_v4())
         .bind(ctx.owner_id)
-        .bind(putaway.id)
         .bind(id)
-        .bind(inventory_batch.id)
-        .bind(serde_json::json!({
-            "warehouse_id": order.warehouse_id,
-            "product_code": req.product_code,
-            "batch_no": req.batch_no,
-            "qty": req.qty,
-            "location_code": req.location_code,
-            "lpn_code": lpn_code,
-            "quality_status": req.quality_status,
-        }))
-        .bind(now)
-        .execute(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(map_db_error)?;
+        if let Some(erp) = &erp_feedback {
+            sqlx::query(
+                r#"
+                INSERT INTO receiving_putaway_erp_feedback_outbox (
+                    id, owner_id, putaway_id, receiving_order_id, batch_id,
+                    event_type, payload, status, attempt_count, next_attempt_at,
+                    created_at, updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, 'inbound_putaway_completed', $6,
+                    'pending', 0, $7, $7, $7
+                )
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(ctx.owner_id)
+            .bind(putaway.id)
+            .bind(id)
+            .bind(inventory_batch.id)
+            .bind(serde_json::json!({
+                "warehouse_id": order.warehouse_id,
+                "erp_bill_code": erp.erp_bill_code,
+                "revision": erp.erp_revision,
+                "line_no": erp.erp_line_no,
+                "goods_id": erp.erp_goods_id,
+                "product_code": req.product_code,
+                "expected_amount": format!("{:.4}", erp.expected_qty),
+                "actual_amount": format!("{:.4}", req.qty),
+                "reject_amount": "0.0000",
+                "shortage_amount": "0.0000",
+                "batch_no": req.batch_no,
+                "production_date": erp.production_date,
+                "expiry_date": erp.expiry_date,
+                "location_code": req.location_code,
+                "operator_name": ctx.actor_name,
+                "scan_time": now,
+                "correlation_id": erp.erp_correlation_id,
+            }))
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_db_error)?;
+        }
 
         let location_updated = sqlx::query(
             r#"
@@ -414,23 +462,25 @@ pub async fn putaway_receiving_order_and_inventory(
             return Err(Wave3RepositoryError::LocationCapacityExceeded);
         }
 
-        let accepted_total: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(accepted_qty), 0)::BIGINT FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
+        let accepted_total: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(accepted_qty), 0) FROM receiving_inspections WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        let putaway_total: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(qty), 0)::BIGINT FROM receiving_putaways WHERE receiving_order_id = $1 AND owner_id = $2",
+        let putaway_total: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(qty), 0) FROM receiving_putaways WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        let next_status = if accepted_total > 0 && putaway_total >= accepted_total {
+        let next_status = if accepted_total > wms_domain::Quantity::ZERO
+            && putaway_total >= accepted_total
+        {
             "completed"
         } else {
             "putaway"
@@ -445,6 +495,84 @@ pub async fn putaway_receiving_order_and_inventory(
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;
+
+        if next_status == "completed" {
+            if let Some(erp) = erp_feedback {
+                let all_completed: bool = sqlx::query_scalar(
+                    r#"
+                    SELECT NOT EXISTS (
+                        SELECT 1
+                          FROM receiving_orders
+                         WHERE owner_id = $1
+                           AND erp_bill_code = $2
+                           AND erp_revision = $3
+                           AND status <> 'completed'
+                    )
+                    "#,
+                )
+                .bind(ctx.owner_id)
+                .bind(&erp.erp_bill_code)
+                .bind(erp.erp_revision)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(map_db_error)?;
+                if all_completed {
+                    let result_count: i64 = sqlx::query_scalar(
+                        r#"
+                        SELECT COUNT(*)
+                          FROM receiving_putaway_erp_feedback_outbox
+                         WHERE owner_id = $1
+                           AND event_type = 'inbound_putaway_completed'
+                           AND payload ->> 'erp_bill_code' = $2
+                           AND payload ->> 'revision' = $3::text
+                        "#,
+                    )
+                    .bind(ctx.owner_id)
+                    .bind(&erp.erp_bill_code)
+                    .bind(erp.erp_revision)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(map_db_error)?;
+                    let barrier_key = format!(
+                        "inbound-complete:{}:{}",
+                        erp.erp_bill_code, erp.erp_revision
+                    );
+                    sqlx::query(
+                        r#"
+                        INSERT INTO receiving_putaway_erp_feedback_outbox (
+                            id, owner_id, putaway_id, receiving_order_id, batch_id,
+                            command_id, event_type, payload, status, attempt_count,
+                            next_attempt_at, created_at, updated_at
+                        ) VALUES (
+                            $1, $2, NULL, $3, NULL, $4, 'order_status', $5,
+                            'pending', 0, $6, $6, $6
+                        )
+                        ON CONFLICT (owner_id, command_id) WHERE command_id IS NOT NULL
+                        DO NOTHING
+                        "#,
+                    )
+                    .bind(Uuid::new_v4())
+                    .bind(ctx.owner_id)
+                    .bind(id)
+                    .bind(barrier_key)
+                    .bind(serde_json::json!({
+                        "warehouse_id": order.warehouse_id,
+                        "erp_bill_code": erp.erp_bill_code,
+                        "revision": erp.erp_revision,
+                        "order_type": 1,
+                        "feedback_type": 2,
+                        "result_count": result_count,
+                        "correlation_id": erp.erp_correlation_id,
+                        "feedback_time": now,
+                        "operator_name": ctx.actor_name,
+                    }))
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(map_db_error)?;
+                }
+            }
+        }
 
         let result = PutawayInventoryCommit {
             putaway,

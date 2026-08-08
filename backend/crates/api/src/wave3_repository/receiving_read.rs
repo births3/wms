@@ -353,15 +353,15 @@ impl PgWave3Repository {
                 actual: locked.status,
             });
         }
-        let shortage_qty: i64 = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(shortage_qty), 0)::BIGINT FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
+        let shortage_qty: wms_domain::Quantity = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(shortage_qty), 0) FROM receiving_order_receipts WHERE receiving_order_id = $1 AND owner_id = $2",
         )
         .bind(id)
         .bind(ctx.owner_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_error)?;
-        if shortage_qty <= 0 {
+        if shortage_qty <= wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
 

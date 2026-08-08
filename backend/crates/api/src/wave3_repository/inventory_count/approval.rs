@@ -69,12 +69,19 @@ impl PgWave3Repository {
         })?;
 
         let mut adjustments = Vec::new();
-        let mut snapshots = BTreeMap::<Uuid, Vec<serde_json::Value>>::new();
+        let mut snapshots = BTreeMap::<
+            Uuid,
+            BTreeMap<
+                (String, String, chrono::NaiveDate, String),
+                (wms_domain::Quantity, wms_domain::Quantity),
+            >,
+        >::new();
         for line in &lines {
             let batch = sqlx::query_as::<_, InventoryCountBatchRow>(
                 r#"
                 SELECT batch.id, location.warehouse_id, batch.product_code,
-                       batch.batch_no, batch.qty_on_hand, batch.qty_locked
+                       batch.batch_no, batch.expiry_date, batch.quality_status,
+                       batch.qty_on_hand, batch.qty_locked
                   FROM inventory_batches batch
                   JOIN warehouse_locations location
                     ON location.owner_id = batch.owner_id
@@ -115,7 +122,7 @@ impl PgWave3Repository {
             if updated.rows_affected() != 1 {
                 return Err(Wave3RepositoryError::InventoryCountQuantityConflict);
             }
-            if variance_qty != 0 {
+            if variance_qty != wms_domain::Quantity::ZERO {
                 sqlx::query(
                     r#"
                     INSERT INTO inventory_movements (
@@ -148,19 +155,17 @@ impl PgWave3Repository {
             snapshots
                 .entry(batch.warehouse_id)
                 .or_default()
-                .push(json!({
-                    "batch_id": batch.id,
-                    "location_id": line.location_id,
-                    "location_code": line.location_code,
-                    "product_code": batch.product_code,
-                    "batch_no": batch.batch_no,
-                    "book_qty": line.book_qty,
-                    "physical_qty": line.physical_qty,
-                    "variance_qty": variance_qty,
-                    "qty_on_hand": next_qty,
-                    "qty_locked": batch.qty_locked,
-                    "qty_available": next_qty - batch.qty_locked,
-                }));
+                .entry((
+                    batch.product_code,
+                    batch.batch_no,
+                    batch.expiry_date,
+                    batch.quality_status,
+                ))
+                .and_modify(|(amount, allocated)| {
+                    *amount += next_qty;
+                    *allocated += batch.qty_locked;
+                })
+                .or_insert((next_qty, batch.qty_locked));
         }
 
         sqlx::query(
@@ -182,8 +187,31 @@ impl PgWave3Repository {
         .map_err(map_db_error)?;
 
         let approved = load_inventory_count_in_tx(&mut tx, ctx.owner_id, count_id).await?;
-        for (warehouse_id, lines) in snapshots {
-            let snapshot_no = format!("{count_id}:{warehouse_id}");
+        for (warehouse_id, grouped) in snapshots {
+            let outbox_id = Uuid::new_v4();
+            let snapshot_no = outbox_id.simple().to_string();
+            let lines = grouped
+                .into_iter()
+                .enumerate()
+                .map(
+                    |(
+                        index,
+                        ((product_code, batch_no, valid_date, goods_status), (amount, allocated)),
+                    )| {
+                        json!({
+                            "row_no": index + 1,
+                            "product_code": product_code,
+                            "batch_no": batch_no,
+                            "valid_date": valid_date,
+                            "goods_status": goods_status,
+                            "wms_amount": format!("{amount:.4}"),
+                            "wms_pickable": format!("{:.4}", amount - allocated),
+                            "wms_allocated": format!("{allocated:.4}"),
+                            "wms_frozen": "0.0000",
+                        })
+                    },
+                )
+                .collect::<Vec<_>>();
             sqlx::query(
                 r#"
                 INSERT INTO inventory_snapshot_erp_feedback_outbox (
@@ -191,12 +219,14 @@ impl PgWave3Repository {
                 ) VALUES ($1, $2, $3, $4, $5, $5)
                 "#,
             )
-            .bind(Uuid::new_v4())
+            .bind(outbox_id)
             .bind(ctx.owner_id)
             .bind(&snapshot_no)
             .bind(json!({
                 "warehouse_id": warehouse_id,
-                "snapshot_no": snapshot_no,
+                "snapshot_id": snapshot_no,
+                "receive_time": now,
+                "correlation_id": outbox_id,
                 "count_id": count_id,
                 "count_type": count.count_type,
                 "zone_id": count.zone_id,

@@ -10,7 +10,7 @@ struct RelocationRow {
     batch_id: Uuid,
     product_code: String,
     batch_no: String,
-    qty: i64,
+    qty: wms_domain::Quantity,
     from_location_id: Uuid,
     from_location_code: String,
     to_location_id: Uuid,
@@ -34,7 +34,7 @@ impl PgWave3Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<InventoryRelocation>, Wave3RepositoryError> {
-        if req.qty <= 0 {
+        if req.qty <= wms_domain::Quantity::ZERO {
             return Err(Wave3RepositoryError::InvalidQuantity);
         }
         let mode = req
@@ -170,9 +170,10 @@ impl PgWave3Repository {
             return Err(Wave3RepositoryError::LocationSkuLimitExceeded);
         }
 
-        let target_batch_id = if req.qty == batch.qty_on_hand && batch.qty_locked == 0 {
-            sqlx::query(
-                r#"
+        let target_batch_id =
+            if req.qty == batch.qty_on_hand && batch.qty_locked == wms_domain::Quantity::ZERO {
+                sqlx::query(
+                    r#"
                 UPDATE inventory_batches
                    SET location_id = $3,
                        location_code = $4,
@@ -180,97 +181,97 @@ impl PgWave3Repository {
                        version = version + 1
                  WHERE id = $1 AND owner_id = $2
                 "#,
-            )
-            .bind(batch.id)
-            .bind(ctx.owner_id)
-            .bind(req.to_location_id)
-            .bind(&req.to_location_code)
-            .bind(now)
-            .execute(&mut *tx)
-            .await
-            .map_err(map_db_error)?;
-            batch.id
-        } else {
-            sqlx::query(
-                r#"
-                UPDATE inventory_batches
-                   SET qty_on_hand = qty_on_hand - $3,
-                       updated_at = $4,
-                       version = version + 1
-                 WHERE id = $1 AND owner_id = $2
-                "#,
-            )
-            .bind(batch.id)
-            .bind(ctx.owner_id)
-            .bind(req.qty)
-            .bind(now)
-            .execute(&mut *tx)
-            .await
-            .map_err(map_db_error)?;
-
-            let existing_target: Option<Uuid> = sqlx::query_scalar(
-                r#"
-                SELECT id FROM inventory_batches
-                 WHERE owner_id = $1 AND product_code = $2 AND batch_no = $3
-                   AND location_id = $4 AND quality_status = $5 AND recall_flag = FALSE
-                 FOR UPDATE
-                "#,
-            )
-            .bind(ctx.owner_id)
-            .bind(&batch.product_code)
-            .bind(&batch.batch_no)
-            .bind(req.to_location_id)
-            .bind(&batch.quality_status)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(map_db_error)?;
-
-            if let Some(target_id) = existing_target {
-                sqlx::query(
-                    r#"
-                    UPDATE inventory_batches
-                       SET qty_on_hand = qty_on_hand + $3,
-                           updated_at = $4,
-                           version = version + 1
-                     WHERE id = $1 AND owner_id = $2
-                    "#,
                 )
-                .bind(target_id)
+                .bind(batch.id)
                 .bind(ctx.owner_id)
-                .bind(req.qty)
-                .bind(now)
-                .execute(&mut *tx)
-                .await
-                .map_err(map_db_error)?;
-                target_id
-            } else {
-                let new_id = Uuid::new_v4();
-                sqlx::query(
-                    r#"
-                    INSERT INTO inventory_batches (
-                        id, owner_id, product_code, batch_no, production_date, expiry_date,
-                        qty_on_hand, qty_locked, quality_status, location_id, location_code,
-                        recall_flag, created_at, updated_at
-                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,0,$8,$9,$10,FALSE,$11,$11)
-                    "#,
-                )
-                .bind(new_id)
-                .bind(ctx.owner_id)
-                .bind(&batch.product_code)
-                .bind(&batch.batch_no)
-                .bind(batch.production_date)
-                .bind(batch.expiry_date)
-                .bind(req.qty)
-                .bind(&batch.quality_status)
                 .bind(req.to_location_id)
                 .bind(&req.to_location_code)
                 .bind(now)
                 .execute(&mut *tx)
                 .await
                 .map_err(map_db_error)?;
-                new_id
-            }
-        };
+                batch.id
+            } else {
+                sqlx::query(
+                    r#"
+                UPDATE inventory_batches
+                   SET qty_on_hand = qty_on_hand - $3,
+                       updated_at = $4,
+                       version = version + 1
+                 WHERE id = $1 AND owner_id = $2
+                "#,
+                )
+                .bind(batch.id)
+                .bind(ctx.owner_id)
+                .bind(req.qty)
+                .bind(now)
+                .execute(&mut *tx)
+                .await
+                .map_err(map_db_error)?;
+
+                let existing_target: Option<Uuid> = sqlx::query_scalar(
+                    r#"
+                SELECT id FROM inventory_batches
+                 WHERE owner_id = $1 AND product_code = $2 AND batch_no = $3
+                   AND location_id = $4 AND quality_status = $5 AND recall_flag = FALSE
+                 FOR UPDATE
+                "#,
+                )
+                .bind(ctx.owner_id)
+                .bind(&batch.product_code)
+                .bind(&batch.batch_no)
+                .bind(req.to_location_id)
+                .bind(&batch.quality_status)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(map_db_error)?;
+
+                if let Some(target_id) = existing_target {
+                    sqlx::query(
+                        r#"
+                    UPDATE inventory_batches
+                       SET qty_on_hand = qty_on_hand + $3,
+                           updated_at = $4,
+                           version = version + 1
+                     WHERE id = $1 AND owner_id = $2
+                    "#,
+                    )
+                    .bind(target_id)
+                    .bind(ctx.owner_id)
+                    .bind(req.qty)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(map_db_error)?;
+                    target_id
+                } else {
+                    let new_id = Uuid::new_v4();
+                    sqlx::query(
+                        r#"
+                    INSERT INTO inventory_batches (
+                        id, owner_id, product_code, batch_no, production_date, expiry_date,
+                        qty_on_hand, qty_locked, quality_status, location_id, location_code,
+                        recall_flag, created_at, updated_at
+                    ) VALUES ($1,$2,$3,$4,$5,$6,$7,0,$8,$9,$10,FALSE,$11,$11)
+                    "#,
+                    )
+                    .bind(new_id)
+                    .bind(ctx.owner_id)
+                    .bind(&batch.product_code)
+                    .bind(&batch.batch_no)
+                    .bind(batch.production_date)
+                    .bind(batch.expiry_date)
+                    .bind(req.qty)
+                    .bind(&batch.quality_status)
+                    .bind(req.to_location_id)
+                    .bind(&req.to_location_code)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(map_db_error)?;
+                    new_id
+                }
+            };
 
         let relocation_id = Uuid::new_v4();
         sqlx::query(

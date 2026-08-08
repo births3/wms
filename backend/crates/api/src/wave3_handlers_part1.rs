@@ -54,7 +54,7 @@ fn receiving_line() -> ReceivingOrderLine {
         line_no: 1,
         product_id: None,
         product_code: "P-001".to_string(),
-        expected_qty: 10,
+        expected_qty: 10.into(),
         batch_no: None,
         production_date: None,
         expiry_date: None,
@@ -94,7 +94,7 @@ fn inventory_putaway_req() -> PutawayInventoryRequest {
         batch_no: "B202606".to_string(),
         production_date: "2026-01-01".to_string(),
         expiry_date: "2028-01-01".to_string(),
-        qty: 10,
+        qty: 10.into(),
         quality_status: STATUS_QUALIFIED.to_string(),
         location_id: Uuid::new_v4(),
         location_code: "A-01-01".to_string(),
@@ -322,9 +322,9 @@ async fn inbound_receive_handler_requires_permission_and_appends_audit() {
     };
 
     let req = ReceiveReceivingOrderRequest {
-        actual_qty: 8,
-        shortage_qty: 2,
-        rejected_qty: 0,
+        actual_qty: 8.into(),
+        shortage_qty: 2.into(),
+        rejected_qty: wms_domain::Quantity::ZERO,
         arrival_temperature_celsius: None,
         exception_note: None,
         details: Some(ReceivingReceiptDetails {
@@ -384,7 +384,7 @@ async fn inbound_receive_handler_requires_permission_and_appends_audit() {
     .await
     .expect("authorized receive should succeed");
 
-    assert_eq!(receipt.actual_qty, 8);
+    assert_eq!(receipt.actual_qty, 8.into());
     let audit_log = state.audit_log.lock().await;
     assert_eq!(audit_log.events().len(), 1);
     assert_eq!(audit_log.events()[0].action, "receive");
@@ -433,9 +433,9 @@ async fn postgres_receive_handler_writes_business_idempotency_and_audit(pool: Pg
         .expect("release order");
 
     let req = ReceiveReceivingOrderRequest {
-        actual_qty: 8,
-        shortage_qty: 2,
-        rejected_qty: 0,
+        actual_qty: 8.into(),
+        shortage_qty: 2.into(),
+        rejected_qty: wms_domain::Quantity::ZERO,
         arrival_temperature_celsius: None,
         exception_note: None,
         details: Some(ReceivingReceiptDetails {
@@ -547,9 +547,9 @@ async fn postgres_putaway_handler_commits_inventory_and_audit(pool: PgPool) {
             &authorized,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 10,
-                shortage_qty: 0,
-                rejected_qty: 0,
+                actual_qty: 10.into(),
+                shortage_qty: wms_domain::Quantity::ZERO,
+                rejected_qty: wms_domain::Quantity::ZERO,
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
@@ -580,8 +580,8 @@ async fn postgres_putaway_handler_commits_inventory_and_audit(pool: PgPool) {
             order.id,
             InspectReceivingOrderRequest {
                 batch_no: "B202606".to_string(),
-                accepted_qty: 10,
-                rejected_qty: 0,
+                accepted_qty: 10.into(),
+                rejected_qty: wms_domain::Quantity::ZERO,
                 production_date: "2026-01-01".to_string(),
                 expiry_date: "2028-01-01".to_string(),
                 quality_status: STATUS_QUALIFIED.to_string(),
@@ -591,7 +591,7 @@ async fn postgres_putaway_handler_commits_inventory_and_audit(pool: PgPool) {
                 package_check: Some("完好".to_string()),
                 instruction_check: Some("有".to_string()),
                 label_check: Some("清晰".to_string()),
-                sampling_qty: Some(1),
+                sampling_qty: Some(1.into()),
                 approval_no: None,
             },
             now.date_naive(),
@@ -615,7 +615,7 @@ async fn postgres_putaway_handler_commits_inventory_and_audit(pool: PgPool) {
         Json(PutawayRequest {
             batch_no: "B202606".to_string(),
             product_code: "P-001".to_string(),
-            qty: 10,
+            qty: 10.into(),
             location_id,
             location_code,
             quality_status: crate::inventory::STATUS_QUALIFIED.to_string(),

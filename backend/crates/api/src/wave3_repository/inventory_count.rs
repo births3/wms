@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde_json::json;
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
@@ -50,9 +50,9 @@ struct InventoryCountLineRow {
     location_code: String,
     product_code: String,
     batch_no: String,
-    book_qty: i64,
-    physical_qty: Option<i64>,
-    variance_qty: Option<i64>,
+    book_qty: wms_domain::Quantity,
+    physical_qty: Option<wms_domain::Quantity>,
+    variance_qty: Option<wms_domain::Quantity>,
     variance_type: Option<String>,
 }
 
@@ -62,8 +62,10 @@ struct InventoryCountBatchRow {
     warehouse_id: Uuid,
     product_code: String,
     batch_no: String,
-    qty_on_hand: i64,
-    qty_locked: i64,
+    expiry_date: NaiveDate,
+    quality_status: String,
+    qty_on_hand: wms_domain::Quantity,
+    qty_locked: wms_domain::Quantity,
 }
 
 impl PgWave3Repository {
@@ -112,8 +114,8 @@ impl PgWave3Repository {
                    batch.product_code,
                    batch.batch_no,
                    batch.qty_on_hand - batch.qty_locked AS book_qty,
-                   NULL::BIGINT AS physical_qty,
-                   NULL::BIGINT AS variance_qty,
+                   NULL::NUMERIC AS physical_qty,
+                   NULL::NUMERIC AS variance_qty,
                    NULL::TEXT AS variance_type
               FROM inventory_batches AS batch
               JOIN warehouse_locations AS location
@@ -591,7 +593,11 @@ fn map_inventory_count_line(line: InventoryCountLineRow, redact_book: bool) -> I
         location_code: line.location_code,
         product_code: line.product_code,
         batch_no: line.batch_no,
-        book_qty: if hide { 0 } else { line.book_qty },
+        book_qty: if hide {
+            wms_domain::Quantity::ZERO
+        } else {
+            line.book_qty
+        },
         physical_qty: line.physical_qty,
         variance_qty: if hide { None } else { line.variance_qty },
         variance_type: if hide { None } else { line.variance_type },
