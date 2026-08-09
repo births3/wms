@@ -31,7 +31,9 @@ pub struct H8ProductMasterInboundRequest {
     pub product_code: Option<String>,
     pub product_name: Option<String>,
     pub approval_no: Option<String>,
-    pub spec: Option<String>,
+    #[serde(default)]
+    #[schema(required = true)]
+    pub spec: String,
     pub dosage_form: Option<String>,
     pub manufacturer: Option<String>,
     pub special_drug_category: Option<String>,
@@ -155,10 +157,7 @@ fn validate_request(
                 .product_name
                 .as_deref()
                 .is_none_or(|value| value.trim().is_empty())
-            || body
-                .spec
-                .as_deref()
-                .is_none_or(|value| value.trim().is_empty())
+            || body.spec.trim().is_empty()
             || body
                 .storage_condition
                 .as_deref()
@@ -199,12 +198,7 @@ async fn product_request(
         .product_name
         .as_deref()
         .ok_or_else(|| H8InboundError::Unprocessable("product name is required".to_string()))?;
-    let specification = body
-        .spec
-        .as_deref()
-        .ok_or_else(|| H8InboundError::Unprocessable("spec is required".to_string()))?
-        .trim()
-        .to_string();
+    let specification = body.spec.trim().to_string();
     let storage_condition = map_value(
         state,
         ctx,

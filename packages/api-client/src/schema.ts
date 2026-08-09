@@ -8266,7 +8266,7 @@ export interface components {
             schema_version: string;
             /** Format: int64 */
             source_version: number;
-            spec?: string | null;
+            spec: string;
             special_drug_category?: string | null;
             storage_condition?: string | null;
             udi_code?: string | null;
