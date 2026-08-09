@@ -6014,8 +6014,8 @@ export interface components {
             status: string;
         };
         BillingChargeCalculation: {
-            /** Format: int64 */
-            amount_cents: number;
+            /** Format: decimal */
+            amount_cents: string;
             charge_item: string;
             /** Format: uuid */
             contract_id: string;
@@ -6027,8 +6027,8 @@ export interface components {
             owner_id: string;
             period_end: string;
             period_start: string;
-            /** Format: int64 */
-            quantity: number;
+            /** Format: decimal */
+            quantity: string;
             source_refs: string[];
             status: string;
         };
@@ -6060,8 +6060,8 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             unit: string;
-            /** Format: int64 */
-            unit_price_cents: number;
+            /** Format: decimal */
+            unit_price_cents: string;
         };
         BillingStatement: {
             charge_ids: string[];
@@ -6076,8 +6076,8 @@ export interface components {
             period_end: string;
             period_start: string;
             status: string;
-            /** Format: int64 */
-            total_amount_cents: number;
+            /** Format: decimal */
+            total_amount_cents: string;
             /** Format: date-time */
             updated_at: string;
         };
@@ -6118,8 +6118,8 @@ export interface components {
             contract_id: string;
             period_end: string;
             period_start: string;
-            /** Format: int64 */
-            quantity: number;
+            /** Format: decimal */
+            quantity: string;
             source_refs: string[];
         };
         CancelDockAppointmentRequest: {
@@ -6239,8 +6239,8 @@ export interface components {
             exception_note?: string | null;
             /** Format: int32 */
             line_no: number;
-            /** Format: int64 */
-            picked_qty: number;
+            /** Format: decimal */
+            picked_qty: string;
         };
         /** @description M1-008 配置中心条目。 */
         ConfigEntry: {
@@ -6349,8 +6349,8 @@ export interface components {
             effective_from: string;
             effective_to: string;
             unit: string;
-            /** Format: int64 */
-            unit_price_cents: number;
+            /** Format: decimal */
+            unit_price_cents: string;
         };
         CreateColdChainDeviceRequest: {
             /** Format: date-time */
@@ -6365,8 +6365,8 @@ export interface components {
             /** Format: uuid */
             outbound_order_id: string;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             /** Format: uuid */
             store_id: string;
         };
@@ -6575,8 +6575,8 @@ export interface components {
             batch_no: string;
             /** Format: int32 */
             line_no: number;
-            /** Format: int64 */
-            planned_qty: number;
+            /** Format: decimal */
+            planned_qty: string;
             product_code: string;
         };
         CreateOutboundOrderRequest: {
@@ -6689,8 +6689,8 @@ export interface components {
         };
         CreatePurchaseReturnRequest: {
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             reason: string;
             return_no: string;
             source_purchase_order_no: string;
@@ -6738,16 +6738,16 @@ export interface components {
             warehouse_id: string;
         };
         CreateRetailReplenishmentSuggestionRequest: {
-            /** Format: int64 */
-            current_qty: number;
-            /** Format: int64 */
-            daily_sales_avg: number;
-            /** Format: int64 */
-            in_transit_qty: number;
-            /** Format: int64 */
-            max_qty: number;
-            /** Format: int64 */
-            min_qty: number;
+            /** Format: decimal */
+            current_qty: string;
+            /** Format: decimal */
+            daily_sales_avg: string;
+            /** Format: decimal */
+            in_transit_qty: string;
+            /** Format: decimal */
+            max_qty: string;
+            /** Format: decimal */
+            min_qty: string;
             period_key: string;
             product_code: string;
             /** Format: uuid */
@@ -6776,8 +6776,8 @@ export interface components {
             /** Format: uuid */
             batch_id: string;
             external_ref?: string | null;
-            /** Format: int64 */
-            quantity: number;
+            /** Format: decimal */
+            quantity: string;
             reason: components["schemas"]["StockLossReason"];
             recall_id?: string | null;
             requires_quality_approval: boolean;
@@ -6789,8 +6789,8 @@ export interface components {
             /** Format: uuid */
             batch_id: string;
             external_ref?: string | null;
-            /** Format: int64 */
-            quantity: number;
+            /** Format: decimal */
+            quantity: string;
             reason: components["schemas"]["StockSurplusReason"];
             requires_quality_approval: boolean;
             source: components["schemas"]["StockAdjustmentSource"];
@@ -6829,8 +6829,8 @@ export interface components {
             /** Format: uuid */
             batch_id?: string | null;
             batch_no?: string | null;
-            /** Format: int64 */
-            planned_qty: number;
+            /** Format: decimal */
+            planned_qty: string;
             /** Format: uuid */
             predecessor_task_id?: string | null;
             /** Format: int32 */
@@ -6878,8 +6878,8 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             status: string;
             /** Format: uuid */
             store_id: string;
@@ -7464,8 +7464,8 @@ export interface components {
         ErpInventorySnapshotItem: {
             batch_no: string;
             product_code: string;
-            /** Format: int64 */
-            qty_on_hand: number;
+            /** Format: decimal */
+            qty_on_hand: string;
         };
         /** @description 统一错误响应。 */
         ErrorResponse: {
@@ -7743,8 +7743,8 @@ export interface components {
             operator_id?: string | null;
             operator_name?: string | null;
             product_code?: string | null;
-            /** Format: int64 */
-            quantity_delta?: number | null;
+            /** Format: decimal */
+            quantity_delta: string | null;
             /** @description 自由结构 JSON 对象。 */
             values: {
                 [key: string]: unknown;
@@ -7865,22 +7865,40 @@ export interface components {
             status: string;
         };
         H8AsnInboundRequest: {
+            /** Format: date */
+            business_date: string;
             correlation_id: string;
-            document_type: string;
-            /** Format: date-time */
-            expected_arrival_at: string;
+            depot_code: string;
+            erp_bill_code: string;
             /** Format: int64 */
-            expected_qty: number;
+            erp_bill_id: number;
             external_ref: string;
+            lines: components["schemas"]["H8AsnLineInput"][];
+            note_code?: string | null;
             /** Format: date-time */
             occurred_at: string;
-            product_code: string;
-            receipt_no: string;
+            /** Format: int32 */
+            order_type: number;
+            partner_code?: string | null;
+            partner_type?: string | null;
+            payload_digest: string;
+            /** Format: int32 */
+            revision: number;
             schema_version: string;
-            /** Format: uuid */
-            supplier_id: string;
-            /** Format: uuid */
-            warehouse_id: string;
+            /** Format: int64 */
+            source_version?: number | null;
+        };
+        H8AsnLineInput: {
+            batch_no?: string | null;
+            /** Format: decimal */
+            expected_qty: string;
+            /** Format: date */
+            expiry_date?: string | null;
+            /** Format: int32 */
+            line_no: number;
+            product_code: string;
+            /** Format: date */
+            production_date?: string | null;
         };
         H8DecryptedPayload: {
             /** Format: date-time */
@@ -8146,33 +8164,50 @@ export interface components {
             total: number;
         };
         H8InboundResponse: {
+            ignored_old_version: boolean;
             /** Format: uuid */
             message_id: string;
             replayed: boolean;
             status: string;
             wms_resource_id: string;
         };
-        H8OutboundOrderInboundRequest: {
+        H8OutboundLineInput: {
             batch_no: string;
+            /** Format: int32 */
+            line_no: number;
+            /** Format: decimal */
+            planned_qty: string;
+            product_code: string;
+        };
+        H8OutboundOrderInboundRequest: {
+            address: string;
+            address_code: string;
+            contact_name?: string | null;
+            contact_phone?: string | null;
             correlation_id: string;
-            /** Format: uuid */
-            customer_id: string;
-            /** Format: uuid */
-            delivery_address_id: string;
-            document_type: string;
-            erp_order_no?: string | null;
+            customer_code: string;
+            depot_code: string;
+            /** Format: int64 */
+            erp_address_id: number;
+            erp_bill_code: string;
+            /** Format: int64 */
+            erp_bill_id: number;
             external_ref: string;
+            lines: components["schemas"]["H8OutboundLineInput"][];
             /** Format: date-time */
             occurred_at: string;
-            /** Format: int64 */
-            planned_qty: number;
-            product_code: string;
+            /** Format: int32 */
+            order_type: number;
+            payload_digest: string;
             /** Format: date-time */
-            required_ship_at?: string | null;
+            required_ship_at: string;
+            /** Format: int32 */
+            revision: number;
             schema_version: string;
-            /** Format: uuid */
-            warehouse_id: string;
-            wms_order_no?: string | null;
+            /** Format: int32 */
+            send_mode?: number | null;
+            /** Format: int64 */
+            source_version?: number | null;
         };
         H8PayloadRetentionPolicy: {
             /** Format: uuid */
@@ -8213,6 +8248,8 @@ export interface components {
             correlation_id: string;
             dosage_form?: string | null;
             electronic_regulatory_code?: string | null;
+            /** Format: int64 */
+            entity_id: number;
             external_ref: string;
             /** Format: double */
             height_mm?: number | null;
@@ -8221,13 +8258,17 @@ export interface components {
             manufacturer?: string | null;
             /** Format: date-time */
             occurred_at: string;
-            packaging_levels: components["schemas"]["H8ProductPackagingLevelInput"][];
-            product_code: string;
-            product_name: string;
+            op_type: string;
+            packaging_levels?: components["schemas"]["H8ProductPackagingLevelInput"][];
+            payload_digest: string;
+            product_code?: string | null;
+            product_name?: string | null;
             schema_version: string;
-            spec: string;
-            special_drug_category: string;
-            storage_condition: string;
+            /** Format: int64 */
+            source_version: number;
+            spec?: string | null;
+            special_drug_category?: string | null;
+            storage_condition?: string | null;
             udi_code?: string | null;
             /** Format: double */
             volume_cm3?: number | null;
@@ -8254,8 +8295,8 @@ export interface components {
             document_type: string;
             /** Format: date-time */
             expected_arrival_at: string;
-            /** Format: int64 */
-            expected_qty: number;
+            /** Format: decimal */
+            expected_qty: string;
             external_ref: string;
             /** Format: date-time */
             occurred_at: string;
@@ -8403,8 +8444,8 @@ export interface components {
             temperature_celsius: number;
         };
         InspectReceivingOrderRequest: {
-            /** Format: int64 */
-            accepted_qty: number;
+            /** Format: decimal */
+            accepted_qty: string;
             /** @description GSP 外观/包装/说明书/标签核对（必填）。 */
             appearance_check?: string | null;
             /** @description 批准文号核对值。 */
@@ -8416,13 +8457,13 @@ export interface components {
             package_check?: string | null;
             production_date: string;
             quality_status: string;
-            /** Format: int64 */
-            rejected_qty: number;
+            /** Format: decimal */
+            rejected_qty: string;
             /**
-             * Format: int64
+             * Format: decimal
              * @description 抽验数量。
              */
-            sampling_qty?: number | null;
+            sampling_qty?: string | null;
             trace_codes: string[];
         };
         InspectionSignatureRecord: {
@@ -8449,8 +8490,8 @@ export interface components {
             created_at: string;
             /** Format: uuid */
             id: string;
-            /** Format: int64 */
-            outbound_qty: number;
+            /** Format: decimal */
+            outbound_qty: string;
             override_reason?: string | null;
             /** Format: uuid */
             owner_id: string;
@@ -8533,10 +8574,10 @@ export interface components {
             product_code: string;
             product_name?: string | null;
             production_date: string;
-            /** Format: int64 */
-            qty_locked: number;
-            /** Format: int64 */
-            qty_on_hand: number;
+            /** Format: decimal */
+            qty_locked: string;
+            /** Format: decimal */
+            qty_on_hand: string;
             quality_color?: string | null;
             quality_status: string;
             recall_flag: boolean;
@@ -8591,8 +8632,8 @@ export interface components {
         };
         InventoryCountLine: {
             batch_no: string;
-            /** Format: int64 */
-            book_qty: number;
+            /** Format: decimal */
+            book_qty: string;
             /** Format: uuid */
             count_id: string;
             /** Format: uuid */
@@ -8604,11 +8645,11 @@ export interface components {
             location_id: string;
             /** Format: uuid */
             owner_id: string;
-            /** Format: int64 */
-            physical_qty?: number | null;
+            /** Format: decimal */
+            physical_qty: string | null;
             product_code: string;
-            /** Format: int64 */
-            variance_qty?: number | null;
+            /** Format: decimal */
+            variance_qty: string | null;
             variance_type?: string | null;
         };
         InventoryCountListResponse: {
@@ -8635,8 +8676,8 @@ export interface components {
             owner_id: string;
             product_code?: string | null;
             product_name?: string | null;
-            /** Format: int64 */
-            qty_delta: number;
+            /** Format: decimal */
+            qty_delta: string;
             /** Format: uuid */
             source_document_id: string;
             source_document_type: string;
@@ -8668,8 +8709,8 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             quality_status: string;
             reason?: string | null;
             relocation_mode: string;
@@ -8754,8 +8795,8 @@ export interface components {
             event_count: number;
             product_code: string;
             product_name?: string | null;
-            /** Format: int64 */
-            total_qty_delta: number;
+            /** Format: decimal */
+            total_qty_delta: string;
         };
         LocationHistoryQuery: {
             batch_no?: string | null;
@@ -8943,17 +8984,17 @@ export interface components {
             batch_no: string;
             /** Format: int32 */
             line_no: number;
-            /** Format: int64 */
-            picked_qty: number;
-            /** Format: int64 */
-            planned_qty: number;
+            /** Format: decimal */
+            picked_qty: string;
+            /** Format: decimal */
+            planned_qty: string;
             product_code: string;
-            /** Format: int64 */
-            reviewed_qty: number;
-            /** Format: int64 */
-            shipped_qty: number;
-            /** Format: int64 */
-            short_pick_qty: number;
+            /** Format: decimal */
+            reviewed_qty: string;
+            /** Format: decimal */
+            shipped_qty: string;
+            /** Format: decimal */
+            short_pick_qty: string;
         };
         OutboundOrderListResponse: {
             data: components["schemas"]["OutboundOrder"][];
@@ -9723,8 +9764,8 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             reason: string;
             reject_reason?: string | null;
             return_no: string;
@@ -9765,8 +9806,8 @@ export interface components {
             location_id: string;
             product_code: string;
             production_date: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             quality_status: string;
             /** Format: uuid */
             source_receiving_order_id: string;
@@ -9788,8 +9829,8 @@ export interface components {
             /** Format: int32 */
             limit?: number | null;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             quality_status: string;
         };
         PutawayRecommendationResponse: {
@@ -9798,8 +9839,8 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             quality_status: string;
             /** Format: uuid */
             receiving_order_id: string;
@@ -9817,8 +9858,8 @@ export interface components {
             /** Format: uuid */
             owner_id: string;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             /** Format: uuid */
             receiving_order_id: string;
         };
@@ -9830,8 +9871,8 @@ export interface components {
             /** @description 可选容器/托盘 LPN（整托上架）。 */
             lpn_code?: string | null;
             product_code: string;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             quality_status: string;
         };
         /** @description 上架策略方案（可配置规则优先级、启停、仓库/品类绑定与无库位通知）。 */
@@ -9919,16 +9960,16 @@ export interface components {
             version: number;
         };
         ReceiveReceivingOrderRequest: {
-            /** Format: int64 */
-            actual_qty: number;
+            /** Format: decimal */
+            actual_qty: string;
             /** Format: double */
             arrival_temperature_celsius?: number | null;
             details?: components["schemas"]["ReceivingReceiptDetails"] | null;
             exception_note?: string | null;
-            /** Format: int64 */
-            rejected_qty: number;
-            /** Format: int64 */
-            shortage_qty: number;
+            /** Format: decimal */
+            rejected_qty: string;
+            /** Format: decimal */
+            shortage_qty: string;
         };
         ReceiveTmsDispatchRequest: {
             carrier_code?: string | null;
@@ -9978,15 +10019,15 @@ export interface components {
             abnormal: boolean;
             /** Format: date-time */
             created_at: string;
-            /** Format: int64 */
-            expected_qty: number;
+            /** Format: decimal */
+            expected_qty: string;
             /** Format: int64 */
             order_count: number;
             status: string;
         };
         ReceivingInspectionRecord: {
-            /** Format: int64 */
-            accepted_qty: number;
+            /** Format: decimal */
+            accepted_qty: string;
             approval_no?: string | null;
             batch_no: string;
             /** Format: uuid */
@@ -9999,10 +10040,10 @@ export interface components {
             quality_status: string;
             /** Format: uuid */
             receiving_order_id: string;
-            /** Format: int64 */
-            rejected_qty: number;
-            /** Format: int64 */
-            sampling_qty?: number | null;
+            /** Format: decimal */
+            rejected_qty: string;
+            /** Format: decimal */
+            sampling_qty?: string | null;
         };
         /** @description 收货单。 */
         ReceivingOrder: {
@@ -10031,10 +10072,10 @@ export interface components {
             /** @description 批号 */
             batch_no?: string | null;
             /**
-             * Format: int64
+             * Format: decimal
              * @description 预计数量
              */
-            expected_qty: number;
+            expected_qty: string;
             /** @description 有效期至 */
             expiry_date?: string | null;
             /**
@@ -10064,8 +10105,8 @@ export interface components {
             signatures: components["schemas"]["InspectionSignatureRecord"][];
         };
         ReceivingOrderReceipt: {
-            /** Format: int64 */
-            actual_qty: number;
+            /** Format: decimal */
+            actual_qty: string;
             /** Format: double */
             arrival_temperature_celsius?: number | null;
             details?: components["schemas"]["ReceivingReceiptDetails"] | null;
@@ -10078,10 +10119,10 @@ export interface components {
             owner_id: string;
             /** Format: uuid */
             receiving_order_id: string;
-            /** Format: int64 */
-            rejected_qty: number;
-            /** Format: int64 */
-            shortage_qty: number;
+            /** Format: decimal */
+            rejected_qty: string;
+            /** Format: decimal */
+            shortage_qty: string;
         };
         /** @description 收货现场信息。固定字段使用类型化结构，避免打印或审计依赖前端展示字符串。 */
         ReceivingReceiptDetails: {
@@ -10127,25 +10168,25 @@ export interface components {
         ReconciliationInventoryAllocation: {
             /** Format: uuid */
             inventory_batch_id: string;
-            /** Format: int64 */
-            quantity: number;
+            /** Format: decimal */
+            quantity: string;
         };
         ReconciliationItem: {
             batch_no: string;
             /** Format: date-time */
             created_at: string;
-            /** Format: int64 */
-            difference_qty: number;
+            /** Format: decimal */
+            difference_qty: string;
             difference_type: string;
-            /** Format: int64 */
-            erp_qty: number;
+            /** Format: decimal */
+            erp_qty: string;
             /** Format: uuid */
             id: string;
             product_code: string;
             resolution_status: string;
             stock_adjustment_order_ids: string[];
-            /** Format: int64 */
-            wms_qty: number;
+            /** Format: decimal */
+            wms_qty: string;
         };
         ReconciliationItemListResponse: {
             data: components["schemas"]["ReconciliationItem"][];
@@ -10207,8 +10248,8 @@ export interface components {
             /** Format: uuid */
             batch_id: string;
             lpn_code?: string | null;
-            /** Format: int64 */
-            qty: number;
+            /** Format: decimal */
+            qty: string;
             reason?: string | null;
             relocation_mode?: string | null;
             to_location_code: string;
@@ -10303,18 +10344,18 @@ export interface components {
         RetailReplenishmentSuggestion: {
             /** Format: date-time */
             created_at: string;
-            /** Format: int64 */
-            current_qty: number;
-            /** Format: int64 */
-            daily_sales_avg: number;
+            /** Format: decimal */
+            current_qty: string;
+            /** Format: decimal */
+            daily_sales_avg: string;
             /** Format: uuid */
             id: string;
-            /** Format: int64 */
-            in_transit_qty: number;
-            /** Format: int64 */
-            max_qty: number;
-            /** Format: int64 */
-            min_qty: number;
+            /** Format: decimal */
+            in_transit_qty: string;
+            /** Format: decimal */
+            max_qty: string;
+            /** Format: decimal */
+            min_qty: string;
             /** Format: uuid */
             owner_id: string;
             period_key: string;
@@ -10322,8 +10363,8 @@ export interface components {
             status: string;
             /** Format: uuid */
             store_id: string;
-            /** Format: int64 */
-            suggested_qty: number;
+            /** Format: decimal */
+            suggested_qty: string;
         };
         ReusableDrugInspectionReportResponse: {
             /** Format: uuid */
@@ -10363,8 +10404,8 @@ export interface components {
             /** Format: int32 */
             line_no: number;
             product_code: string;
-            /** Format: int64 */
-            reviewed_qty: number;
+            /** Format: decimal */
+            reviewed_qty: string;
         };
         ReviewOutboundOrderRequest: {
             lines: components["schemas"]["ReviewOutboundOrderLineRequest"][];
@@ -10511,8 +10552,8 @@ export interface components {
             customer_id: string;
             /** Format: uuid */
             order_id: string;
-            /** Format: int64 */
-            shipped_qty: number;
+            /** Format: decimal */
+            shipped_qty: string;
             wms_order_no?: string | null;
         };
         SignInspectionRequest: {
@@ -10598,8 +10639,8 @@ export interface components {
             policy?: components["schemas"]["DualPersonPolicy"] | null;
             product_code: string;
             quality_liaison_id?: string | null;
-            /** Format: int64 */
-            quantity: number;
+            /** Format: decimal */
+            quantity: string;
             reason: components["schemas"]["StockLossReason"];
             recall_id?: string | null;
             requires_quality_approval: boolean;
@@ -10643,8 +10684,8 @@ export interface components {
             policy?: components["schemas"]["DualPersonPolicy"] | null;
             product_code: string;
             quality_liaison_id?: string | null;
-            /** Format: int64 */
-            quantity: number;
+            /** Format: decimal */
+            quantity: string;
             reason: components["schemas"]["StockSurplusReason"];
             requires_quality_approval: boolean;
             /** Format: uuid */
@@ -10694,8 +10735,8 @@ export interface components {
             operation: components["schemas"]["AlertDefinitionChangeOperation"];
         };
         SubmitInventoryCountLineRequest: {
-            /** Format: int64 */
-            physical_qty: number;
+            /** Format: decimal */
+            physical_qty: string;
         };
         SubmitReconciliationRunRequest: {
             /** Format: uuid */
@@ -11065,8 +11106,8 @@ export interface components {
         };
         TransitionWarehouseTaskRequest: {
             action: components["schemas"]["TaskTransitionAction"];
-            /** Format: int64 */
-            actual_qty?: number | null;
+            /** Format: decimal */
+            actual_qty: string | null;
             /** Format: uuid */
             assignee_user_id?: string | null;
             exception_code?: string | null;
@@ -11542,8 +11583,8 @@ export interface components {
             page: components["schemas"]["PageMeta"];
         };
         WarehouseTask: {
-            /** Format: int64 */
-            actual_qty?: number | null;
+            /** Format: decimal */
+            actual_qty: string | null;
             /** Format: date-time */
             assigned_at?: string | null;
             /** Format: uuid */
@@ -11567,8 +11608,8 @@ export interface components {
             manually_expedited: boolean;
             /** Format: uuid */
             owner_id: string;
-            /** Format: int64 */
-            planned_qty: number;
+            /** Format: decimal */
+            planned_qty: string;
             /** Format: uuid */
             predecessor_task_id?: string | null;
             /** Format: int32 */

@@ -112,7 +112,9 @@ pub struct WarehouseTask {
     pub product_code: String,
     pub batch_id: Option<Uuid>,
     pub batch_no: Option<String>,
+    #[schema(value_type = String, format = "decimal")]
     pub planned_qty: Quantity,
+    #[schema(value_type = String, format = "decimal", nullable = true)]
     pub actual_qty: Option<Quantity>,
     pub source_location_id: Option<Uuid>,
     pub source_location_code: Option<String>,
@@ -154,6 +156,7 @@ pub struct CreateWarehouseTaskRequest {
     pub product_code: String,
     pub batch_id: Option<Uuid>,
     pub batch_no: Option<String>,
+    #[schema(value_type = String, format = "decimal")]
     pub planned_qty: Quantity,
     pub source_location_id: Option<Uuid>,
     pub source_location_code: Option<String>,
@@ -186,6 +189,7 @@ pub enum TaskTransitionAction {
 pub struct TransitionWarehouseTaskRequest {
     pub action: TaskTransitionAction,
     pub assignee_user_id: Option<Uuid>,
+    #[schema(value_type = String, format = "decimal", nullable = true)]
     pub actual_qty: Option<Quantity>,
     pub exception_code: Option<String>,
     pub exception_note: Option<String>,

@@ -19,6 +19,7 @@ pub struct CreateInventoryCountRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct SubmitInventoryCountLineRequest {
+    #[schema(value_type = String, format = "decimal")]
     pub physical_qty: Quantity,
 }
 
@@ -38,8 +39,11 @@ pub struct InventoryCountLine {
     pub location_code: String,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub book_qty: Quantity,
+    #[schema(value_type = String, format = "decimal", nullable = true)]
     pub physical_qty: Option<Quantity>,
+    #[schema(value_type = String, format = "decimal", nullable = true)]
     pub variance_qty: Option<Quantity>,
     pub variance_type: Option<String>,
 }

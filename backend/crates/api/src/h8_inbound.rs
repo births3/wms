@@ -117,6 +117,7 @@ pub struct H8AsnInboundRequest {
 pub struct H8AsnLineInput {
     pub line_no: u32,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub expected_qty: wms_domain::Quantity,
     pub batch_no: Option<String>,
     pub production_date: Option<NaiveDate>,
@@ -152,6 +153,7 @@ pub struct H8OutboundLineInput {
     pub line_no: u32,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub planned_qty: wms_domain::Quantity,
 }
 

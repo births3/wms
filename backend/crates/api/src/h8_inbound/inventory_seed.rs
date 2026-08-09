@@ -43,6 +43,7 @@ pub struct H8InventorySeedItemInput {
     pub expiry_date: Option<NaiveDate>,
     pub location_code: Option<String>,
     pub goods_status: Option<String>,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: Quantity,
 }
 

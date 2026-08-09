@@ -37,6 +37,7 @@ use validation::{map_stock_adjustment, normalize_request};
 pub struct ErpInventorySnapshotItem {
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty_on_hand: wms_domain::Quantity,
 }
 
@@ -54,8 +55,11 @@ pub struct ReconciliationItem {
     pub id: Uuid,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub wms_qty: wms_domain::Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub erp_qty: wms_domain::Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub difference_qty: wms_domain::Quantity,
     pub difference_type: String,
     pub resolution_status: String,
@@ -66,6 +70,7 @@ pub struct ReconciliationItem {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReconciliationInventoryAllocation {
     pub inventory_batch_id: Uuid,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: wms_domain::Quantity,
 }
 

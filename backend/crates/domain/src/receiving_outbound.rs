@@ -18,6 +18,7 @@ pub struct ReceivingOrderLine {
     /// 商品编码
     pub product_code: String,
     /// 预计数量
+    #[schema(value_type = String, format = "decimal")]
     pub expected_qty: Quantity,
     /// 批号
     pub batch_no: Option<String>,
@@ -147,6 +148,7 @@ pub struct CreateOutboundOrderLineRequest {
     pub line_no: u32,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub planned_qty: Quantity,
 }
 
@@ -155,10 +157,15 @@ pub struct OutboundOrderLine {
     pub line_no: u32,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub planned_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub picked_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub reviewed_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub shipped_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub short_pick_qty: Quantity,
 }
 
@@ -170,6 +177,7 @@ pub const REVIEW_MODE_PDA_LOOSE: &str = "pda_loose";
 pub struct ReviewOutboundOrderLineRequest {
     pub line_no: u32,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub reviewed_qty: Quantity,
 }
 
@@ -344,6 +352,7 @@ pub struct OutboundWaveListResponse {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompletePickTaskRequest {
     pub line_no: u32,
+    #[schema(value_type = String, format = "decimal")]
     pub picked_qty: Quantity,
     pub exception_code: Option<String>,
     pub exception_note: Option<String>,
@@ -547,6 +556,7 @@ pub struct CreatePurchaseReturnRequest {
     pub reason: String,
     pub warehouse_id: Uuid,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
 }
 
@@ -570,6 +580,7 @@ pub struct PurchaseReturnOrder {
     pub approval_source: String,
     pub status: String,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
     pub reject_reason: Option<String>,
     pub shipped_at: Option<DateTime<Utc>>,

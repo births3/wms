@@ -163,6 +163,7 @@ impl TryFrom<&str> for StockAdjustmentStatus {
 pub struct CreateStockLossOrderRequest {
     pub warehouse_id: Uuid,
     pub batch_id: Uuid,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: Quantity,
     pub reason: StockLossReason,
     pub recall_id: Option<String>,
@@ -175,6 +176,7 @@ pub struct CreateStockLossOrderRequest {
 pub struct CreateStockSurplusOrderRequest {
     pub warehouse_id: Uuid,
     pub batch_id: Uuid,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: Quantity,
     pub reason: StockSurplusReason,
     pub source: StockAdjustmentSource,
@@ -213,6 +215,7 @@ pub struct StockLossOrder {
     pub batch_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: Quantity,
     pub reason: StockLossReason,
     pub recall_id: Option<String>,
@@ -241,6 +244,7 @@ pub struct StockSurplusOrder {
     pub batch_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: Quantity,
     pub reason: StockSurplusReason,
     pub source: StockAdjustmentSource,

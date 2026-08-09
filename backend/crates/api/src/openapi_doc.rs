@@ -1,8 +1,8 @@
 // @governance: skip-page-size: utoipa 的 OpenApi derive 需要集中注册路径与 schema；具体契约已拆到 openapi_paths 模块。
 use crate::h8_inbound::{
-    H8AsnInboundRequest, H8InboundResponse, H8OutboundOrderInboundRequest,
-    H8PhysicalDimensionsInput, H8ProductChangeInboundRequest, H8ProductMasterInboundRequest,
-    H8ProductPackagingLevelInput, H8ReturnOrderInboundRequest,
+    H8AsnInboundRequest, H8AsnLineInput, H8InboundResponse, H8OutboundLineInput,
+    H8OutboundOrderInboundRequest, H8PhysicalDimensionsInput, H8ProductChangeInboundRequest,
+    H8ProductMasterInboundRequest, H8ProductPackagingLevelInput, H8ReturnOrderInboundRequest,
 };
 use crate::openapi_contract::ContractSecurityAddon;
 use crate::openapi_paths::*;
@@ -600,7 +600,9 @@ use wms_domain::{
         UpdateH8ErpConnectorRequest,
         H8ErpMessage,
         H8AsnInboundRequest,
+        H8AsnLineInput,
         H8OutboundOrderInboundRequest,
+        H8OutboundLineInput,
         H8PhysicalDimensionsInput,
         H8ProductChangeInboundRequest,
         H8ProductMasterInboundRequest,

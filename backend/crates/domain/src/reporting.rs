@@ -34,6 +34,7 @@ pub struct GspLedgerRow {
     pub occurred_at: Option<DateTime<Utc>>,
     pub product_code: Option<String>,
     pub batch_no: Option<String>,
+    #[schema(value_type = String, format = "decimal", nullable = true)]
     pub quantity_delta: Option<crate::Quantity>,
     pub document_type: Option<String>,
     pub document_no: Option<String>,

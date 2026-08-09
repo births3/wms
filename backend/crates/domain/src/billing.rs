@@ -48,6 +48,7 @@ pub struct BillingRule {
     pub contract_id: Uuid,
     pub charge_item: String,
     pub unit: String,
+    #[schema(value_type = String, format = "decimal")]
     pub unit_price_cents: Quantity,
     pub billing_cycle: String,
     pub effective_from: String,
@@ -60,6 +61,7 @@ pub struct CreateBillingRuleRequest {
     pub contract_id: Uuid,
     pub charge_item: String,
     pub unit: String,
+    #[schema(value_type = String, format = "decimal")]
     pub unit_price_cents: Quantity,
     pub billing_cycle: String,
     pub effective_from: String,
@@ -133,7 +135,9 @@ pub struct BillingChargeCalculation {
     pub period_start: String,
     pub period_end: String,
     pub charge_item: String,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub amount_cents: Quantity,
     pub source_refs: Vec<String>,
     pub status: String,
@@ -146,6 +150,7 @@ pub struct CalculateBillingChargesRequest {
     pub period_start: String,
     pub period_end: String,
     pub charge_item: String,
+    #[schema(value_type = String, format = "decimal")]
     pub quantity: Quantity,
     pub source_refs: Vec<String>,
 }
@@ -158,6 +163,7 @@ pub struct BillingStatement {
     pub period_start: String,
     pub period_end: String,
     pub status: String,
+    #[schema(value_type = String, format = "decimal")]
     pub total_amount_cents: Quantity,
     pub charge_ids: Vec<Uuid>,
     pub created_at: DateTime<Utc>,

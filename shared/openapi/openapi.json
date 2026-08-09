@@ -3008,8 +3008,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -31490,8 +31490,8 @@
         ],
         "properties": {
           "amount_cents": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "charge_item": {
             "type": "string"
@@ -31519,8 +31519,8 @@
             "type": "string"
           },
           "quantity": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "source_refs": {
             "type": "array",
@@ -31623,8 +31623,8 @@
             "type": "string"
           },
           "unit_price_cents": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -31676,8 +31676,8 @@
             "type": "string"
           },
           "total_amount_cents": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "updated_at": {
             "type": "string",
@@ -31810,8 +31810,8 @@
             "type": "string"
           },
           "quantity": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "source_refs": {
             "type": "array",
@@ -32190,8 +32190,8 @@
             "minimum": 0
           },
           "picked_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -32541,8 +32541,8 @@
             "type": "string"
           },
           "unit_price_cents": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -32592,8 +32592,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "store_id": {
             "type": "string",
@@ -33299,8 +33299,8 @@
             "minimum": 0
           },
           "planned_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "product_code": {
             "type": "string"
@@ -33686,8 +33686,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "reason": {
             "type": "string"
@@ -33811,24 +33811,24 @@
         ],
         "properties": {
           "current_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "daily_sales_avg": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "in_transit_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "max_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "min_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "period_key": {
             "type": "string"
@@ -33923,8 +33923,8 @@
             "nullable": true
           },
           "quantity": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "reason": {
             "$ref": "#/components/schemas/StockLossReason"
@@ -33965,8 +33965,8 @@
             "nullable": true
           },
           "quantity": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "reason": {
             "$ref": "#/components/schemas/StockSurplusReason"
@@ -34120,8 +34120,8 @@
             "nullable": true
           },
           "planned_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "predecessor_task_id": {
             "type": "string",
@@ -34262,8 +34262,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "status": {
             "type": "string"
@@ -36066,8 +36066,8 @@
             "type": "string"
           },
           "qty_on_hand": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -36943,6 +36943,7 @@
         "type": "object",
         "required": [
           "ledger_type",
+          "quantity_delta",
           "values"
         ],
         "properties": {
@@ -36988,8 +36989,8 @@
             "nullable": true
           },
           "quantity_delta": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "nullable": true
           },
           "values": {
@@ -37379,52 +37380,112 @@
           "external_ref",
           "correlation_id",
           "occurred_at",
-          "warehouse_id",
-          "receipt_no",
-          "document_type",
-          "supplier_id",
-          "product_code",
-          "expected_qty",
-          "expected_arrival_at"
+          "payload_digest",
+          "erp_bill_id",
+          "erp_bill_code",
+          "revision",
+          "order_type",
+          "depot_code",
+          "business_date",
+          "lines"
         ],
         "properties": {
+          "business_date": {
+            "type": "string",
+            "format": "date"
+          },
           "correlation_id": {
             "type": "string"
           },
-          "document_type": {
+          "depot_code": {
             "type": "string"
           },
-          "expected_arrival_at": {
-            "type": "string",
-            "format": "date-time"
+          "erp_bill_code": {
+            "type": "string"
           },
-          "expected_qty": {
+          "erp_bill_id": {
             "type": "integer",
             "format": "int64"
           },
           "external_ref": {
             "type": "string"
           },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8AsnLineInput"
+            }
+          },
+          "note_code": {
+            "type": "string",
+            "nullable": true
+          },
           "occurred_at": {
             "type": "string",
             "format": "date-time"
           },
-          "product_code": {
+          "order_type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "partner_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "partner_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "payload_digest": {
             "type": "string"
           },
-          "receipt_no": {
-            "type": "string"
+          "revision": {
+            "type": "integer",
+            "format": "int32"
           },
           "schema_version": {
             "type": "string"
           },
-          "supplier_id": {
+          "source_version": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "H8AsnLineInput": {
+        "type": "object",
+        "required": [
+          "line_no",
+          "product_code",
+          "expected_qty"
+        ],
+        "properties": {
+          "batch_no": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true
           },
-          "warehouse_id": {
+          "expected_qty": {
             "type": "string",
-            "format": "uuid"
+            "format": "decimal"
+          },
+          "expiry_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "line_no": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "production_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
           }
         }
       },
@@ -38281,9 +38342,13 @@
           "message_id",
           "wms_resource_id",
           "status",
-          "replayed"
+          "replayed",
+          "ignored_old_version"
         ],
         "properties": {
+          "ignored_old_version": {
+            "type": "boolean"
+          },
           "message_id": {
             "type": "string",
             "format": "uuid"
@@ -38299,17 +38364,10 @@
           }
         }
       },
-      "H8OutboundOrderInboundRequest": {
+      "H8OutboundLineInput": {
         "type": "object",
         "required": [
-          "schema_version",
-          "external_ref",
-          "correlation_id",
-          "occurred_at",
-          "warehouse_id",
-          "document_type",
-          "customer_id",
-          "delivery_address_id",
+          "line_no",
           "product_code",
           "batch_no",
           "planned_qty"
@@ -38318,52 +38376,114 @@
           "batch_no": {
             "type": "string"
           },
-          "correlation_id": {
+          "line_no": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "planned_qty": {
+            "type": "string",
+            "format": "decimal"
+          },
+          "product_code": {
+            "type": "string"
+          }
+        }
+      },
+      "H8OutboundOrderInboundRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "external_ref",
+          "correlation_id",
+          "occurred_at",
+          "payload_digest",
+          "erp_bill_id",
+          "erp_bill_code",
+          "revision",
+          "order_type",
+          "customer_code",
+          "depot_code",
+          "required_ship_at",
+          "erp_address_id",
+          "address_code",
+          "address",
+          "lines"
+        ],
+        "properties": {
+          "address": {
             "type": "string"
           },
-          "customer_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "delivery_address_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "document_type": {
+          "address_code": {
             "type": "string"
           },
-          "erp_order_no": {
+          "contact_name": {
             "type": "string",
             "nullable": true
           },
+          "contact_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlation_id": {
+            "type": "string"
+          },
+          "customer_code": {
+            "type": "string"
+          },
+          "depot_code": {
+            "type": "string"
+          },
+          "erp_address_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erp_bill_code": {
+            "type": "string"
+          },
+          "erp_bill_id": {
+            "type": "integer",
+            "format": "int64"
+          },
           "external_ref": {
             "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/H8OutboundLineInput"
+            }
           },
           "occurred_at": {
             "type": "string",
             "format": "date-time"
           },
-          "planned_qty": {
+          "order_type": {
             "type": "integer",
-            "format": "int64"
+            "format": "int32"
           },
-          "product_code": {
+          "payload_digest": {
             "type": "string"
           },
           "required_ship_at": {
             "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "format": "date-time"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
           },
           "schema_version": {
             "type": "string"
           },
-          "warehouse_id": {
-            "type": "string",
-            "format": "uuid"
+          "send_mode": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
-          "wms_order_no": {
-            "type": "string",
+          "source_version": {
+            "type": "integer",
+            "format": "int64",
             "nullable": true
           }
         }
@@ -38482,12 +38602,10 @@
           "external_ref",
           "correlation_id",
           "occurred_at",
-          "product_code",
-          "product_name",
-          "spec",
-          "special_drug_category",
-          "packaging_levels",
-          "storage_condition"
+          "payload_digest",
+          "source_version",
+          "entity_id",
+          "op_type"
         ],
         "properties": {
           "approval_no": {
@@ -38504,6 +38622,10 @@
           "electronic_regulatory_code": {
             "type": "string",
             "nullable": true
+          },
+          "entity_id": {
+            "type": "integer",
+            "format": "int64"
           },
           "external_ref": {
             "type": "string"
@@ -38526,29 +38648,44 @@
             "type": "string",
             "format": "date-time"
           },
+          "op_type": {
+            "type": "string"
+          },
           "packaging_levels": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/H8ProductPackagingLevelInput"
             }
           },
-          "product_code": {
+          "payload_digest": {
             "type": "string"
           },
+          "product_code": {
+            "type": "string",
+            "nullable": true
+          },
           "product_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "schema_version": {
             "type": "string"
           },
+          "source_version": {
+            "type": "integer",
+            "format": "int64"
+          },
           "spec": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "special_drug_category": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "storage_condition": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "udi_code": {
             "type": "string",
@@ -38635,8 +38772,8 @@
             "format": "date-time"
           },
           "expected_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "external_ref": {
             "type": "string"
@@ -39110,8 +39247,8 @@
         ],
         "properties": {
           "accepted_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "appearance_check": {
             "type": "string",
@@ -39148,12 +39285,12 @@
             "type": "string"
           },
           "rejected_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "sampling_qty": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "description": "抽验数量。",
             "nullable": true
           },
@@ -39240,8 +39377,8 @@
             "format": "uuid"
           },
           "outbound_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "override_reason": {
             "type": "string",
@@ -39503,12 +39640,12 @@
             "type": "string"
           },
           "qty_locked": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "qty_on_hand": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "quality_color": {
             "type": "string",
@@ -39691,15 +39828,17 @@
           "location_code",
           "product_code",
           "batch_no",
-          "book_qty"
+          "book_qty",
+          "physical_qty",
+          "variance_qty"
         ],
         "properties": {
           "batch_no": {
             "type": "string"
           },
           "book_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "count_id": {
             "type": "string",
@@ -39725,16 +39864,16 @@
             "format": "uuid"
           },
           "physical_qty": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "nullable": true
           },
           "product_code": {
             "type": "string"
           },
           "variance_qty": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "nullable": true
           },
           "variance_type": {
@@ -39831,8 +39970,8 @@
             "nullable": true
           },
           "qty_delta": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "source_document_id": {
             "type": "string",
@@ -39938,8 +40077,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "quality_status": {
             "type": "string"
@@ -40201,8 +40340,8 @@
             "nullable": true
           },
           "total_qty_delta": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -40826,27 +40965,27 @@
             "minimum": 0
           },
           "picked_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "planned_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "product_code": {
             "type": "string"
           },
           "reviewed_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "shipped_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "short_pick_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -43169,8 +43308,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "reason": {
             "type": "string"
@@ -43301,8 +43440,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "quality_status": {
             "type": "string"
@@ -43373,8 +43512,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "quality_status": {
             "type": "string"
@@ -43410,8 +43549,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "quality_status": {
             "type": "string"
@@ -43466,8 +43605,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "receiving_order_id": {
             "type": "string",
@@ -43505,8 +43644,8 @@
             "type": "string"
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "quality_status": {
             "type": "string"
@@ -43772,8 +43911,8 @@
         ],
         "properties": {
           "actual_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "arrival_temperature_celsius": {
             "type": "number",
@@ -43793,12 +43932,12 @@
             "nullable": true
           },
           "rejected_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "shortage_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -43964,8 +44103,8 @@
             "format": "date-time"
           },
           "expected_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "order_count": {
             "type": "integer",
@@ -43990,8 +44129,8 @@
         ],
         "properties": {
           "accepted_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "approval_no": {
             "type": "string",
@@ -44023,12 +44162,12 @@
             "format": "uuid"
           },
           "rejected_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "sampling_qty": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "nullable": true
           }
         }
@@ -44114,8 +44253,8 @@
             "nullable": true
           },
           "expected_qty": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "description": "预计数量"
           },
           "expiry_date": {
@@ -44210,8 +44349,8 @@
         ],
         "properties": {
           "actual_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "arrival_temperature_celsius": {
             "type": "number",
@@ -44247,12 +44386,12 @@
             "format": "uuid"
           },
           "rejected_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "shortage_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -44400,8 +44539,8 @@
             "format": "uuid"
           },
           "quantity": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -44428,15 +44567,15 @@
             "format": "date-time"
           },
           "difference_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "difference_type": {
             "type": "string"
           },
           "erp_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "id": {
             "type": "string",
@@ -44456,8 +44595,8 @@
             }
           },
           "wms_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -44651,8 +44790,8 @@
             "nullable": true
           },
           "qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "reason": {
             "type": "string",
@@ -44911,28 +45050,28 @@
             "format": "date-time"
           },
           "current_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "daily_sales_avg": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "id": {
             "type": "string",
             "format": "uuid"
           },
           "in_transit_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "max_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "min_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "owner_id": {
             "type": "string",
@@ -44952,8 +45091,8 @@
             "format": "uuid"
           },
           "suggested_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -45081,8 +45220,8 @@
             "type": "string"
           },
           "reviewed_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -45579,8 +45718,8 @@
             "format": "uuid"
           },
           "shipped_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "wms_order_no": {
             "type": "string",
@@ -45898,8 +46037,8 @@
             "nullable": true
           },
           "quantity": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "reason": {
             "$ref": "#/components/schemas/StockLossReason"
@@ -46045,8 +46184,8 @@
             "nullable": true
           },
           "quantity": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "reason": {
             "$ref": "#/components/schemas/StockSurplusReason"
@@ -46202,8 +46341,8 @@
         ],
         "properties": {
           "physical_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           }
         }
       },
@@ -47391,15 +47530,16 @@
       "TransitionWarehouseTaskRequest": {
         "type": "object",
         "required": [
-          "action"
+          "action",
+          "actual_qty"
         ],
         "properties": {
           "action": {
             "$ref": "#/components/schemas/TaskTransitionAction"
           },
           "actual_qty": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "nullable": true
           },
           "assignee_user_id": {
@@ -49002,6 +49142,7 @@
           "task_group_code",
           "product_code",
           "planned_qty",
+          "actual_qty",
           "priority",
           "urgent_order",
           "cold_chain",
@@ -49014,8 +49155,8 @@
         ],
         "properties": {
           "actual_qty": {
-            "type": "integer",
-            "format": "int64",
+            "type": "string",
+            "format": "decimal",
             "nullable": true
           },
           "assigned_at": {
@@ -49078,8 +49219,8 @@
             "format": "uuid"
           },
           "planned_qty": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string",
+            "format": "decimal"
           },
           "predecessor_task_id": {
             "type": "string",

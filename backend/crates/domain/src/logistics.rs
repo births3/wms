@@ -223,11 +223,17 @@ pub struct RetailReplenishmentSuggestion {
     pub store_id: Uuid,
     pub product_code: String,
     pub period_key: String,
+    #[schema(value_type = String, format = "decimal")]
     pub min_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub max_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub current_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub in_transit_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub daily_sales_avg: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub suggested_qty: Quantity,
     pub status: String,
     pub created_at: DateTime<Utc>,
@@ -238,10 +244,15 @@ pub struct CreateRetailReplenishmentSuggestionRequest {
     pub store_id: Uuid,
     pub product_code: String,
     pub period_key: String,
+    #[schema(value_type = String, format = "decimal")]
     pub min_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub max_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub current_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub in_transit_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub daily_sales_avg: Quantity,
 }
 
@@ -253,6 +264,7 @@ pub struct CrossdockPlan {
     pub outbound_order_id: Uuid,
     pub store_id: Uuid,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
     pub status: String,
     pub created_at: DateTime<Utc>,
@@ -264,6 +276,7 @@ pub struct CreateCrossdockPlanRequest {
     pub outbound_order_id: Uuid,
     pub store_id: Uuid,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
 }
 

@@ -9,8 +9,11 @@ use crate::Quantity;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceiveReceivingOrderRequest {
+    #[schema(value_type = String, format = "decimal")]
     pub actual_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub shortage_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub rejected_qty: Quantity,
     #[serde(default)]
     pub arrival_temperature_celsius: Option<f64>,
@@ -137,8 +140,11 @@ pub struct ReceivingOrderReceipt {
     pub id: Uuid,
     pub receiving_order_id: Uuid,
     pub owner_id: Uuid,
+    #[schema(value_type = String, format = "decimal")]
     pub actual_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub shortage_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub rejected_qty: Quantity,
     pub arrival_temperature_celsius: Option<f64>,
     pub exception_note: Option<String>,
@@ -149,7 +155,9 @@ pub struct ReceivingOrderReceipt {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct InspectReceivingOrderRequest {
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub accepted_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub rejected_qty: Quantity,
     pub production_date: String,
     pub expiry_date: String,
@@ -166,6 +174,7 @@ pub struct InspectReceivingOrderRequest {
     pub label_check: Option<String>,
     /// 抽验数量。
     #[serde(default)]
+    #[schema(value_type = String, format = "decimal", nullable = true)]
     pub sampling_qty: Option<Quantity>,
     /// 批准文号核对值。
     #[serde(default)]
@@ -178,12 +187,15 @@ pub struct ReceivingInspectionRecord {
     pub receiving_order_id: Uuid,
     pub owner_id: Uuid,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub accepted_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub rejected_qty: Quantity,
     pub quality_status: String,
     #[serde(default)]
     pub quality_checks: Option<serde_json::Value>,
     #[serde(default)]
+    #[schema(value_type = String, format = "decimal", nullable = true)]
     pub sampling_qty: Option<Quantity>,
     #[serde(default)]
     pub approval_no: Option<String>,
@@ -222,6 +234,7 @@ pub struct ReceivingOrderPrintData {
 pub struct PutawayRequest {
     pub batch_no: String,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
     pub location_id: Uuid,
     pub location_code: String,
@@ -235,6 +248,7 @@ pub struct PutawayRequest {
 pub struct PutawayRecommendationQuery {
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
     pub quality_status: String,
     pub limit: Option<u32>,
@@ -257,6 +271,7 @@ pub struct PutawayRecommendationResponse {
     pub owner_id: Uuid,
     pub product_code: String,
     pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
     pub quality_status: String,
     pub data: Vec<PutawayLocationRecommendation>,
@@ -269,6 +284,7 @@ pub struct PutawayRecord {
     pub owner_id: Uuid,
     pub batch_no: String,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
     pub location_id: Uuid,
     pub location_code: String,
@@ -288,7 +304,9 @@ pub struct InventoryBatch {
     pub batch_no: String,
     pub production_date: String,
     pub expiry_date: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty_on_hand: Quantity,
+    #[schema(value_type = String, format = "decimal")]
     pub qty_locked: Quantity,
     pub quality_status: String,
     pub location_id: Uuid,
@@ -340,6 +358,7 @@ pub struct PutawayInventoryRequest {
     pub batch_no: String,
     pub production_date: String,
     pub expiry_date: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
     pub quality_status: String,
     pub location_id: Uuid,
@@ -360,6 +379,7 @@ pub struct ReceivingDashboardRow {
     pub created_at: DateTime<Utc>,
     pub status: String,
     pub order_count: i64,
+    #[schema(value_type = String, format = "decimal")]
     pub expected_qty: Quantity,
     pub abnormal: bool,
 }
@@ -431,6 +451,7 @@ pub struct InventoryMovement {
     pub owner_id: Uuid,
     pub batch_id: Uuid,
     pub movement_type: String,
+    #[schema(value_type = String, format = "decimal")]
     pub qty_delta: Quantity,
     pub source_document_type: String,
     pub source_document_id: Uuid,
@@ -502,6 +523,7 @@ pub struct LocationHistoryProductShare {
     pub product_code: String,
     pub product_name: Option<String>,
     pub event_count: i64,
+    #[schema(value_type = String, format = "decimal")]
     pub total_qty_delta: Quantity,
 }
 

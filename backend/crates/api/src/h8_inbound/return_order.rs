@@ -28,6 +28,7 @@ pub struct H8ReturnOrderInboundRequest {
     pub customer_id: Uuid,
     pub supplier_id: Option<Uuid>,
     pub product_code: String,
+    #[schema(value_type = String, format = "decimal")]
     pub expected_qty: wms_domain::Quantity,
     pub expected_arrival_at: DateTime<Utc>,
     pub batch_no: String,
