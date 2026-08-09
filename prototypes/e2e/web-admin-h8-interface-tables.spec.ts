@@ -39,28 +39,31 @@ test("H8 接口表探查：列表、状态筛选、详情且无写操作", async
   await login(page);
   await openInterfaceTables(page);
 
-  await expect(page.getByText("ASN-20260719-001")).toBeVisible({ timeout: 15_000 });
+  // v1.9 起页面默认接口表为商品主数据，ASN 行数据在入库单头表：先切换再断言。
+  await page.getByLabel("接口表", { exact: true }).selectOption("x_wmsinter_InboundOrder");
+  await page.getByRole("button", { name: "查询", exact: true }).click();
+  await expect(page.getByText("RK20260805-001")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("MSSQL 只读查询")).toBeVisible();
   await expect(page.getByRole("button", { name: "重放", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "新增", exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-list.png"), fullPage: false });
 
   await page.getByLabel("同步状态", { exact: true }).click();
-  await page.getByLabel("成功", { exact: true }).check();
-  await page.getByLabel("失败", { exact: true }).check();
+  await page.getByLabel("业务已提交", { exact: true }).check();
+  await page.getByLabel("可重试失败", { exact: true }).check();
   await page.getByLabel("同步状态", { exact: true }).click();
   const filteredRequest = page.waitForRequest((request) =>
     request.url().includes("/api/v1/h8/erp-interface-tables/rows") &&
-    new URL(request.url()).searchParams.get("sync_status") === "success,failed",
+    new URL(request.url()).searchParams.get("sync_status") === "acked,failed",
   );
   await page.getByRole("button", { name: "查询", exact: true }).click();
   await filteredRequest;
-  await expect(page.getByText("ASN-20260719-002")).toBeVisible();
-  await expect(page.getByText("ASN-20260719-001")).toBeVisible();
+  await expect(page.getByText("RK20260805-002")).toBeVisible();
+  await expect(page.getByText("RK20260805-001")).toBeVisible();
   await expect(page.getByText(/合计 2/)).toBeVisible();
   await page.screenshot({ path: path.join(screenshotDir, "interface-table-multi-status-filter.png"), fullPage: false });
 
-  const row = page.locator("tbody tr").filter({ hasText: "ASN-20260719-002" });
+  const row = page.locator("tbody tr").filter({ hasText: "RK20260805-002" });
   await row.getByRole("checkbox", { name: "选择此行" }).check();
   await page.getByRole("button", { name: "详情", exact: true }).click();
   await expect(page.getByRole("dialog").getByText("接口表行详情")).toBeVisible();

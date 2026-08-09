@@ -58,7 +58,14 @@ export default defineConfig({
       url: baseURL,
       reuseExistingServer: false,
       timeout: 120_000,
-      env: { ...process.env, WMS_WEB_ADMIN_E2E_API_URL: apiURL },
+      env: {
+        ...process.env,
+        WMS_WEB_ADMIN_E2E_API_URL: apiURL,
+        // 显式关闭 dev-mock：dev-mock 中间件在 vite 代理之前拦截全部 /api，
+        // requirement-rules 等真实链路路由未在 dev-mock 注册，开启时会 404 DEV_MOCK_NOT_FOUND。
+        // 与 h1/h5/h8/m1/m9/m10 real 配置保持一致，不依赖调用方 shell 是否 export 该变量。
+        WMS_WEB_ADMIN_DEV_MOCK: "0",
+      },
     },
   ],
 });

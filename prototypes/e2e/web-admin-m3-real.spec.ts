@@ -168,7 +168,7 @@ test("M3 盘点、养护和移库真实写入并从 PostgreSQL 回读", async ({
   await countDialog.getByRole("button", { name: "创建", exact: true }).click();
   expect((await countCreateResponse).ok()).toBeTruthy();
   const countListBody = await (await countListResponse).json() as {
-    data: Array<{ id: string; product_code: string | null; status: string; lines: Array<{ batch_no: string; physical_qty: number | null }> }>;
+    data: Array<{ id: string; product_code: string | null; status: string; lines: Array<{ batch_no: string; physical_qty: string | null }> }>;
   };
   const count = countListBody.data.find((item) => item.product_code === "P-M1-E2E-001");
   expect(count).toEqual(expect.objectContaining({ status: "in_progress" }));
@@ -189,7 +189,7 @@ test("M3 盘点、养护和移库真实写入并从 PostgreSQL 回读", async ({
   const countReadback = await (await countReadbackResponse).json() as typeof countListBody;
   const submittedCount = countReadback.data.find((item) => item.id === count?.id);
   expect(submittedCount?.lines).toEqual(expect.arrayContaining([
-    expect.objectContaining({ batch_no: "B-M4-E2E-001", physical_qty: 100 }),
+    expect.objectContaining({ batch_no: "B-M4-E2E-001", physical_qty: "100.0000" }),
   ]));
   await page.screenshot({ path: path.join(artifactsRoot, "count-submitted.png"), fullPage: false });
 
@@ -241,10 +241,10 @@ test("M3 盘点、养护和移库真实写入并从 PostgreSQL 回读", async ({
   await relocationDialog.getByRole("button", { name: "提交", exact: true }).click();
   expect((await relocationResponse).ok()).toBeTruthy();
   const relocationReadback = await (await relocationReadbackResponse).json() as {
-    data: Array<{ batch_no: string; qty: number; to_location_code: string }>;
+    data: Array<{ batch_no: string; qty: string; to_location_code: string }>;
   };
   expect(relocationReadback.data).toEqual(expect.arrayContaining([
-    expect.objectContaining({ batch_no: "B-M4-E2E-001", qty: 5, to_location_code: "A01-01-02-04" }),
+    expect.objectContaining({ batch_no: "B-M4-E2E-001", qty: "5.0000", to_location_code: "A01-01-02-04" }),
   ]));
   await page.screenshot({ path: path.join(artifactsRoot, "relocation-created.png"), fullPage: false });
 });

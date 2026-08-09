@@ -153,12 +153,12 @@ test("M-RC 多批次显式分配、异步状态与稳定加载更多", async ({ 
   expect(resolveResponse.status(), await resolveResponse.text()).toBe(200);
   const requestBody = resolveResponse.request().postDataJSON() as {
     disposition: string;
-    allocations: Array<{ inventory_batch_id: string; quantity: number }>;
+    allocations: Array<{ inventory_batch_id: string; quantity: string }>;
   };
   expect(requestBody.disposition).toBe("erp_truth");
   expect(requestBody.allocations).toHaveLength(2);
   expect(new Set(requestBody.allocations.map((allocation) => allocation.inventory_batch_id)).size).toBe(2);
-  expect(requestBody.allocations.reduce((sum, allocation) => sum + allocation.quantity, 0)).toBe(3);
+  expect(requestBody.allocations.reduce((sum, allocation) => sum + Number(allocation.quantity), 0)).toBe(3);
   const resolvedItem = await resolveResponse.json() as {
     resolution_status: string;
     stock_adjustment_order_ids: string[];

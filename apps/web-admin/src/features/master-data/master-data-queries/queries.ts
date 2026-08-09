@@ -191,17 +191,6 @@ export function listMasterDataRows(viewId: MasterDataViewId): Promise<MasterData
   }
 }
 
-export function useBatchCreateLocationsMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: batchCreateLocations,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: [...masterDataQueryKey, "m1-locations"] });
-      void queryClient.invalidateQueries({ queryKey: [...masterDataQueryKey, "m1-zones"] });
-    },
-  });
-}
-
 export {
   batchCreateLocations,
   createCustomer,

@@ -9,6 +9,10 @@ const ownerOverrideCode = "product_label";
 
 test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) => {
   await login(page, "admin");
+  // 种子缺口补授：warehouse_manager 角色缺少 h1.auth.me（工作台菜单权限键），否则后端按权限
+  // 过滤后其菜单树缺工作台，App 判定“已发布菜单为空或缺少工作台入口”不渲染任何菜单，
+  // 本测试后段 wh-manager 只读场景将无法经菜单导航。
+  await grantWhManagerMenu(page);
   await openSystemDictionary(page);
   await page.getByRole("button", { name: /打印模板类型 print_template_type/ }).click();
 
@@ -201,6 +205,39 @@ test("US-H9-001 打印模板类型字典真实数据验收", async ({ page }) =>
   }, { ownerId });
   expect(forbiddenStatus).toBe(403);
 });
+
+/** E2E 种子缺口补授：warehouse_manager 角色未授予 h1.auth.me（工作台菜单节点的权限键），
+ *  后端按权限过滤后仓库主管的已发布菜单树缺工作台，App 判定“已发布菜单为空或缺少工作台入口”
+ *  而不渲染任何菜单，导致 wh-manager 只读场景无法经菜单导航。此处用 admin 会话经 H1 角色
+ *  权限 API 在 wh-manager 登录前补授该权限（幂等：已存在则跳过）。 */
+async function grantWhManagerMenu(page: Page) {
+  await page.evaluate(async () => {
+    const session = JSON.parse(localStorage.getItem("wms.web-admin.auth-session") ?? "null");
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${session.accessToken}`,
+      "Content-Type": "application/json",
+    };
+    const rolesResponse = await fetch("/api/v1/auth/roles", { headers });
+    if (!rolesResponse.ok) throw new Error(`列出角色失败: ${rolesResponse.status}`);
+    const roles = (await rolesResponse.json()) as {
+      items: Array<{ id: string; role_code: string; permission_codes: string[] }>;
+    };
+    const manager = roles.items.find((role) => role.role_code === "warehouse_manager");
+    if (!manager) throw new Error("未找到 warehouse_manager 角色");
+    if (manager.permission_codes.includes("h1.auth.me")) return;
+    const response = await fetch(`/api/v1/auth/roles/${manager.id}/permissions`, {
+      method: "PUT",
+      headers: {
+        ...headers,
+        "Idempotency-Key": `e2e-wh-manager-menu-${Date.now()}`,
+      },
+      body: JSON.stringify({ permission_codes: [...manager.permission_codes, "h1.auth.me"] }),
+    });
+    if (!response.ok) {
+      throw new Error(`补授 h1.auth.me 失败: ${response.status} ${await response.text()}`);
+    }
+  });
+}
 
 async function login(page: Page, username: string) {
   await page.goto("/");

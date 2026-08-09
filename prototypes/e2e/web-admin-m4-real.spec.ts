@@ -29,7 +29,7 @@ test("M4 PC 新建出库单使用真实 API 返回单据类型和自动单号", 
   const created = JSON.parse(responseBody) as { id: string; wms_order_no: string; document_type: string; lines: Array<{ planned_qty: number }> };
   expect(created.document_type).toBe("sales_outbound");
   expect(created.wms_order_no).toMatch(/OUT|SO|销售|M4/i);
-  expect(created.lines[0]?.planned_qty).toBe(8);
+  expect(created.lines[0]?.planned_qty).toBe("8.0000");
 
   await expect(page.getByRole("status")).toContainText(`${created.wms_order_no} 已创建`);
   await expect(page.getByText(created.wms_order_no, { exact: true })).toBeVisible();
@@ -333,7 +333,7 @@ async function createOutboundOrderViaHttp(
       delivery_address_id: "00000000-0000-0000-0000-000000001211",
       warehouse_id: "00000000-0000-0000-0000-000000001301",
       required_ship_at: null,
-      lines: [{ line_no: 1, product_code: "P-M1-E2E-001", batch_no: "B-M4-E2E-001", planned_qty: 1 }],
+      lines: [{ line_no: 1, product_code: "P-M1-E2E-001", batch_no: "B-M4-E2E-001", planned_qty: "1" }],
     },
   });
   const body = await response.text();

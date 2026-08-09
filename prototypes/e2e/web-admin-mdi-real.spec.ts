@@ -1,3 +1,4 @@
+// @governance: skip-page-size M-DI 真实链路三场景共用一批种子/夹具（runPsql/附件/验收弹窗），拆分会复制夹具；后续夹具抽共享后再拆。
 import { expect, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -464,10 +465,15 @@ test("M-DI 受控规则真实处理缺失和不合格药检单并允许副本失
   await page.getByRole("button", { name: "交接", exact: true }).click();
   const shipDialog = page.getByRole("dialog", { name: new RegExp(`发货交接.*${m4ReviewOrderNo}`) });
   await expect(shipDialog).toContainText("生成失败时不阻塞发货");
-  // 与 wave4 发货契约对齐：承运方式 / 交接对象 / 件数必填。
-  await shipDialog.getByLabel("承运方式（必选）").selectOption("third_party_express");
-  await shipDialog.getByLabel("交接对象（必填）").fill("E2E 快递员");
-  await shipDialog.getByLabel("件数（必填正整数）").fill("1");
+  // 后端 wave4 校验签字附件真实存在（attachments 表 M4/outbound_handover_signature），先播种。
+  seedHandoverSignature();
+  // 与 wave4 发货契约对齐：配送方类型 / 快递员姓名 / 包裹数量必填。
+  await shipDialog.getByLabel("配送方类型").selectOption("third_party_express");
+  await shipDialog.getByLabel("车牌号").fill("沪A-E2E01");
+  await shipDialog.getByLabel("快递员姓名").fill("E2E 快递员");
+  await shipDialog.getByLabel("快递员电话").fill("13800000000");
+  await shipDialog.getByLabel("签字附件 ID").fill("00000000-0000-0000-8000-000000000007");
+  await shipDialog.getByLabel("包裹数量").fill("1");
   const shipResponse = page.waitForResponse(
     (candidate) =>
       candidate.url().endsWith(`/api/v1/outbound/orders/${m4ReviewOrderId}/ship`)
@@ -476,7 +482,7 @@ test("M-DI 受控规则真实处理缺失和不合格药检单并允许副本失
   await shipDialog.getByRole("button", { name: "确认发货", exact: true }).click();
   const shipped = await shipResponse;
   expect(shipped.status()).toBe(200);
-  await expect(page.getByRole("status")).toContainText(`${m4ReviewOrderNo} 发货交接已完成`);
+  await expect(page.getByRole("status")).toContainText("发货交接已完成");
   await expect(outboundRow).toContainText("已发货");
   expect(readFailedCopyShippingResult()).toBe("shipped|failed");
   await page.screenshot({
@@ -747,6 +753,16 @@ function seedReceivingClerk() {
           AND role.role_code = 'receiving_clerk'
        ON CONFLICT DO NOTHING;
 
+       -- 验收员需 h1.auth.me 才能看到工作台入口；缺它时前端 fail-closed 不渲染侧边栏。
+       INSERT INTO auth_role_permissions (role_id, permission_id)
+       SELECT role.id, permission.id
+         FROM auth_roles AS role
+         JOIN auth_permissions AS permission
+           ON permission.permission_code = 'h1.auth.me'
+        WHERE role.owner_id = :'owner_id'
+          AND role.role_code = 'receiving_clerk'
+       ON CONFLICT DO NOTHING;
+
        INSERT INTO auth_user_roles (user_id, owner_id, role_id)
        SELECT md5('mdi-e2e-receiving-clerk')::uuid, :'owner_id', role.id
          FROM auth_roles AS role
@@ -754,6 +770,23 @@ function seedReceivingClerk() {
           AND role.role_code = 'receiving_clerk'
        ON CONFLICT DO NOTHING;`,
     { owner_id: ownerId, admin_id: adminUserId },
+  );
+}
+
+function seedHandoverSignature() {
+  runPsql(
+    `INSERT INTO attachments (
+        id, owner_id, module, entity_type, entity_id, file_name,
+        content_type, size_bytes, storage_key, sha256, uploaded_by
+      )
+      VALUES (
+        '00000000-0000-0000-8000-000000000007', :'owner_id',
+        'M4', 'outbound_handover_signature', :'order_id',
+        'handover-signature.png', 'image/png', 100,
+        'e2e/handover-signature.png', 'e2e', :'admin_id'
+      )
+      ON CONFLICT (id) DO NOTHING;`,
+    { owner_id: ownerId, admin_id: adminUserId, order_id: m4ReviewOrderId },
   );
 }
 

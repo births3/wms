@@ -1,35 +1,13 @@
-import { createApiClient, putBinary, type paths } from "@wms/api-client";
+import { createApiClient, putBinary } from "@wms/api-client";
 
 import { readAccessToken } from "./auth-session";
 
-type AuthTokenProvider = () => string | null;
-
-let authTokenProvider: AuthTokenProvider = readAccessToken;
-
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
-
-export const wave1ContractPaths = [
-  "/api/v1/healthz",
-  "/api/v1/auth/login",
-  "/api/v1/auth/me",
-  "/api/v1/auth/logout",
-  "/api/v1/auth/me/password",
-  "/api/v1/auth/sessions",
-  "/api/v1/auth/sessions/revoke-others",
-  "/api/v1/auth/sessions/{session_id}/revoke",
-  "/api/v1/auth/users/{user_id}/kick",
-  "/api/v1/auth/users/{user_id}/status",
-  "/api/v1/audit/events",
-] as const satisfies readonly (keyof paths)[];
 
 export const api = createApiClient({
   baseUrl: apiBaseUrl,
-  authToken: () => authTokenProvider(),
+  authToken: readAccessToken,
 });
-
-export function setAuthTokenProvider(provider: AuthTokenProvider) {
-  authTokenProvider = provider;
-}
 
 export function putApiBinary(url: string, file: File) {
   return putBinary({

@@ -104,7 +104,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   expect(printDataResponse.status).toBe(200);
   expect(printDataResponse.body).toMatchObject({
     order: { id: receivingOrderId },
-    receipts: [{ actual_qty: 10, shortage_qty: 0, rejected_qty: 0 }],
+    receipts: [{ actual_qty: "10.0000", shortage_qty: "0", rejected_qty: "0" }],
   });
   expect(printDataResponse.body.receipts[0].details).toMatchObject({
     vehicle_no: "沪A-12345",
@@ -155,7 +155,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   expect(acceptancePrintBody.business_document_type).toBe("acceptance_record");
   expect(acceptancePrintBody.business_document_id).toBe(receivingOrderId);
   expect(acceptancePrintBody.status).toBe("printed");
-  expect((acceptancePrintBody.data as { receipts?: Array<{ actual_qty?: number }> }).receipts?.at(-1)?.actual_qty).toBe(10);
+  expect((acceptancePrintBody.data as { receipts?: Array<{ actual_qty?: string }> }).receipts?.at(-1)?.actual_qty).toBe("10.0000");
   await expect(acceptancePrintResponse.json()).resolves.toMatchObject({ retry_count: 0, status: "printed" });
   await expect(page.getByRole("status").filter({ hasText: "打印记录已写入" })).toBeVisible();
 
@@ -170,8 +170,8 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
       },
       body: JSON.stringify({
         batch_no: "B-M2-E2E-OVER",
-        accepted_qty: 11,
-        rejected_qty: 0,
+        accepted_qty: "11",
+        rejected_qty: "0",
         production_date: "2026-01-01",
         expiry_date: "2028-01-01",
         quality_status: "qualified",
@@ -275,7 +275,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   const recommendationBody = await recommendationResponse.json() as { data: Array<{ location_code: string; same_product: boolean }> };
   expect(recommendationBody.data.length).toBeGreaterThan(0);
   await expect(putawayDialog.getByText("推荐 #1", { exact: false })).toBeVisible();
-  await expect(putawayDialog.getByText("推荐原因：", { exact: false })).toBeVisible();
+  await expect(putawayDialog.getByText("推荐原因：", { exact: false }).first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "putaway-recommendations.png") });
   await putawayDialog.locator('input[name="putaway-recommended-location"]').first().check();
   await page.getByLabel("上架商品编码").fill("P-M1-E2E-001");

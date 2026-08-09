@@ -190,12 +190,6 @@ export function usePublishPrintFieldLibraryMutation() {
   });
 }
 
-export function useResolvePrintTemplateMutation() {
-  return useMutation<ResolvePrintTemplateResponse, ApiError, ResolvePrintTemplateRequest>({
-    mutationFn: resolvePrintTemplate,
-  });
-}
-
 export function usePrintTemplateVersionsMutation() {
   return useMutation<PrintTemplateVersion[], ApiError, string>({
     mutationFn: listPrintTemplateVersions,
@@ -358,6 +352,8 @@ async function publishPrintFieldLibrary(libraryVersionId: string) {
   return result.data;
 }
 
+// 保留：resolve 端点由 self-check 端点面断言（h9-print-template-tree-self-check.mjs:79）守护，
+// 为真实契约端点（schema + dev-mock 已校准），当前无 UI 调用；原 useResolvePrintTemplateMutation 死导出已删除。
 async function resolvePrintTemplate(request: ResolvePrintTemplateRequest) {
   const result = await api.POST("/api/v1/print-templates/resolve", { body: request });
   if (!result.data) {

@@ -258,25 +258,6 @@ export function systemDictionaryPaneItem(item: SystemDictionaryItem): SystemDict
   };
 }
 
-export function specialDrugCategoryOptions(
-  categories: readonly SpecialDrugCategoryOption[],
-  currentValue = "none",
-  activeOnly = true,
-): SpecialDrugCategoryOption[] {
-  const options = categories
-    .filter((category) => !activeOnly || category.status === "active" || category.value === currentValue)
-    .map((category) => ({ ...category }));
-  if (currentValue && !options.some((option) => option.value === currentValue)) {
-    options.unshift({
-      value: currentValue,
-      label: currentValue === "none" ? "普通药品（none）" : currentValue,
-      status: "unknown",
-      requiresDualSign: false,
-    });
-  }
-  return options;
-}
-
 function row(input: Omit<MasterDataRow, "searchText">): MasterDataRow {
   const locationSearchText = input.locationFields ? Object.values(input.locationFields) : [];
   const zoneSearchText = input.zoneFields ? Object.values(input.zoneFields) : [];

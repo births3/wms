@@ -118,7 +118,7 @@ export async function createReceivedAsn(
             line_no: index + 1,
             product_id: productId,
             product_code: "P-M1-E2E-001",
-            expected_qty: 10,
+            expected_qty: "10",
             batch_no: null,
             production_date: null,
             expiry_date: null,
@@ -134,9 +134,9 @@ export async function createReceivedAsn(
       await call(
         `/api/v1/inbound/receiving-orders/${created.id}/receive`,
         {
-          actual_qty: batches.length * 10,
-          shortage_qty: 0,
-          rejected_qty: 0,
+          actual_qty: String(batches.length * 10),
+          shortage_qty: "0",
+          rejected_qty: "0",
           arrival_temperature_celsius: 5,
           exception_note: null,
           details: {
@@ -167,8 +167,8 @@ export async function createReceivedAsn(
             `/api/v1/inbound/receiving-orders/${created.id}/inspect`,
             {
               batch_no: batchNo,
-              accepted_qty: 10,
-              rejected_qty: 0,
+              accepted_qty: "10",
+              rejected_qty: "0",
               production_date: "2026-01-01",
               expiry_date: "2028-01-01",
               quality_status: "qualified",
@@ -177,7 +177,7 @@ export async function createReceivedAsn(
               package_check: "通过",
               instruction_check: "通过",
               label_check: "通过",
-              sampling_qty: 1,
+              sampling_qty: "1",
               approval_no: "国药准字E2E001",
             },
             `mdi-inspect-${receiptNo}-${index + 1}`,

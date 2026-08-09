@@ -6,7 +6,6 @@ import { api } from "@/lib/api";
 
 export type FeatureFlagConfig = components["schemas"]["FeatureFlagConfig"];
 type FeatureFlagExportResponse = components["schemas"]["FeatureFlagExportResponse"];
-type FeatureFlagReconcileReport = components["schemas"]["FeatureFlagReconcileReport"];
 
 export const featureFlagQueryKey = ["config-center", "feature-flags"] as const;
 
@@ -16,17 +15,6 @@ export function useFeatureFlagsQuery() {
     queryFn: async () => {
       const result = await api.GET("/api/v1/config-center/feature-flags/export");
       if (!result.data) throw new ApiError(result.error, "读取 Feature Flag 列表失败", result.response.status);
-      return result.data;
-    },
-  });
-}
-
-export function useFeatureFlagReconcileQuery() {
-  return useQuery<FeatureFlagReconcileReport, ApiError>({
-    queryKey: [...featureFlagQueryKey, "reconcile"],
-    queryFn: async () => {
-      const result = await api.GET("/api/v1/config-center/feature-flags/reconcile");
-      if (!result.data) throw new ApiError(result.error, "读取 Feature Flag 对账报告失败", result.response.status);
       return result.data;
     },
   });

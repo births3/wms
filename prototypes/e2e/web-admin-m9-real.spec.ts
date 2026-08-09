@@ -13,7 +13,7 @@ type BillingRule = {
   charge_item: string;
   unit: string;
   billing_cycle: string;
-  unit_price_cents: number;
+  unit_price_cents: string;
   effective_from: string;
   effective_to: string;
 };
@@ -68,7 +68,7 @@ test("US-M9-001 真实后端创建计费规则并保留浏览器证据", async (
     charge_item: "storage",
     unit: "pallet_day",
     billing_cycle: "monthly",
-    unit_price_cents: 125,
+    unit_price_cents: "125",
     effective_from: "2026-07-01",
     effective_to: "2026-07-31",
   });
