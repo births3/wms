@@ -244,13 +244,13 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
   expect(released).toBeDefined();
 
   const receiveResponse = await request.post(`/api/v1/inbound/receiving-orders/${released?.id}/receive`, {
-    data: { actual_qty: 20, shortage_qty: 0, rejected_qty: 0 },
+    data: { actual_qty: "20", shortage_qty: "0", rejected_qty: "0" },
   });
   expect(receiveResponse.status()).toBe(200);
   const receipt = await receiveResponse.json() as { id: string };
   expect(receipt.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
   const inspectResponse = await request.post(`/api/v1/inbound/receiving-orders/${released?.id}/inspect`, {
-    data: { batch_no: "BATCH-E2E", accepted_qty: 20, rejected_qty: 0, quality_status: "qualified" },
+    data: { batch_no: "BATCH-E2E", accepted_qty: "20", rejected_qty: "0", quality_status: "qualified" },
   });
   expect(inspectResponse.status()).toBe(200);
   const inspection = await inspectResponse.json() as { id: string };

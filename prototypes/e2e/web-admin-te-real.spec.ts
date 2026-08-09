@@ -88,7 +88,7 @@ test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下�
         product_code: "P-MTE-E2E-001",
         batch_id: null,
         batch_no: "B-MTE-E2E-001",
-        planned_qty: 5,
+        planned_qty: "5",
         source_location_id: null,
         source_location_code: "RECV",
         target_location_id: null,
