@@ -2,7 +2,7 @@
 """check_openapi_in_sync.py — 验证后端 utoipa 与仓库内 openapi.json 同步
 
 类别：5. 接口契约治理（Wave 1+ 启用）
-Tier：T2（< 120s；含 cargo run 编译耗时）
+Tier：T2（< 240s；含 cargo run 编译耗时；just 并行依赖下与 clippy/test 竞争 cargo 构建锁）
 输入：
   backend/ (Cargo workspace) + shared/openapi/openapi.json + packages/api-client/src/schema.ts
 输出：人类可读
@@ -37,7 +37,7 @@ API_CLIENT_SCHEMA = REPO_ROOT / "packages" / "api-client" / "src" / "schema.ts"
 PORTAL_OPENAPI = REPO_ROOT / "shared" / "openapi" / "customer-portal-openapi.yaml"
 PORTAL_SCHEMA = REPO_ROOT / "apps" / "customer-portal" / "src" / "schema.ts"
 EXPORT_BIN = "openapi-export"
-CARGO_EXPORT_TIMEOUT_SECONDS = 90
+CARGO_EXPORT_TIMEOUT_SECONDS = 240
 SCHEMA_EXPORT_TIMEOUT_SECONDS = 20
 
 

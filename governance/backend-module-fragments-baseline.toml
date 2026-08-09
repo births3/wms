@@ -204,3 +204,7 @@ include = "wave5_repository_part1.rs"
 [[fragments]]
 parent = "backend/crates/api/src/wave5_repository.rs"
 include = "wave5_repository_part2.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/master_data_postgres.rs"
+include = "master_data_postgres/erp_master.rs"

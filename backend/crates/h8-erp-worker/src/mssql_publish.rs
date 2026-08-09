@@ -319,10 +319,13 @@ async fn execute_insert(
     connection: &mut Object<Manager>,
     record: &PublishedRecord,
 ) -> Result<(), TiberiusError> {
-    let fields = insert_fields(record.table).expect("published table registry is exhaustive");
-    let mut query = Query::new(
-        insert_statement(record.table).expect("published insert registry is exhaustive"),
-    );
+    let Some(fields) = insert_fields(record.table) else {
+        unreachable!("published table registry is exhaustive")
+    };
+    let Some(statement) = insert_statement(record.table) else {
+        unreachable!("published insert registry is exhaustive")
+    };
+    let mut query = Query::new(statement);
     for (field, _) in fields {
         query.bind(sql_value(record.row.get(*field)));
     }

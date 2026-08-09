@@ -37,19 +37,6 @@ pub(super) fn validate_payload_digest(value: &str) -> Result<String, H8InboundEr
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::validate_payload_digest;
-
-    #[test]
-    fn payload_digest_uses_publisher_canonical_digest() {
-        let digest = "a".repeat(64);
-        assert_eq!(validate_payload_digest(&digest).unwrap(), digest);
-        assert!(validate_payload_digest(&"A".repeat(64)).is_err());
-        assert!(validate_payload_digest("abc").is_err());
-    }
-}
-
 pub(super) struct InboundMetadata {
     pub message_type: &'static str,
     pub schema_version: String,
@@ -262,4 +249,17 @@ pub(super) async fn succeed_message(
         }
     };
     apply_stage(state, ctx, current, "receipt", "ok", Some(resource_id)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_payload_digest;
+
+    #[test]
+    fn payload_digest_uses_publisher_canonical_digest() {
+        let digest = "a".repeat(64);
+        assert_eq!(validate_payload_digest(&digest).unwrap(), digest);
+        assert!(validate_payload_digest(&"A".repeat(64)).is_err());
+        assert!(validate_payload_digest("abc").is_err());
+    }
 }

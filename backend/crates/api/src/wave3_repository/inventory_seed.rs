@@ -55,11 +55,11 @@ impl PgWave3Repository {
             .filter(|item| {
                 item.location_code
                     .as_deref()
-                    .map_or(true, |value| value.trim().is_empty())
+                    .is_none_or(|value| value.trim().is_empty())
                     || item
                         .goods_status
                         .as_deref()
-                        .map_or(true, |value| value.trim().is_empty())
+                        .is_none_or(|value| value.trim().is_empty())
             })
             .count();
         let status = if snapshot.push_type == 1 {
@@ -97,8 +97,8 @@ impl PgWave3Repository {
             .bind(item.location_code.as_deref().map(str::trim).filter(|value| !value.is_empty()))
             .bind(item.goods_status.as_deref().map(str::trim).filter(|value| !value.is_empty()))
             .bind(item.quantity)
-            .bind(item.location_code.as_deref().map_or(true, |value| value.trim().is_empty())
-                || item.goods_status.as_deref().map_or(true, |value| value.trim().is_empty()))
+            .bind(item.location_code.as_deref().is_none_or(|value| value.trim().is_empty())
+                || item.goods_status.as_deref().is_none_or(|value| value.trim().is_empty()))
             .bind(now)
             .execute(&mut *tx)
             .await

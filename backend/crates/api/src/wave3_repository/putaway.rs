@@ -578,19 +578,6 @@ pub(super) fn product_required_volume_cm3(
         .ok_or(Wave3RepositoryError::InvalidQuantity)
 }
 
-#[cfg(test)]
-mod decimal_volume_tests {
-    use super::*;
-
-    #[test]
-    fn fractional_quantity_reserves_rounded_up_volume() {
-        assert_eq!(
-            product_required_volume_cm3(Some(10.0), "1.25".parse().unwrap()).unwrap(),
-            13
-        );
-    }
-}
-
 /// 按策略 `rule_priority` 比较库位；未配置时按 enabled_rules 回退。
 fn apply_putaway_rule_priority(
     left: &PutawayLocationRow,
@@ -639,4 +626,17 @@ fn apply_putaway_rule_priority(
         }
     }
     left.location_code.cmp(&right.location_code)
+}
+
+#[cfg(test)]
+mod decimal_volume_tests {
+    use super::*;
+
+    #[test]
+    fn fractional_quantity_reserves_rounded_up_volume() {
+        assert_eq!(
+            product_required_volume_cm3(Some(10.0), "1.25".parse().unwrap()).unwrap(),
+            13
+        );
+    }
 }

@@ -201,8 +201,8 @@ fn validate_partner(
 ) -> Result<(), H8InboundError> {
     validate_envelope(ctx, schema_version, external_ref, correlation_id, None)?;
     let snapshot_missing = op_type != "D"
-        && (code.map_or(true, |value| value.trim().is_empty())
-            || name.map_or(true, |value| value.trim().is_empty()));
+        && (code.is_none_or(|value| value.trim().is_empty())
+            || name.is_none_or(|value| value.trim().is_empty()));
     if entity_id <= 0
         || source_version <= 0
         || !matches!(op_type, "I" | "U" | "D")
