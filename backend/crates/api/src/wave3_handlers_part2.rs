@@ -627,9 +627,16 @@ async fn inventory_batch_date_query_filters_and_sorts_in_memory() {
     let authorized = ctx(owner_id, &["m3.read", "m3.write"]);
     let state = Wave3AppState::default();
 
+    // 相对日期：绝对日期会随运行日推进而过期（putaway 拒绝 ExpiredBatch），根治脆弱性。
+    let today = chrono::Utc::now().date_naive();
+    let later_date = today + chrono::Duration::days(120);
+    let earlier_date = today + chrono::Duration::days(60);
+    let from_date = today + chrono::Duration::days(30);
+    let to_date = today + chrono::Duration::days(150);
+
     let mut later = inventory_putaway_req();
     later.batch_no = "B-LATER".to_string();
-    later.expiry_date = "2026-09-01".to_string();
+    later.expiry_date = later_date.format("%Y-%m-%d").to_string();
     let Json(_) =
         putaway_inventory_batch_handler(authorized.clone(), State(state.clone()), Json(later))
             .await
@@ -637,7 +644,7 @@ async fn inventory_batch_date_query_filters_and_sorts_in_memory() {
 
     let mut earlier = inventory_putaway_req();
     earlier.batch_no = "B-EARLIER".to_string();
-    earlier.expiry_date = "2026-08-01".to_string();
+    earlier.expiry_date = earlier_date.format("%Y-%m-%d").to_string();
     let Json(_) =
         putaway_inventory_batch_handler(authorized.clone(), State(state.clone()), Json(earlier))
             .await
@@ -647,8 +654,8 @@ async fn inventory_batch_date_query_filters_and_sorts_in_memory() {
         authorized,
         State(state),
         Query(InventoryBatchQuery {
-            expiry_from: Some("2026-07-13".to_string()),
-            expiry_to: Some("2026-09-30".to_string()),
+            expiry_from: Some(from_date.format("%Y-%m-%d").to_string()),
+            expiry_to: Some(to_date.format("%Y-%m-%d").to_string()),
             ..Default::default()
         }),
     )

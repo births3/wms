@@ -469,7 +469,8 @@ pub async fn seed_h8_warehouse_manager(
         INSERT INTO auth_permissions (id, permission_code, permission_name)
         VALUES
             (md5('auth_permission:h8.erp_connector.read')::uuid, 'h8.erp_connector.read', 'H8 ERP 连接只读'),
-            (md5('auth_permission:h8.erp_connector.write')::uuid, 'h8.erp_connector.write', 'H8 ERP 连接维护')
+            (md5('auth_permission:h8.erp_connector.write')::uuid, 'h8.erp_connector.write', 'H8 ERP 连接维护'),
+            (md5('auth_permission:h1.auth.me')::uuid, 'h1.auth.me', 'H1 登录身份（工作台菜单入口）')
         ON CONFLICT DO NOTHING
         "#,
     )
@@ -500,12 +501,13 @@ pub async fn seed_h8_warehouse_manager(
     .bind(role_id)
     .execute(pool)
     .await?;
-    // 仅读权限（写权限不得授予仓库主管）
+    // 仅读权限（写权限不得授予仓库主管）；h1.auth.me 是工作台菜单节点的权限键，
+    // 缺失会导致后端按权限过滤后已发布菜单缺工作台入口，前端判定“菜单为空”不渲染侧边栏。
     sqlx::query(
         r#"
         INSERT INTO auth_role_permissions (role_id, permission_id)
         SELECT $1, id FROM auth_permissions
-         WHERE permission_code = 'h8.erp_connector.read'
+         WHERE permission_code IN ('h8.erp_connector.read', 'h1.auth.me')
         ON CONFLICT DO NOTHING
         "#,
     )
