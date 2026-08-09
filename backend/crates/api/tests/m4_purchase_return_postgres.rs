@@ -29,7 +29,7 @@ fn create_request(return_no: &str) -> CreatePurchaseReturnRequest {
         reason: "供应商召回".to_string(),
         warehouse_id: Uuid::new_v4(),
         product_code: "P-M4-001".to_string(),
-        qty: 6,
+        qty: 6.into(),
     }
 }
 
@@ -80,7 +80,7 @@ async fn m4_purchase_return_full_lifecycle_with_audit_evidence(pool: PgPool) {
     assert_eq!(created.status, "pending_approval");
     assert_eq!(created.document_type, "purchase_return_outbound");
     assert_eq!(created.approval_source, "purchase_return_approval");
-    assert_eq!(created.qty, 6);
+    assert_eq!(created.qty, 6.into());
     assert!(created.shipped_at.is_none());
 
     let approved = repo
@@ -187,7 +187,7 @@ async fn m4_purchase_return_create_rejects_duplicate_return_no(pool: PgPool) {
 
     // 数量非法直接 422。
     let mut invalid = create_request("PRTN-M4-DUP-0002");
-    invalid.qty = 0;
+    invalid.qty = 0.into();
     let rejected = repo
         .create_purchase_return(&ctx, invalid, now, "prtn-dup-3", None)
         .await

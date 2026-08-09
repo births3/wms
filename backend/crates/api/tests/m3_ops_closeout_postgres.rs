@@ -104,7 +104,7 @@ async fn relocate_inventory_moves_qty_atomically_and_rejects_quarantined(pool: s
     let actor = ctx(owner_id);
     let request = RelocateInventoryRequest {
         batch_id,
-        qty: 5,
+        qty: 5.into(),
         to_location_id: to_id,
         to_location_code: "A01-01-01-02".to_string(),
         relocation_mode: Some("direct".to_string()),
@@ -130,7 +130,7 @@ async fn relocate_inventory_moves_qty_atomically_and_rejects_quarantined(pool: s
         .await
         .expect("relocate");
     assert!(!result.replayed);
-    assert_eq!(result.value.qty, 5);
+    assert_eq!(result.value.qty, 5.into());
     assert_eq!(result.value.to_location_code, "A01-01-01-02");
     let replay = repository
         .relocate_inventory_with_audit(&actor, request, Utc::now(), "idem-relocate-1", Some(audit))
@@ -177,7 +177,7 @@ async fn relocate_inventory_moves_qty_atomically_and_rejects_quarantined(pool: s
             &actor,
             RelocateInventoryRequest {
                 batch_id,
-                qty: 1,
+                qty: 1.into(),
                 to_location_id: to_id,
                 to_location_code: "A01-01-01-02".to_string(),
                 relocation_mode: None,

@@ -339,7 +339,7 @@ async fn quarantined_inventory_is_not_allocated_to_outbound_wave(pool: PgPool) {
                     line_no: 1,
                     product_code: product_code.to_string(),
                     batch_no: batch_no.to_string(),
-                    planned_qty: 1,
+                    planned_qty: 1.into(),
                 }],
             },
             route_now,

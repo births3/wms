@@ -151,7 +151,7 @@ async fn capacity_release_reuses_worker_active_task_limit(pool: PgPool) {
             &worker,
             first.id,
             TransitionWarehouseTaskRequest {
-                actual_qty: Some(10),
+                actual_qty: Some(10.into()),
                 ..transition(TaskTransitionAction::Complete)
             },
             now,

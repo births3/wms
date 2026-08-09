@@ -117,9 +117,9 @@ async fn force_close_shortage_from_receiving_with_shortage_qty(pool: PgPool) {
             &ctx,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 2,
-                rejected_qty: 0,
+                actual_qty: 8.into(),
+                shortage_qty: 2.into(),
+                rejected_qty: 0.into(),
                 arrival_temperature_celsius: None,
                 exception_note: Some("到货短少 2".to_string()),
                 details: Some(ReceivingReceiptDetails {

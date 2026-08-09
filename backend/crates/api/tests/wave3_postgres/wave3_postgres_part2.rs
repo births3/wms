@@ -22,9 +22,9 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
         .expect("release receiving order");
 
     let req = ReceiveReceivingOrderRequest {
-        actual_qty: 8,
-        shortage_qty: 2,
-        rejected_qty: 0,
+        actual_qty: 8.into(),
+        shortage_qty: 2.into(),
+        rejected_qty: 0.into(),
         arrival_temperature_celsius: Some(4.8),
         exception_note: None,
         details: Some(ReceivingReceiptDetails {
@@ -58,9 +58,9 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
             &ctx,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 7,
-                shortage_qty: 3,
-                rejected_qty: 0,
+                actual_qty: 7.into(),
+                shortage_qty: 3.into(),
+                rejected_qty: 0.into(),
                 arrival_temperature_celsius: Some(4.8),
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
@@ -98,9 +98,9 @@ async fn receiving_receipt_is_single_closure_and_idempotent(pool: PgPool) {
             &ctx,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 2,
-                rejected_qty: 0,
+                actual_qty: 8.into(),
+                shortage_qty: 2.into(),
+                rejected_qty: 0.into(),
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
@@ -269,7 +269,7 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
         )
         .await
         .expect("receiving status order can be rejected");
-    assert_eq!(receiving_reject.rejected_qty, 10);
+    assert_eq!(receiving_reject.rejected_qty, 10.into());
 
     let draft = repo
         .create_receiving_order(
@@ -321,9 +321,9 @@ async fn concurrent_same_idempotency_key_replays_first_receipt(pool: PgPool) {
         .expect("release receiving order");
 
     let req = ReceiveReceivingOrderRequest {
-        actual_qty: 8,
-        shortage_qty: 2,
-        rejected_qty: 0,
+        actual_qty: 8.into(),
+        shortage_qty: 2.into(),
+        rejected_qty: 0.into(),
         arrival_temperature_celsius: Some(4.8),
         exception_note: None,
         details: Some(ReceivingReceiptDetails {
@@ -409,9 +409,9 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
         &ctx,
         order.id,
         ReceiveReceivingOrderRequest {
-            actual_qty: 10,
-            shortage_qty: 0,
-            rejected_qty: 0,
+            actual_qty: 10.into(),
+            shortage_qty: 0.into(),
+            rejected_qty: 0.into(),
             arrival_temperature_celsius: None,
             exception_note: None,
             details: Some(ReceivingReceiptDetails {
@@ -441,8 +441,8 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
         order.id,
         wms_domain::InspectReceivingOrderRequest {
             batch_no: "B202606".to_string(),
-            accepted_qty: 10,
-            rejected_qty: 0,
+            accepted_qty: 10.into(),
+            rejected_qty: 0.into(),
             production_date: "2026-01-01".to_string(),
             expiry_date: "2028-01-01".to_string(),
             quality_status: STATUS_QUALIFIED.to_string(),
@@ -452,7 +452,7 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
                 package_check: Some("完好".to_string()),
                 instruction_check: Some("有".to_string()),
                 label_check: Some("清晰".to_string()),
-                sampling_qty: Some(1),
+                sampling_qty: Some(1.into()),
                 approval_no: None,
             },
         now.date_naive(),
@@ -471,7 +471,7 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
     let req = PutawayRequest {
         batch_no: "B202606".to_string(),
         product_code: "P-001".to_string(),
-        qty: 10,
+        qty: 10.into(),
         location_id,
         location_code,
         quality_status: STATUS_QUALIFIED.to_string(),
@@ -517,8 +517,8 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
     assert_eq!(first.value.putaway.id, replay.value.putaway.id);
     assert!(!first.replayed);
     assert!(replay.replayed);
-    assert_eq!(first.value.inventory_batch.qty_on_hand, 10);
-    assert_eq!(first.value.inventory_movement.qty_delta, 10);
+    assert_eq!(first.value.inventory_batch.qty_on_hand, 10.into());
+    assert_eq!(first.value.inventory_movement.qty_delta, 10.into());
 
     let counts: (i64, i64, i64, String, i64) = sqlx::query_as(
         r#"

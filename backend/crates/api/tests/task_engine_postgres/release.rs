@@ -284,7 +284,7 @@ async fn conditional_release_waits_for_predecessor_completion(pool: PgPool) {
             &worker,
             predecessor.id,
             TransitionWarehouseTaskRequest {
-                actual_qty: Some(10),
+                actual_qty: Some(10.into()),
                 ..transition(TaskTransitionAction::Complete)
             },
             now,

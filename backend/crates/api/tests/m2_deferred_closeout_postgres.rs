@@ -50,7 +50,7 @@ fn request_with_receipt_no(
             line_no: 1,
             product_id: None,
             product_code: "P-M2-001".to_string(),
-            expected_qty: 10,
+            expected_qty: 10.into(),
             batch_no: batch_no.map(str::to_string),
             production_date: None,
             expiry_date: None,
@@ -242,9 +242,9 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
             &ctx,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 2,
-                rejected_qty: 0,
+                actual_qty: 8.into(),
+                shortage_qty: 2.into(),
+                rejected_qty: 0.into(),
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
@@ -272,8 +272,8 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
 
     let inspection = |accepted_qty: i64, key: &str| InspectReceivingOrderRequest {
         batch_no: "B-QUANTITY-GATE".to_string(),
-        accepted_qty,
-        rejected_qty: 0,
+        accepted_qty: accepted_qty.into(),
+        rejected_qty: 0.into(),
         production_date: "2026-01-01".to_string(),
         expiry_date: "2028-01-01".to_string(),
         quality_status: STATUS_QUALIFIED.to_string(),
@@ -282,7 +282,7 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
         package_check: Some("完好".to_string()),
         instruction_check: Some("有".to_string()),
         label_check: Some("清晰".to_string()),
-        sampling_qty: Some(1),
+        sampling_qty: Some(1.into()),
         approval_no: None,
     };
     let over_actual = repository

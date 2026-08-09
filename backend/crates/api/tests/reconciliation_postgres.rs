@@ -237,17 +237,17 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
             ErpInventorySnapshotItem {
                 product_code: "P1".into(),
                 batch_no: "B1".into(),
-                qty_on_hand: 12,
+                qty_on_hand: 12.into(),
             },
             ErpInventorySnapshotItem {
                 product_code: "P2".into(),
                 batch_no: "B2".into(),
-                qty_on_hand: 4,
+                qty_on_hand: 4.into(),
             },
             ErpInventorySnapshotItem {
                 product_code: "P4".into(),
                 batch_no: "B4".into(),
-                qty_on_hand: 1,
+                qty_on_hand: 1.into(),
             },
         ],
     };
@@ -265,9 +265,9 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
         .items
         .iter()
         .any(|item| item.product_code == "P1"
-            && item.wms_qty == 15
-            && item.erp_qty == 12
-            && item.difference_qty == 3
+            && item.wms_qty == 15.into()
+            && item.erp_qty == 12.into()
+            && item.difference_qty == 3.into()
             && item.difference_type == "wms_more"));
 
     let (runs, items, notifications, audits, status_changes): (i64, i64, i64, i64, i64) =
@@ -324,17 +324,17 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
                     ErpInventorySnapshotItem {
                         product_code: "P4".into(),
                         batch_no: "B4".into(),
-                        qty_on_hand: 1,
+                        qty_on_hand: 1.into(),
                     },
                     ErpInventorySnapshotItem {
                         product_code: "P2".into(),
                         batch_no: "B2".into(),
-                        qty_on_hand: 4,
+                        qty_on_hand: 4.into(),
                     },
                     ErpInventorySnapshotItem {
                         product_code: "P1".into(),
                         batch_no: "B1".into(),
-                        qty_on_hand: 12,
+                        qty_on_hand: 12.into(),
                     },
                 ],
             },
@@ -358,7 +358,7 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
                 items: vec![ErpInventorySnapshotItem {
                     product_code: "P1".into(),
                     batch_no: "B1".into(),
-                    qty_on_hand: 13,
+                    qty_on_hand: 13.into(),
                 }],
             },
             Utc::now(),
@@ -412,17 +412,17 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
                     ErpInventorySnapshotItem {
                         product_code: "P1".into(),
                         batch_no: "B1".into(),
-                        qty_on_hand: 12,
+                        qty_on_hand: 12.into(),
                     },
                     ErpInventorySnapshotItem {
                         product_code: "P2".into(),
                         batch_no: "B2".into(),
-                        qty_on_hand: 4,
+                        qty_on_hand: 4.into(),
                     },
                     ErpInventorySnapshotItem {
                         product_code: "P4".into(),
                         batch_no: "B4".into(),
-                        qty_on_hand: 1,
+                        qty_on_hand: 1.into(),
                     },
                 ],
             },
@@ -650,11 +650,11 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
             vec![
                 ReconciliationInventoryAllocation {
                     inventory_batch_id: p3_batch_id,
-                    quantity: 7,
+                    quantity: 7.into(),
                 },
                 ReconciliationInventoryAllocation {
                     inventory_batch_id: p3_second_batch_id,
-                    quantity: 2,
+                    quantity: 2.into(),
                 },
             ],
             Utc::now(),
@@ -681,7 +681,7 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
             ReconciliationDisposition::ErpTruth,
             vec![ReconciliationInventoryAllocation {
                 inventory_batch_id: p2_batch_id,
-                quantity: 4,
+                quantity: 4.into(),
             }],
             Utc::now(),
             "rc-resolve-surplus-1",

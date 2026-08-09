@@ -40,7 +40,7 @@ fn receiving_order_req(receipt_no: &str) -> CreateReceivingOrderRequest {
             line_no: 1,
             product_id: None,
             product_code: "P-001".to_string(),
-            expected_qty: 10,
+            expected_qty: 10.into(),
             batch_no: None,
             production_date: None,
             expiry_date: None,
@@ -114,9 +114,9 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
         &ctx,
         order.id,
         ReceiveReceivingOrderRequest {
-            actual_qty: 10,
-            shortage_qty: 0,
-            rejected_qty: 0,
+            actual_qty: 10.into(),
+            shortage_qty: 0.into(),
+            rejected_qty: 0.into(),
             arrival_temperature_celsius: None,
             exception_note: None,
             details: Some(ReceivingReceiptDetails {
@@ -144,8 +144,8 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
 
     let inspect_req = InspectReceivingOrderRequest {
         batch_no: "B202606".to_string(),
-        accepted_qty: 10,
-        rejected_qty: 0,
+        accepted_qty: 10.into(),
+        rejected_qty: 0.into(),
         production_date: "2026-01-01".to_string(),
         expiry_date: "2028-01-01".to_string(),
         quality_status: STATUS_QUALIFIED.to_string(),
@@ -155,7 +155,7 @@ async fn inspect_and_sign_receiving_order_replay_without_duplicate_audit(pool: P
         package_check: Some("完好".to_string()),
         instruction_check: Some("有".to_string()),
         label_check: Some("清晰".to_string()),
-        sampling_qty: Some(1),
+        sampling_qty: Some(1.into()),
         approval_no: None,
     };
     let first = repo

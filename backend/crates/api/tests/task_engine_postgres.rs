@@ -162,7 +162,7 @@ fn create_request(warehouse_id: Uuid) -> CreateWarehouseTaskRequest {
         product_code: "P-001".to_string(),
         batch_id: None,
         batch_no: Some("LOT-001".to_string()),
-        planned_qty: 10,
+        planned_qty: 10.into(),
         source_location_id: None,
         source_location_code: Some("A-01-01".to_string()),
         target_location_id: None,
@@ -367,7 +367,7 @@ async fn task_main_chain_enforces_qualification_state_machine_and_idempotency(po
             &worker,
             first.value.id,
             TransitionWarehouseTaskRequest {
-                actual_qty: Some(9),
+                actual_qty: Some(9.into()),
                 ..transition(TaskTransitionAction::Complete)
             },
             now,
@@ -385,7 +385,7 @@ async fn task_main_chain_enforces_qualification_state_machine_and_idempotency(po
             &worker,
             first.value.id,
             TransitionWarehouseTaskRequest {
-                actual_qty: Some(10),
+                actual_qty: Some(10.into()),
                 ..transition(TaskTransitionAction::Complete)
             },
             now,
@@ -394,13 +394,13 @@ async fn task_main_chain_enforces_qualification_state_machine_and_idempotency(po
         .await
         .expect("matching actual quantity should complete");
     assert_eq!(completed.value.status, "completed");
-    assert_eq!(completed.value.actual_qty, Some(10));
+    assert_eq!(completed.value.actual_qty, Some(10.into()));
     let completed_replay = repository
         .transition_task(
             &worker,
             first.value.id,
             TransitionWarehouseTaskRequest {
-                actual_qty: Some(10),
+                actual_qty: Some(10.into()),
                 ..transition(TaskTransitionAction::Complete)
             },
             now,

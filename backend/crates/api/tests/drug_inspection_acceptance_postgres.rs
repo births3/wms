@@ -351,8 +351,8 @@ async fn seed_report(
 fn inspect_request(batch_no: &str) -> InspectReceivingOrderRequest {
     InspectReceivingOrderRequest {
         batch_no: batch_no.to_string(),
-        accepted_qty: 10,
-        rejected_qty: 0,
+        accepted_qty: 10.into(),
+        rejected_qty: 0.into(),
         production_date: "2026-01-01".to_string(),
         expiry_date: "2028-01-01".to_string(),
         quality_status: STATUS_QUALIFIED.to_string(),
@@ -361,7 +361,7 @@ fn inspect_request(batch_no: &str) -> InspectReceivingOrderRequest {
         package_check: Some("完好".to_string()),
         instruction_check: Some("有".to_string()),
         label_check: Some("清晰".to_string()),
-        sampling_qty: Some(1),
+        sampling_qty: Some(1.into()),
         approval_no: None,
     }
 }

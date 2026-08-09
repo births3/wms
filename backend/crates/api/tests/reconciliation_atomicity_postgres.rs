@@ -265,7 +265,7 @@ async fn erp_truth_rolls_back_loss_order_when_reconciliation_update_fails(pool: 
             ReconciliationDisposition::ErpTruth,
             vec![ReconciliationInventoryAllocation {
                 inventory_batch_id: fixture.batch_id,
-                quantity: 3,
+                quantity: 3.into(),
             }],
             Utc::now(),
             "rc-resolve-update-failure",
@@ -308,7 +308,7 @@ async fn erp_truth_rolls_back_surplus_order_when_resolution_audit_fails(pool: Pg
             ReconciliationDisposition::ErpTruth,
             vec![ReconciliationInventoryAllocation {
                 inventory_batch_id: fixture.batch_id,
-                quantity: 3,
+                quantity: 3.into(),
             }],
             Utc::now(),
             "rc-resolve-audit-failure",

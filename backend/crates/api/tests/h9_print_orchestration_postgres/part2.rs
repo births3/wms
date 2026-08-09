@@ -44,7 +44,7 @@ async fn outbound_order_creation_freezes_the_effective_address_route(pool: PgPoo
                     line_no: 1,
                     product_code: "P-H9-ROUTE".to_string(),
                     batch_no: "B-H9-ROUTE".to_string(),
-                    planned_qty: 1,
+                    planned_qty: 1.into(),
                 }],
             },
             now,

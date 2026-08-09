@@ -33,7 +33,7 @@ fn rule_request(contract_id: Uuid) -> CreateBillingRuleRequest {
         contract_id,
         charge_item: "storage".to_string(),
         unit: "pallet_day".to_string(),
-        unit_price_cents: 125,
+        unit_price_cents: 125.into(),
         billing_cycle: "monthly".to_string(),
         effective_from: "2026-06-01".to_string(),
         effective_to: "2026-06-30".to_string(),
@@ -110,7 +110,7 @@ async fn billing_rule_is_idempotent_owner_scoped_and_audited(pool: PgPool) {
     assert_eq!(first.value.id, replay.value.id);
 
     let mut changed_request = request.clone();
-    changed_request.unit_price_cents = 130;
+    changed_request.unit_price_cents = 130.into();
     let conflict = repo
         .create_billing_rule_with_audit(
             &ctx_a,
@@ -176,7 +176,7 @@ async fn billing_rule_validates_fields_and_contract_window(pool: PgPool) {
     ));
 
     let mut invalid_rate = rule_request(contract_id);
-    invalid_rate.unit_price_cents = -1;
+    invalid_rate.unit_price_cents = (-1).into();
     assert!(matches!(
         repo.create_billing_rule(&context, invalid_rate, now).await,
         Err(Wave3RepositoryError::InvalidRate)

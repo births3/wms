@@ -123,7 +123,7 @@ async fn outbound_wave_release_persists_tasks_locks_audit_and_replays(pool: PgPo
                     line_no: 1,
                     product_code: "P-WAVE-001".to_string(),
                     batch_no: "B-WAVE-001".to_string(),
-                    planned_qty: 6,
+                    planned_qty: 6.into(),
                 }],
             },
             now,
@@ -213,7 +213,7 @@ async fn h8_outbound_order_create_replays_without_duplicate_lines(pool: PgPool) 
             line_no: 1,
             product_code: "P-H8-L11-001".to_string(),
             batch_no: "B-H8-L11-001".to_string(),
-            planned_qty: 3,
+            planned_qty: 3.into(),
         }],
     };
 

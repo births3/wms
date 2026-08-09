@@ -31,7 +31,7 @@ fn request() -> CreateReceivingOrderRequest {
             line_no: 1,
             product_id: None,
             product_code: "M2-REFERENCE-PRODUCT".to_string(),
-            expected_qty: 1,
+            expected_qty: 1.into(),
             batch_no: None,
             production_date: None,
             expiry_date: None,

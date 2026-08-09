@@ -24,9 +24,9 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
             &ctx,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 8,
-                shortage_qty: 1,
-                rejected_qty: 1,
+                actual_qty: 8.into(),
+                shortage_qty: 1.into(),
+                rejected_qty: 1.into(),
                 arrival_temperature_celsius: Some(4.5),
                 exception_note: Some("外包装轻微破损".to_string()),
                 details: Some(ReceivingReceiptDetails {
@@ -61,8 +61,8 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
             order.id,
             InspectReceivingOrderRequest {
                 batch_no: "B-PRINT-001".to_string(),
-                accepted_qty: 7,
-                rejected_qty: 1,
+                accepted_qty: 7.into(),
+                rejected_qty: 1.into(),
                 production_date: "2026-01-01".to_string(),
                 expiry_date: "2028-01-01".to_string(),
                 quality_status: STATUS_QUALIFIED.to_string(),
@@ -72,7 +72,7 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
                 package_check: Some("完好".to_string()),
                 instruction_check: Some("有".to_string()),
                 label_check: Some("清晰".to_string()),
-                sampling_qty: Some(1),
+                sampling_qty: Some(1.into()),
                 approval_no: None,
             },
             chrono::NaiveDate::from_ymd_opt(2026, 7, 12).expect("valid date"),
@@ -136,7 +136,7 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
         details.arrival_at.expect("arrival").to_rfc3339(),
         "2026-06-04T10:00:00+00:00"
     );
-    assert_eq!(print_data.receipts[0].actual_qty, 8);
+    assert_eq!(print_data.receipts[0].actual_qty, 8.into());
     assert_eq!(print_data.inspections[0].batch_no, "B-PRINT-001");
     assert_eq!(print_data.signatures[0].first_signer_id, first_signer_id);
     assert_eq!(

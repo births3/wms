@@ -139,7 +139,7 @@ async fn create_confirmed_order(
                 line_no: 1,
                 product_code: product_code.to_string(),
                 batch_no: batch_no.to_string(),
-                planned_qty,
+                planned_qty: planned_qty.into(),
             }],
         },
         now,
