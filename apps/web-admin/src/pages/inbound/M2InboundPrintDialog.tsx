@@ -15,6 +15,7 @@ import {
   type ReceivingOrder,
 } from "@/features/inbound/inbound-queries";
 import type { M2InboundMode } from "./m2-inbound-page-helpers";
+import { NO_INBOUND_ORDER_SELECTED } from "./M2InboundDialogs";
 import {
   H9BusinessPrintDialog,
   type H9BusinessPrintTarget,
@@ -59,7 +60,7 @@ export function M2InboundPrintDialog({
           <DialogHeader>
             <DialogTitle>准备打印</DialogTitle>
             <DialogDescription>
-              {order ? `${order.receipt_no} · ${templateLabel(mode)}` : "未选择入库单"}
+              {order ? `${order.receipt_no} · ${templateLabel(mode)}` : NO_INBOUND_ORDER_SELECTED}
             </DialogDescription>
           </DialogHeader>
           {printDataQuery.isError ? (

@@ -16,6 +16,7 @@ import {
   QueryPanel,
   StatusBadge,
   buildQueryPanelSummaryItems,
+  formatDateTime,
   type DataGridColumn,
   type DataGridRefreshAction,
   type DataGridToolbarAction,
@@ -42,6 +43,15 @@ import {
   type CreateUserRequest,
 } from "@/features/auth/role-permission-queries";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_ADD,
+  BUTTON_REFRESH,
+  COLUMN_CREATED_AT,
+  FIELD_KEYWORD,
+  FILTER_ALL,
+  LOADING_SAVING,
+  LOADING_SUBMITTING,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
@@ -63,11 +73,11 @@ const DATA_SCOPE_OPTIONS = [
   { label: "自己", value: "self" },
   { label: "本仓", value: "warehouse" },
   { label: "本货主", value: "owner" },
-  { label: "全部", value: "all" },
+  { label: FILTER_ALL, value: "all" },
 ];
 
 const h1RoleQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "角色编码 / 名称", ariaLabel: "搜索角色" },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "角色编码 / 名称", ariaLabel: "搜索角色" },
   { key: "dataScope", label: "数据范围", type: "select", options: DATA_SCOPE_OPTIONS },
 ];
 const h1RoleCoreQueryFieldKeys = ["keyword"];
@@ -255,14 +265,14 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
     [roles],
   );
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新角色、权限和用户数据",
     disabled: rolesQuery.isFetching || permissionsQuery.isFetching || usersQuery.isFetching,
     onClick: () => void refreshAll(),
   };
   const toolbarActions: DataGridToolbarAction[] = canManage
     ? [
-        { key: "create-user", label: "新增", description: "新增用户并绑定角色", icon: <UsersRound className="size-4" aria-hidden />, onClick: () => setCreateUserDialogOpen(true) },
+        { key: "create-user", label: BUTTON_ADD, description: "新增用户并绑定角色", icon: <UsersRound className="size-4" aria-hidden />, onClick: () => setCreateUserDialogOpen(true) },
         { key: "batch-assign", label: "授权", description: "为多个用户分配多个角色", icon: <UsersRound className="size-4" aria-hidden />, onClick: openBatchDialog },
       ]
     : [];
@@ -308,7 +318,7 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
               storageKey="h1-role-permission-roles"
               exportFileBaseName="H1 角色权限"
               refreshAction={refreshAction}
-              createAction={{ label: "新增", description: "新增角色", onClick: () => openRoleDialog(null) }}
+              createAction={{ label: BUTTON_ADD, description: "新增角色", onClick: () => openRoleDialog(null) }}
               editAction={{ label: "修改", description: "修改选中角色", disabled: ({ selectedRowKeys: keys }) => keys.length !== 1 || busy, onClick: ({ selectedRowKeys: keys }) => { const role = roles.find((item) => item.id === keys[0]); if (role) openRoleDialog(role); } }}
               deleteAction={{ label: "删除", description: "删除选中角色", disabled: ({ selectedRowKeys: keys }) => keys.length !== 1 || busy, onClick: ({ selectedRowKeys: keys }) => { const role = roles.find((item) => item.id === keys[0]); if (role) { setSelectedRoleId(role.id); setDeleteDialogOpen(true); } } }}
               toolbarActions={toolbarActions}
@@ -384,7 +394,7 @@ function PermissionMatrix({
             <h2 className="flex items-center gap-2 text-base font-semibold"><ShieldCheck className="size-4" aria-hidden />权限矩阵</h2>
             <p className="text-xs text-muted-foreground">{role ? `${role.role_name} · ${permissionCodes.length} 项；保存时完整替换当前角色权限集` : "请选择角色查看权限"}</p>
           </div>
-          {role ? <Button type="button" size="sm" disabled={loading || saving} onClick={onSave}>{saving ? "保存中..." : "保存权限"}</Button> : null}
+          {role ? <Button type="button" size="sm" disabled={loading || saving} onClick={onSave}>{saving ? LOADING_SAVING : "保存权限"}</Button> : null}
         </div>
         {loading ? <div className="rounded-md border border-dashed p-5 text-sm text-muted-foreground" role="status">加载权限目录...</div> : null}
         {!loading && groups.length === 0 ? <div className="rounded-md border border-dashed p-5 text-sm text-muted-foreground">暂无权限目录</div> : null}
@@ -446,7 +456,7 @@ function RoleDialog({
           <Field label="父角色"><select value={form.parentRoleId} onChange={(event) => onFormChange({ ...form, parentRoleId: event.target.value })} aria-label="父角色" className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">无父角色</option>{parents.map((role) => <option key={role.id} value={role.id}>{role.role_name}（{role.role_code}）</option>)}</select></Field>
           <Field label="数据范围"><select value={form.dataScope} onChange={(event) => onFormChange({ ...form, dataScope: event.target.value })} aria-label="数据范围" className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">请选择</option>{DATA_SCOPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
         </div>
-        <DialogFooter><Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>取消</Button><Button type="button" disabled={saving} onClick={onSave}>{saving ? "保存中..." : editing ? "保存修改" : "新增角色"}</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>取消</Button><Button type="button" disabled={saving} onClick={onSave}>{saving ? LOADING_SAVING : editing ? "保存修改" : "新增角色"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -513,7 +523,7 @@ function BatchAssignDialog({
           <div className="space-y-2"><h3 className="text-sm font-semibold">用户（已选 {selectedUserIds.length}）</h3>{loading ? <div className="rounded-md border border-dashed p-5 text-sm text-muted-foreground" role="status">加载用户列表...</div> : <DataGrid columns={columns} data={users} rowKey={(row) => row.user_id} selectedRowKeys={selectedUserIds} onSelectedRowKeysChange={onUsersChange} selectable storageKey="h1-role-permission-users" defaultPageSize={10} emptyTitle="暂无可授权用户" emptyDescription="当前货主没有可用用户。" tableClassName="min-w-[470px]" />}</div>
           <div className="space-y-2"><h3 className="text-sm font-semibold">角色（已选 {selectedRoleIds.length}）</h3><div className="space-y-2 rounded-md border p-3">{roles.length === 0 ? <p className="text-sm text-muted-foreground">暂无角色</p> : roles.map((role) => <label key={role.id} className="flex items-start gap-2 text-sm"><Checkbox checked={selectedRoleIds.includes(role.id)} onCheckedChange={() => onRoleToggle(role.id)} /><span className="min-w-0"><span className="block truncate">{role.role_name}</span><span className="block font-mono text-xs text-muted-foreground">{role.role_code}</span></span></label>)}</div></div>
         </div>
-        <DialogFooter><Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>取消</Button><Button type="button" disabled={saving || selectedUserIds.length === 0 || selectedRoleIds.length === 0} onClick={onSave}>{saving ? "提交中..." : "确认批量授权"}</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>取消</Button><Button type="button" disabled={saving || selectedUserIds.length === 0 || selectedRoleIds.length === 0} onClick={onSave}>{saving ? LOADING_SUBMITTING : "确认批量授权"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -531,7 +541,7 @@ function roleColumns(roles: Role[]): DataGridColumn<Role>[] {
     { key: "data_scope", header: "数据范围", width: 130, sortable: true, sortValue: (row) => dataScopeLabel(row.data_scope), filterValue: (row) => row.data_scope, filter: { type: "multiSelect", options: DATA_SCOPE_OPTIONS }, render: (row) => <StatusBadge status="completed" label={dataScopeLabel(row.data_scope)} size="sm" /> },
     { key: "parent_role_id", header: "父角色", width: 170, sortable: true, sortValue: (row) => names.get(row.parent_role_id ?? "") ?? "", render: (row) => row.parent_role_id ? names.get(row.parent_role_id) ?? "未知角色" : "无" },
     { key: "permission_count", header: "权限数", width: 110, align: "right", sortable: true, sortValue: (row) => row.permission_codes.length, render: (row) => `${row.permission_codes.length} 项` },
-    { key: "created_at", header: "创建时间", width: 170, sortable: true, copyable: true, render: (row) => formatDateTime(row.created_at) },
+    { key: "created_at", header: COLUMN_CREATED_AT, width: 170, sortable: true, copyable: true, render: (row) => formatDateTime(row.created_at) },
   ];
 }
 
@@ -579,9 +589,4 @@ function roleFormFromRole(role: Role): RoleForm {
 
 function dataScopeLabel(value: string) {
   return DATA_SCOPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }

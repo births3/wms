@@ -17,6 +17,7 @@ import {
   StatusBadge,
   buildQueryPanelSummaryItems,
   cn,
+  formatZhDate,
   type DataGridColumn,
   type DataGridCreateAction,
   type DataGridRefreshAction,
@@ -42,6 +43,19 @@ import { useApiKeysQuery } from "@/features/api-key/api-key-queries";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import { queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_REFRESH,
+  BUTTON_SAVE,
+  COLUMN_CREATED_AT,
+  COLUMN_STATUS,
+  COLUMN_UPDATED_AT,
+  COLUMN_VERSION,
+  FIELD_KEYWORD,
+  LOADING_SAVING,
+  STATUS_DEACTIVATED,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+} from "@/lib/ui-strings";
 
 export const H8_ERP_CONNECTOR_WRITE = "h8.erp_connector.write";
 
@@ -51,14 +65,14 @@ type ConfirmAction = "test" | "activate" | "disable" | "delete";
 export const h8ErpConnectorQueryFields: QueryPanelField[] = [
   {
     key: "keyword",
-    label: "关键字",
+    label: FIELD_KEYWORD,
     type: "text",
     placeholder: "连接编码 / 名称",
     ariaLabel: "搜索 ERP 连接",
   },
   {
     key: "status",
-    label: "状态",
+    label: COLUMN_STATUS,
     type: "multiSelect",
     options: [
       { label: "testing", value: "testing" },
@@ -75,7 +89,7 @@ const columns: DataGridColumn<H8ErpConnector>[] = [
   textColumn("channel_mode", "通道", 140),
   {
     key: "status",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 100,
     render: (row) => (
       <StatusBadge status={statusVariant(row.status)} label={row.status} size="sm" />
@@ -83,7 +97,7 @@ const columns: DataGridColumn<H8ErpConnector>[] = [
   },
   {
     key: "config_version",
-    header: "版本",
+    header: COLUMN_VERSION,
     width: 70,
     filter: false,
     render: (row) => row.config_version,
@@ -98,16 +112,16 @@ const columns: DataGridColumn<H8ErpConnector>[] = [
   },
   {
     key: "created_at",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 160,
-    render: (row) => formatDateTime(row.created_at),
+    render: (row) => formatZhDate(row.created_at),
   },
   {
     key: "updated_at",
-    header: "更新时间",
+    header: COLUMN_UPDATED_AT,
     width: 180,
     defaultHidden: true,
-    render: (row) => formatDateTime(row.updated_at),
+    render: (row) => formatZhDate(row.updated_at),
   },
   {
     key: "directions",
@@ -235,7 +249,7 @@ export function ErpConnectorConfigPage({
     deleteMutation.isPending;
 
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新 ERP 连接列表",
     disabled: listQuery.isFetching,
     onClick: () => void listQuery.refetch(),
@@ -287,7 +301,7 @@ export function ErpConnectorConfigPage({
         },
         {
           key: "activate",
-          label: "启用",
+          label: STATUS_ENABLED,
           description: "当前版本测试通过后启用",
           icon: <Power className="size-4" aria-hidden />,
           disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
@@ -295,7 +309,7 @@ export function ErpConnectorConfigPage({
         },
         {
           key: "disable",
-          label: "停用",
+          label: STATUS_DISABLED,
           description: "停用 active 连接并暂停在途",
           icon: <PowerOff className="size-4" aria-hidden />,
           disabled: (ctx) =>
@@ -361,7 +375,7 @@ export function ErpConnectorConfigPage({
     } else if (confirmAction === "activate") {
       void run(() => activateMutation.mutateAsync(id), "已启用");
     } else if (confirmAction === "disable") {
-      void run(() => disableMutation.mutateAsync(id), "已停用");
+      void run(() => disableMutation.mutateAsync(id), STATUS_DEACTIVATED);
     } else if (confirmAction === "delete") {
       void run(() => deleteMutation.mutateAsync(id), "已删除");
     }
@@ -567,7 +581,7 @@ export function ErpConnectorConfigPage({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={busy}>
-                {busy ? "保存中..." : "保存"}
+                {busy ? LOADING_SAVING : BUTTON_SAVE}
               </Button>
             </DialogFooter>
           </form>
@@ -669,7 +683,7 @@ export function ErpConnectorConfigPage({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={busy || !selected}>
-                {busy ? "保存中..." : "保存"}
+                {busy ? LOADING_SAVING : BUTTON_SAVE}
               </Button>
             </DialogFooter>
           </form>
@@ -734,13 +748,3 @@ function statusVariant(value: string): "completed" | "isolated" | "expired" {
   return value === "active" ? "completed" : value === "testing" ? "isolated" : "expired";
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
-}

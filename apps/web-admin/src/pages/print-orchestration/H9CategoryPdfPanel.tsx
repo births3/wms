@@ -17,6 +17,7 @@ import {
   type PrintSuiteInstance,
 } from "@/features/print-orchestration/print-orchestration-queries";
 import { formatDateTime } from "@/lib/format";
+import { instanceStatusLabel, processingStatusLabel } from "./print-status";
 
 interface H9CategoryPdfPanelProps {
   instances: PrintSuiteInstance[];
@@ -295,20 +296,6 @@ function categoryPdfColumns(
       render: (row) => row.failure_reason ?? "-",
     },
   ];
-}
-
-function processingStatusLabel(status: string) {
-  return status === "ready"
-    ? "已就绪"
-    : status === "failed"
-      ? "生成失败"
-      : status === "processing"
-        ? "处理中"
-        : "待处理";
-}
-
-function instanceStatusLabel(status: string) {
-  return status === "queued" ? "待打印" : status === "cancelled" ? "已取消" : "等待分类 PDF";
 }
 
 function shortHash(value: string | null | undefined) {

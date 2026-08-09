@@ -44,7 +44,9 @@ def has_datagrid(text: str) -> bool:
 
 
 def has_created_time_column(text: str) -> bool:
-    return bool(re.search(r'key:\s*["\'](?:createdAt|created_at)["\']', text)) and "创建时间" in text
+    # header 可为字面量 "创建时间" 或 ui-strings 常量 COLUMN_CREATED_AT（文案收敛后）
+    has_created_header = "创建时间" in text or "COLUMN_CREATED_AT" in text
+    return bool(re.search(r'key:\s*["\'](?:createdAt|created_at)["\']', text)) and has_created_header
 
 
 def scan() -> list[Issue]:

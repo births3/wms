@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { asNullableString, asString, readJsonBody, sendError, sendJson } from "./web-admin-dev-mock-core-common";
 
+import { stringArray } from "../src/pages/wechat-notify/wechat-notify-helpers";
+
 interface DevRole {
   id: string;
   role_code: string;
@@ -221,8 +223,4 @@ function rolePermissionSeed(roleCode: string) {
     driver: ["m4.read", "h5.express.read"],
   };
   return seeds[roleCode] ?? [];
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }

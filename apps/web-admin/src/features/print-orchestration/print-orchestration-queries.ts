@@ -151,27 +151,17 @@ export function useCreateCutoffPlanMutation() {
   });
 }
 
-export function usePublishCutoffPlanMutation() {
-  const queryClient = useQueryClient();
-  return useMutation<CutoffPlan, ApiError, string>({
-    mutationFn: async (planId) => {
-      const result = await api.POST(
-        "/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish",
-        {
-          params: {
-            path: { plan_id: planId },
-            header: { "Idempotency-Key": idempotencyKey("web-h9-cutoff-plan-publish") },
-          },
-        },
-      );
-      if (!result.data) {
-        throw new ApiError(result.error, "发布截单计划失败", result.response.status);
-      }
-      return result.data;
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
-  });
-}
+export const usePublishCutoffPlanMutation = createVersionStateMutation<CutoffPlan>(
+  (planId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish", {
+      params: {
+        path: { plan_id: planId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-cutoff-plan-publish",
+  "发布截单计划失败",
+);
 
 export function useAggregationFieldsQuery() {
   return useQuery<AggregationFieldDefinition[], ApiError>({
@@ -239,49 +229,29 @@ export function useTestAggregationRuleMutation() {
   });
 }
 
-export function usePublishAggregationRuleMutation() {
-  const queryClient = useQueryClient();
-  return useMutation<AggregationRuleVersion, ApiError, string>({
-    mutationFn: async (versionId) => {
-      const result = await api.POST(
-        "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish",
-        {
-          params: {
-            path: { version_id: versionId },
-            header: { "Idempotency-Key": idempotencyKey("web-h9-agg-rule-publish") },
-          },
-        },
-      );
-      if (!result.data) {
-        throw new ApiError(result.error, "发布归集规则失败", result.response.status);
-      }
-      return result.data;
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
-  });
-}
+export const usePublishAggregationRuleMutation = createVersionStateMutation<AggregationRuleVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-agg-rule-publish",
+  "发布归集规则失败",
+);
 
-export function useDisableAggregationRuleMutation() {
-  const queryClient = useQueryClient();
-  return useMutation<AggregationRuleVersion, ApiError, string>({
-    mutationFn: async (versionId) => {
-      const result = await api.POST(
-        "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable",
-        {
-          params: {
-            path: { version_id: versionId },
-            header: { "Idempotency-Key": idempotencyKey("web-h9-agg-rule-disable") },
-          },
-        },
-      );
-      if (!result.data) {
-        throw new ApiError(result.error, "停用归集规则失败", result.response.status);
-      }
-      return result.data;
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
-  });
-}
+export const useDisableAggregationRuleMutation = createVersionStateMutation<AggregationRuleVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-agg-rule-disable",
+  "停用归集规则失败",
+);
 
 export function usePrintDocumentCategoriesQuery() {
   return useQuery<PrintDocumentCategory[], ApiError>({
@@ -444,48 +414,56 @@ export function useTestPrintSuiteMutation() {
   });
 }
 
-export function usePublishPrintSuiteMutation() {
-  const queryClient = useQueryClient();
-  return useMutation<PrintSuiteVersion, ApiError, string>({
-    mutationFn: async (versionId) => {
-      const result = await api.POST(
-        "/api/v1/print-orchestration/print-suites/versions/{version_id}/publish",
-        {
-          params: {
-            path: { version_id: versionId },
-            header: { "Idempotency-Key": idempotencyKey("web-h9-print-suite-publish") },
-          },
-        },
-      );
-      if (!result.data) {
-        throw new ApiError(result.error, "发布打印组套失败", result.response.status);
-      }
-      return result.data;
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
-  });
-}
+export const usePublishPrintSuiteMutation = createVersionStateMutation<PrintSuiteVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/print-suites/versions/{version_id}/publish", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-print-suite-publish",
+  "发布打印组套失败",
+);
 
-export function useDisablePrintSuiteMutation() {
-  const queryClient = useQueryClient();
-  return useMutation<PrintSuiteVersion, ApiError, string>({
-    mutationFn: async (versionId) => {
-      const result = await api.POST(
-        "/api/v1/print-orchestration/print-suites/versions/{version_id}/disable",
-        {
-          params: {
-            path: { version_id: versionId },
-            header: { "Idempotency-Key": idempotencyKey("web-h9-print-suite-disable") },
-          },
-        },
-      );
-      if (!result.data) {
-        throw new ApiError(result.error, "停用打印组套失败", result.response.status);
-      }
-      return result.data;
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
-  });
+export const useDisablePrintSuiteMutation = createVersionStateMutation<PrintSuiteVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/print-suites/versions/{version_id}/disable", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-print-suite-disable",
+  "停用打印组套失败",
+);
+
+// 版本发布/停用类变更的通用工厂：统一负责 queryClient 失效、幂等键生成与错误包装，
+// 具体接口调用（字面量路径以保留 openapi-fetch 类型推导）由调用方以闭包形式提供。
+type VersionStateApiResult<TVersion> = {
+  data?: TVersion | undefined;
+  error?: components["schemas"]["ErrorResponse"] | undefined;
+  response: Response;
+};
+
+function createVersionStateMutation<TVersion>(
+  apiCall: (versionId: string, requestKey: string) => Promise<VersionStateApiResult<TVersion>>,
+  idempotencyPrefix: string,
+  failureMessage: string,
+) {
+  return function useVersionStateMutation() {
+    const queryClient = useQueryClient();
+    return useMutation<TVersion, ApiError, string>({
+      mutationFn: async (versionId) => {
+        const result = await apiCall(versionId, idempotencyKey(idempotencyPrefix));
+        if (!result.data) {
+          throw new ApiError(result.error, failureMessage, result.response.status);
+        }
+        return result.data;
+      },
+      onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+    });
+  };
 }
 
 function idempotencyKey(prefix: string) {

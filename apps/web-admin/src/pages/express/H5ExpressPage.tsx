@@ -8,6 +8,7 @@ import {
   QueryPanel,
   StatusBadge,
   buildQueryPanelSummaryItems,
+  formatZhDate,
   type DataGridColumn,
   type QueryPanelField,
   type QueryPanelValue,
@@ -44,18 +45,29 @@ import {
 import { providerLabel, providerOptions, waybillStatusKey, waybillStatusLabel } from "./h5-express-model";
 import { errorText } from "@/lib/error-text";
 import { queryString as libQueryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_ADD,
+  BUTTON_REFRESH,
+  COLUMN_CREATED_AT,
+  COLUMN_RULE_NAME,
+  COLUMN_STATUS,
+  COLUMN_UPDATED_AT,
+  FIELD_KEYWORD,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 type Notice = { type: "success" | "error"; text: string } | null;
 
 const queryFields: QueryPanelField[] = [
-  { key: "q", label: "关键字", type: "text", placeholder: "快递商 / 规则编码" },
+  { key: "q", label: FIELD_KEYWORD, type: "text", placeholder: "快递商 / 规则编码" },
   {
     key: "enabled",
     label: "启停状态",
     type: "multiSelect",
-    options: [{ label: "启用", value: "true" }, { label: "停用", value: "false" }],
+    options: [{ label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }],
   },
 ];
 const h5ExpressCoreQueryFieldKeys = ["q", "enabled"];
@@ -86,13 +98,13 @@ const carrierColumns: DataGridColumn<ExpressCarrier>[] = [
   },
   {
     key: "enabled",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 110,
     minWidth: 90,
     filterValue: (row) => row.enabled ? "true" : "false",
-    copyValue: (row) => row.enabled ? "启用" : "停用",
-    filter: { type: "multiSelect", options: [{ label: "启用", value: "true" }, { label: "停用", value: "false" }] },
-    render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? "启用" : "停用"} size="sm" />,
+    copyValue: (row) => row.enabled ? STATUS_ENABLED : STATUS_DISABLED,
+    filter: { type: "multiSelect", options: [{ label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }] },
+    render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? STATUS_ENABLED : STATUS_DISABLED} size="sm" />,
   },
   {
     key: "priority",
@@ -126,27 +138,27 @@ const carrierColumns: DataGridColumn<ExpressCarrier>[] = [
   },
   {
     key: "updated_at",
-    header: "更新时间",
+    header: COLUMN_UPDATED_AT,
     width: 180,
     minWidth: 150,
     sortable: true,
     sortValue: (row) => row.updated_at,
-    copyValue: (row) => formatDateTime(row.updated_at),
+    copyValue: (row) => formatZhDate(row.updated_at),
     filterValue: (row) => row.updated_at,
     filter: { type: "dateRange" },
-    render: (row) => formatDateTime(row.updated_at),
+    render: (row) => formatZhDate(row.updated_at),
   },
   {
     key: "created_at",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 180,
     minWidth: 150,
     sortable: true,
     sortValue: (row) => row.created_at,
-    copyValue: (row) => formatDateTime(row.created_at),
+    copyValue: (row) => formatZhDate(row.created_at),
     filterValue: (row) => row.created_at,
     filter: { type: "dateRange" },
-    render: (row) => formatDateTime(row.created_at),
+    render: (row) => formatZhDate(row.created_at),
   },
 ];
 
@@ -165,7 +177,7 @@ const ruleColumns: DataGridColumn<ExpressRoutingRule>[] = [
   },
   {
     key: "rule_name",
-    header: "规则名称",
+    header: COLUMN_RULE_NAME,
     width: 220,
     minWidth: 150,
     sortable: true,
@@ -197,13 +209,13 @@ const ruleColumns: DataGridColumn<ExpressRoutingRule>[] = [
   },
   {
     key: "enabled",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 110,
     minWidth: 90,
     filterValue: (row) => row.enabled ? "true" : "false",
-    copyValue: (row) => row.enabled ? "启用" : "停用",
-    filter: { type: "multiSelect", options: [{ label: "启用", value: "true" }, { label: "停用", value: "false" }] },
-    render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? "启用" : "停用"} size="sm" />,
+    copyValue: (row) => row.enabled ? STATUS_ENABLED : STATUS_DISABLED,
+    filter: { type: "multiSelect", options: [{ label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }] },
+    render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? STATUS_ENABLED : STATUS_DISABLED} size="sm" />,
   },
   {
     key: "priority",
@@ -227,15 +239,15 @@ const ruleColumns: DataGridColumn<ExpressRoutingRule>[] = [
   },
   {
     key: "created_at",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 180,
     minWidth: 150,
     sortable: true,
     sortValue: (row) => row.created_at,
-    copyValue: (row) => formatDateTime(row.created_at),
+    copyValue: (row) => formatZhDate(row.created_at),
     filterValue: (row) => row.created_at,
     filter: { type: "dateRange" },
-    render: (row) => formatDateTime(row.created_at),
+    render: (row) => formatZhDate(row.created_at),
   },
 ];
 
@@ -371,12 +383,12 @@ export function H5ExpressPage() {
               exportFileBaseName="H5 快递商配置"
               tableClassName="min-w-[1220px]"
               refreshAction={{
-                label: "刷新",
+                label: BUTTON_REFRESH,
                 description: "刷新快递商配置",
                 disabled: carriersQuery.isFetching,
                 onClick: () => void refreshCarriers(),
               }}
-              createAction={{ label: "新增", description: "新增快递商", onClick: () => openCarrierDialog(null) }}
+              createAction={{ label: BUTTON_ADD, description: "新增快递商", onClick: () => openCarrierDialog(null) }}
               editAction={{
                 label: "修改",
                 description: "修改选中快递商",
@@ -407,12 +419,12 @@ export function H5ExpressPage() {
             exportFileBaseName="H5 快递选择规则"
             tableClassName="min-w-[1050px]"
             refreshAction={{
-              label: "刷新",
+              label: BUTTON_REFRESH,
               description: "刷新快递选择规则",
               disabled: rulesQuery.isFetching,
               onClick: () => void refreshRules(),
             }}
-            createAction={{ label: "新增", description: "新增快递选择规则", onClick: () => openRuleDialog(null) }}
+            createAction={{ label: BUTTON_ADD, description: "新增快递选择规则", onClick: () => openRuleDialog(null) }}
             editAction={{
               label: "修改",
               description: "修改选中规则",
@@ -793,14 +805,4 @@ function parseJsonObject(value: string) {
   const parsed = JSON.parse(value || "{}") as unknown;
   if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error("JSON 必须是对象");
   return parsed as Record<string, unknown>;
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }

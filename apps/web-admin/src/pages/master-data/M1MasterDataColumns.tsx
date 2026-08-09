@@ -1,9 +1,16 @@
-import { StatusBadge, type DataGridColumn, type StatusKey } from "@wms/ui";
+import { StatusBadge, formatDateTime, type DataGridColumn, type StatusKey } from "@wms/ui";
 
 import type {
   LocationMasterDataFields,
   MasterDataRow,
 } from "@/features/master-data/master-data-queries";
+import {
+  COLUMN_CREATED_AT,
+  COLUMN_OWNER,
+  COLUMN_STATUS,
+  COLUMN_UPDATED_AT,
+  STATUS_DISABLED,
+} from "@/lib/ui-strings";
 
 export const baseMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   {
@@ -32,7 +39,7 @@ export const baseMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   },
   {
     key: "status",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 130,
     minWidth: 120,
     sortable: true,
@@ -43,7 +50,7 @@ export const baseMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
       type: "multiSelect",
       options: [
         { label: "启用/可用", value: "active" },
-        { label: "停用", value: "disabled" },
+        { label: STATUS_DISABLED, value: "disabled" },
         { label: "其他", value: "other" },
       ],
     },
@@ -81,7 +88,7 @@ export const baseMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   },
   {
     key: "createdAt",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 190,
     minWidth: 170,
     sortable: true,
@@ -93,7 +100,7 @@ export const baseMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   },
   {
     key: "updatedAt",
-    header: "更新时间",
+    header: COLUMN_UPDATED_AT,
     width: 190,
     minWidth: 170,
     sortable: true,
@@ -108,7 +115,7 @@ export const baseMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
 export const locationMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   {
     key: "owner",
-    header: "货主",
+    header: COLUMN_OWNER,
     width: 160,
     minWidth: 140,
     sortable: true,
@@ -173,7 +180,7 @@ export const locationMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   },
   {
     key: "status",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 130,
     minWidth: 120,
     sortable: true,
@@ -212,7 +219,7 @@ export const locationMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   },
   {
     key: "createdAt",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 190,
     minWidth: 170,
     sortable: true,
@@ -224,7 +231,7 @@ export const locationMasterDataColumns: DataGridColumn<MasterDataRow>[] = [
   },
   {
     key: "updatedAt",
-    header: "更新时间",
+    header: COLUMN_UPDATED_AT,
     width: 190,
     minWidth: 170,
     sortable: true,
@@ -259,12 +266,6 @@ function statusFilterValue(status: string) {
   if (status === "active" || status === "available") return "active";
   if (status === "disabled" || status === "inactive" || status === "locked") return "disabled";
   return "other";
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "-";
-  return date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function shortDisplayId(value: string) {

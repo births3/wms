@@ -47,6 +47,7 @@ import {
 } from "@/features/print-orchestration/print-orchestration-queries";
 import { formatDateTime } from "@/lib/format";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { BUTTON_REFRESH, COLUMN_CREATED_AT, COLUMN_RULE_NAME, COLUMN_STATUS, COLUMN_VERSION, COLUMN_WAREHOUSE, FIELD_KEYWORD, FIELD_VALIDITY, STATUS_DEACTIVATED, STATUS_DRAFT, STATUS_PUBLISHED } from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import {
   AggregationRuleDialog,
@@ -60,6 +61,7 @@ import {
   type H9LifecycleConfirmation,
 } from "./H9LifecycleConfirmDialog";
 import { H9PrintSuitePanel } from "./H9PrintSuitePanel";
+import { aggregationFieldLabel, statusCompletion, statusLabel } from "./print-status";
 
 /**
  * 页面设计契约：列表/配置工作台；主信息为 QueryPanel + Tabs + DataGrid；
@@ -537,41 +539,19 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
 }
 
 const ruleColumns: DataGridColumn<AggregationRuleVersion>[] = [
-  { key: "version_no", header: "版本", width: 80, mono: true, render: (row) => `V${row.version_no}` },
-  { key: "name", header: "规则名称", width: 220, render: (row) => row.name },
-  { key: "status", header: "状态", width: 110, render: (row) => <StatusBadge status={ruleStatusKey(row.status)} label={ruleStatusLabel(row.status)} size="sm" /> },
+  { key: "version_no", header: COLUMN_VERSION, width: 80, mono: true, render: (row) => `V${row.version_no}` },
+  { key: "name", header: COLUMN_RULE_NAME, width: 220, render: (row) => row.name },
+  { key: "status", header: COLUMN_STATUS, width: 110, render: (row) => <StatusBadge status={statusCompletion(row.status)} label={statusLabel(row.status)} size="sm" /> },
   { key: "dimensions", header: "维度顺序（等值归组）", width: 340, render: (row) => row.dimensions.map((item) => aggregationFieldLabel(item.field_code)).join(" → ") },
   { key: "tested_at", header: "测试时间", width: 170, render: (row) => row.tested_at ? formatDateTime(row.tested_at) : "-" },
   { key: "published_at", header: "发布时间", width: 170, render: (row) => row.published_at ? formatDateTime(row.published_at) : "-" },
-  { key: "created_at", header: "创建时间", width: 170, defaultHidden: true, render: (row) => formatDateTime(row.created_at) },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 170, defaultHidden: true, render: (row) => formatDateTime(row.created_at) },
 ];
-
-function ruleStatusKey(status: string) {
-  return status === "published" ? "completed" : status === "disabled" ? "expired" : status === "tested" ? "in_progress" : "pending";
-}
-
-function ruleStatusLabel(status: string) {
-  return status === "published" ? "已发布" : status === "disabled" ? "已停用" : status === "tested" ? "已测试" : "草稿";
-}
-
-export function aggregationFieldLabel(code: string) {
-  const labels: Record<string, string> = {
-    document_type: "单据类型",
-    erp_order_no: "ERP 订单号",
-    invoice_no: "发票号",
-    transport_mode_code: "运输方式",
-    department_code: "业务部门",
-    sales_group_code: "销售组",
-    order_group_no: "订单组号",
-    business_type_code: "业务类型",
-  };
-  return labels[code] ?? code;
-}
 
 const candidateColumns: DataGridColumn<DeliveryNoteCandidate>[] = [
   { key: "wms_order_no", header: "WMS 订单号", width: 180, mono: true, copyValue: (row) => row.wms_order_no },
   { key: "erp_order_no", header: "ERP 订单号", width: 170, mono: true, render: (row) => row.erp_order_no ?? "-" },
-  { key: "warehouse", header: "仓库", width: 160, render: (row) => `${row.warehouse_code} ${row.warehouse_name}` },
+  { key: "warehouse", header: COLUMN_WAREHOUSE, width: 160, render: (row) => `${row.warehouse_code} ${row.warehouse_name}` },
   { key: "customer", header: "客户", width: 180, render: (row) => `${row.customer_code} ${row.customer_name}` },
   { key: "delivery_address", header: "送货地址", width: 250, render: (row) => row.delivery_address },
   { key: "route_code", header: "冻结线路", width: 180, render: (row) => row.route_code },
@@ -584,8 +564,8 @@ function buildH9DeliveryNoteQueryFields(
   addressOptions: Array<{ value: string; label: string }>,
 ): QueryPanelField[] {
   return [
-    { key: "warehouseId", label: "仓库", type: "select", options: warehouseOptions },
-    { key: "keyword", label: "关键字", type: "text", placeholder: "订单号 / 随货同行单号 / 客户" },
+    { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "select", options: warehouseOptions },
+    { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "订单号 / 随货同行单号 / 客户" },
     { key: "customerId", label: "客户", type: "select", options: customerOptions },
     { key: "routeCode", label: "线路", type: "text", placeholder: "线路编码" },
     { key: "deliveryAddressId", label: "送货地址", type: "select", options: addressOptions },
@@ -596,7 +576,7 @@ const groupColumns: DataGridColumn<DeliveryNoteGroupListItem>[] = [
   { key: "delivery_note_no", header: "随货同行单号", width: 250, mono: true, copyValue: (row) => row.delivery_note_no },
   { key: "cutoff_mode", header: "截单方式", width: 100, render: (row) => <StatusBadge status={row.cutoff_mode === "manual" ? "pending" : "completed"} label={row.cutoff_mode === "manual" ? "人工截单" : "计划截单"} size="sm" /> },
   { key: "orders", header: "归集订单", width: 170, render: (row) => row.order_nos.join("、") },
-  { key: "warehouse", header: "仓库", width: 180, defaultHidden: true, render: (row) => `${row.warehouse_code} ${row.warehouse_name}` },
+  { key: "warehouse", header: COLUMN_WAREHOUSE, width: 180, defaultHidden: true, render: (row) => `${row.warehouse_code} ${row.warehouse_name}` },
   { key: "customer", header: "客户", width: 160, render: (row) => `${row.customer_code} ${row.customer_name}` },
   { key: "delivery_address", header: "送货地址", width: 240, render: (row) => row.delivery_address },
   { key: "route_code", header: "冻结线路", width: 150, render: (row) => row.route_code },
@@ -607,19 +587,19 @@ const groupColumns: DataGridColumn<DeliveryNoteGroupListItem>[] = [
 function planColumns(customerLabels: Map<string, string>, warehouseLabels: Map<string, string>): DataGridColumn<CutoffPlan>[] {
   return [
     { key: "name", header: "计划名称", width: 200, render: (row) => row.name },
-    { key: "status", header: "状态", width: 110, render: (row) => <StatusBadge status={row.status === "published" ? "completed" : "pending"} label={row.status === "published" ? "已发布" : row.status === "disabled" ? "已停用" : "草稿"} size="sm" /> },
+    { key: "status", header: COLUMN_STATUS, width: 110, render: (row) => <StatusBadge status={row.status === "published" ? "completed" : "pending"} label={row.status === "published" ? STATUS_PUBLISHED : row.status === "disabled" ? STATUS_DEACTIVATED : STATUS_DRAFT} size="sm" /> },
     { key: "scope", header: "匹配层级", width: 130, render: (row) => scopeLabel(row.scope) },
     { key: "target", header: "匹配对象", width: 220, render: (row) => row.customer_id ? customerLabels.get(row.customer_id) ?? row.customer_id : row.route_code ?? "当前货主" },
-    { key: "warehouse", header: "仓库", width: 180, defaultHidden: true, render: (row) => warehouseLabels.get(row.warehouse_id) ?? row.warehouse_id },
+    { key: "warehouse", header: COLUMN_WAREHOUSE, width: 180, defaultHidden: true, render: (row) => warehouseLabels.get(row.warehouse_id) ?? row.warehouse_id },
     { key: "weekly_schedule", header: "每周截单", width: 300, render: (row) => row.weekly_schedule.map((item) => `${weekdayLabel(item.weekday)} ${item.cutoff_time}`).join("；") },
     { key: "exceptions", header: "例外日期", width: 240, render: (row) => row.exceptions.length ? row.exceptions.map((item) => `${item.date} ${item.cutoff_time ?? "不截单"}`).join("；") : "无" },
-    { key: "effective", header: "有效期", width: 330, defaultHidden: true, render: (row) => `${formatDateTime(row.effective_from)} 至 ${formatDateTime(row.effective_to)}` },
+    { key: "effective", header: FIELD_VALIDITY, width: 330, defaultHidden: true, render: (row) => `${formatDateTime(row.effective_from)} 至 ${formatDateTime(row.effective_to)}` },
   ];
 }
 
 const routeColumns: DataGridColumn<RouteBinding>[] = [
   { key: "route_code", header: "线路编码", width: 160, mono: true, render: (row) => row.route_code },
-  { key: "warehouse", header: "仓库", width: 210, render: (row) => `${row.warehouse_code} ${row.warehouse_name}` },
+  { key: "warehouse", header: COLUMN_WAREHOUSE, width: 210, render: (row) => `${row.warehouse_code} ${row.warehouse_name}` },
   { key: "customer", header: "客户", width: 220, render: (row) => `${row.customer_code} ${row.customer_name}` },
   { key: "delivery_address", header: "送货地址", width: 330, render: (row) => row.delivery_address },
   { key: "effective_from", header: "生效时间", width: 180, render: (row) => formatDateTime(row.effective_from) },
@@ -627,7 +607,7 @@ const routeColumns: DataGridColumn<RouteBinding>[] = [
 ];
 
 function refreshAction(query: { isFetching: boolean; refetch: () => Promise<unknown> }, label: string): DataGridRefreshAction {
-  return { label: "刷新", description: `刷新${label}`, disabled: query.isFetching, onClick: () => void query.refetch() };
+  return { label: BUTTON_REFRESH, description: `刷新${label}`, disabled: query.isFetching, onClick: () => void query.refetch() };
 }
 
 function defaultQuery(): QueryPanelValue {

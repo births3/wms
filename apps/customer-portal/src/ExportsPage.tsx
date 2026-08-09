@@ -7,7 +7,7 @@ import {
   FileWarning,
   RefreshCw,
 } from "lucide-react";
-import { Button, StatusBadge } from "@wms/ui";
+import { Button, StatusBadge, formatZhDate } from "@wms/ui";
 
 import { authorizeExportDownload, listExports } from "./api";
 import type { ExportJob, LoginResponse } from "./types";
@@ -138,7 +138,7 @@ function ExportRow(props: {
       data-testid={`portal-export-${props.job.status}`}
       data-export-id={props.job.id}
     >
-      <td data-label="创建时间">{formatTime(props.job.created_at)}</td>
+      <td data-label="创建时间">{formatZhDate(props.job.created_at)}</td>
       <td data-label="订单数">{props.job.requested_order_count}</td>
       <td data-label="药检单">{props.job.report_file_count} 份</td>
       <td data-label="缺失项">
@@ -153,7 +153,7 @@ function ExportRow(props: {
         ) : null}
       </td>
       <td data-label="保留至">
-        {props.job.expires_at ? formatTime(props.job.expires_at) : "—"}
+        {props.job.expires_at ? formatZhDate(props.job.expires_at) : "—"}
       </td>
       <td data-mobile="action">
         <Button
@@ -172,14 +172,4 @@ function ExportRow(props: {
       </td>
     </tr>
   );
-}
-
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }

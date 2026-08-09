@@ -9,7 +9,7 @@ export type QualityStatusOption = { value: string; label: string };
 
 export function availableQty(batch: InventoryBatch) {
   if (batch.quality_status !== "qualified" || batch.recall_flag) return 0;
-  return batch.qty_on_hand - batch.qty_locked;
+  return Number(batch.qty_on_hand) - Number(batch.qty_locked);
 }
 
 export function qualityStatusLabel(status: string, options: readonly QualityStatusOption[] = []) {
@@ -27,11 +27,7 @@ export function qualityStatusKey(status: string, recalled: boolean): StatusKey {
   return "pending";
 }
 
-export function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "-";
-  return date.toLocaleString("zh-CN", { hour12: false });
-}
+export { formatDateTime } from "@wms/ui";
 
 export function ExpiryDateCell({
   expiryDate,

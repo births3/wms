@@ -21,6 +21,8 @@ import type {
   DeliveryNoteCandidate,
   PublishRouteBindingRequest,
 } from "@/features/print-orchestration/print-orchestration-queries";
+import { COLUMN_RULE_NAME, COLUMN_WAREHOUSE, LOADING_SAVING } from "@/lib/ui-strings";
+import { aggregationFieldLabel } from "./print-status";
 
 export interface H9SelectOption {
   label: string;
@@ -156,7 +158,7 @@ export function RouteBindingDialog({
           <DialogDescription>订单进入时按生效线路冻结；同一地址在同一时间只能有一条有效线路。</DialogDescription>
         </DialogHeader>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void submit(event).catch(() => undefined)}>
-          <Field label="仓库"><NativeSelect value={warehouseId} options={warehouses} onChange={setWarehouseId} /></Field>
+          <Field label={COLUMN_WAREHOUSE}><NativeSelect value={warehouseId} options={warehouses} onChange={setWarehouseId} /></Field>
           <Field label="客户"><NativeSelect value={customerId} options={customers} onChange={setCustomerId} /></Field>
           <Field label="送货地址" wide>
             <NativeSelect
@@ -266,7 +268,7 @@ export function CutoffPlanDialog({
         <form className="space-y-5" onSubmit={(event) => void submit(event).catch(() => undefined)}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="计划名称"><Input value={name} maxLength={100} onChange={(event) => setName(event.target.value)} /></Field>
-            <Field label="仓库"><NativeSelect value={warehouseId} options={warehouses} onChange={setWarehouseId} /></Field>
+            <Field label={COLUMN_WAREHOUSE}><NativeSelect value={warehouseId} options={warehouses} onChange={setWarehouseId} /></Field>
             <Field label="适用层级">
               <NativeSelect
                 value={scope}
@@ -322,7 +324,7 @@ export function CutoffPlanDialog({
           <DialogFooter>
             <DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose>
             <Button type="submit" disabled={pending || !name.trim() || !warehouseId || weekly.every((item) => !item.enabled)}>
-              {pending ? "保存中..." : "保存草稿"}
+              {pending ? LOADING_SAVING : "保存草稿"}
             </Button>
           </DialogFooter>
         </form>
@@ -371,7 +373,7 @@ export function AggregationRuleDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <Field label="规则名称">
+          <Field label={COLUMN_RULE_NAME}>
             <Input
               value={name}
               maxLength={100}
@@ -419,7 +421,7 @@ export function AggregationRuleDialog({
               }).catch(() => undefined)
             }
           >
-            {pending ? "保存中..." : "保存草稿"}
+            {pending ? LOADING_SAVING : "保存草稿"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -458,7 +460,7 @@ export function AggregationRuleTestDialog({
           <DialogTitle>样本订单测试</DialogTitle>
           <DialogDescription>
             规则 {rule ? `V${rule.version_no}「${rule.name}」` : "-"} · 维度顺序：
-            {rule?.dimensions.map((item) => dimensionLabel(item.field_code)).join(" → ") ?? "-"}
+            {rule?.dimensions.map((item) => aggregationFieldLabel(item.field_code)).join(" → ") ?? "-"}
             。仓库与送货地址为不可覆盖硬边界，测试结果按边界先分组。
           </DialogDescription>
         </DialogHeader>
@@ -529,20 +531,6 @@ function move(list: string[], index: number, delta: number) {
   if (target < 0 || target >= next.length) return next;
   [next[index], next[target]] = [next[target], next[index]];
   return next;
-}
-
-function dimensionLabel(code: string) {
-  const labels: Record<string, string> = {
-    document_type: "单据类型",
-    erp_order_no: "ERP 订单号",
-    invoice_no: "发票号",
-    transport_mode_code: "运输方式",
-    department_code: "业务部门",
-    sales_group_code: "销售组",
-    order_group_no: "订单组号",
-    business_type_code: "业务类型",
-  };
-  return labels[code] ?? code;
 }
 
 function Field({ label, wide, children }: { label: string; wide?: boolean; children: React.ReactNode }) {

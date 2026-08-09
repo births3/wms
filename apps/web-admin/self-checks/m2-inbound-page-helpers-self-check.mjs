@@ -185,7 +185,7 @@ try {
   assert.match(inboundQueriesSource, /api\.POST\("\/api\/v1\/inbound\/receiving-orders\/\{id\}\/sign"/, "PC 验收必须调用真实双人签字 API");
   assert.match(dialogSource, /disabled=\{dualSignRequiredByStrategy\}/, "策略要求时双人签字 checkbox 必须 disabled");
   assert.match(dialogSource, /dualPolicyDescription/, "策略锁定需显示实时命中策略");
-  assert.match(dialogSource, /SelectField label="质量状态"[\s\S]*\["qualified", "合格"\]/, "质量状态选项需中文");
+  assert.match(dialogSource, /SelectField label=\{COLUMN_QUALITY_STATUS\}[\s\S]*\["qualified", "合格"\]/, "质量状态选项需中文");
   assert.match(dialogSource, /activeDialog === "inspect"[\s\S]*DialogDescription>\{orderReceiptNo/, "验收弹窗需保留单号上下文");
   assert.match(dialogSource, /activeDialog === "putaway"[\s\S]*DialogDescription>\{orderReceiptNo/, "上架弹窗需保留单号上下文");
   assert.match(dialogSource, /<TextField label="验收批号" required placeholder=\{inspectExamples\.batchNo\}/, "验收批号背景值只允许作为 placeholder");

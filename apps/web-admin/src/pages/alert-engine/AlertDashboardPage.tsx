@@ -2,7 +2,7 @@ import * as React from "react";
 import {
   Button, Card, CardContent, CardHeader, CardTitle, DataGrid, Dialog, DialogClose,
   DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input,
-  PageHeader, QueryPanel, StatusBadge, buildQueryPanelSummaryItems, type DataGridColumn,
+  PageHeader, QueryPanel, StatusBadge, buildQueryPanelSummaryItems, formatDateTime, type DataGridColumn,
   type DataGridRefreshAction, type QueryPanelField,
   type QueryPanelValue,
 } from "@wms/ui";
@@ -14,13 +14,22 @@ import {
 } from "@/features/alert-engine/alert-runtime-queries";
 import { errorText } from "@/lib/error-text";
 import { queryRange, queryString, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_REFRESH,
+  COLUMN_CREATED_AT,
+  COLUMN_STATUS,
+  COLUMN_WAREHOUSE,
+  FIELD_WAREHOUSE_ID,
+  FILTER_ALL,
+  LOADING_SUBMITTING,
+} from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const alertDashboardQueryFields: QueryPanelField[] = [
   { key: "alertCode", label: "告警类型", type: "text", placeholder: "告警编码" },
   { key: "severity", label: "级别", type: "select", options: severityOptions(true) },
-  { key: "status", label: "状态", type: "select", options: statusOptions(true) },
-  { key: "warehouseId", label: "仓库", type: "text", placeholder: "仓库 ID" },
+  { key: "status", label: COLUMN_STATUS, type: "select", options: statusOptions(true) },
+  { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "text", placeholder: FIELD_WAREHOUSE_ID },
   { key: "triggeredAt", label: "触发时间", type: "dateRange" },
 ];
 export const alertDashboardCoreQueryFieldKeys = ["alertCode", "severity", "status"];
@@ -33,13 +42,13 @@ const alertColumns: DataGridColumn<AlertInstance>[] = [
   { key: "severity", header: "级别", width: 95, minWidth: 85, sortable: true, sortValue: (row) => severityOrder(row.severity), render: (row) => <StatusBadge status={row.severity === "critical" ? "unqualified" : row.severity === "warning" ? "pending" : "completed"} label={severityLabel(row.severity)} size="sm" /> },
   { key: "alert_name", header: "告警", width: 210, minWidth: 150, sortable: true, sortValue: (row) => row.alert_name, filterValue: (row) => `${row.alert_code} ${row.alert_name}`, copyValue: (row) => row.alert_code, filter: { type: "text" }, render: (row) => <div><div>{row.alert_name}</div><div className="font-mono text-xs text-muted-foreground">{row.alert_code}</div></div> },
   { key: "resource", header: "业务对象", width: 210, minWidth: 150, filterValue: (row) => `${row.resource_type} ${row.resource_id}`, copyValue: (row) => row.resource_id, filter: { type: "text" }, render: (row) => row.resource_path ? <a className="text-primary underline-offset-4 hover:underline" href={row.resource_path}>{row.resource_type} · {row.resource_id}</a> : <span>{row.resource_type} · {row.resource_id}</span> },
-  { key: "warehouse_id", header: "仓库", width: 155, minWidth: 120, mono: true, render: (row) => row.warehouse_id ?? "-" },
-  { key: "status", header: "状态", width: 115, minWidth: 95, render: (row) => <StatusBadge status={statusTone(row.status)} label={statusLabel(row.status)} size="sm" /> },
+  { key: "warehouse_id", header: COLUMN_WAREHOUSE, width: 155, minWidth: 120, mono: true, render: (row) => row.warehouse_id ?? "-" },
+  { key: "status", header: COLUMN_STATUS, width: 115, minWidth: 95, render: (row) => <StatusBadge status={statusTone(row.status)} label={statusLabel(row.status)} size="sm" /> },
   { key: "escalation_level", header: "升级", width: 85, minWidth: 75, sortable: true, sortValue: (row) => row.escalation_level, render: (row) => row.escalation_level ? `L${row.escalation_level}` : "未升级" },
   { key: "recipients", header: "接收人", width: 210, minWidth: 150, render: (row) => row.recipients.join("、") || "-", copyValue: (row) => row.recipients.join(",") },
   { key: "waiting", header: "已等待", width: 105, minWidth: 90, sortable: true, sortValue: (row) => Date.now() - new Date(row.triggered_at).getTime(), render: (row) => elapsedSince(row.triggered_at, row.closed_at) },
   { key: "triggered_at", header: "触发时间", width: 175, minWidth: 150, sortable: true, sortValue: (row) => row.triggered_at, filterValue: (row) => row.triggered_at, filter: { type: "dateRange" }, render: (row) => formatDateTime(row.triggered_at) },
-  { key: "created_at", header: "创建时间", width: 175, minWidth: 150, sortable: true, sortValue: (row) => row.created_at, render: (row) => formatDateTime(row.created_at) },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 175, minWidth: 150, sortable: true, sortValue: (row) => row.created_at, render: (row) => formatDateTime(row.created_at) },
 ];
 
 const gspColumns: DataGridColumn<AlertInstance>[] = [
@@ -66,7 +75,7 @@ export function AlertDashboardPage() {
   const createExport = useCreateAlertExportMutation();
   const rows = active.data?.data ?? [];
   const selectedAlert = rows.find((row) => row.id === selected[0]);
-  const refreshAction: DataGridRefreshAction = { label: "刷新", description: "刷新活动告警", disabled: active.isFetching, onClick: () => void refreshAll() };
+  const refreshAction: DataGridRefreshAction = { label: BUTTON_REFRESH, description: "刷新活动告警", disabled: active.isFetching, onClick: () => void refreshAll() };
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
     <PageHeader title="H-AL 告警看板" subtitle="活动告警每 5 秒刷新；按当前用户、货主和授权仓库隔离，严重告警优先" />
@@ -108,7 +117,7 @@ function RankingCard({ title, rows }: { title: string; rows: Array<{ key: string
 
 function AlertActionDialog({ action, description, pending, errorMessage, onDescriptionChange, onOpenChange, onConfirm }: { action: ActionDialog; description: string; pending: boolean; errorMessage?: string; onDescriptionChange: (value: string) => void; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
   const needsDescription = action?.operation !== "acknowledge";
-  return <Dialog open={Boolean(action)} onOpenChange={(open) => !pending && onOpenChange(open)}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{action ? actionLabel(action.operation) : "处理告警"}</DialogTitle><DialogDescription>{action?.alert.alert_name} · {action?.alert.resource_type} {action?.alert.resource_id}</DialogDescription></DialogHeader>{needsDescription && <label className="grid gap-1 text-sm">处理说明<textarea autoFocus rows={4} maxLength={1000} className="rounded-md border border-input bg-background px-3 py-2" value={description} onChange={(event) => onDescriptionChange(event.target.value)} /></label>}{errorMessage && <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{errorMessage}</div>}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="button" variant={action?.operation === "ignore" ? "destructive" : "default"} disabled={pending || (needsDescription && !description.trim())} onClick={onConfirm}>{pending ? "提交中..." : "确认"}</Button></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open={Boolean(action)} onOpenChange={(open) => !pending && onOpenChange(open)}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{action ? actionLabel(action.operation) : "处理告警"}</DialogTitle><DialogDescription>{action?.alert.alert_name} · {action?.alert.resource_type} {action?.alert.resource_id}</DialogDescription></DialogHeader>{needsDescription && <label className="grid gap-1 text-sm">处理说明<textarea autoFocus rows={4} maxLength={1000} className="rounded-md border border-input bg-background px-3 py-2" value={description} onChange={(event) => onDescriptionChange(event.target.value)} /></label>}{errorMessage && <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{errorMessage}</div>}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="button" variant={action?.operation === "ignore" ? "destructive" : "default"} disabled={pending || (needsDescription && !description.trim())} onClick={onConfirm}>{pending ? LOADING_SUBMITTING : "确认"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function defaultQuery(): QueryPanelValue { return { alertCode: "", severity: "", status: "", warehouseId: "", triggeredAt: { from: "", to: "" } }; }
@@ -116,8 +125,8 @@ function normalizeQuery(value: unknown): QueryPanelValue { const row = queryValu
 function toFilters(value: QueryPanelValue): AlertInstanceFilters { const dates = queryRange(value.triggeredAt); return { alert_code: optional(value.alertCode), severity: optional(value.severity), status: optional(value.status), warehouse_id: optional(value.warehouseId), from: dateBoundary(dates.from, false), to: dateBoundary(dates.to, true) }; }
 function dateBoundary(value: string | undefined, end: boolean) { return value ? new Date(`${value}T${end ? "23:59:59.999" : "00:00:00"}`).toISOString() : undefined; }
 function optional(value: QueryPanelValue[string]) { const result = queryString(value).trim(); return result || undefined; }
-function severityOptions(all: boolean) { return [...(all ? [{ label: "全部", value: "" }] : []), { label: "提示", value: "info" }, { label: "警告", value: "warning" }, { label: "严重", value: "critical" }]; }
-function statusOptions(all: boolean) { return [...(all ? [{ label: "全部", value: "" }] : []), ...["triggered", "notified", "notification_failed", "timed_out", "escalated", "acknowledged", "handling"].map((value) => ({ label: statusLabel(value), value }))]; }
+function severityOptions(all: boolean) { return [...(all ? [{ label: FILTER_ALL, value: "" }] : []), { label: "提示", value: "info" }, { label: "警告", value: "warning" }, { label: "严重", value: "critical" }]; }
+function statusOptions(all: boolean) { return [...(all ? [{ label: FILTER_ALL, value: "" }] : []), ...["triggered", "notified", "notification_failed", "timed_out", "escalated", "acknowledged", "handling"].map((value) => ({ label: statusLabel(value), value }))]; }
 function statusTone(value: string): "completed" | "unqualified" | "pending" | "isolated" { if (["notification_failed", "timed_out"].includes(value)) return "unqualified"; if (["acknowledged", "handling"].includes(value)) return "completed"; if (value === "escalated") return "isolated"; return "pending"; }
 function statusLabel(value: string) { return ({ triggered: "已触发", notified: "已通知", notification_failed: "通知失败", timed_out: "已超时", escalated: "已升级", acknowledged: "已确认", handling: "处理中", closed: "已关闭", ignored: "已忽略" } as Record<string, string>)[value] ?? value; }
 function severityLabel(value: string) { return ({ info: "提示", warning: "警告", critical: "严重" } as Record<string, string>)[value] ?? value; }
@@ -126,5 +135,4 @@ function actionLabel(value: AlertOperation) { return ({ acknowledge: "确认接�
 function percent(value: number) { return `${(value * 100).toFixed(1)}%`; }
 function duration(seconds: number) { return seconds < 60 ? `${Math.round(seconds)} 秒` : `${(seconds / 60).toFixed(1)} 分钟`; }
 function elapsedSince(from: string, to?: string | null) { const seconds = Math.max(0, (new Date(to ?? Date.now()).getTime() - new Date(from).getTime()) / 1000); if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`; if (seconds < 86400) return `${(seconds / 3600).toFixed(1)} 小时`; return `${(seconds / 86400).toFixed(1)} 天`; }
-function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
 function formatOptionalDate(value?: string | null) { return value ? formatDateTime(value) : "-"; }

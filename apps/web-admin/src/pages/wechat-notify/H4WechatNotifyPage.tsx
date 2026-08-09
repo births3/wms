@@ -38,8 +38,13 @@ import {
 } from "./H4WechatNotifyDialogs";
 import { configColumns, recordColumns } from "./H4WechatNotifyColumns";
 import { settingsColumns } from "./H4WechatSettingsColumns";
+import { stringArray } from "./wechat-notify-helpers";
 import { errorText as libErrorText } from "@/lib/error-text";
 import { queryRange, queryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_ADD, BUTTON_REFRESH, COLUMN_CREATED_AT, COLUMN_EVENT_TYPE, FIELD_KEYWORD,
+  STATUS_DISABLED, STATUS_ENABLED,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
@@ -50,29 +55,29 @@ interface H4WechatNotifyPageProps {
 }
 
 const h4WechatSettingsQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "企业 ID / Agent / 别名" },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "企业 ID / Agent / 别名" },
   {
     key: "enabled",
     label: "启停状态",
     type: "multiSelect",
-    options: [{ label: "启用", value: "true" }, { label: "停用", value: "false" }],
+    options: [{ label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }],
   },
 ];
 const h4WechatSettingsCoreQueryFieldKeys = ["keyword", "enabled"];
 
 const h4NotificationConfigQueryFields: QueryPanelField[] = [
-  { key: "eventType", label: "事件类型", type: "text", placeholder: "例如 asn_arrived" },
+  { key: "eventType", label: COLUMN_EVENT_TYPE, type: "text", placeholder: "例如 asn_arrived" },
   {
     key: "enabled",
     label: "启停状态",
     type: "multiSelect",
-    options: [{ label: "启用", value: "true" }, { label: "停用", value: "false" }],
+    options: [{ label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }],
   },
 ];
 const h4NotificationConfigCoreQueryFieldKeys = ["eventType", "enabled"];
 
 const h4NotificationRecordQueryFields: QueryPanelField[] = [
-  { key: "eventType", label: "事件类型", type: "text", placeholder: "例如 asn_arrived" },
+  { key: "eventType", label: COLUMN_EVENT_TYPE, type: "text", placeholder: "例如 asn_arrived" },
   { key: "recipient", label: "接收人", type: "text", placeholder: "用户 ID / 企业微信账号" },
   {
     key: "status",
@@ -84,7 +89,7 @@ const h4NotificationRecordQueryFields: QueryPanelField[] = [
       { label: "重试中", value: "retrying" },
     ],
   },
-  { key: "createdAt", label: "创建时间", type: "dateRange" },
+  { key: "createdAt", label: COLUMN_CREATED_AT, type: "dateRange" },
 ];
 const h4NotificationRecordCoreQueryFieldKeys = ["eventType", "recipient", "status"];
 
@@ -187,13 +192,13 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
           exportFileBaseName="H4 参数设置"
           tableClassName="min-w-[2180px]"
           refreshAction={{
-            label: "刷新",
+            label: BUTTON_REFRESH,
             description: "刷新企业微信参数",
             disabled: settingsQueryResult.isFetching,
             onClick: () => void refreshSettings(),
           }}
           createAction={{
-            label: "新增",
+            label: BUTTON_ADD,
             description: "首次新增企业微信参数",
             disabled: () => Boolean(settingsQueryResult.data),
             onClick: () => openSettingsDialog(null),
@@ -251,7 +256,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
           exportFileBaseName="H4 发送记录"
           tableClassName="min-w-[1660px]"
           refreshAction={{
-            label: "刷新",
+            label: BUTTON_REFRESH,
             description: "刷新发送记录",
             disabled: recordsQuery.isFetching,
             onClick: () => void refreshRecords(),
@@ -307,13 +312,13 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
         exportFileBaseName="H4 通知配置"
         tableClassName="min-w-[1410px]"
         refreshAction={{
-          label: "刷新",
+          label: BUTTON_REFRESH,
           description: "刷新通知配置",
           disabled: configsQuery.isFetching,
           onClick: () => void refreshConfigs(),
         }}
         createAction={{
-          label: "新增",
+          label: BUTTON_ADD,
           description: "新增企业微信通知配置",
           onClick: () => openConfigDialog(null),
         }}
@@ -641,10 +646,6 @@ function formFromConfig(config: H4NotificationConfig): ConfigFormState {
 
 function usersFromRule(rule: Record<string, unknown>) {
   return stringArray(rule.users);
-}
-
-function stringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }
 
 function splitTokens(value: string) {

@@ -2,7 +2,7 @@ import * as React from "react";
 import {
   Button, Card, CardContent, DataGrid, Dialog, DialogClose, DialogContent, DialogDescription,
   DialogFooter, DialogHeader, DialogTitle, PageHeader, QueryPanel, Select, SelectContent,
-  SelectItem, SelectTrigger, SelectValue, StatusBadge, buildQueryPanelSummaryItems,
+  SelectItem, SelectTrigger, SelectValue, StatusBadge, buildQueryPanelSummaryItems, formatDateTime,
   type DataGridColumn, type DataGridRefreshAction, type DataGridToolbarAction,
   type QueryPanelField, type QueryPanelValue,
 } from "@wms/ui";
@@ -90,7 +90,7 @@ export function TaskDispatchPage() {
   async function mutate(task: WarehouseTask, action: TaskTransitionAction, assigneeUserId?: string) {
     setNotice(null);
     try {
-      const result = await transition.mutateAsync({ taskId: task.id, body: { action, assignee_user_id: assigneeUserId } });
+      const result = await transition.mutateAsync({ taskId: task.id, body: { action, actual_qty: null, assignee_user_id: assigneeUserId } });
       setAssignOpen(false); setConfirmOpen(false); setConfirmAction(null); setSelected([result.id]); setNotice({ kind: "success", text: action === "expedite" ? `任务 ${result.task_no} 已手动加急` : `任务 ${result.task_no} 已更新为${statusLabels[result.status] ?? result.status}` });
     } catch (error) { setNotice({ kind: "error", text: errorText(error, "任务状态更新失败") }); }
   }
@@ -124,4 +124,3 @@ function taskAttention(task: WarehouseTask, now = Date.now()) {
 function statusTone(status: string): "completed" | "isolated" | "pending" { if (status === "completed") return "completed"; if (status === "exception" || status === "cancelled") return "isolated"; return "pending"; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", status: "", taskTypeCode: "", warehouseId: "" }; }
 function normalizeQuery(value: unknown): QueryPanelValue { const row = queryValueFromUnknown(value); return { keyword: queryString(row.keyword), status: queryString(row.status), taskTypeCode: queryString(row.taskTypeCode), warehouseId: queryString(row.warehouseId) }; }
-function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }

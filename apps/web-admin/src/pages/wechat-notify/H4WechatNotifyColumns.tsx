@@ -5,6 +5,7 @@ import type {
   H4NotificationRecord,
 } from "@/features/wechat-notify/wechat-notify-queries";
 import { formatDateTime } from "@/lib/format";
+import { stringArray } from "./wechat-notify-helpers";
 
 export const configColumns: DataGridColumn<H4NotificationConfig>[] = [
   {
@@ -217,6 +218,3 @@ function statusKey(status: string): StatusKey {
   return "pending";
 }
 
-function stringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
-}

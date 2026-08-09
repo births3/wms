@@ -1,4 +1,6 @@
 import { StatusBadge, type DataGridColumn } from "@wms/ui";
+import { formatDate } from "@/lib/format";
+import { COLUMN_BATCH_NO, COLUMN_CREATED_AT, COLUMN_STATUS } from "@/lib/ui-strings";
 
 import {
   BatchNoCell,
@@ -10,6 +12,10 @@ import {
   ValidationBadge,
   purchaseReturnDocumentTypeLabel,
 } from "./M4OutboundPageParts";
+import {
+  waveLineCount,
+  waveQty,
+} from "./m4-outbound-page-helpers";
 import type {
   OutboundOrder,
   OutboundWave,
@@ -44,7 +50,7 @@ export function outboundOrderColumns(
   return [
     { key: "wms_order_no", header: "单号 / 类型", mono: true, minWidth: 220, width: 240, onDoubleClick: (row) => openDetail(row.id), render: (row) => <OrderNoSummary order={row} /> },
     { key: "product", header: "商品 / 数量", minWidth: 140, render: (row) => <ProductSummary order={row} /> },
-    { key: "batch_no", header: "批号", mono: true, minWidth: 150, render: (row) => <BatchNoCell order={row} /> },
+    { key: "batch_no", header: COLUMN_BATCH_NO, mono: true, minWidth: 150, render: (row) => <BatchNoCell order={row} /> },
     { key: "validation", header: "校验", minWidth: 100, render: (row) => <ValidationBadge order={row} /> },
     { key: "customer_id", header: "客户 / 门店", minWidth: 150, render: (row) => <CustomerCell customerId={row.customer_id} /> },
     { key: "required_ship_at", header: "要求发货", minWidth: 150, render: (row) => formatDate(row.required_ship_at) },
@@ -83,7 +89,7 @@ export function purchaseReturnColumns(
 }
 
 function createdAtColumn<Row>(value: (row: Row) => string): DataGridColumn<Row> {
-  return { key: "created_at", header: "创建时间", minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(value(row)) };
+  return { key: "created_at", header: COLUMN_CREATED_AT, minWidth: 150, filter: { type: "dateRange" }, render: (row) => formatDate(value(row)) };
 }
 
 function statusColumn<Row>(
@@ -92,27 +98,10 @@ function statusColumn<Row>(
 ): DataGridColumn<Row> {
   return {
     key: "status",
-    header: "状态",
+    header: COLUMN_STATUS,
     minWidth: 130,
     filter: { type: "multiSelect", options: statusOptions(mode).map(([option, label]) => ({ value: option, label })) },
     render: (row) => <StatusBadge status={statusKey(value(row))} label={statusLabel(value(row))} size="sm" />,
   };
 }
 
-function waveQty(wave: OutboundWave, orders: OutboundOrder[]) {
-  const orderIds = wave.order_ids ?? [];
-  return orders
-    .filter((order) => orderIds.includes(order.id))
-    .reduce((sum, order) => sum + (order.lines ?? []).reduce((lineSum, line) => lineSum + line.planned_qty, 0), 0);
-}
-
-function waveLineCount(wave: OutboundWave, orders: OutboundOrder[]) {
-  const orderIds = wave.order_ids ?? [];
-  return orders
-    .filter((order) => orderIds.includes(order.id))
-    .reduce((sum, order) => sum + (order.lines ?? []).length, 0);
-}
-
-function formatDate(value: string | null | undefined) {
-  return value?.slice(0, 10) || "-";
-}

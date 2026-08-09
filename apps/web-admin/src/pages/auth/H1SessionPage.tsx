@@ -14,6 +14,7 @@ import {
   PageHeader,
   QueryPanel,
   buildQueryPanelSummaryItems,
+  formatDateTime,
   type DataGridColumn,
   type DataGridDisableAction,
   type QueryPanelField,
@@ -258,11 +259,6 @@ const sessionColumns: DataGridColumn<AuthSession>[] = [
 
 function queryText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function dialogTitle(action: SessionAction) {

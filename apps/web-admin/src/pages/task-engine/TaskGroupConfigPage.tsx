@@ -2,7 +2,7 @@ import * as React from "react";
 import {
   Button, Card, CardContent, DataGrid, Dialog, DialogClose, DialogContent, DialogDescription,
   DialogFooter, DialogHeader, DialogTitle, Input, PageHeader, QueryPanel, Select, SelectContent,
-  SelectItem, SelectTrigger, SelectValue, StatusBadge, buildQueryPanelSummaryItems,
+  SelectItem, SelectTrigger, SelectValue, StatusBadge, buildQueryPanelSummaryItems, formatDateTime,
   type DataGridColumn, type DataGridCreateAction, type DataGridEditAction,
   type DataGridRefreshAction, type QueryPanelField, type QueryPanelValue,
 } from "@wms/ui";
@@ -161,5 +161,4 @@ function formFor(row: TaskGroup): FormState { return { code: row.task_group_code
 function validate(form: FormState, editing: boolean) { if (!editing && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(form.code.trim())) return "任务组编码非法"; if (!form.name.trim() || !form.warehouseId || form.taskTypeCodes.length === 0) return "请填写名称、仓库并至少选择一个任务类型"; if (form.memberQualifications.some((item) => item.maxActiveTasks && (!Number.isInteger(Number(item.maxActiveTasks)) || Number(item.maxActiveTasks) <= 0))) return "同时在手上限必须为正整数"; return null; }
 function defaultQuery(): QueryPanelValue { return { keyword: "", status: "", warehouseId: "" }; }
 function normalizeQuery(value: unknown): QueryPanelValue { const row = queryValueFromUnknown(value); return { keyword: queryString(row.keyword), status: queryString(row.status), warehouseId: queryString(row.warehouseId) }; }
-function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }
 function toDateTimeLocal(value?: string | null) { if (!value) return ""; const date = new Date(value); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }

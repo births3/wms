@@ -1,4 +1,4 @@
-import { Button, StatusBadge, type DataGridColumn } from "@wms/ui";
+import { Button, StatusBadge, formatZhDate, type DataGridColumn } from "@wms/ui";
 
 import type { OrderSummary } from "./types";
 
@@ -178,11 +178,5 @@ export function buildOrderGridColumns(
 }
 
 export function formatPortalTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return formatZhDate(value);
 }

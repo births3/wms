@@ -2,6 +2,7 @@ import type { QueryPanelRangeValue, QueryPanelValue, StatusKey } from "@wms/ui";
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import { queryString, queryStringArray } from "@/lib/query-value";
+import { STATUS_COMPLETED, STATUS_DRAFT, STATUS_PENDING, TEMP_AMBIENT, TEMP_COLD } from "@/lib/ui-strings";
 import type { InboundDetailStage } from "./m2-inbound-detail-view-model";
 import {
   inboundDocumentTypeLabel,
@@ -144,7 +145,7 @@ export function statusFilterOptions(mode: M2InboundMode): StatusFilterOption[] {
     inspecting: [{ value: "inspecting", label: "验收中" }],
     putaway: [
       { value: "putaway", label: "上架中" },
-      { value: "completed", label: "已完成" },
+      { value: "completed", label: STATUS_COMPLETED },
     ],
   };
   return options[mode];
@@ -153,7 +154,7 @@ export function statusFilterOptions(mode: M2InboundMode): StatusFilterOption[] {
 export function statusColumnFilterOptions(mode: M2InboundMode): Array<{ value: string; label: string }> {
   const options: Record<M2InboundMode, Array<{ value: string; label: string }>> = {
     receiving: [
-      { value: "draft", label: "草稿" },
+      { value: "draft", label: STATUS_DRAFT },
       { value: "released", label: "待收货" },
       { value: "receiving", label: "收货中" },
       { value: "closed_rejected", label: "已关闭(拒收)" },
@@ -161,7 +162,7 @@ export function statusColumnFilterOptions(mode: M2InboundMode): Array<{ value: s
     inspecting: [{ value: "inspecting", label: "验收中" }],
     putaway: [
       { value: "putaway", label: "上架中" },
-      { value: "completed", label: "已完成" },
+      { value: "completed", label: STATUS_COMPLETED },
     ],
   };
   return options[mode];
@@ -239,14 +240,14 @@ export function statusKey(status: string | null | undefined): StatusKey {
 export function statusLabel(status: string | null | undefined) {
   if (!status) return "-";
   const labels: Record<string, string> = {
-    pending: "待处理",
-    draft: "草稿",
+    pending: STATUS_PENDING,
+    draft: STATUS_DRAFT,
     released: "待收货",
     receiving: "收货中",
     inspecting: "验收中",
     awaiting_second_sign: "待第二人签字",
     putaway: "上架中",
-    completed: "已完成",
+    completed: STATUS_COMPLETED,
     closed_rejected: "已关闭(拒收)",
     closed_shortage: "已关闭(短少)",
     cancelled: "已作废",
@@ -255,7 +256,7 @@ export function statusLabel(status: string | null | undefined) {
 }
 
 export function totalExpectedQty(order: ReceivingOrder) {
-  return (order.lines ?? []).reduce((sum, line) => sum + line.expected_qty, 0);
+  return (order.lines ?? []).reduce((sum, line) => sum + Number(line.expected_qty), 0);
 }
 
 export function productTemperatureAttribute(
@@ -269,19 +270,19 @@ export function productTemperatureAttribute(
     || condition === "cool"
     || condition === "refrigerated"
     || condition?.includes("冷")
-  ) return "冷藏";
-  if (condition) return "常温";
+  ) return TEMP_COLD;
+  if (condition) return TEMP_AMBIENT;
   // ponytail: 老单据缺商品主数据时才按编码降级；ReceivingOrderLine 补温区后删除。
-  if (!productCode) return "常温";
+  if (!productCode) return TEMP_AMBIENT;
   if (/冻|FROZEN/i.test(productCode)) return "冷冻";
-  if (/冷|COLD/i.test(productCode)) return "冷藏";
-  return "常温";
+  if (/冷|COLD/i.test(productCode)) return TEMP_COLD;
+  return TEMP_AMBIENT;
 }
 
 export function temperatureControlFromProductAttribute(attribute: string) {
   if (attribute === "冷冻") return "冷冻车";
-  if (attribute === "冷藏") return "冷藏车";
-  return "常温";
+  if (attribute === TEMP_COLD) return "冷藏车";
+  return TEMP_AMBIENT;
 }
 
 export function toInteger(value: string) {

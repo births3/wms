@@ -29,8 +29,17 @@ import {
   type PutawayRecommendation,
 } from "@/features/inbound/inbound-queries";
 import { useMasterDataRowsQuery, type MasterDataRow } from "@/features/master-data/master-data-queries";
+import {
+  COLUMN_DOCUMENT_TYPE,
+  COLUMN_QUALITY_STATUS,
+  FIELD_PLATE_NO,
+  FIELD_WAREHOUSE_ID,
+} from "@/lib/ui-strings";
 import type { InboundDocumentType } from "./m2-inbound-document-type";
 import { ProductLookupDialog, ProductLookupField } from "./M2InboundProductLookup";
+
+/** 未选中入库单时的展示文案（inbound feature 内共用）。 */
+export const NO_INBOUND_ORDER_SELECTED = "未选择入库单";
 
 export type InboundDialog = "create" | "receive" | "reject" | "inspect" | "putaway";
 
@@ -198,7 +207,7 @@ export function M2InboundDialogs({
   const recommendationInput = {
     product_code: putawayForm.productCode.trim(),
     batch_no: putawayForm.batchNo.trim(),
-    qty: Number.parseInt(putawayForm.qty, 10) || 0,
+    qty: putawayForm.qty.trim() || "0",
     quality_status: putawayForm.qualityStatus.trim(),
     limit: 5,
   };
@@ -233,7 +242,7 @@ export function M2InboundDialogs({
   const recommendationQty = recommendationInput.qty;
   const recommendationInputError = !recommendationInput.product_code || !recommendationInput.batch_no || !recommendationInput.quality_status
     ? "商品编码、批号和质量状态完整后才能读取推荐库位"
-    : recommendationQty <= 0
+    : Number(recommendationQty) <= 0
       ? "上架数量必须大于 0"
       : null;
 
@@ -254,9 +263,9 @@ export function M2InboundDialogs({
             </DialogHeader>
             <TextField label="ASN 号" placeholder="留空由 M-CG 编号规则生成" value={createForm.receiptNo} onChange={(receiptNo) => setCreateForm((value) => ({ ...value, receiptNo }))} />
             <div>
-              <label className="mb-1 block text-xs text-muted-foreground">单据类型</label>
+              <label className="mb-1 block text-xs text-muted-foreground">{COLUMN_DOCUMENT_TYPE}</label>
               <select
-                aria-label="单据类型"
+                aria-label={COLUMN_DOCUMENT_TYPE}
                 required
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={createForm.documentType}
@@ -273,7 +282,7 @@ export function M2InboundDialogs({
               </select>
             </div>
             <TextField label="供应商 ID" required placeholder="例如 00000000-0000-0000-0000-000000005001" value={createForm.supplierId} onChange={(supplierId) => setCreateForm((value) => ({ ...value, supplierId }))} />
-            <TextField label="仓库 ID" required placeholder="例如 00000000-0000-0000-0000-000000003001" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
+            <TextField label={FIELD_WAREHOUSE_ID} required placeholder="例如 00000000-0000-0000-0000-000000003001" value={createForm.warehouseId} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
             <TextField label="预计到货" type="date" required placeholder="例如 2026-06-27" value={createForm.expectedArrivalDate} onChange={(expectedArrivalDate) => setCreateForm((value) => ({ ...value, expectedArrivalDate }))} />
             <ProductLookupField
               batchNo={createForm.batchNo}
@@ -307,7 +316,7 @@ export function M2InboundDialogs({
           <form className="grid gap-3 md:grid-cols-3" onSubmit={submitReceive}>
             <DialogHeader className="md:col-span-3">
               <DialogTitle>收货</DialogTitle>
-              <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
+              <DialogDescription>{orderReceiptNo ?? NO_INBOUND_ORDER_SELECTED}</DialogDescription>
             </DialogHeader>
             <TextField label="送货数量" type="number" placeholder="默认订单预报数量" value={receiveForm.deliveryQty} onChange={(deliveryQty) => setReceiveForm((value) => ({ ...value, deliveryQty }))} />
             <TextField label="实际到货数量" type="number" value={receiveForm.actualQty} onChange={(actualQty) => setReceiveForm((value) => ({ ...value, actualQty }))} />
@@ -325,7 +334,7 @@ export function M2InboundDialogs({
                 <TextField label="冷链运输方式" required placeholder="例如 冷藏车" value={receiveForm.transportMode} onChange={(transportMode) => setReceiveForm((value) => ({ ...value, transportMode }))} />
               </section>
             )}
-            <TextField label="车牌号" value={receiveForm.vehicleNo} onChange={(vehicleNo) => setReceiveForm((value) => ({ ...value, vehicleNo }))} />
+            <TextField label={FIELD_PLATE_NO} value={receiveForm.vehicleNo} onChange={(vehicleNo) => setReceiveForm((value) => ({ ...value, vehicleNo }))} />
             <TextField label="发运地点" value={receiveForm.origin} onChange={(origin) => setReceiveForm((value) => ({ ...value, origin }))} />
             <TextField label="收货入库时间" type="datetime-local" value={receiveForm.storageTime} onChange={(storageTime) => setReceiveForm((value) => ({ ...value, storageTime }))} />
             <TextField label="承运商" value={receiveForm.carrier} onChange={(carrier) => setReceiveForm((value) => ({ ...value, carrier }))} />
@@ -364,7 +373,7 @@ export function M2InboundDialogs({
           <form className="grid gap-3" onSubmit={submitReject}>
             <DialogHeader>
               <DialogTitle>整单拒收</DialogTitle>
-              <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
+              <DialogDescription>{orderReceiptNo ?? NO_INBOUND_ORDER_SELECTED}</DialogDescription>
             </DialogHeader>
             <TextField
               label="拒收原因"
@@ -383,7 +392,7 @@ export function M2InboundDialogs({
           <form className="grid gap-3 md:grid-cols-2" onSubmit={submitInspect}>
             <DialogHeader className="md:col-span-2">
               <DialogTitle>验收</DialogTitle>
-              <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
+              <DialogDescription>{orderReceiptNo ?? NO_INBOUND_ORDER_SELECTED}</DialogDescription>
             </DialogHeader>
             {!secondSignature && (
               <>
@@ -393,7 +402,7 @@ export function M2InboundDialogs({
                 <TextField label="生产日期" type="date" required placeholder={inspectExamples.productionDate} value={inspectForm.productionDate} onChange={(productionDate) => setInspectForm((value) => ({ ...value, productionDate }))} />
                 <TextField label="有效期至" type="date" required placeholder={inspectExamples.expiryDate} value={inspectForm.expiryDate} onChange={(expiryDate) => setInspectForm((value) => ({ ...value, expiryDate }))} />
                 <TextField label="追溯码" required placeholder={inspectExamples.traceCodes} value={inspectForm.traceCodes} onChange={(traceCodes) => setInspectForm((value) => ({ ...value, traceCodes }))} />
-                <SelectField label="质量状态" required placeholder="请选择质量状态" value={inspectForm.qualityStatus} onChange={(qualityStatus) => setInspectForm((value) => ({ ...value, qualityStatus }))} options={[["qualified", "合格"], ["unqualified", "不合格"], ["quarantine", "待复验 / 隔离"]]} />
+                <SelectField label={COLUMN_QUALITY_STATUS} required placeholder="请选择质量状态" value={inspectForm.qualityStatus} onChange={(qualityStatus) => setInspectForm((value) => ({ ...value, qualityStatus }))} options={[["qualified", "合格"], ["unqualified", "不合格"], ["quarantine", "待复验 / 隔离"]]} />
                 <TextField label="外观核对" required placeholder={inspectExamples.appearanceCheck} value={inspectForm.appearanceCheck} onChange={(appearanceCheck) => setInspectForm((value) => ({ ...value, appearanceCheck }))} />
                 <TextField label="包装核对" required placeholder={inspectExamples.packageCheck} value={inspectForm.packageCheck} onChange={(packageCheck) => setInspectForm((value) => ({ ...value, packageCheck }))} />
                 <TextField label="说明书核对" required placeholder={inspectExamples.instructionCheck} value={inspectForm.instructionCheck} onChange={(instructionCheck) => setInspectForm((value) => ({ ...value, instructionCheck }))} />
@@ -436,7 +445,7 @@ export function M2InboundDialogs({
           <form className="grid gap-3" onSubmit={submitPutaway}>
             <DialogHeader>
               <DialogTitle>上架</DialogTitle>
-              <DialogDescription>{orderReceiptNo ?? "未选择入库单"}</DialogDescription>
+              <DialogDescription>{orderReceiptNo ?? NO_INBOUND_ORDER_SELECTED}</DialogDescription>
             </DialogHeader>
             <TextField label="容器 LPN" value={putawayForm.lpn} onChange={(lpn) => setPutawayForm((value) => ({ ...value, lpn }))} />
             <TextField label="上架商品编码" value={putawayForm.productCode} onChange={(productCode) => setPutawayForm((value) => ({ ...value, productCode }))} />

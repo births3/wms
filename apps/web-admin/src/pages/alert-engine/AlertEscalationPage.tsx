@@ -2,7 +2,7 @@ import * as React from "react";
 import {
   Button, Card, CardContent, DataGrid, Dialog, DialogClose, DialogContent,
   DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, PageHeader,
-  QueryPanel, StatusBadge, buildQueryPanelSummaryItems, type DataGridColumn,
+  QueryPanel, StatusBadge, buildQueryPanelSummaryItems, formatDateTime, type DataGridColumn,
   type DataGridCreateAction, type DataGridEditAction, type DataGridRefreshAction,
   type QueryPanelField, type QueryPanelValue,
 } from "@wms/ui";
@@ -13,12 +13,25 @@ import {
 } from "@/features/alert-engine/alert-runtime-queries";
 import { errorText } from "@/lib/error-text";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_REFRESH,
+  COLUMN_CREATED_AT,
+  COLUMN_RULE_NAME,
+  COLUMN_STATUS,
+  COLUMN_UPDATED_AT,
+  COLUMN_VERSION,
+  FIELD_KEYWORD,
+  FILTER_ALL,
+  LOADING_SAVING,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const alertEscalationQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "规则编码 / 名称" },
-  { key: "enabled", label: "状态", type: "select", options: [{ label: "全部", value: "" }, { label: "启用", value: "true" }, { label: "停用", value: "false" }] },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "规则编码 / 名称" },
+  { key: "enabled", label: COLUMN_STATUS, type: "select", options: [{ label: FILTER_ALL, value: "" }, { label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }] },
   { key: "handlerRole", label: "值班角色", type: "text", placeholder: "角色编码" },
 ];
 export const alertEscalationCoreQueryFieldKeys = ["keyword", "enabled"];
@@ -38,16 +51,16 @@ interface RuleForm {
 
 const columns: DataGridColumn<AlertEscalationRule>[] = [
   { key: "rule_code", header: "规则编码", width: 190, minWidth: 150, mono: true, sortable: true, sortValue: (row) => row.rule_code, filterValue: (row) => row.rule_code, copyValue: (row) => row.rule_code, filter: { type: "text" } },
-  { key: "rule_name", header: "规则名称", width: 190, minWidth: 140, sortable: true, sortValue: (row) => row.rule_name, filterValue: (row) => row.rule_name, filter: { type: "text" } },
+  { key: "rule_name", header: COLUMN_RULE_NAME, width: 190, minWidth: 140, sortable: true, sortValue: (row) => row.rule_name, filterValue: (row) => row.rule_name, filter: { type: "text" } },
   { key: "levels", header: "升级阈值", width: 280, minWidth: 210, render: (row) => row.levels.map((level) => `L${level.level} ${duration(level.threshold_seconds)}`).join(" / ") },
   { key: "recipients", header: "升级接收角色", width: 300, minWidth: 220, render: (row) => row.levels.map((level) => `L${level.level}: ${level.recipient_roles.join("、")}`).join("；") },
   { key: "off_hours", header: "非工作时间", width: 240, minWidth: 180, render: (row) => `${row.off_hours_start}-${row.off_hours_end} · ${row.off_hours_handler_roles.join("、")}` },
   { key: "notify_lower_levels", header: "保留下级接收人", width: 135, minWidth: 115, render: (row) => row.notify_lower_levels ? "是" : "否" },
   { key: "holiday_dates", header: "节假日", width: 190, minWidth: 140, render: (row) => row.holiday_dates.join("、") || "无" },
-  { key: "enabled", header: "状态", width: 100, minWidth: 90, render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? "启用" : "停用"} size="sm" /> },
-  { key: "version", header: "版本", width: 80, minWidth: 70, mono: true, sortable: true, sortValue: (row) => row.version },
-  { key: "created_at", header: "创建时间", width: 175, minWidth: 150, sortable: true, sortValue: (row) => row.created_at, render: (row) => formatDateTime(row.created_at) },
-  { key: "updated_at", header: "更新时间", width: 175, minWidth: 150, sortable: true, sortValue: (row) => row.updated_at, filterValue: (row) => row.updated_at, filter: { type: "dateRange" }, render: (row) => formatDateTime(row.updated_at) },
+  { key: "enabled", header: COLUMN_STATUS, width: 100, minWidth: 90, render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? STATUS_ENABLED : STATUS_DISABLED} size="sm" /> },
+  { key: "version", header: COLUMN_VERSION, width: 80, minWidth: 70, mono: true, sortable: true, sortValue: (row) => row.version },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 175, minWidth: 150, sortable: true, sortValue: (row) => row.created_at, render: (row) => formatDateTime(row.created_at) },
+  { key: "updated_at", header: COLUMN_UPDATED_AT, width: 175, minWidth: 150, sortable: true, sortValue: (row) => row.updated_at, filterValue: (row) => row.updated_at, filter: { type: "dateRange" }, render: (row) => formatDateTime(row.updated_at) },
 ];
 
 /** 页面设计契约：配置型列表页；规则最多三级，阈值严格递增，L3 由后台每 24 小时持续提醒。 */
@@ -68,7 +81,7 @@ export function AlertEscalationPage() {
   const upsert = useUpsertAlertEscalationRuleMutation();
   const rows = filterRules(query.data?.data ?? [], appliedQuery);
   const selectedRow = rows.find((row) => row.id === selected[0]);
-  const refreshAction: DataGridRefreshAction = { label: "刷新", description: "刷新升级规则", disabled: query.isFetching, onClick: () => void query.refetch() };
+  const refreshAction: DataGridRefreshAction = { label: BUTTON_REFRESH, description: "刷新升级规则", disabled: query.isFetching, onClick: () => void query.refetch() };
   const createAction: DataGridCreateAction = { label: "新增规则", description: "新增告警升级规则", disabled: upsert.isPending, onClick: () => openForm(null) };
   const editAction: DataGridEditAction = { label: "编辑", description: "编辑选中升级规则", disabled: (context) => context.selectedRowKeys.length !== 1 || upsert.isPending, onClick: () => selectedRow && openForm(selectedRow) };
 
@@ -103,7 +116,7 @@ function EscalationRuleDialog({ open, editing, form, pending, errorMessage, onOp
     <label className="grid gap-1 text-sm">节假日日期（逗号分隔，YYYY-MM-DD）<Input placeholder="2026-10-01, 2026-10-02" value={form.holidayDates} onChange={(event) => set("holidayDates", event.target.value)} /></label>
     <div className="grid gap-2 sm:grid-cols-2"><label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={form.notifyLowerLevels} onChange={(event) => set("notifyLowerLevels", event.target.checked)} />升级时保留下级接收人</label><label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(event) => set("enabled", event.target.checked)} />启用规则</label></div>
     {errorMessage && <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{errorMessage}</div>}
-    <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending}>{pending ? "保存中..." : "保存规则"}</Button></DialogFooter></form></DialogContent></Dialog>;
+    <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending}>{pending ? LOADING_SAVING : "保存规则"}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
 function emptyRuleForm(): RuleForm { return { ruleCode: "", ruleName: "", notifyLowerLevels: true, offHoursStart: "18:00", offHoursEnd: "08:00", offHoursHandlerRoles: "warehouse_manager,system_admin", holidayDates: "", enabled: true, levels: [{ thresholdMinutes: "30", recipientRoles: "warehouse_manager" }, { thresholdMinutes: "120", recipientRoles: "warehouse_manager,system_admin" }, { thresholdMinutes: "1440", recipientRoles: "system_admin" }] }; }
@@ -115,4 +128,3 @@ function defaultQuery(): QueryPanelValue { return { keyword: "", enabled: "", ha
 function normalizeQuery(value: unknown): QueryPanelValue { const row = queryValueFromUnknown(value); return { keyword: queryString(row.keyword), enabled: queryString(row.enabled), handlerRole: queryString(row.handlerRole) }; }
 function splitValues(value: string) { return value.split(",").map((item) => item.trim()).filter(Boolean); }
 function duration(seconds: number) { const minutes = seconds / 60; return minutes < 60 ? `${minutes} 分钟` : minutes < 1440 ? `${minutes / 60} 小时` : `${minutes / 1440} 天`; }
-function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false }); }

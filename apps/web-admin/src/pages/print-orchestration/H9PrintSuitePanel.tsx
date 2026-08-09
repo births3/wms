@@ -37,11 +37,13 @@ import {
 } from "@/features/print-orchestration/print-orchestration-queries";
 import { usePrintTemplatesQuery } from "@/features/print-template/print-template-queries";
 import { formatDateTime } from "@/lib/format";
+import { BUTTON_REFRESH, COLUMN_CREATED_AT, COLUMN_STATUS, COLUMN_VERSION, COLUMN_WAREHOUSE, FIELD_VALIDITY, LOADING_SAVING } from "@/lib/ui-strings";
 import {
   H9LifecycleConfirmDialog,
   type H9LifecycleConfirmation,
 } from "./H9LifecycleConfirmDialog";
 import { H9CategoryPdfPanel } from "./H9CategoryPdfPanel";
+import { instanceStatusLabel, statusCompletion, statusLabel } from "./print-status";
 
 /**
  * US-H9-008 打印组套页签：版本列表 + 冻结组套实例；新建/测试走 Dialog。
@@ -413,7 +415,7 @@ export function PrintSuiteCreateDialog({
         <form className="space-y-5" onSubmit={(event) => void submit(event).catch(() => undefined)}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="组套名称"><Input value={name} maxLength={100} onChange={(event) => setName(event.target.value)} /></Field>
-            <Field label="仓库"><NativeSelect value={warehouseId} options={warehouses} onChange={setWarehouseId} /></Field>
+            <Field label={COLUMN_WAREHOUSE}><NativeSelect value={warehouseId} options={warehouses} onChange={setWarehouseId} /></Field>
             <Field label="适用层级">
               <NativeSelect
                 value={scope}
@@ -549,7 +551,7 @@ export function PrintSuiteCreateDialog({
           <DialogFooter>
             <DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose>
             <Button type="submit" disabled={pending || !name.trim() || !warehouseId || !itemsValid}>
-              {pending ? "保存中..." : "保存草稿"}
+              {pending ? LOADING_SAVING : "保存草稿"}
             </Button>
           </DialogFooter>
         </form>
@@ -670,9 +672,9 @@ function suiteColumns(
   const customerLabels = new Map(customers.map((item) => [item.value, item.label]));
   const warehouseLabels = new Map(warehouses.map((item) => [item.value, item.label]));
   return [
-    { key: "version_no", header: "版本", width: 80, mono: true, render: (row) => `V${row.version_no}` },
+    { key: "version_no", header: COLUMN_VERSION, width: 80, mono: true, render: (row) => `V${row.version_no}` },
     { key: "name", header: "组套名称", width: 200, render: (row) => row.name },
-    { key: "status", header: "状态", width: 110, render: (row) => <StatusBadge status={suiteStatusKey(row.status)} label={suiteStatusLabel(row.status)} size="sm" /> },
+    { key: "status", header: COLUMN_STATUS, width: 110, render: (row) => <StatusBadge status={statusCompletion(row.status)} label={statusLabel(row.status)} size="sm" /> },
     { key: "scope", header: "匹配层级", width: 130, render: (row) => scopeLabel(row.scope) },
     {
       key: "target",
@@ -694,10 +696,10 @@ function suiteColumns(
           .map((item) => `${item.sort_order}.${item.category_name}×${item.copies}${item.required ? "（必需，" : "（可选，"}${readyPolicyLabel(item.ready_policy)}）`)
           .join(" → "),
     },
-    { key: "warehouse", header: "仓库", width: 180, defaultHidden: true, render: (row) => warehouseLabels.get(row.warehouse_id) ?? row.warehouse_id },
-    { key: "effective", header: "有效期", width: 320, defaultHidden: true, render: (row) => `${formatDateTime(row.effective_from)} 至 ${formatDateTime(row.effective_to)}` },
+    { key: "warehouse", header: COLUMN_WAREHOUSE, width: 180, defaultHidden: true, render: (row) => warehouseLabels.get(row.warehouse_id) ?? row.warehouse_id },
+    { key: "effective", header: FIELD_VALIDITY, width: 320, defaultHidden: true, render: (row) => `${formatDateTime(row.effective_from)} 至 ${formatDateTime(row.effective_to)}` },
     { key: "published_at", header: "发布时间", width: 170, render: (row) => row.published_at ? formatDateTime(row.published_at) : "-" },
-    { key: "created_at", header: "创建时间", width: 170, defaultHidden: true, render: (row) => formatDateTime(row.created_at) },
+    { key: "created_at", header: COLUMN_CREATED_AT, width: 170, defaultHidden: true, render: (row) => formatDateTime(row.created_at) },
   ];
 }
 
@@ -715,18 +717,6 @@ const instanceColumns: DataGridColumn<PrintSuiteInstance>[] = [
   { key: "rule", header: "归集规则版本", width: 130, defaultHidden: true, render: (row) => row.aggregation_rule_version_no ? `V${row.aggregation_rule_version_no}` : "-" },
   { key: "created_at", header: "冻结时间", width: 170, render: (row) => formatDateTime(row.created_at) },
 ];
-
-function suiteStatusKey(status: string) {
-  return status === "published" ? "completed" : status === "disabled" ? "expired" : status === "tested" ? "in_progress" : "pending";
-}
-
-function suiteStatusLabel(status: string) {
-  return status === "published" ? "已发布" : status === "disabled" ? "已停用" : status === "tested" ? "已测试" : "草稿";
-}
-
-function instanceStatusLabel(status: string) {
-  return status === "queued" ? "待打印" : status === "cancelled" ? "已取消" : "等待分类 PDF";
-}
 
 export function scopeLabel(scope: PrintSuiteVersion["scope"]) {
   return scope === "delivery_address"
@@ -747,7 +737,7 @@ function readyPolicyLabel(policy: PrintSuiteItemInput["ready_policy"]) {
 }
 
 function refreshAction(query: { isFetching: boolean; refetch: () => Promise<unknown> }, label: string): DataGridRefreshAction {
-  return { label: "刷新", description: `刷新${label}`, disabled: query.isFetching, onClick: () => void query.refetch() };
+  return { label: BUTTON_REFRESH, description: `刷新${label}`, disabled: query.isFetching, onClick: () => void query.refetch() };
 }
 
 function move<T>(list: T[], index: number, delta: number) {

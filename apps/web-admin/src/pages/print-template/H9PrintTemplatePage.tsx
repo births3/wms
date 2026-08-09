@@ -13,6 +13,7 @@ import {
   TreeCatalog,
   buildQueryPanelSummaryItems,
   cn,
+  formatZhDate,
   type DataGridColumn,
   type DataGridDisableAction,
   type DataGridEditAction,
@@ -48,11 +49,26 @@ import { H9TemplatePreviewDialog } from "./H9TemplatePreviewDialog";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_ADD,
+  BUTTON_REFRESH,
+  COLUMN_CREATED_AT,
+  COLUMN_OWNER,
+  COLUMN_STATUS,
+  COLUMN_UPDATED_AT,
+  COLUMN_VERSION,
+  FIELD_KEYWORD,
+  FIELD_SCOPE,
+  STATUS_DISABLED,
+  STATUS_DRAFT,
+  STATUS_ENABLED,
+  STATUS_PUBLISHED,
+} from "@/lib/ui-strings";
 
 const h9PrintTemplateQueryFields: QueryPanelField[] = [
   {
     key: "keyword",
-    label: "关键字",
+    label: FIELD_KEYWORD,
     type: "text",
     placeholder: "搜索模板编码、名称或状态",
     ariaLabel: "搜索打印模板",
@@ -123,38 +139,38 @@ const columns: DataGridColumn<PrintTemplateRow>[] = [
     sortable: true,
     sortValue: (row) => row.latestVersionStatus,
     filterValue: (row) => row.latestVersionStatus,
-    copyValue: (row) => row.latestVersionStatus === "published" ? "已发布" : "草稿",
-    filter: { type: "multiSelect", options: [{ label: "已发布", value: "published" }, { label: "草稿", value: "draft" }] },
+    copyValue: (row) => row.latestVersionStatus === "published" ? STATUS_PUBLISHED : STATUS_DRAFT,
+    filter: { type: "multiSelect", options: [{ label: STATUS_PUBLISHED, value: "published" }, { label: STATUS_DRAFT, value: "draft" }] },
     render: (row) => (
       <StatusBadge
         status={row.latestVersionStatus === "published" ? "completed" : "pending"}
-        label={row.latestVersionStatus === "published" ? "已发布" : "草稿"}
+        label={row.latestVersionStatus === "published" ? STATUS_PUBLISHED : STATUS_DRAFT}
         size="sm"
       />
     ),
   },
   {
     key: "scope",
-    header: "作用域",
+    header: FIELD_SCOPE,
     width: 120,
     minWidth: 100,
     sortable: true,
     sortValue: (row) => row.scopeLabel,
     filterValue: (row) => row.scope,
     copyValue: (row) => row.scopeLabel,
-    filter: { type: "multiSelect", options: [{ label: "全局", value: "global" }, { label: "货主", value: "owner" }] },
+    filter: { type: "multiSelect", options: [{ label: "全局", value: "global" }, { label: COLUMN_OWNER, value: "owner" }] },
     render: (row) => row.scopeLabel,
   },
   {
     key: "status",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 120,
     minWidth: 100,
     sortable: true,
     sortValue: (row) => row.statusLabel,
     filterValue: (row) => row.enabled ? "enabled" : "disabled",
     copyValue: (row) => row.statusLabel,
-    filter: { type: "multiSelect", options: [{ label: "启用", value: "enabled" }, { label: "停用", value: "disabled" }] },
+    filter: { type: "multiSelect", options: [{ label: STATUS_ENABLED, value: "enabled" }, { label: STATUS_DISABLED, value: "disabled" }] },
     render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.statusLabel} size="sm" />,
   },
   {
@@ -182,27 +198,27 @@ const columns: DataGridColumn<PrintTemplateRow>[] = [
   },
   {
     key: "createdAt",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 180,
     minWidth: 140,
     sortable: true,
     sortValue: (row) => row.createdAt,
     filterValue: (row) => row.createdAt,
-    copyValue: (row) => formatDateTime(row.createdAt),
+    copyValue: (row) => formatZhDate(row.createdAt),
     filter: { type: "text" },
-    render: (row) => formatDateTime(row.createdAt),
+    render: (row) => formatZhDate(row.createdAt),
   },
   {
     key: "updatedAt",
-    header: "更新时间",
+    header: COLUMN_UPDATED_AT,
     width: 180,
     minWidth: 140,
     sortable: true,
     sortValue: (row) => row.updatedAt,
     filterValue: (row) => row.updatedAt,
-    copyValue: (row) => formatDateTime(row.updatedAt),
+    copyValue: (row) => formatZhDate(row.updatedAt),
     filter: { type: "text" },
-    render: (row) => formatDateTime(row.updatedAt),
+    render: (row) => formatZhDate(row.updatedAt),
   },
   {
     key: "publishedAt",
@@ -212,9 +228,9 @@ const columns: DataGridColumn<PrintTemplateRow>[] = [
     sortable: true,
     sortValue: (row) => row.publishedAt ?? "",
     filterValue: (row) => row.publishedAt ?? "",
-    copyValue: (row) => row.publishedAt ? formatDateTime(row.publishedAt) : "",
+    copyValue: (row) => row.publishedAt ? formatZhDate(row.publishedAt) : "",
     filter: { type: "text" },
-    render: (row) => row.publishedAt ? formatDateTime(row.publishedAt) : "-",
+    render: (row) => row.publishedAt ? formatZhDate(row.publishedAt) : "-",
   },
 ];
 
@@ -262,7 +278,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   );
   const templateById = React.useMemo(() => new Map((templatesQuery.data ?? []).map((row) => [row.id, row])), [templatesQuery.data]);
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新打印模板树和模板列表",
     disabled: librariesQuery.isFetching || templateTypesQuery.isFetching || templatesQuery.isFetching,
     onClick: () => {
@@ -270,7 +286,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
     },
   };
   const createAction = {
-    label: "新增",
+    label: BUTTON_ADD,
     description: "打开 hiprint 打印模板设计器",
     disabled: librariesQuery.isPending || templateTypesQuery.isPending,
     onClick: () => openCreateDesigner(),
@@ -283,7 +299,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   };
   const selectedRow = selectedTemplateRow(selectedRowKeys);
   const disableAction: DataGridDisableAction = {
-    label: selectedRow?.enabled === false ? "启用" : "停用",
+    label: selectedRow?.enabled === false ? STATUS_ENABLED : STATUS_DISABLED,
     description: selectedRow?.enabled === false ? "启用选中模板" : "停用选中模板",
     disabled: (context) => context.selectedRowKeys.length !== 1 || enabledMutation.isPending,
     onClick: (context) => void toggleTemplateEnabled(context.selectedRowKeys[0]),
@@ -315,7 +331,7 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
   toolbarActions.push(
     {
       key: "version-history",
-      label: "版本",
+      label: COLUMN_VERSION,
       description: "查看版本历史",
       icon: <History className="size-4" aria-hidden />,
       disabled: (context) => context.selectedRowKeys.length !== 1 || versionsMutation.isPending,
@@ -591,7 +607,7 @@ function buildH9TreeNodes(
               id: h9VersionNodeId(library.publishedVersionId),
               label: `v${library.publishedVersionNo}`,
               description: library.sourceSchema,
-              badge: "已发布",
+              badge: STATUS_PUBLISHED,
             },
           ],
         }
@@ -650,18 +666,6 @@ function h9VersionNodeId(id: string) {
   return `version:${id}`;
 }
 
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
 function VersionHistoryDialog({
   open,
   versions,
@@ -682,19 +686,19 @@ function VersionHistoryDialog({
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">版本</th>
-                <th className="px-3 py-2 text-left font-medium">状态</th>
+                <th className="px-3 py-2 text-left font-medium">{COLUMN_VERSION}</th>
+                <th className="px-3 py-2 text-left font-medium">{COLUMN_STATUS}</th>
                 <th className="px-3 py-2 text-left font-medium">设计器</th>
-                <th className="px-3 py-2 text-left font-medium">创建时间</th>
+                <th className="px-3 py-2 text-left font-medium">{COLUMN_CREATED_AT}</th>
               </tr>
             </thead>
             <tbody>
               {versions.map((version) => (
                 <tr key={version.id} className="border-t">
                   <td className="px-3 py-2">v{version.version_no}</td>
-                  <td className="px-3 py-2">{version.status === "published" ? "已发布" : "草稿"}</td>
+                  <td className="px-3 py-2">{version.status === "published" ? STATUS_PUBLISHED : STATUS_DRAFT}</td>
                   <td className="px-3 py-2">{version.designer_version}</td>
-                  <td className="px-3 py-2">{formatDateTime(version.created_at)}</td>
+                  <td className="px-3 py-2">{formatZhDate(version.created_at)}</td>
                 </tr>
               ))}
               {versions.length === 0 && (
