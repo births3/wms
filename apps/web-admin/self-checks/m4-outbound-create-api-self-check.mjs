@@ -12,7 +12,7 @@ const devMockCore = readFileSync(resolve(root, "dev-mocks/web-admin-dev-mock-cor
 const devMock = readFileSync(resolve(root, "dev-mocks/outbound-dev-mock.ts"), "utf8");
 
 assert.doesNotMatch(page, /待接真实 API 后拆 feature hooks/, "M4 页面豁免理由必须反映新建接口已接入");
-assert.match(page, /key:\s*"statusFilter", label:\s*"状态", type:\s*"select"/, "M4 状态查询必须与单值服务端 status 契约一致");
+assert.match(page, /key:\s*"statusFilter", label:\s*COLUMN_STATUS, type:\s*"select"/, "M4 状态查询必须与单值服务端 status 契约一致");
 assert.doesNotMatch(page, /businessDate|商品 \/ 批号 \/ 客商/, "M4 查询面板不得展示未接服务端的日期/商品/批号/客商条件");
 assert.match(page, /当前窗口可能未完整，请收窄条件/, "M4 返回 limit 窗口时必须提示结果可能不完整");
 assert.match(queries, /api\.POST\("\/api\/v1\/outbound\/orders"/, "M4 必须提供真实创建出库单 API 客户端");

@@ -12,6 +12,13 @@ import {
 } from "@wms/ui";
 import { CheckCircle2, ClipboardCheck, Truck, XCircle } from "lucide-react";
 
+import {
+  COLUMN_BATCH_NO,
+  COLUMN_PRODUCT_CODE,
+  COLUMN_WAREHOUSE,
+  FIELD_PLATE_NO,
+  LOADING_SUBMITTING,
+} from "@/lib/ui-strings";
 import type { OutboundOrder, OutboundWave, PurchaseReturnOrder } from "./m4-outbound-page-model";
 import { ActionExtraFields, TextField } from "./M4OutboundPageParts";
 import {
@@ -268,11 +275,11 @@ export function M4OutboundActionDialog({ action, target, createForm, purchaseRet
                   {documentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <SelectField label="仓库" value={createForm.warehouseId} options={warehouseOptions} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
+              <SelectField label={COLUMN_WAREHOUSE} value={createForm.warehouseId} options={warehouseOptions} onChange={(warehouseId) => setCreateForm((value) => ({ ...value, warehouseId }))} />
               <SelectField label="客户 / 门店" value={createForm.customerId} options={customerOptions} onChange={(customerId) => setCreateForm((value) => ({ ...value, customerId, deliveryAddressId: "" }))} />
               <SelectField label="送货地址" value={createForm.deliveryAddressId} options={addressOptions} onChange={(deliveryAddressId) => setCreateForm((value) => ({ ...value, deliveryAddressId }))} />
-              <TextField label="商品编码" value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
-              <TextField label="批号" value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
+              <TextField label={COLUMN_PRODUCT_CODE} value={createForm.productCode} onChange={(productCode) => setCreateForm((value) => ({ ...value, productCode }))} />
+              <TextField label={COLUMN_BATCH_NO} value={createForm.batchNo} onChange={(batchNo) => setCreateForm((value) => ({ ...value, batchNo }))} />
               <TextField label="计划数量" type="number" value={createForm.plannedQty} onChange={(plannedQty) => setCreateForm((value) => ({ ...value, plannedQty }))} />
               <TextField label="要求发货" type="date" value={createForm.requiredShipDate} onChange={(requiredShipDate) => setCreateForm((value) => ({ ...value, requiredShipDate }))} />
             </>
@@ -281,9 +288,9 @@ export function M4OutboundActionDialog({ action, target, createForm, purchaseRet
               <TextField required label="采购退货单号" value={purchaseReturnForm.returnNo} onChange={(returnNo) => setPurchaseReturnForm((value) => ({ ...value, returnNo }))} />
               <TextField required label="原采购入库单" value={purchaseReturnForm.sourcePurchaseOrderNo} onChange={(sourcePurchaseOrderNo) => setPurchaseReturnForm((value) => ({ ...value, sourcePurchaseOrderNo }))} />
               <TextField required label="供应商" value={purchaseReturnForm.supplierName} onChange={(supplierName) => setPurchaseReturnForm((value) => ({ ...value, supplierName }))} />
-              <SelectField required label="仓库" value={purchaseReturnForm.warehouseId} options={warehouseOptions} onChange={(warehouseId) => setPurchaseReturnForm((value) => ({ ...value, warehouseId }))} />
+              <SelectField required label={COLUMN_WAREHOUSE} value={purchaseReturnForm.warehouseId} options={warehouseOptions} onChange={(warehouseId) => setPurchaseReturnForm((value) => ({ ...value, warehouseId }))} />
               <TextField required className="md:col-span-2" label="退货原因" value={purchaseReturnForm.reason} onChange={(reason) => setPurchaseReturnForm((value) => ({ ...value, reason }))} />
-              <TextField required label="商品编码" value={purchaseReturnForm.productCode} onChange={(productCode) => setPurchaseReturnForm((value) => ({ ...value, productCode }))} />
+              <TextField required label={COLUMN_PRODUCT_CODE} value={purchaseReturnForm.productCode} onChange={(productCode) => setPurchaseReturnForm((value) => ({ ...value, productCode }))} />
               <TextField required label="数量" type="number" value={purchaseReturnForm.qty} onChange={(qty) => setPurchaseReturnForm((value) => ({ ...value, qty }))} />
             </>
           ) : action.kind === "ship" ? (
@@ -295,7 +302,7 @@ export function M4OutboundActionDialog({ action, target, createForm, purchaseRet
                 options={outboundCarrierTypeOptions}
                 onChange={(deliveryProviderType) => setShipForm((value) => ({ ...value, deliveryProviderType }))}
               />
-              <TextField required label="车牌号" value={shipForm.plateNo} onChange={(plateNo) => setShipForm((value) => ({ ...value, plateNo }))} />
+              <TextField required label={FIELD_PLATE_NO} value={shipForm.plateNo} onChange={(plateNo) => setShipForm((value) => ({ ...value, plateNo }))} />
               {shipForm.deliveryProviderType === "own_fleet" ? (
                 <>
                   <TextField required label="车辆编号" value={shipForm.vehicleNo} onChange={(vehicleNo) => setShipForm((value) => ({ ...value, vehicleNo }))} />
@@ -335,7 +342,7 @@ export function M4OutboundActionDialog({ action, target, createForm, purchaseRet
           )}
           <DialogFooter className="md:col-span-2">
             <DialogClose asChild><Button type="button" variant="outline">取消</Button></DialogClose>
-            <Button type="submit" disabled={pending} variant={action.kind === "reject-return" ? "destructive" : "default"}>{pending ? "提交中..." : meta.submitLabel}</Button>
+            <Button type="submit" disabled={pending} variant={action.kind === "reject-return" ? "destructive" : "default"}>{pending ? LOADING_SUBMITTING : meta.submitLabel}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

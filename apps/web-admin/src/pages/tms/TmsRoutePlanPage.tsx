@@ -23,6 +23,7 @@ import {
   type ReceiveTmsRoutePlanRequest,
   type TmsRoutePlan,
 } from "@/features/tms/tms-route-plan-queries";
+import { COLUMN_STATUS, FIELD_PLATE_NO } from "@/lib/ui-strings";
 
 type FormState = {
   deliveryDate: string;
@@ -94,7 +95,7 @@ export function TmsRoutePlanPage() {
               <Field id="driverUserId" label="司机 user_id" value={form.driverUserId} onChange={(value) => update("driverUserId", value)} />
               <Field id="version" label="规划版本" type="number" value={form.version} onChange={(value) => update("version", value)} />
               <Field id="vehicleNo" label="车辆编号" value={form.vehicleNo} onChange={(value) => update("vehicleNo", value)} />
-              <Field id="plateNo" label="车牌号" value={form.plateNo} onChange={(value) => update("plateNo", value)} />
+              <Field id="plateNo" label={FIELD_PLATE_NO} value={form.plateNo} onChange={(value) => update("plateNo", value)} />
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="grid gap-1.5">
@@ -136,7 +137,7 @@ function ReceivedPlan({ plan }: { plan: TmsRoutePlan }) {
           <div><dt className="text-muted-foreground">路线 ID</dt><dd className="mt-1 break-all font-mono">{plan.id}</dd></div>
           <div><dt className="text-muted-foreground">调度结果 ID</dt><dd className="mt-1 break-all font-mono">{plan.dispatch_result_id}</dd></div>
           <div><dt className="text-muted-foreground">规划版本</dt><dd className="mt-1">{plan.version}</dd></div>
-          <div><dt className="text-muted-foreground">状态</dt><dd className="mt-1">{plan.status}</dd></div>
+          <div><dt className="text-muted-foreground">{COLUMN_STATUS}</dt><dd className="mt-1">{plan.status}</dd></div>
           <div><dt className="text-muted-foreground">配送日期</dt><dd className="mt-1">{plan.delivery_date}</dd></div>
           <div><dt className="text-muted-foreground">司机 user_id</dt><dd className="mt-1 break-all font-mono">{plan.driver_user_id}</dd></div>
           <div><dt className="text-muted-foreground">车辆 / 车牌</dt><dd className="mt-1">{plan.vehicle_no} / {plan.plate_no}</dd></div>

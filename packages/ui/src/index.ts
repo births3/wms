@@ -29,3 +29,7 @@ export type {
   LocationBatchPreviewGroup,
   LocationBatchRange,
 } from "./lib/location-batch";
+export {
+  formatDateTime,
+  formatZhDate,
+} from "./lib/datetime";

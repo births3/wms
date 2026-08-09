@@ -126,7 +126,7 @@ export function M3RelocationPage() {
               void relocate
                 .mutateAsync({
                   batch_id: form.batch_id.trim(),
-                  qty: Number(form.qty),
+                  qty: String(form.qty),
                   to_location_id: form.to_location_id.trim(),
                   to_location_code: form.to_location_code.trim(),
                   reason: form.reason.trim() || undefined,

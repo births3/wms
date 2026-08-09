@@ -28,6 +28,7 @@ import {
 import { errorText } from "@/lib/error-text";
 import { formatDateTime } from "@/lib/format";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { BUTTON_REFRESH, COLUMN_BATCH_NO, COLUMN_CREATED_AT, COLUMN_PRODUCT_CODE, ERROR_AUTH_API_CHECK } from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const PENDING_LOCATION_KEY = "m3-location-history-code";
@@ -48,8 +49,8 @@ export const m3LocationHistoryQueryFields: QueryPanelField[] = [
     ],
   },
   { key: "movementType", label: "操作类型", type: "text", placeholder: "inbound_putaway / outbound_ship" },
-  { key: "productCode", label: "商品编码", type: "text", placeholder: "按商品编码模糊查询" },
-  { key: "batchNo", label: "批号", type: "text", placeholder: "按批号模糊查询" },
+  { key: "productCode", label: COLUMN_PRODUCT_CODE, type: "text", placeholder: "按商品编码模糊查询" },
+  { key: "batchNo", label: COLUMN_BATCH_NO, type: "text", placeholder: "按批号模糊查询" },
 ];
 
 interface M3LocationHistoryPageProps {
@@ -87,7 +88,7 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
   );
 
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新库位历史",
     disabled: historyQuery.isFetching || !enabled,
     onClick: () => {
@@ -99,7 +100,7 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
     () => [
       {
         key: "created_at",
-        header: "创建时间",
+        header: COLUMN_CREATED_AT,
         width: 180,
         minWidth: 160,
         sortable: true,
@@ -267,7 +268,7 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
               !enabled
                 ? "从 M3 批号管理库位专项视图跳转，或在此输入库位编码后查询"
                 : historyQuery.isError
-                  ? errorText(historyQuery.error, "请检查鉴权和 API 服务")
+                  ? errorText(historyQuery.error, ERROR_AUTH_API_CHECK)
                   : "该库位在所选时间范围内没有流水"
             }
             exportFileBaseName="M3-库位历史"

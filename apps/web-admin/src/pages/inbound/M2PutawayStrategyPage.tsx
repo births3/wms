@@ -32,6 +32,20 @@ import {
 import { errorText } from "@/lib/error-text";
 import { formatDateTime } from "@/lib/format";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_ADD,
+  BUTTON_REFRESH,
+  BUTTON_SAVE,
+  COLUMN_CREATED_AT,
+  COLUMN_STATUS,
+  COLUMN_UPDATED_AT,
+  ERROR_AUTH_API_CHECK,
+  FIELD_KEYWORD,
+  FILTER_ALL,
+  LOADING_SAVING,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import { isUuid } from "@/lib/uuid";
@@ -50,15 +64,15 @@ export const PUTAWAY_RULE_CATALOG: Array<{ code: string; label: string }> = [
 ];
 
 export const queryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "方案编码 / 名称 / 品类" },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "方案编码 / 名称 / 品类" },
   {
     key: "status",
-    label: "状态",
+    label: COLUMN_STATUS,
     type: "select",
     options: [
-      { label: "全部", value: "" },
-      { label: "启用", value: "active" },
-      { label: "停用", value: "disabled" },
+      { label: FILTER_ALL, value: "" },
+      { label: STATUS_ENABLED, value: "active" },
+      { label: STATUS_DISABLED, value: "disabled" },
     ],
   },
   {
@@ -66,7 +80,7 @@ export const queryFields: QueryPanelField[] = [
     label: "默认方案",
     type: "select",
     options: [
-      { label: "全部", value: "" },
+      { label: FILTER_ALL, value: "" },
       { label: "是", value: "yes" },
       { label: "否", value: "no" },
     ],
@@ -161,12 +175,12 @@ const columns: DataGridColumn<PutawayStrategyProfile>[] = [
   },
   {
     key: "status",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 100,
     render: (row) => (
       <StatusBadge
         status={row.status === "active" ? "completed" : "isolated"}
-        label={row.status === "active" ? "启用" : "停用"}
+        label={row.status === "active" ? STATUS_ENABLED : STATUS_DISABLED}
         size="sm"
       />
     ),
@@ -174,14 +188,14 @@ const columns: DataGridColumn<PutawayStrategyProfile>[] = [
     filter: {
       type: "multiSelect",
       options: [
-        { label: "启用", value: "active" },
-        { label: "停用", value: "disabled" },
+        { label: STATUS_ENABLED, value: "active" },
+        { label: STATUS_DISABLED, value: "disabled" },
       ],
     },
   },
   {
     key: "created_at",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 180,
     sortable: true,
     sortValue: (row) => row.created_at,
@@ -191,7 +205,7 @@ const columns: DataGridColumn<PutawayStrategyProfile>[] = [
   },
   {
     key: "updated_at",
-    header: "更新时间",
+    header: COLUMN_UPDATED_AT,
     width: 180,
     sortable: true,
     sortValue: (row) => row.updated_at,
@@ -218,13 +232,13 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
   );
   const busy = saveMutation.isPending;
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新上架策略方案",
     disabled: profilesQuery.isFetching,
     onClick: () => void profilesQuery.refetch(),
   };
   const createAction: DataGridCreateAction = {
-    label: "新增",
+    label: BUTTON_ADD,
     description: "新增上架策略方案",
     disabled: busy,
     onClick: () => openDialog(null),
@@ -341,7 +355,7 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
             emptyTitle={profilesQuery.isError ? "读取上架策略失败" : "暂无上架策略方案"}
             emptyDescription={
               profilesQuery.isError
-                ? errorText(profilesQuery.error, "请检查鉴权和 API 服务")
+                ? errorText(profilesQuery.error, ERROR_AUTH_API_CHECK)
                 : "请新增默认通用方案，规则默认全部启用"
             }
             exportFileBaseName="M2-putaway-strategy-profiles"
@@ -393,7 +407,7 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
                   onChange={(event) => setForm((current) => ({ ...current, topN: event.target.value }))}
                 />
               </Field>
-              <Field label="状态">
+              <Field label={COLUMN_STATUS}>
                 <select
                   className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                   value={form.status}
@@ -500,7 +514,7 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={busy}>
-                {busy ? "保存中..." : "保存"}
+                {busy ? LOADING_SAVING : BUTTON_SAVE}
               </Button>
             </DialogFooter>
           </form>

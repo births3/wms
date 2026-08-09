@@ -54,7 +54,7 @@ export function useSubmitInventoryCountLineMutation() {
           path: { id: countId, line_id: lineId },
           header: { "Idempotency-Key": idempotencyKey("web-m3-count-line") },
         },
-        body: { physical_qty } satisfies SubmitInventoryCountLineRequest,
+        body: { physical_qty: String(physical_qty) } satisfies SubmitInventoryCountLineRequest,
       });
       if (!result.data) throw new ApiError(result.error, "提交实盘数量失败", result.response.status);
       return result.data;

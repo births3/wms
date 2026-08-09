@@ -41,6 +41,21 @@ import { useSystemDictionaryItemOptionsQuery } from "@/features/master-data/mast
 import { errorText } from "@/lib/error-text";
 import { formatDateTime } from "@/lib/format";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_ADD,
+  BUTTON_REFRESH,
+  BUTTON_SAVE,
+  COLUMN_CREATED_AT,
+  COLUMN_DOCUMENT_TYPE,
+  COLUMN_RULE_NAME,
+  COLUMN_STATUS,
+  COLUMN_UPDATED_AT,
+  FILTER_ALL,
+  LOADING_PROCESSING,
+  LOADING_SAVING,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
@@ -51,9 +66,9 @@ function buildMcgDocumentNumberQueryFields(
 ): QueryPanelField[] {
   return [{
     key: "documentType",
-    label: "单据类型",
+    label: COLUMN_DOCUMENT_TYPE,
     type: "select",
-    options: [{ label: "全部", value: "" }, ...documentTypeOptions],
+    options: [{ label: FILTER_ALL, value: "" }, ...documentTypeOptions],
   }];
 }
 const mcgDocumentNumberCoreQueryFieldKeys = ["documentType"];
@@ -63,7 +78,7 @@ function buildRuleColumns(documentTypeOptions: DocumentTypeOption[]): DataGridCo
   textColumn<DocumentNumberRule>("rule_code", "规则编码", 180),
   {
     key: "document_type",
-    header: "单据类型",
+    header: COLUMN_DOCUMENT_TYPE,
     width: 150,
     sortable: true,
     sortValue: (row) => documentTypeLabel(row.document_type, documentTypeOptions),
@@ -72,7 +87,7 @@ function buildRuleColumns(documentTypeOptions: DocumentTypeOption[]): DataGridCo
     filter: { type: "multiSelect", options: documentTypeOptions },
     render: (row) => documentTypeLabel(row.document_type, documentTypeOptions),
   },
-  textColumn<DocumentNumberRule>("rule_name", "规则名称", 190),
+  textColumn<DocumentNumberRule>("rule_name", COLUMN_RULE_NAME, 190),
   {
     key: "template",
     header: "模板",
@@ -107,18 +122,18 @@ function buildRuleColumns(documentTypeOptions: DocumentTypeOption[]): DataGridCo
   },
   {
     key: "enabled",
-    header: "状态",
+    header: COLUMN_STATUS,
     width: 100,
     sortable: true,
     sortValue: (row) => String(row.enabled),
     filterValue: (row) => row.enabled ? "enabled" : "disabled",
-    copyValue: (row) => row.enabled ? "启用" : "停用",
-    filter: { type: "multiSelect", options: [{ label: "启用", value: "enabled" }, { label: "停用", value: "disabled" }] },
-    render: (row) => <StatusBadge status={row.enabled ? "completed" : "offline_cached"} label={row.enabled ? "启用" : "停用"} size="sm" />,
+    copyValue: (row) => row.enabled ? STATUS_ENABLED : STATUS_DISABLED,
+    filter: { type: "multiSelect", options: [{ label: STATUS_ENABLED, value: "enabled" }, { label: STATUS_DISABLED, value: "disabled" }] },
+    render: (row) => <StatusBadge status={row.enabled ? "completed" : "offline_cached"} label={row.enabled ? STATUS_ENABLED : STATUS_DISABLED} size="sm" />,
   },
   {
     key: "updated_at",
-    header: "更新时间",
+    header: COLUMN_UPDATED_AT,
     width: 175,
     sortable: true,
     sortValue: (row) => row.updated_at,
@@ -129,7 +144,7 @@ function buildRuleColumns(documentTypeOptions: DocumentTypeOption[]): DataGridCo
   },
   {
     key: "created_at",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 175,
     sortable: true,
     sortValue: (row) => row.created_at,
@@ -148,7 +163,7 @@ function buildAllocationColumns(
   textColumn<DocumentNumberAllocation>("generated_no", "生成单号", 230),
   {
     key: "document_type",
-    header: "单据类型",
+    header: COLUMN_DOCUMENT_TYPE,
     width: 150,
     filterValue: (row) => row.document_type,
     copyValue: (row) => row.document_type,
@@ -244,13 +259,13 @@ export function MCGDocumentNumberingPage() {
   const dictionaryReady = !documentTypeOptionsQuery.isPending && !documentTypeOptionsQuery.isError;
 
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新编码规则和生成记录",
     disabled: rulesQuery.isFetching || allocationsQuery.isFetching,
     onClick: () => void refresh(),
   };
   const createAction: DataGridCreateAction = {
-    label: "新增",
+    label: BUTTON_ADD,
     description: "新增单据号生成规则",
     disabled: busy || !dictionaryReady,
     onClick: () => openEditor(null),
@@ -316,7 +331,7 @@ export function MCGDocumentNumberingPage() {
     try {
       await enabledMutation.mutateAsync({ ruleCode: rule.rule_code, enabled: !rule.enabled });
       setSelectedRowKeys([]);
-      setNotice({ type: "success", text: `${rule.rule_name} 已${rule.enabled ? "停用" : "启用"}` });
+      setNotice({ type: "success", text: `${rule.rule_name} 已${rule.enabled ? STATUS_DISABLED : STATUS_ENABLED}` });
       return true;
     } catch (error) {
       setNotice({ type: "error", text: errorText(error, "更新规则状态失败") });
@@ -437,7 +452,7 @@ export function MCGDocumentNumberingPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">规则编码<Input required disabled={Boolean(editingRule)} value={form.ruleCode} onChange={(event) => updateForm("ruleCode", event.target.value)} placeholder="purchase-inbound" /></label>
               <label className="grid gap-1 text-sm">规则名称<Input required value={form.ruleName} onChange={(event) => updateForm("ruleName", event.target.value)} placeholder="采购入库单号" /></label>
-              <label className="grid gap-1 text-sm">单据类型<select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={form.documentType} onChange={(event) => updateForm("documentType", event.target.value)} aria-label="单据类型" disabled={!dictionaryReady}><option value="">请选择</option>{documentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              <label className="grid gap-1 text-sm">{COLUMN_DOCUMENT_TYPE}<select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={form.documentType} onChange={(event) => updateForm("documentType", event.target.value)} aria-label={COLUMN_DOCUMENT_TYPE} disabled={!dictionaryReady}><option value="">请选择</option>{documentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
               <label className="grid gap-1 text-sm">重置策略<select className="h-9 rounded-md border border-input bg-background px-3 text-sm" value={form.resetPolicy} onChange={(event) => updateForm("resetPolicy", event.target.value)} aria-label="重置策略"><option value="daily">每日重置</option><option value="continuous">连续递增</option></select></label>
               <label className="grid gap-1 text-sm">流水位数<Input required type="number" min="1" max="12" step="1" value={form.sequenceWidth} onChange={(event) => updateForm("sequenceWidth", event.target.value)} /></label>
               <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={form.enabled} onChange={(event) => setForm((current) => ({ ...current, enabled: event.target.checked }))} />保存后启用</label>
@@ -447,7 +462,7 @@ export function MCGDocumentNumberingPage() {
               <label className="grid gap-1 text-sm">生效时间<Input type="datetime-local" value={form.effectiveFrom} onChange={(event) => updateForm("effectiveFrom", event.target.value)} /></label>
               <label className="grid gap-1 text-sm">失效时间<Input type="datetime-local" value={form.effectiveTo} onChange={(event) => updateForm("effectiveTo", event.target.value)} /></label>
             </div>
-            <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="submit" disabled={busy}>{busy ? "保存中..." : "保存"}</Button></DialogFooter>
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="submit" disabled={busy}>{busy ? LOADING_SAVING : BUTTON_SAVE}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
@@ -458,14 +473,14 @@ export function MCGDocumentNumberingPage() {
           <p className="text-sm">确认{disableRuleTarget?.enabled ? "停用" : "启用"}规则“{disableRuleTarget?.rule_name ?? ""}”？</p>
           {/* 启停失败提示优先渲染在确认弹窗内部，避免页面层 notice 被模态遮挡。 */}
           {notice?.type === "error" && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{notice.text}</div>}
-          <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="button" disabled={busy} onClick={() => void confirmToggleRule()}>{busy ? "处理中..." : disableRuleTarget?.enabled ? "确认停用" : "确认启用"}</Button></DialogFooter>
+          <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={busy}>取消</Button></DialogClose><Button type="button" disabled={busy} onClick={() => void confirmToggleRule()}>{busy ? LOADING_PROCESSING : disableRuleTarget?.enabled ? "确认停用" : "确认启用"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader><DialogTitle>规则预览</DialogTitle><DialogDescription>预览只生成示例，不会占用真实流水号。</DialogDescription></DialogHeader>
-          {previewRule ? <div className="grid gap-4 text-sm"><div className="rounded-md border bg-muted/30 p-4"><div className="mb-2 text-xs text-muted-foreground">示例单据号</div><code className="break-all text-base font-semibold text-primary">{renderPreview(previewRule.template, previewRule.sequence_width)}</code></div><dl className="grid grid-cols-[110px_1fr] gap-x-4 gap-y-2"><dt className="text-muted-foreground">规则编码</dt><dd>{previewRule.rule_code}</dd><dt className="text-muted-foreground">单据类型</dt><dd>{documentTypeLabel(previewRule.document_type, documentTypeOptions)}</dd><dt className="text-muted-foreground">流水策略</dt><dd>{previewRule.reset_policy === "daily" ? "每日重置" : "连续递增"} / {previewRule.sequence_width} 位</dd><dt className="text-muted-foreground">状态</dt><dd>{previewRule.enabled ? "启用" : "停用"}</dd></dl></div> : null}
+          {previewRule ? <div className="grid gap-4 text-sm"><div className="rounded-md border bg-muted/30 p-4"><div className="mb-2 text-xs text-muted-foreground">示例单据号</div><code className="break-all text-base font-semibold text-primary">{renderPreview(previewRule.template, previewRule.sequence_width)}</code></div><dl className="grid grid-cols-[110px_1fr] gap-x-4 gap-y-2"><dt className="text-muted-foreground">规则编码</dt><dd>{previewRule.rule_code}</dd><dt className="text-muted-foreground">单据类型</dt><dd>{documentTypeLabel(previewRule.document_type, documentTypeOptions)}</dd><dt className="text-muted-foreground">流水策略</dt><dd>{previewRule.reset_policy === "daily" ? "每日重置" : "连续递增"} / {previewRule.sequence_width} 位</dd><dt className="text-muted-foreground">{COLUMN_STATUS}</dt><dd>{previewRule.enabled ? STATUS_ENABLED : STATUS_DISABLED}</dd></dl></div> : null}
           <DialogFooter><Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>关闭</Button></DialogFooter>
         </DialogContent>
       </Dialog>

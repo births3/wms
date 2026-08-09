@@ -93,6 +93,7 @@ import {
   type OutboundShipForm,
 } from "./m4-outbound-page-helpers";
 import { outboundPrintTarget } from "./m4-outbound-print";
+import { BUTTON_ADD, BUTTON_REFRESH, COLUMN_STATUS, FIELD_KEYWORD } from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import { useTransientEvent } from "@/lib/use-transient-event";
@@ -106,8 +107,8 @@ interface M4OutboundPageProps {
 }
 
 const m4OutboundQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text" },
-  { key: "statusFilter", label: "状态", type: "select" },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text" },
+  { key: "statusFilter", label: COLUMN_STATUS, type: "select" },
 ];
 const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
 
@@ -303,7 +304,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       : (returnsQuery.data?.length ?? 0) >= OUTBOUND_LIST_LIMIT;
   const createActionKind = meta.createAction;
   const gridRefreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: `刷新${meta.title}列表`,
     disabled: ordersQuery.isFetching || wavesQuery.isFetching || returnsQuery.isFetching,
     onClick: () => {
@@ -312,7 +313,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
   };
   const gridCreateAction: DataGridCreateAction | undefined = createActionKind
     ? {
-        label: "新增",
+        label: BUTTON_ADD,
         description: meta.createLabel,
         onClick: () => openAction(createActionKind),
       }

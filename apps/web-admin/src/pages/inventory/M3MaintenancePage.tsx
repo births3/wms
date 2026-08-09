@@ -35,18 +35,19 @@ import {
 } from "@/features/inventory/m3-ops-queries";
 import { formatDateTime } from "@/lib/format";
 import { queryValueFromUnknown } from "@/lib/query-value";
+import { BUTTON_REFRESH, COLUMN_BATCH_NO, COLUMN_CREATED_AT, COLUMN_STATUS, FIELD_KEYWORD, FILTER_ALL, LOADING_SUBMITTING, STATUS_COMPLETED } from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const m3MaintenanceQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "商品 / 批号 / 库位" },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "商品 / 批号 / 库位" },
   {
     key: "status",
-    label: "状态",
+    label: COLUMN_STATUS,
     type: "select",
     options: [
-      { label: "全部", value: "" },
+      { label: FILTER_ALL, value: "" },
       { label: "待执行", value: "pending" },
-      { label: "已完成", value: "completed" },
+      { label: STATUS_COMPLETED, value: "completed" },
     ],
   },
 ];
@@ -84,12 +85,12 @@ export function M3MaintenancePage() {
 
   const columns = React.useMemo<DataGridColumn<MaintenanceTask>[]>(
     () => [
-      { key: "created_at", header: "创建时间", width: 180, render: (row) => formatDateTime(row.created_at) },
+      { key: "created_at", header: COLUMN_CREATED_AT, width: 180, render: (row) => formatDateTime(row.created_at) },
       { key: "product_code", header: "商品", width: 140, mono: true, render: (row) => row.product_code },
-      { key: "batch_no", header: "批号", width: 140, mono: true, render: (row) => row.batch_no },
+      { key: "batch_no", header: COLUMN_BATCH_NO, width: 140, mono: true, render: (row) => row.batch_no },
       { key: "location_code", header: "库位", width: 140, mono: true, render: (row) => row.location_code },
       { key: "planned_at", header: "计划时间", width: 180, render: (row) => formatDateTime(row.planned_at) },
-      { key: "status", header: "状态", width: 100, render: (row) => row.status },
+      { key: "status", header: COLUMN_STATUS, width: 100, render: (row) => row.status },
       {
         key: "actions",
         header: "操作",
@@ -108,7 +109,7 @@ export function M3MaintenancePage() {
   );
 
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新养护任务",
     disabled: query.isFetching,
     onClick: () => void query.refetch(),
@@ -247,7 +248,7 @@ export function M3MaintenancePage() {
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={createRecord.isPending}>
-                {createRecord.isPending ? "提交中..." : "提交养护结果"}
+                {createRecord.isPending ? LOADING_SUBMITTING : "提交养护结果"}
               </Button>
             </DialogFooter>
           </form>

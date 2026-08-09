@@ -33,7 +33,7 @@ export function outboundOrderRequest(form: OutboundCreateForm): CreateOutboundOr
       line_no: 1,
       product_code: form.productCode.trim(),
       batch_no: form.batchNo.trim(),
-      planned_qty: positiveInteger(form.plannedQty, "计划数量"),
+      planned_qty: String(positiveInteger(form.plannedQty, "计划数量")),
     }],
   };
 }
@@ -48,7 +48,7 @@ export function purchaseReturnRequest(
     supplier_name: form.supplierName.trim(),
     reason: form.reason.trim(),
     product_code: form.productCode.trim(),
-    qty,
+    qty: String(qty),
     warehouse_id: form.warehouseId,
   };
   if (Object.values(request).some((value) => value === "")) {

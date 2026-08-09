@@ -31,6 +31,7 @@ import {
   usePublishDrugInspectionProcessingRuleMutation,
   useReviewDrugInspectionStampMutation,
 } from "@/features/drug-inspection/stamp-queries";
+import { COLUMN_CREATED_AT, COLUMN_STATUS, COLUMN_UPDATED_AT, COLUMN_VERSION, FIELD_KEYWORD, FILTER_ALL, STATUS_DRAFT, STATUS_PUBLISHED } from "@/lib/ui-strings";
 
 type Notice = { kind: "success" | "error"; text: string } | null;
 type DragState = {
@@ -50,18 +51,18 @@ type PendingAction =
 export const drugInspectionStampQueryFields: QueryPanelField[] = [
   {
     key: "keyword",
-    label: "关键字",
+    label: FIELD_KEYWORD,
     type: "text",
     placeholder: "版本 / 配置人 / 审核人 / 药检单版本 / 错误",
   },
   {
     key: "status",
-    label: "状态",
+    label: COLUMN_STATUS,
     type: "select",
     options: [
-      { label: "全部", value: "" },
+      { label: FILTER_ALL, value: "" },
       { label: "待发布审核", value: "pending_review" },
-      { label: "已发布", value: "published" },
+      { label: STATUS_PUBLISHED, value: "published" },
       { label: "已退回", value: "rejected" },
       { label: "已替代", value: "superseded" },
       { label: "副本待处理", value: "queued" },
@@ -163,13 +164,13 @@ export function DrugInspectionStampPage() {
   const versionColumns = React.useMemo<DataGridColumn<DrugInspectionStampVersion>[]>(() => [
     {
       key: "version_number",
-      header: "版本",
+      header: COLUMN_VERSION,
       width: 90,
       render: (row) => `v${row.version_number}`,
     },
     {
       key: "status",
-      header: "状态",
+      header: COLUMN_STATUS,
       width: 130,
       render: (row) => (
         <StatusBadge
@@ -209,7 +210,7 @@ export function DrugInspectionStampPage() {
     },
     {
       key: "created_at",
-      header: "创建时间",
+      header: COLUMN_CREATED_AT,
       width: 180,
       render: (row) => formatDateTime(row.created_at),
     },
@@ -283,7 +284,7 @@ export function DrugInspectionStampPage() {
     },
     {
       key: "updated_at",
-      header: "更新时间",
+      header: COLUMN_UPDATED_AT,
       width: 180,
       render: (row) => formatDateTime(row.updated_at),
     },
@@ -647,9 +648,9 @@ function formatDateTime(value?: string | null) {
 
 function stampStatusLabel(status: string) {
   return {
-    draft: "草稿",
+    draft: STATUS_DRAFT,
     pending_review: "待发布审核",
-    published: "已发布",
+    published: STATUS_PUBLISHED,
     rejected: "已退回",
     superseded: "已替代",
   }[status] ?? status;

@@ -140,7 +140,25 @@ export function useLocationHistoryQuery(query: LocationHistoryQuery, enabled: bo
       if (!result.data) {
         throw new ApiError(result.error, "读取库位历史失败", result.response.status);
       }
-      return result.data as LocationHistoryResponse;
+      // Decimal 迁移后 qty_delta/total_qty_delta 以字符串传输，转换为 number 供页面比较/排序使用。
+      const movements: LocationHistoryMovement[] = result.data.data.map((movement) => ({
+        ...movement,
+        qty_delta: Number(movement.qty_delta),
+      }));
+      const productShares: LocationHistoryProductShare[] = result.data.product_shares.map((share) => ({
+        ...share,
+        total_qty_delta: Number(share.total_qty_delta),
+      }));
+      return {
+        location_code: result.data.location_code,
+        data: movements,
+        risks: result.data.risks,
+        product_shares: productShares,
+        page: {
+          count: result.data.page.count,
+          next_cursor: result.data.page.next_cursor ?? null,
+        },
+      };
     },
   });
 }

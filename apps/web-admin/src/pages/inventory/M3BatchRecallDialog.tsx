@@ -12,6 +12,7 @@ import {
 } from "@wms/ui";
 
 import type { InventoryBatch, MarkInventoryRecallRequest } from "@/features/inventory/inventory-queries";
+import { LOADING_SUBMITTING } from "@/lib/ui-strings";
 
 const emptyForm = {
   approval_source: "M-QL",
@@ -99,7 +100,7 @@ export function M3BatchRecallDialog({
               <Button type="button" variant="outline" disabled={pending}>取消</Button>
             </DialogClose>
             <Button type="submit" disabled={pending}>
-              {pending ? "提交中..." : "确认召回"}
+              {pending ? LOADING_SUBMITTING : "确认召回"}
             </Button>
           </DialogFooter>
         </form>

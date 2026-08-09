@@ -44,6 +44,17 @@ import {
 } from "@/features/print-orchestration/print-device-queries";
 import { formatDateTime } from "@/lib/format";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_REFRESH,
+  COLUMN_CREATED_AT,
+  COLUMN_OWNER,
+  COLUMN_STATUS,
+  COLUMN_WAREHOUSE,
+  FIELD_KEYWORD,
+  STATUS_DEACTIVATED,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+} from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import {
   DeviceWriteConfirmDialog,
@@ -623,8 +634,8 @@ export function H9PrintDevicePage({ currentUser }: { currentUser: CurrentUser })
 const siteColumns: DataGridColumn<PrintSite>[] = [
   { key: "site_code", header: "站点编码", width: 160, mono: true, copyValue: (row) => row.site_code },
   { key: "site_name", header: "站点名称", width: 220, render: (row) => row.site_name },
-  { key: "status", header: "状态", width: 110, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : "expired"} label={row.status === "active" ? "启用" : "停用"} size="sm" /> },
-  { key: "created_at", header: "创建时间", width: 180, render: (row) => formatDateTime(row.created_at) },
+  { key: "status", header: COLUMN_STATUS, width: 110, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : "expired"} label={row.status === "active" ? STATUS_ENABLED : STATUS_DISABLED} size="sm" /> },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 180, render: (row) => formatDateTime(row.created_at) },
 ];
 
 function mappingColumns(
@@ -634,12 +645,12 @@ function mappingColumns(
   return [
     {
       key: "owner",
-      header: "货主",
+      header: COLUMN_OWNER,
       width: 200,
       render: (row) => (row.owner_id === currentUser.owner_id ? `${currentUser.owner_code}（当前货主）` : row.owner_id),
     },
-    { key: "warehouse", header: "仓库", width: 220, render: (row) => warehouseLabels.get(row.warehouse_id) ?? row.warehouse_id },
-    { key: "status", header: "状态", width: 110, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : "expired"} label={row.status === "active" ? "生效" : "已停用"} size="sm" /> },
+    { key: "warehouse", header: COLUMN_WAREHOUSE, width: 220, render: (row) => warehouseLabels.get(row.warehouse_id) ?? row.warehouse_id },
+    { key: "status", header: COLUMN_STATUS, width: 110, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : "expired"} label={row.status === "active" ? "生效" : STATUS_DEACTIVATED} size="sm" /> },
     { key: "created_at", header: "映射时间", width: 180, render: (row) => formatDateTime(row.created_at) },
     { key: "disabled_at", header: "停用时间", width: 180, render: (row) => row.disabled_at ? formatDateTime(row.disabled_at) : "-" },
   ];
@@ -650,17 +661,17 @@ const printerColumns: DataGridColumn<Printer>[] = [
   { key: "site", header: "所属站点", width: 200, render: (row) => `${row.site_code} ${row.site_name}` },
   { key: "printer_model", header: "型号", width: 180, render: (row) => row.printer_model ?? "-" },
   { key: "connection_type", header: "连接类型", width: 140, render: (row) => <StatusBadge status={row.connection_type === "usb" ? "pending" : "completed"} label={row.connection_type === "usb" ? "USB（单机）" : "网络"} size="sm" /> },
-  { key: "status", header: "状态", width: 110, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : "expired"} label={row.status === "active" ? "启用" : "停用"} size="sm" /> },
+  { key: "status", header: COLUMN_STATUS, width: 110, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : "expired"} label={row.status === "active" ? STATUS_ENABLED : STATUS_DISABLED} size="sm" /> },
   { key: "release_mode", header: "释放模式", width: 200, render: (row) => `${releaseModeLabel(row.effective_release_mode)}${row.release_mode_override ? "（单机覆盖）" : "（全局默认）"}` },
-  { key: "created_at", header: "创建时间", width: 180, defaultHidden: true, render: (row) => formatDateTime(row.created_at) },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 180, defaultHidden: true, render: (row) => formatDateTime(row.created_at) },
 ];
 
 const trayColumns: DataGridColumn<PrinterTray>[] = [
   { key: "tray_code", header: "设备标识", width: 150, mono: true, copyValue: (row) => row.tray_code },
   { key: "paper_size", header: "纸张尺寸", width: 130, render: (row) => row.paper_size },
   { key: "paper_type", header: "纸张类型", width: 180, render: (row) => row.paper_type },
-  { key: "enabled", header: "启用状态", width: 110, render: (row) => <StatusBadge status={row.enabled ? "completed" : "expired"} label={row.enabled ? "启用" : "停用"} size="sm" /> },
-  { key: "created_at", header: "创建时间", width: 180, render: (row) => formatDateTime(row.created_at) },
+  { key: "enabled", header: "启用状态", width: 110, render: (row) => <StatusBadge status={row.enabled ? "completed" : "expired"} label={row.enabled ? STATUS_ENABLED : STATUS_DISABLED} size="sm" /> },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 180, render: (row) => formatDateTime(row.created_at) },
 ];
 
 const leaseColumns: DataGridColumn<DeviceLease>[] = [
@@ -680,7 +691,7 @@ function buildH9PrintDeviceQueryFields(
   siteOptions: Array<{ value: string; label: string }>,
 ): QueryPanelField[] {
   return [
-    { key: "keyword", label: "关键字", type: "text", placeholder: "站点 / 打印机 / 租约令牌" },
+    { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "站点 / 打印机 / 租约令牌" },
     { key: "siteId", label: "站点", type: "select", options: siteOptions },
     {
       key: "connectionType",
@@ -742,7 +753,7 @@ function testPrintResultLabel(result: string) {
 }
 
 function refreshAction(query: { isFetching: boolean; refetch: () => Promise<unknown> }, label: string): DataGridRefreshAction {
-  return { label: "刷新", description: `刷新${label}`, disabled: query.isFetching, onClick: () => void query.refetch() };
+  return { label: BUTTON_REFRESH, description: `刷新${label}`, disabled: query.isFetching, onClick: () => void query.refetch() };
 }
 
 function ErrorNotice({ message }: { message?: string }) {

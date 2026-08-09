@@ -8,6 +8,8 @@ import {
   type UpsertCustomerProfileRequest,
 } from "@/features/master-data/master-data-queries";
 
+import { LOADING_SAVING } from "@/lib/ui-strings";
+
 const emptyProfile: UpsertCustomerProfileRequest = {
   customer_type: "customer",
   contact_name: "",
@@ -73,7 +75,7 @@ export function CustomerProfileEditor({ customerId }: { customerId: string }) {
           <p className="text-xs text-muted-foreground">联系方式、经营范围、资质和连锁归属。</p>
         </div>
         <Button type="button" size="sm" onClick={() => void save()} disabled={saveMutation.isPending || profileQuery.isPending}>
-          {saveMutation.isPending ? "保存中..." : "保存档案"}
+          {saveMutation.isPending ? LOADING_SAVING : "保存档案"}
         </Button>
       </div>
       {profileQuery.isPending && <p className="text-xs text-muted-foreground">档案加载中...</p>}
@@ -116,6 +118,8 @@ export function CustomerProfileEditor({ customerId }: { customerId: string }) {
                 新增资质
               </Button>
             </div>
+            {/* 资质证照为可增删列表且条目无稳定业务主键（新增即空对象），
+                输入均为受控值（value + onChange 全量重渲染），index key 为有意保留 */}
             {qualifications.map((item, index) => (
               <div className="grid gap-2 md:grid-cols-[1fr_1fr_10rem_auto]" key={index}>
                 <Input aria-label={`资质类型-${index + 1}`} placeholder="证照类型" value={item.certificate_type} onChange={(event) => updateQualification(index, { certificate_type: event.target.value })} />

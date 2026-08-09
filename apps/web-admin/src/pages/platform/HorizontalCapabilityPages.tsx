@@ -19,6 +19,12 @@ import {
   type AuditEventRow,
 } from "@/features/audit/audit-queries";
 import { queryRange } from "@/lib/query-value";
+import {
+  BUTTON_REFRESH,
+  COLUMN_BATCH_NO,
+  COLUMN_CREATED_AT,
+  COLUMN_PRODUCT_CODE,
+} from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const h2AuditQueryFields: QueryPanelField[] = [
@@ -54,15 +60,15 @@ const h2AuditQueryFields: QueryPanelField[] = [
   },
   {
     key: "productCode",
-    label: "商品编码",
+    label: COLUMN_PRODUCT_CODE,
     type: "text",
-    placeholder: "商品编码",
+    placeholder: COLUMN_PRODUCT_CODE,
   },
   {
     key: "batchNo",
-    label: "批号",
+    label: COLUMN_BATCH_NO,
     type: "text",
-    placeholder: "批号",
+    placeholder: COLUMN_BATCH_NO,
   },
   {
     key: "occurredAt",
@@ -75,7 +81,7 @@ const h2AuditCoreQueryFieldKeys = ["resourceType", "occurredAt"];
 const h2AuditColumns: DataGridColumn<AuditEventRow>[] = [
   {
     key: "createdAt",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 190,
     minWidth: 160,
     sortable: true,
@@ -199,7 +205,7 @@ export function H2AuditTrailPage() {
   );
 
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "重新加载审计事件",
     disabled: eventsQuery.isFetching,
     onClick: () => {

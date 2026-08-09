@@ -10,6 +10,7 @@ import {
 
 import type { ExpressTrackingResponse, ExpressWaybill } from "@/features/express/express-queries";
 import { formatDateTime } from "@/lib/format";
+import { BUTTON_SAVE, COLUMN_RULE_NAME, COLUMN_STATUS } from "@/lib/ui-strings";
 import { providerOptions } from "./h5-express-model";
 
 export interface CarrierForm {
@@ -186,7 +187,7 @@ export function CarrierDialog({ open, form, error, saving, onFormChange, onOpenC
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button onClick={onSave} disabled={saving}>{saving ? "保存中" : "保存"}</Button>
+          <Button onClick={onSave} disabled={saving}>{saving ? "保存中" : BUTTON_SAVE}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -209,7 +210,7 @@ export function RuleDialog({ open, form, error, saving, onFormChange, onOpenChan
         <DialogErrorNotice error={error} />
         <div className="grid gap-3 md:grid-cols-2">
           <FormInput label="规则编码" value={form.ruleCode} onChange={(ruleCode) => onFormChange({ ...form, ruleCode })} />
-          <FormInput label="规则名称" value={form.ruleName} onChange={(ruleName) => onFormChange({ ...form, ruleName })} />
+          <FormInput label={COLUMN_RULE_NAME} value={form.ruleName} onChange={(ruleName) => onFormChange({ ...form, ruleName })} />
           <label className="text-sm">
             <span className="mb-1 block font-medium">配送方式</span>
             <select
@@ -231,7 +232,7 @@ export function RuleDialog({ open, form, error, saving, onFormChange, onOpenChan
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button onClick={onSave} disabled={saving}>{saving ? "保存中" : "保存"}</Button>
+          <Button onClick={onSave} disabled={saving}>{saving ? "保存中" : BUTTON_SAVE}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -317,7 +318,7 @@ function WaybillInfo({ waybill }: { waybill: ExpressWaybill }) {
   return (
     <div className="grid gap-3 text-sm md:grid-cols-2">
       <Info label="运单号" value={waybill.waybill_no} mono />
-      <Info label="状态" value={waybill.status} />
+      <Info label={COLUMN_STATUS} value={waybill.status} />
       <Info label="快递商" value={waybill.carrier_code} mono />
       <Info label="包裹号" value={waybill.package_no} mono />
       <Info label="收件人" value={`${waybill.receiver_name} / ${waybill.receiver_mobile}`} />

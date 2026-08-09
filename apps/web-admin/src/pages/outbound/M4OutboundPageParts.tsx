@@ -1,5 +1,12 @@
 import { Input, StatusBadge } from "@wms/ui";
 
+import {
+  COLUMN_DOCUMENT_TYPE,
+  COLUMN_TEMP_ZONE,
+  DOC_TYPE_PURCHASE_RETURN,
+  FIELD_PLATE_NO,
+  STATUS_PENDING_INPUT,
+} from "@/lib/ui-strings";
 import type { OutboundOrder, PurchaseReturnOrder } from "./m4-outbound-page-model";
 
 export function OutboundPageErrors({
@@ -82,7 +89,7 @@ export function OrderNoSummary({ order }: { order: OutboundOrder }) {
 }
 
 export function documentTypeLabel(value: string) {
-  return value === "purchase_return_outbound" ? "采购退货出库" : "销售出库";
+  return value === "purchase_return_outbound" ? DOC_TYPE_PURCHASE_RETURN : "销售出库";
 }
 
 export function BatchNoCell({ order }: { order: OutboundOrder }) {
@@ -132,7 +139,7 @@ function shortId(value: string) {
 }
 
 export function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["document_type"]) {
-  return value === "purchase_return_outbound" ? "采购退货出库" : value;
+  return value === "purchase_return_outbound" ? DOC_TYPE_PURCHASE_RETURN : value;
 }
 
 export function purchaseReturnApprovalSourceLabel(value: PurchaseReturnOrder["approval_source"] | string) {
@@ -156,29 +163,29 @@ export function ActionExtraFields({ kind }: { kind: string }) {
  * 不得预填虚构的工位码 / 车牌 / 供应商等业务数据。
  */
 function extraActionFields(kind: string): Array<[string, string, string?]> {
-  if (kind === "release-wave" || kind === "create-wave") return [["路径策略", "", "待录入"], ["温区", "", "待录入"], ["容量上限", "", "待录入"]];
-  if (kind === "review") return [["工位码", "", "待录入"], ["实际复核数量", "按扫码累计"], ["短拣标识", "", "待录入"], ["复核人", "当前用户"]];
+  if (kind === "release-wave" || kind === "create-wave") return [["路径策略", "", STATUS_PENDING_INPUT], [COLUMN_TEMP_ZONE, "", STATUS_PENDING_INPUT], ["容量上限", "", STATUS_PENDING_INPUT]];
+  if (kind === "review") return [["工位码", "", STATUS_PENDING_INPUT], ["实际复核数量", "按扫码累计"], ["短拣标识", "", STATUS_PENDING_INPUT], ["复核人", "当前用户"]];
   if (kind === "ship" || kind === "ship-return") {
     return [
-      ["配送方类型", "", "待录入"],
-      ["包裹数量", "", "待录入"],
-      ["车牌号", "", "待录入"],
+      ["配送方类型", "", STATUS_PENDING_INPUT],
+      ["包裹数量", "", STATUS_PENDING_INPUT],
+      [FIELD_PLATE_NO, "", STATUS_PENDING_INPUT],
       ["装车温度", "", "冷链时必填"],
       ["签字", "交接双方签字"],
     ];
   }
   if (kind === "approve-return" || kind === "reject-return" || kind === "pick-return" || kind === "review-return" || kind === "create-return") {
     return [
-      ["单据类型", "采购退货出库"],
-      ["原采购入库单", "", "待录入"],
-      ["供应商", "", "待录入"],
-      ["退货原因", "", "待录入"],
-      ["商品", "", "待录入"],
-      ["数量", "", "待录入"],
+      [COLUMN_DOCUMENT_TYPE, DOC_TYPE_PURCHASE_RETURN],
+      ["原采购入库单", "", STATUS_PENDING_INPUT],
+      ["供应商", "", STATUS_PENDING_INPUT],
+      ["退货原因", "", STATUS_PENDING_INPUT],
+      ["商品", "", STATUS_PENDING_INPUT],
+      ["数量", "", STATUS_PENDING_INPUT],
       ["审批来源", purchaseReturnApprovalSourceLabel("purchase_return_approval")],
     ];
   }
-  return [["校验结果", "", "校验后回填"], ["审批来源", "", "待录入"]];
+  return [["校验结果", "", "校验后回填"], ["审批来源", "", STATUS_PENDING_INPUT]];
 }
 
 /** 只读展示：值从不被读取提交，禁止渲染成可编辑输入框误导用户。 */
@@ -186,11 +193,11 @@ function StaticField({ label, value, placeholder }: { label: string; value: stri
   return (
     <label>
       <span className="mb-1 block text-xs text-muted-foreground">{label}</span>
-      <Input readOnly disabled value={value} placeholder={placeholder ?? "待录入"} />
+      <Input readOnly disabled value={value} placeholder={placeholder ?? STATUS_PENDING_INPUT} />
     </label>
   );
 }
 
 function lineTotalPlannedQty(order: OutboundOrder) {
-  return (order.lines ?? []).reduce((sum, line) => sum + line.planned_qty, 0);
+  return (order.lines ?? []).reduce((sum, line) => sum + Number(line.planned_qty), 0);
 }

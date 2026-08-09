@@ -27,6 +27,7 @@ import {
   useDrugInspectionVersionsQuery,
   useReviewDrugInspectionMutation,
 } from "@/features/drug-inspection/document-queries";
+import { COLUMN_BATCH_NO, COLUMN_CREATED_AT, COLUMN_STATUS, COLUMN_VERSION, FIELD_KEYWORD } from "@/lib/ui-strings";
 import { DrugInspectionRequirementRulesCard } from "./DrugInspectionRequirementRulesCard";
 
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -34,7 +35,7 @@ type Notice = { kind: "success" | "error"; text: string } | null;
 export const drugInspectionReviewQueryFields: QueryPanelField[] = [
   {
     key: "keyword",
-    label: "关键字",
+    label: FIELD_KEYWORD,
     type: "text",
     placeholder: "报告编号 / 商品 / 批号 / 上传人",
   },
@@ -76,7 +77,7 @@ export function DrugInspectionReviewPage() {
     () => [
       textColumn("report", "报告编号", (row) => row.version.report_no, 180),
       textColumn("product", "商品", (row) => `${row.product_code} ${row.product_name}`, 220),
-      textColumn("batch", "批号", (row) => row.batch_no, 150),
+      textColumn("batch", COLUMN_BATCH_NO, (row) => row.batch_no, 150),
       textColumn("uploader", "上传人", (row) => row.uploader_name, 150),
       textColumn(
         "submitted",
@@ -86,13 +87,13 @@ export function DrugInspectionReviewPage() {
       ),
       {
         key: "created_at",
-        header: "创建时间",
+        header: COLUMN_CREATED_AT,
         width: 180,
         render: (row) => formatDateTime(row.version.created_at),
       },
       {
         key: "status",
-        header: "状态",
+        header: COLUMN_STATUS,
         width: 130,
         render: () => (
           <StatusBadge status="pending" label="待确认" size="sm" />
@@ -206,7 +207,7 @@ export function DrugInspectionReviewPage() {
             </DialogHeader>
             {notice && <NoticeBox notice={notice} />}
             <div className="grid gap-3 rounded-md border p-4 md:grid-cols-2">
-              <Info label="版本" value={`v${selected.version.version_number}`} />
+              <Info label={COLUMN_VERSION} value={`v${selected.version.version_number}`} />
               <Info label="上传人" value={selected.uploader_name} />
               <Info
                 label="图像处理"

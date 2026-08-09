@@ -38,6 +38,17 @@ import type {
   UpdateWarehouseZoneRequest,
   SystemDictionaryOption,
 } from "@/features/master-data/master-data-queries";
+import {
+  BUTTON_SAVE,
+  COLUMN_STATUS,
+  COLUMN_TEMP_ZONE,
+  COLUMN_WAREHOUSE,
+  FIELD_UNIFIED_SOCIAL_CREDIT_CODE,
+  LOADING_SAVING,
+  STATUS_DEACTIVATED,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+} from "@/lib/ui-strings";
 
 export type MasterDataCrudViewId = "m1-business-partners" | "m1-warehouses" | "m1-zones" | "m1-locations";
 
@@ -65,8 +76,8 @@ export interface LocationFormState { kind: "location"; mode: "create" | "edit"; 
 export type MasterDataCrudForm = SourceEditFormState | WarehouseFormState | ZoneFormState | LocationFormState;
 
 const activeOptions = [
-  ["active", "启用"],
-  ["disabled", "停用"],
+  ["active", STATUS_ENABLED],
+  ["disabled", STATUS_DISABLED],
 ] as const;
 const warehouseTypeOptions = [
   ["physical", "物理仓"],
@@ -77,7 +88,7 @@ const locationStatusOptions = [
   ["available", "可用"],
   ["occupied", "占用"],
   ["locked", "锁定"],
-  ["disabled", "停用"],
+  ["disabled", STATUS_DISABLED],
 ] as const;
 export function isMasterDataCrudView(viewId: MasterDataViewId): viewId is MasterDataCrudViewId {
   return ["m1-business-partners", "m1-warehouses", "m1-zones", "m1-locations"].includes(viewId);
@@ -118,7 +129,7 @@ export function masterDataCrudColumns(
               <Pencil className="size-4" aria-hidden /> 编辑
             </Button>
             <Button type="button" variant="outline" size="sm" disabled={disabled || disablingId === row.id} onClick={() => onDisable(row)}>
-              <Ban className="size-4" aria-hidden /> {disabled ? "已停用" : "停用"}
+              <Ban className="size-4" aria-hidden /> {disabled ? STATUS_DEACTIVATED : STATUS_DISABLED}
             </Button>
           </div>
         );
@@ -210,9 +221,9 @@ export function MasterDataCrudDialog({
               <>
                 <TextField label="供应商编码" value={form.code} disabled onChange={() => undefined} />
                 <TextField label="供应商名称" value={form.name} required onChange={(name) => patch({ name })} />
-                <TextField label="统一社会信用代码" required value={form.licenseNo} onChange={(licenseNo) => patch({ licenseNo })} />
+                <TextField label={FIELD_UNIFIED_SOCIAL_CREDIT_CODE} required value={form.licenseNo} onChange={(licenseNo) => patch({ licenseNo })} />
                 <TextField label="联系人" required value={form.contactName} onChange={(contactName) => patch({ contactName })} />
-                <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />
+                <SelectField label={COLUMN_STATUS} value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />
               </>
             )}
             {form.kind === "customer" && (
@@ -220,7 +231,7 @@ export function MasterDataCrudDialog({
                 <TextField label="客户编码" value={form.code} disabled onChange={() => undefined} />
                 <TextField label="客户名称" value={form.name} required onChange={(name) => patch({ name })} />
                 <TextField label="资质证号" value={form.licenseNo} onChange={(licenseNo) => patch({ licenseNo })} />
-                <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />
+                <SelectField label={COLUMN_STATUS} value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />
                 <CustomerProfileEditor customerId={form.id} />
                 <CustomerAddressEditor customerId={form.id} />
               </>
@@ -230,17 +241,17 @@ export function MasterDataCrudDialog({
                 <TextField label="仓库编码" value={form.code} required disabled={form.mode === "edit"} onChange={(code) => patch({ code })} />
                 <TextField label="仓库名称" value={form.name} required onChange={(name) => patch({ name })} />
                 <SelectField label="仓库类型" value={form.warehouseType} options={warehouseTypeOptions} onChange={(warehouseType) => patch({ warehouseType })} />
-                {form.mode === "edit" && <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />}
+                {form.mode === "edit" && <SelectField label={COLUMN_STATUS} value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />}
               </>
             )}
             {form.kind === "zone" && (
               <>
-                <SelectField label="仓库" value={form.warehouseId} options={warehouseOptions.map((row) => [row.id, `${row.code} · ${row.name}`] as const)} onChange={(warehouseId) => patch({ warehouseId })} />
+                <SelectField label={COLUMN_WAREHOUSE} value={form.warehouseId} options={warehouseOptions.map((row) => [row.id, `${row.code} · ${row.name}`] as const)} onChange={(warehouseId) => patch({ warehouseId })} />
                 <TextField label="库区编码" value={form.code} required disabled={form.mode === "edit"} onChange={(code) => patch({ code })} />
                 <TextField label="库区名称" value={form.name} required onChange={(name) => patch({ name })} />
-                <SelectField label="温区" value={form.temperatureZone} options={temperatureZoneOptions} onChange={(temperatureZone) => patch({ temperatureZone })} />
+                <SelectField label={COLUMN_TEMP_ZONE} value={form.temperatureZone} options={temperatureZoneOptions} onChange={(temperatureZone) => patch({ temperatureZone })} />
                 <SelectField label="色标" value={form.qualityColor} options={qualityColorOptions} onChange={(qualityColor) => patch({ qualityColor })} />
-                {form.mode === "edit" && <SelectField label="状态" value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />}
+                {form.mode === "edit" && <SelectField label={COLUMN_STATUS} value={form.status} options={activeOptions} onChange={(status) => patch({ status })} />}
               </>
             )}
             {form.kind === "location" && (
@@ -258,7 +269,7 @@ export function MasterDataCrudDialog({
                 {form.mode === "edit" && <NumberField label="当前已用容积 cm³" value={form.usedVolumeCm3} min={0} onChange={(usedVolumeCm3) => patch({ usedVolumeCm3 })} />}
                 <NumberField label="最大 SKU 数" value={form.maxSkuCount} min={1} onChange={(maxSkuCount) => patch({ maxSkuCount })} />
                 <SelectField label="库位类型" value={form.locationType} options={locationTypeOptions} onChange={(locationType) => patch({ locationType })} />
-                {form.mode === "edit" && <SelectField label="状态" value={form.status} options={locationStatusOptions} onChange={(status) => patch({ status })} />}
+                {form.mode === "edit" && <SelectField label={COLUMN_STATUS} value={form.status} options={locationStatusOptions} onChange={(status) => patch({ status })} />}
               </>
             )}
           </div>
@@ -267,7 +278,7 @@ export function MasterDataCrudDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={pending}>取消</Button>
             </DialogClose>
-            <Button type="submit" disabled={pending || !canSubmit(form, locationScopes, locationTypeOptions)}>{pending ? "保存中..." : "保存"}</Button>
+            <Button type="submit" disabled={pending || !canSubmit(form, locationScopes, locationTypeOptions)}>{pending ? LOADING_SAVING : BUTTON_SAVE}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

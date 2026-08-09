@@ -47,6 +47,23 @@ import { DockOccupancyBoard } from "@/pages/dock/DockOccupancyBoard";
 import { formatDateTime } from "@/lib/format";
 import { queryString } from "@/lib/query-value";
 import { readSpreadsheetRows } from "@/lib/spreadsheet";
+import {
+  BUTTON_ADD,
+  BUTTON_REFRESH,
+  BUTTON_SAVE,
+  COLUMN_CREATED_AT,
+  COLUMN_STATUS,
+  COLUMN_TEMP_ZONE,
+  COLUMN_UPDATED_AT,
+  COLUMN_WAREHOUSE,
+  FIELD_KEYWORD,
+  LOADING_SAVING,
+  STATUS_CANCELLED,
+  STATUS_DISABLED,
+  STATUS_ENABLED,
+  TEMP_AMBIENT,
+  TEMP_COLD,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
@@ -56,16 +73,16 @@ import { usePageQueryState } from "@/lib/use-page-query-state";
  */
 
 export const dockQueryFields: QueryPanelField[] = [
-  { key: "warehouseId", label: "仓库", type: "select", options: [] },
-  { key: "keyword", label: "关键字", type: "text", placeholder: "月台编号 / 位置说明" },
+  { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "select", options: [] },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "月台编号 / 位置说明" },
   {
     key: "status",
-    label: "状态",
+    label: COLUMN_STATUS,
     type: "multiSelect",
     options: [
-      { label: "启用", value: "active" },
+      { label: STATUS_ENABLED, value: "active" },
       { label: "维护中", value: "maintenance" },
-      { label: "停用", value: "disabled" },
+      { label: STATUS_DISABLED, value: "disabled" },
     ],
   },
 ];
@@ -90,15 +107,15 @@ const dockTypeOptions = [
   { label: "收发共用", value: "both" },
 ];
 const temperatureZoneOptions = [
-  { label: "常温", value: "normal" },
-  { label: "冷藏", value: "cold" },
+  { label: TEMP_AMBIENT, value: "normal" },
+  { label: TEMP_COLD, value: "cold" },
   { label: "冷冻", value: "frozen" },
   { label: "冷链", value: "cold_chain" },
 ];
 const statusOptions = [
-  { label: "启用", value: "active" },
+  { label: STATUS_ENABLED, value: "active" },
   { label: "维护中", value: "maintenance" },
-  { label: "停用", value: "disabled" },
+  { label: STATUS_DISABLED, value: "disabled" },
 ];
 
 export function DockManagementPage() {
@@ -163,12 +180,12 @@ export function DockManagementPage() {
     { key: "window_start_at", header: "时间窗", width: 250, minWidth: 220, render: (row) => `${formatDateTime(row.window_start_at)} - ${formatDateTime(row.window_end_at)}` },
     { key: "document_no", header: "关联单据", width: 180, minWidth: 150, render: (row) => row.document_no },
     { key: "vehicle_plate_no", header: "车辆 / 司机", width: 190, minWidth: 160, render: (row) => `${row.vehicle_plate_no || "未填车牌"} / ${row.driver_name}` },
-    { key: "status", header: "状态", width: 120, minWidth: 100, render: (row) => <StatusBadge status={row.status === "cancelled" ? "isolated" : row.status === "arrived" ? "completed" : "pending"} label={appointmentStatusLabel(row.status)} size="sm" /> },
+    { key: "status", header: COLUMN_STATUS, width: 120, minWidth: 100, render: (row) => <StatusBadge status={row.status === "cancelled" ? "isolated" : row.status === "arrived" ? "completed" : "pending"} label={appointmentStatusLabel(row.status)} size="sm" /> },
     { key: "actions", header: "操作", width: 180, minWidth: 160, render: (row) => <div className="flex gap-2"><Button type="button" size="sm" variant="outline" disabled={row.status === "cancelled" || row.status === "arrived"} onClick={(event) => { event.stopPropagation(); setChangeForm(appointmentFormFor(row)); setChangeValidationError(null); updateAppointment.reset(); changeDialog.openWith(row); }}>变更</Button><Button type="button" size="sm" variant="outline" disabled={row.status === "cancelled" || row.status === "arrived" || cancelAppointment.isPending} onClick={(event) => { event.stopPropagation(); cancelAppointment.reset(); cancelDialog.openWith(row); }}>取消</Button></div> },
   ];
 
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新月台列表",
     disabled: docksQuery.isFetching || !warehouseId,
     onClick: () => {
@@ -178,7 +195,7 @@ export function DockManagementPage() {
     },
   };
   const createAction: DataGridCreateAction = {
-    label: "新增",
+    label: BUTTON_ADD,
     description: "新增月台档案",
     disabled: !warehouseId || createDock.isPending,
     onClick: () => {
@@ -503,20 +520,20 @@ export function DockManagementPage() {
 const dockColumns: DataGridColumn<Dock>[] = [
   { key: "dock_code", header: "月台编号", width: 150, minWidth: 120, mono: true, sortable: true, sortValue: (row) => row.dock_code, filterValue: (row) => row.dock_code, copyValue: (row) => row.dock_code, filter: { type: "text" } },
   { key: "dock_type", header: "作业类型", width: 140, minWidth: 120, filterValue: (row) => row.dock_type, copyValue: (row) => dockTypeLabel(row.dock_type), filter: { type: "multiSelect", options: dockTypeOptions }, render: (row) => dockTypeLabel(row.dock_type) },
-  { key: "temperature_zone", header: "温区", width: 120, minWidth: 100, filterValue: (row) => row.temperature_zone, copyValue: (row) => temperatureZoneLabel(row.temperature_zone), filter: { type: "multiSelect", options: temperatureZoneOptions }, render: (row) => temperatureZoneLabel(row.temperature_zone) },
-  { key: "status", header: "状态", width: 120, minWidth: 100, sortable: true, sortValue: (row) => row.status, filterValue: (row) => row.status, copyValue: (row) => statusLabel(row.status), filter: { type: "multiSelect", options: statusOptions }, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : row.status === "maintenance" ? "pending" : "isolated"} label={statusLabel(row.status)} size="sm" /> },
+  { key: "temperature_zone", header: COLUMN_TEMP_ZONE, width: 120, minWidth: 100, filterValue: (row) => row.temperature_zone, copyValue: (row) => temperatureZoneLabel(row.temperature_zone), filter: { type: "multiSelect", options: temperatureZoneOptions }, render: (row) => temperatureZoneLabel(row.temperature_zone) },
+  { key: "status", header: COLUMN_STATUS, width: 120, minWidth: 100, sortable: true, sortValue: (row) => row.status, filterValue: (row) => row.status, copyValue: (row) => statusLabel(row.status), filter: { type: "multiSelect", options: statusOptions }, render: (row) => <StatusBadge status={row.status === "active" ? "completed" : row.status === "maintenance" ? "pending" : "isolated"} label={statusLabel(row.status)} size="sm" /> },
   { key: "maintenance_recovery_at", header: "预计恢复", width: 170, minWidth: 150, sortable: true, sortValue: (row) => row.maintenance_recovery_at ?? "", filterValue: (row) => row.maintenance_recovery_at ?? "", copyValue: (row) => row.maintenance_recovery_at ? formatDateTime(row.maintenance_recovery_at) : "", filter: { type: "dateRange" }, render: (row) => row.maintenance_recovery_at ? formatDateTime(row.maintenance_recovery_at) : "-" },
   { key: "location_description", header: "位置说明", width: 230, minWidth: 160, filterValue: (row) => row.location_description ?? "", copyValue: (row) => row.location_description ?? "", filter: { type: "text" }, render: (row) => row.location_description || "-" },
-  { key: "created_at", header: "创建时间", width: 180, minWidth: 150, sortable: true, sortValue: (row) => row.created_at, filterValue: (row) => row.created_at, copyValue: (row) => formatDateTime(row.created_at), filter: { type: "dateRange" }, render: (row) => formatDateTime(row.created_at) },
-  { key: "updated_at", header: "更新时间", width: 180, minWidth: 150, sortable: true, sortValue: (row) => row.updated_at, filterValue: (row) => row.updated_at, copyValue: (row) => formatDateTime(row.updated_at), filter: { type: "dateRange" }, render: (row) => formatDateTime(row.updated_at) },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 180, minWidth: 150, sortable: true, sortValue: (row) => row.created_at, filterValue: (row) => row.created_at, copyValue: (row) => formatDateTime(row.created_at), filter: { type: "dateRange" }, render: (row) => formatDateTime(row.created_at) },
+  { key: "updated_at", header: COLUMN_UPDATED_AT, width: 180, minWidth: 150, sortable: true, sortValue: (row) => row.updated_at, filterValue: (row) => row.updated_at, copyValue: (row) => formatDateTime(row.updated_at), filter: { type: "dateRange" }, render: (row) => formatDateTime(row.updated_at) },
 ];
 
 function DockCreateDialog({ open, form, pending, onOpenChange, onFormChange, onSubmit, errorMessage }: { open: boolean; form: DockForm; pending: boolean; onOpenChange: (open: boolean) => void; onFormChange: (form: DockForm) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; errorMessage?: string }) {
-  return <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}><DialogContent className="sm:max-w-lg"><form className="grid gap-4" onSubmit={onSubmit}><DialogHeader><DialogTitle>新增月台</DialogTitle><DialogDescription>保存后按当前仓库展示月台档案。</DialogDescription></DialogHeader><label className="grid gap-1 text-sm">月台编号<Input required maxLength={32} value={form.dockCode} onChange={(event) => onFormChange({ ...form, dockCode: event.target.value })} /></label><SelectField label="作业类型" value={form.dockType} options={dockTypeOptions} onChange={(value) => onFormChange({ ...form, dockType: value })} /><SelectField label="温区" value={form.temperatureZone} options={temperatureZoneOptions} onChange={(value) => onFormChange({ ...form, temperatureZone: value })} /><label className="grid gap-1 text-sm">位置说明<Input value={form.locationDescription} onChange={(event) => onFormChange({ ...form, locationDescription: event.target.value })} placeholder="例如东门卸货区" /></label>{errorMessage && <ErrorNotice message={errorMessage} />}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending}>{pending ? "保存中..." : "保存"}</Button></DialogFooter></form></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}><DialogContent className="sm:max-w-lg"><form className="grid gap-4" onSubmit={onSubmit}><DialogHeader><DialogTitle>新增月台</DialogTitle><DialogDescription>保存后按当前仓库展示月台档案。</DialogDescription></DialogHeader><label className="grid gap-1 text-sm">月台编号<Input required maxLength={32} value={form.dockCode} onChange={(event) => onFormChange({ ...form, dockCode: event.target.value })} /></label><SelectField label="作业类型" value={form.dockType} options={dockTypeOptions} onChange={(value) => onFormChange({ ...form, dockType: value })} /><SelectField label={COLUMN_TEMP_ZONE} value={form.temperatureZone} options={temperatureZoneOptions} onChange={(value) => onFormChange({ ...form, temperatureZone: value })} /><label className="grid gap-1 text-sm">位置说明<Input value={form.locationDescription} onChange={(event) => onFormChange({ ...form, locationDescription: event.target.value })} placeholder="例如东门卸货区" /></label>{errorMessage && <ErrorNotice message={errorMessage} />}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending}>{pending ? LOADING_SAVING : BUTTON_SAVE}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
 function DockEditDialog({ open, dock, form, pending, onOpenChange, onFormChange, onSubmit, errorMessage }: { open: boolean; dock: Dock | null; form: DockEditForm; pending: boolean; onOpenChange: (open: boolean) => void; onFormChange: (form: DockEditForm) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; errorMessage?: string }) {
-  return <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}><DialogContent className="sm:max-w-lg"><form className="grid gap-4" onSubmit={onSubmit}><DialogHeader><DialogTitle>编辑月台</DialogTitle><DialogDescription>{dock ? `${dock.dock_code} · ${dockTypeLabel(dock.dock_type)}` : "编辑月台状态"}</DialogDescription></DialogHeader><SelectField label="状态" value={form.status} options={statusOptions} onChange={(value) => onFormChange({ ...form, status: value })} />{form.status === "maintenance" && <label className="grid gap-1 text-sm">预计恢复日期<Input required type="date" value={form.maintenanceRecoveryDate} onChange={(event) => onFormChange({ ...form, maintenanceRecoveryDate: event.target.value })} /></label>}{errorMessage && <ErrorNotice message={errorMessage} />}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending || !form.status}>{pending ? "保存中..." : "保存"}</Button></DialogFooter></form></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={(next) => !pending && onOpenChange(next)}><DialogContent className="sm:max-w-lg"><form className="grid gap-4" onSubmit={onSubmit}><DialogHeader><DialogTitle>编辑月台</DialogTitle><DialogDescription>{dock ? `${dock.dock_code} · ${dockTypeLabel(dock.dock_type)}` : "编辑月台状态"}</DialogDescription></DialogHeader><SelectField label={COLUMN_STATUS} value={form.status} options={statusOptions} onChange={(value) => onFormChange({ ...form, status: value })} />{form.status === "maintenance" && <label className="grid gap-1 text-sm">预计恢复日期<Input required type="date" value={form.maintenanceRecoveryDate} onChange={(event) => onFormChange({ ...form, maintenanceRecoveryDate: event.target.value })} /></label>}{errorMessage && <ErrorNotice message={errorMessage} />}<DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={pending}>取消</Button></DialogClose><Button type="submit" disabled={pending || !form.status}>{pending ? LOADING_SAVING : BUTTON_SAVE}</Button></DialogFooter></form></DialogContent></Dialog>;
 }
 
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: Array<{ label: string; value: string }>; onChange: (value: string) => void }) {
@@ -607,4 +624,4 @@ function dateTimeLocalToIso(value: string) {
 function appointmentFormFor(appointment: DockAppointment): DockAppointmentForm {
   return { dockId: appointment.dock_id, appointmentNo: appointment.appointment_no, documentType: appointment.document_type, documentNo: appointment.document_no, windowStartAt: toDateTimeLocal(new Date(appointment.window_start_at)), windowEndAt: toDateTimeLocal(new Date(appointment.window_end_at)), vehiclePlateNo: appointment.vehicle_plate_no ?? "", vehicleType: appointment.vehicle_type, driverName: appointment.driver_name, driverPhone: appointment.driver_phone, reason: "" };
 }
-function appointmentStatusLabel(value: string) { return ({ pending: "待确认", confirmed: "已确认", arrived: "已到达", cancelled: "已取消" } as Record<string, string>)[value] ?? value; }
+function appointmentStatusLabel(value: string) { return ({ pending: "待确认", confirmed: "已确认", arrived: "已到达", cancelled: STATUS_CANCELLED } as Record<string, string>)[value] ?? value; }

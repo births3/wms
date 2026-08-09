@@ -1,4 +1,13 @@
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
+import {
+  COLUMN_BATCH_NO,
+  COLUMN_PRODUCT_CODE,
+  COLUMN_QUALITY_STATUS,
+  FIELD_VALIDITY,
+  STATUS_COMPLETED,
+  STATUS_PENDING,
+  STATUS_PENDING_INPUT,
+} from "@/lib/ui-strings";
 
 export type InboundDetailStage = "receiving" | "inspection" | "putaway" | "completed";
 export type InboundDetailFieldSection = "product" | "order" | "batch" | "process";
@@ -23,7 +32,7 @@ export type ProductInfoFieldKey =
   | "casePackQty";
 
 export const productInfoFieldDefinitions: Array<{ key: ProductInfoFieldKey; label: string; align?: "left" | "right" }> = [
-  { key: "productCode", label: "商品编码" },
+  { key: "productCode", label: COLUMN_PRODUCT_CODE },
   { key: "productName", label: "品名" },
   { key: "specification", label: "规格" },
   { key: "manufacturer", label: "生产厂家" },
@@ -48,14 +57,14 @@ export type BatchInfoFieldKey =
 
 export const batchInfoFieldDefinitions: Array<{ key: BatchInfoFieldKey; label: string; align?: "left" | "right" }> = [
   { key: "lineNo", label: "行号" },
-  { key: "batchNo", label: "批号" },
+  { key: "batchNo", label: COLUMN_BATCH_NO },
   { key: "approvalNo", label: "批准文号" },
   { key: "importRegistrationCertificate", label: "进口注册证" },
   { key: "marketingAuthorizationHolder", label: "上市持有人" },
   { key: "batchQty", label: "批号数量", align: "right" },
   { key: "batchCasePackage", label: "批号件包装" },
   { key: "productionDate", label: "生产日期" },
-  { key: "expiryDate", label: "有效期" },
+  { key: "expiryDate", label: FIELD_VALIDITY },
 ];
 
 export const inboundDetailStages: Array<{ label: string; stage: InboundDetailStage; index: number }> = [
@@ -85,16 +94,16 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
       title: "收货信息",
       state: processState(0, currentStage),
       rows: [
-        ["承运商 / 车牌", "待录入"],
-        ["发运地点", "待录入"],
-        ["启运 / 到货", "待录入"],
-        ["入库时间", "待录入"],
-        ["运输 / 温控 / 温度", "待录入"],
-        ["联系人", "待录入"],
-        ["随货核对", "待录入"],
+        ["承运商 / 车牌", STATUS_PENDING_INPUT],
+        ["发运地点", STATUS_PENDING_INPUT],
+        ["启运 / 到货", STATUS_PENDING_INPUT],
+        ["入库时间", STATUS_PENDING_INPUT],
+        ["运输 / 温控 / 温度", STATUS_PENDING_INPUT],
+        ["联系人", STATUS_PENDING_INPUT],
+        ["随货核对", STATUS_PENDING_INPUT],
         ["数量闭合", `预报 ${expectedQty} 件 / 实收待录入`],
-        ["第一收货员", "待录入"],
-        ["第二收货员", "待录入"],
+        ["第一收货员", STATUS_PENDING_INPUT],
+        ["第二收货员", STATUS_PENDING_INPUT],
         ["异常备注", "-"],
       ],
     },
@@ -102,12 +111,12 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
       title: "验收信息",
       state: processState(1, currentStage),
       rows: [
-        ["通过 / 拒收", "待录入"],
-        ["追溯码", "待录入"],
-        ["质量状态", "待录入"],
-        ["四项核对", "待录入"],
-        ["验收复核", "待录入"],
-        ["验收 / 复核人", "待录入"],
+        ["通过 / 拒收", STATUS_PENDING_INPUT],
+        ["追溯码", STATUS_PENDING_INPUT],
+        [COLUMN_QUALITY_STATUS, STATUS_PENDING_INPUT],
+        ["四项核对", STATUS_PENDING_INPUT],
+        ["验收复核", STATUS_PENDING_INPUT],
+        ["验收 / 复核人", STATUS_PENDING_INPUT],
         ["验收备注", "-"],
       ],
     },
@@ -115,9 +124,9 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
       title: "上架信息",
       state: processState(2, currentStage),
       rows: [
-        ["容器 LPN", "待录入"],
+        ["容器 LPN", STATUS_PENDING_INPUT],
         ["推荐库位", "-"],
-        ["实际库位", "待录入"],
+        ["实际库位", STATUS_PENDING_INPUT],
         ["校验结果", "待执行"],
         ["上架备注", "-"],
       ],
@@ -125,7 +134,7 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
     completed: {
       title: "完成信息",
       state: processState(3, currentStage),
-      rows: [["完成状态", currentStage >= 3 ? "已完成" : "未完成"]],
+      rows: [["完成状态", currentStage >= 3 ? STATUS_COMPLETED : "未完成"]],
     },
   } satisfies Record<InboundDetailStage, { title: string; state: ProcessState; rows: Array<[string, string]> }>;
   return map[stage];
@@ -134,7 +143,7 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
 export function productInfoRows(order: Pick<ReceivingOrder, "lines">) {
   const rows = new Map<string, number>();
   for (const item of order.lines ?? []) {
-    rows.set(item.product_code, (rows.get(item.product_code) ?? 0) + item.expected_qty);
+    rows.set(item.product_code, (rows.get(item.product_code) ?? 0) + Number(item.expected_qty));
   }
   return [...rows.entries()].map(([productCode, orderQty]) => ({
     ...productMasterFields(),
@@ -168,9 +177,9 @@ export function orderLicenseRows(order: Pick<ReceivingOrder, "lines">): Array<[s
 }
 
 function processState(index: number, current: number): ProcessState {
-  if (index < current) return { label: "已完成", status: "completed" };
+  if (index < current) return { label: STATUS_COMPLETED, status: "completed" };
   if (index === current) return { label: "当前", status: "in_progress" };
-  return { label: "待处理", status: "pending" };
+  return { label: STATUS_PENDING, status: "pending" };
 }
 
 function linePackageFields() {

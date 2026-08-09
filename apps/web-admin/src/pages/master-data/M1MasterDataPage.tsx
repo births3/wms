@@ -65,6 +65,7 @@ import {
   H9BusinessPrintDialog,
   type H9BusinessPrintTarget,
 } from "../print-template/H9BusinessPrintDialog";
+import { BUTTON_ADD } from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 export type { MasterDataViewId } from "@/features/master-data/master-data-queries";
 export const masterDataViewMeta: Record<
@@ -378,19 +379,19 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const gridCreateAction: DataGridCreateAction | undefined = canWrite
     ? viewId === "m1-warehouses"
         ? {
-            label: "新增",
+            label: BUTTON_ADD,
             description: "新建仓库",
             onClick: () => setCrudTarget({ kind: "warehouse", mode: "create" }),
           }
         : viewId === "m1-zones"
           ? {
-              label: "新增",
+              label: BUTTON_ADD,
               description: "新建库区",
               onClick: () => setCrudTarget({ kind: "zone", mode: "create" }),
             }
         : viewId === "m1-locations"
           ? {
-              label: "新增",
+              label: BUTTON_ADD,
               description: "新建库位",
               onClick: () => setCrudTarget({ kind: "location", mode: "create" }),
             }

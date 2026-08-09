@@ -22,6 +22,13 @@ import {
 
 import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import {
+  COLUMN_DOCUMENT_TYPE,
+  COLUMN_OWNER,
+  COLUMN_WAREHOUSE,
+  STATUS_COMPLETED,
+  STATUS_PENDING,
+} from "@/lib/ui-strings";
+import {
   batchInfoFieldDefinitions,
   batchInfoRows,
   inboundDetailFieldSections,
@@ -69,12 +76,12 @@ export function M2InboundDetailDialog({ order, currentOwner, defaultStage, open,
   const selectedProcess = processDetail(selectedStage, expectedQty, currentStage);
   const orderRows: Array<[string, string]> = [
     ["单据状态", statusLabel(order.status)],
-    ["单据类型", inboundDocumentTypeLabel(documentType)],
-    ["货主", ownerLabel(order.owner_id, currentOwner)],
+    [COLUMN_DOCUMENT_TYPE, inboundDocumentTypeLabel(documentType)],
+    [COLUMN_OWNER, ownerLabel(order.owner_id, currentOwner)],
     ["供应商", shortId(order.supplier_id)],
     // 采购员尚未随入库单返回：缺数据展示「-」，不得虚构账号
     ["采购员", "-"],
-    ["仓库", shortId(order.warehouse_id)],
+    [COLUMN_WAREHOUSE, shortId(order.warehouse_id)],
     ["预计到货", formatDateTime(order.expected_arrival_at)],
     ["预报数量", `${expectedQty} 件`],
     ...orderLicenseRows(order),
@@ -168,7 +175,7 @@ function InboundStatusRail({
               <span className="text-sm font-semibold">{label}</span>
               <StatusBadge
                 status={done ? "completed" : active ? "in_progress" : "pending"}
-                label={done ? "已完成" : active ? "当前" : "待处理"}
+                label={done ? STATUS_COMPLETED : active ? "当前" : STATUS_PENDING}
                 size="sm"
               />
             </div>

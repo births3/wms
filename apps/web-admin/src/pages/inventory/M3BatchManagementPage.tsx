@@ -46,6 +46,18 @@ import {
   type InventoryStatusTransition,
 } from "@/features/inventory/inventory-status-config-queries";
 import { useSystemDictionaryItemOptionsQuery } from "@/features/master-data/master-data-queries";
+import {
+  BUTTON_REFRESH,
+  COLUMN_BATCH_NO,
+  COLUMN_CREATED_AT,
+  COLUMN_PRODUCT_CODE,
+  COLUMN_QUALITY_STATUS,
+  COLUMN_STATUS,
+  COLUMN_TEMP_ZONE,
+  FIELD_KEYWORD,
+  FIELD_VALIDITY,
+  LOADING_SUBMITTING,
+} from "@/lib/ui-strings";
 import { useDialogState } from "@/lib/use-dialog-state";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import { M3BatchDetailDialog } from "./M3BatchDetailDialog";
@@ -77,19 +89,19 @@ function buildM3BatchQueryFields(qualityStatusOptions: QualityStatusOption[]): Q
   return [
     {
       key: "keyword",
-      label: "关键字",
+      label: FIELD_KEYWORD,
       type: "text",
       placeholder: "批号 / 商品编码 / 库位",
     },
     {
       key: "productCode",
-      label: "商品编码",
+      label: COLUMN_PRODUCT_CODE,
       type: "text",
       placeholder: "按商品编码模糊查询",
     },
     {
       key: "batchNo",
-      label: "批号",
+      label: COLUMN_BATCH_NO,
       type: "text",
       placeholder: "按批号模糊查询",
     },
@@ -107,13 +119,13 @@ function buildM3BatchQueryFields(qualityStatusOptions: QualityStatusOption[]): Q
     },
     {
       key: "temperatureZone",
-      label: "温区",
+      label: COLUMN_TEMP_ZONE,
       type: "text",
       placeholder: "normal / cool / cold / frozen",
     },
     {
       key: "qualityStatus",
-      label: "质量状态",
+      label: COLUMN_QUALITY_STATUS,
       type: "multiSelect",
       options: qualityStatusOptions,
     },
@@ -136,8 +148,8 @@ function buildM3BatchQueryFields(qualityStatusOptions: QualityStatusOption[]): Q
       ],
     },
     { key: "productionDate", label: "生产日期", type: "dateRange" },
-    { key: "expiryDate", label: "有效期", type: "dateRange" },
-    { key: "createdAt", label: "创建时间", type: "dateRange" },
+    { key: "expiryDate", label: FIELD_VALIDITY, type: "dateRange" },
+    { key: "createdAt", label: COLUMN_CREATED_AT, type: "dateRange" },
   ];
 }
 
@@ -245,7 +257,7 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
   }
 
   const gridRefreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新批号列表",
     disabled: batchesQuery.isFetching,
     onClick: () => {
@@ -265,7 +277,7 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
 
   const statusAction: DataGridToolbarAction = {
     key: "change-status",
-    label: "状态",
+    label: COLUMN_STATUS,
     description: "变更选中库存批次的质量状态",
     disabled: ({ selectedRowKeys }) => {
       const batch = batches.find((item) => item.id === selectedRowKeys[0]);
@@ -512,7 +524,7 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
             <label className="grid gap-1 text-sm">变更原因<Input required value={statusForm.reason} onChange={(event) => setStatusForm((value) => ({ ...value, reason: event.target.value }))} placeholder="说明状态变更原因" /></label>
             <DialogFooter>
               <DialogClose asChild><Button type="button" variant="outline" disabled={statusMutation.isPending}>取消</Button></DialogClose>
-              <Button type="submit" disabled={statusMutation.isPending || !statusForm.targetStatus}>{statusMutation.isPending ? "提交中..." : "确认变更"}</Button>
+              <Button type="submit" disabled={statusMutation.isPending || !statusForm.targetStatus}>{statusMutation.isPending ? LOADING_SUBMITTING : "确认变更"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -712,10 +724,10 @@ function InventoryDimensionSummary({
   const batchNo = queryString(query.batchNo).trim();
   if (!locationCode && !batchNo) return null;
   const dimensionBatches = batches;
-  const totalQty = dimensionBatches.reduce((total, batch) => total + batch.qty_on_hand, 0);
+  const totalQty = dimensionBatches.reduce((total, batch) => total + Number(batch.qty_on_hand), 0);
   const statusSummary = Object.entries(
     dimensionBatches.reduce<Record<string, number>>((summary, batch) => {
-      summary[batch.quality_status] = (summary[batch.quality_status] ?? 0) + batch.qty_on_hand;
+      summary[batch.quality_status] = (summary[batch.quality_status] ?? 0) + Number(batch.qty_on_hand);
       return summary;
     }, {}),
   ).map(([status, qty]) => `${qualityStatusLabel(status, qualityStatusOptions)} ${qty}`).join("、");

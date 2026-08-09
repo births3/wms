@@ -60,6 +60,15 @@ import {
 } from "./m2-inbound-page-helpers";
 import { M2InboundOrderTable } from "./M2InboundOrderTable";
 import { M2InboundDashboardPage } from "./M2InboundDashboardPage";
+import {
+  BUTTON_ADD,
+  BUTTON_REFRESH,
+  COLUMN_CREATED_AT,
+  COLUMN_DOCUMENT_TYPE,
+  COLUMN_OWNER,
+  COLUMN_STATUS,
+  FIELD_KEYWORD,
+} from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export type { M2InboundMode } from "./m2-inbound-page-helpers";
@@ -155,19 +164,19 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const m2InboundQueryFields: QueryPanelField[] = React.useMemo(() => [
     {
       key: "keyword",
-      label: "关键字",
+      label: FIELD_KEYWORD,
       type: "text",
       placeholder: "ASN / 商品 / 批号 / 单据类型",
     },
     {
       key: "ownerKeyword",
-      label: "货主",
+      label: COLUMN_OWNER,
       type: "text",
       placeholder: "货主编码 / ID",
     },
     {
       key: "documentTypeFilter",
-      label: "单据类型",
+      label: COLUMN_DOCUMENT_TYPE,
       type: "multiSelect",
       options: [
         { value: "purchase_inbound", label: "采购入库" },
@@ -176,7 +185,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     },
     {
       key: "statusFilter",
-      label: "状态",
+      label: COLUMN_STATUS,
       type: "multiSelect",
       options: statusFilterOptions(mode),
     },
@@ -187,7 +196,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     },
     {
       key: "createdAt",
-      label: "创建时间",
+      label: COLUMN_CREATED_AT,
       type: "dateRange",
     },
   ], [mode]);
@@ -471,7 +480,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           product_code: createForm.productCode.trim(),
           product_id: null,
           batch_no: createAsnBatchNo(documentType, createForm.batchNo),
-          expected_qty: toInteger(createForm.expectedQty),
+          expected_qty: String(toInteger(createForm.expectedQty)),
           production_date: createForm.productionDate || null,
           expiry_date: createForm.expiryDate || null,
         },
@@ -491,9 +500,9 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     await receiveMutation.mutateAsync({
       id: order.id,
       request: {
-        actual_qty: toInteger(receiveForm.actualQty),
-        shortage_qty: toInteger(receiveForm.shortageQty),
-        rejected_qty: toInteger(receiveForm.rejectedQty),
+        actual_qty: String(toInteger(receiveForm.actualQty)),
+        shortage_qty: String(toInteger(receiveForm.shortageQty)),
+        rejected_qty: String(toInteger(receiveForm.rejectedQty)),
         arrival_temperature_celsius: coldChain && receiveForm.temperature !== "" ? Number(receiveForm.temperature) : null,
         exception_note: receiveForm.note.trim() || null,
         details: {
@@ -561,8 +570,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
         id: order.id,
         request: {
           batch_no: inspectForm.batchNo.trim(),
-          accepted_qty: toInteger(inspectForm.acceptedQty),
-          rejected_qty: toInteger(inspectForm.rejectedQty),
+          accepted_qty: String(toInteger(inspectForm.acceptedQty)),
+          rejected_qty: String(toInteger(inspectForm.rejectedQty)),
           production_date: inspectForm.productionDate,
           expiry_date: inspectForm.expiryDate,
           quality_status: inspectForm.qualityStatus.trim(),
@@ -571,7 +580,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           package_check: inspectForm.packageCheck.trim() || null,
           instruction_check: inspectForm.instructionCheck.trim() || null,
           label_check: inspectForm.labelCheck.trim() || null,
-          sampling_qty: toInteger(inspectForm.samplingQty || "0"),
+          sampling_qty: String(toInteger(inspectForm.samplingQty || "0")),
           approval_no: inspectForm.approvalNo.trim() || null,
         },
       });
@@ -614,7 +623,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       request: {
         product_code: putawayForm.productCode.trim(),
         batch_no: putawayForm.batchNo.trim(),
-        qty,
+        qty: String(qty),
         location_id: location.id,
         location_code: locationCode,
         quality_status: putawayForm.qualityStatus.trim(),
@@ -626,7 +635,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   }
   const pageMeta = inboundPageMeta(mode);
   const tableRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     onClick: () => {
       void refreshInbound();
     },
@@ -634,7 +643,7 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   const tableCreateAction =
     mode === "receiving"
       ? {
-          label: "新增",
+          label: BUTTON_ADD,
           description: "新建 ASN",
           onClick: openCreateDialog,
         }

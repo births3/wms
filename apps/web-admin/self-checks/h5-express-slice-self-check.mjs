@@ -30,7 +30,7 @@ assert.doesNotMatch(carriersGrid, /label:\s*"取消"/, "快递商配置表不得
 assert.doesNotMatch(carriersGrid, /printAction=/, "快递商配置表不得挂载打印面单动作");
 
 const rulesGrid = pageSource.slice(rulesGridStart);
-assert.match(rulesGrid, /createAction=\{\{ label: "新增"/, "快递选择规则表必须保留新增");
+assert.match(rulesGrid, /createAction=\{\{ label: BUTTON_ADD/, "快递选择规则表必须保留新增");
 assert.match(rulesGrid, /editAction=\{\{/, "快递选择规则表必须保留修改");
 assert.match(rulesGrid, /refreshAction=\{\{/, "快递选择规则表必须保留刷新");
 assert.doesNotMatch(rulesGrid, /label:\s*"下单"/, "快递选择规则表不得挂载运单作业动作");

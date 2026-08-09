@@ -57,7 +57,7 @@ assert.match(querySource, /usePrintTemplateTypesQuery/);
 assert.match(querySource, /usePrintTemplatesQuery/);
 assert.match(querySource, /usePrintFieldDefinitionsQuery/);
 assert.match(querySource, /useSavePrintTemplateMutation/);
-assert.match(querySource, /useResolvePrintTemplateMutation/);
+// useResolvePrintTemplateMutation 已删除：生产无调用（死导出）；resolve 端点断言见下方 querySource 端点面
 assert.match(querySource, /usePrintTemplateVersionsMutation/);
 assert.match(querySource, /usePublishPrintTemplateMutation/);
 assert.match(querySource, /useSetPrintTemplateEnabledMutation/);

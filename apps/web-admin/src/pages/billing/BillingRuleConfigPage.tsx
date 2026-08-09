@@ -91,7 +91,7 @@ export function BillingRuleConfigPage() {
       charge_item: form.charge_item,
       unit: form.unit,
       billing_cycle: form.billing_cycle,
-      unit_price_cents: Number(form.unit_price_cents),
+      unit_price_cents: form.unit_price_cents,
       effective_from: form.effective_from,
       effective_to: form.effective_to,
     };

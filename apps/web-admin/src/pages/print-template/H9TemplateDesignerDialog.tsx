@@ -21,6 +21,8 @@ import {
   type SavePrintTemplateRequest,
 } from "@/features/print-template/print-template-queries";
 
+import { FIELD_SCOPE } from "@/lib/ui-strings";
+
 import { H9HiprintDesigner, type H9HiprintDesignerHandle } from "./H9HiprintDesigner";
 
 export type H9TemplateDesignerMode = "create" | "edit" | "copy";
@@ -215,7 +217,7 @@ export function H9TemplateDesignerDialog({
           ))}
         </select>
       </Field>
-      <Field label="作用域">
+      <Field label={FIELD_SCOPE}>
         <select className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={scope} onChange={(event) => setScope(event.target.value as "global" | "owner")}>
           <option value="global">全局默认</option>
           <option value="owner">货主覆盖</option>

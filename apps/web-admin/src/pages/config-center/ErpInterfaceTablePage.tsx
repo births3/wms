@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  formatDateTime,
   QueryPanel,
   type DataGridColumn,
   type DataGridToolbarAction,
@@ -27,6 +28,10 @@ import {
   type H8ErpInterfaceTableRow,
 } from "@/features/config-center/erp-interface-table-queries";
 import { usePageQueryState } from "@/lib/use-page-query-state";
+import {
+  BUTTON_REFRESH, COLUMN_CREATED_AT,
+  COLUMN_UPDATED_AT, FIELD_WAREHOUSE_ID, STATUS_DEACTIVATED, STATUS_PENDING,
+} from "@/lib/ui-strings";
 
 const TABLES = [
   ["x_wmsinter_GoodsInfo", "商品主数据"],
@@ -63,7 +68,7 @@ const MAIN_TABLES = new Set([
 ]);
 const V19_STATUSES = ["pending", "processing", "awaiting_receipt", "failed", "dead", "acked"];
 const STATUS_LABELS: Record<string, string> = {
-  pending: "待处理",
+  pending: STATUS_PENDING,
   processing: "处理中",
   awaiting_receipt: "技术接收完成",
   failed: "可重试失败",
@@ -73,7 +78,7 @@ const STATUS_LABELS: Record<string, string> = {
   unknown: "未知状态",
   testing: "测试中",
   active: "已启用",
-  disabled: "已停用",
+  disabled: STATUS_DEACTIVATED,
 };
 const DETAIL_FIELD_LABELS: Record<string, string> = {
   id: "记录 ID",
@@ -82,14 +87,14 @@ const DETAIL_FIELD_LABELS: Record<string, string> = {
   business_key: "业务键摘要",
   event_type: "事件类型",
   external_ref: "外部引用",
-  warehouse_id: "仓库 ID",
+  warehouse_id: FIELD_WAREHOUSE_ID,
   wms_resource_id: "WMS 资源 ID",
   sync_status: "同步状态",
   retry_count: "重试次数",
   last_error: "错误摘要",
   idempotency_key: "幂等键",
-  created_at: "创建时间",
-  updated_at: "更新时间",
+  created_at: COLUMN_CREATED_AT,
+  updated_at: COLUMN_UPDATED_AT,
   payload_summary: "报文摘要",
   product_code: "商品编码",
   product_name: "商品名称",
@@ -140,8 +145,8 @@ const columns: DataGridColumn<H8ErpInterfaceTableRow>[] = [
   { key: "retry_count", header: "重试次数", width: 90 },
   { key: "last_error", header: "错误摘要", width: 220, render: (row) => row.last_error ?? "—" },
   { key: "idempotency_key", header: "幂等键", width: 180, render: (row) => row.idempotency_key ?? "—" },
-  { key: "created_at", header: "创建时间", width: 175, render: (row) => new Date(row.created_at).toLocaleString() },
-  { key: "updated_at", header: "更新时间", width: 175, render: (row) => new Date(row.updated_at).toLocaleString() },
+  { key: "created_at", header: COLUMN_CREATED_AT, width: 175, render: (row) => formatDateTime(row.created_at) },
+  { key: "updated_at", header: COLUMN_UPDATED_AT, width: 175, render: (row) => formatDateTime(row.updated_at) },
 ];
 
 const productColumns: DataGridColumn<H8ErpInterfaceTableRow>[] = [
@@ -152,7 +157,7 @@ const productColumns: DataGridColumn<H8ErpInterfaceTableRow>[] = [
   { key: "spec", header: "规格", width: 160, render: (row) => businessValue(row, "spec") },
   { key: "sync_status", header: "同步状态", width: 110, render: (row) => statusLabel(row.sync_status) },
   { key: "retry_count", header: "重试次数", width: 90 },
-  { key: "updated_at", header: "更新时间", width: 175, render: (row) => new Date(row.updated_at).toLocaleString() },
+  { key: "updated_at", header: COLUMN_UPDATED_AT, width: 175, render: (row) => formatDateTime(row.updated_at) },
 ];
 
 type PackagingLevel = {
@@ -217,7 +222,7 @@ function packagingLevels(value: string | null | undefined): PackagingLevel[] | n
 
 function detailValue(key: string, value: string | null | undefined): string {
   if (key === "sync_status") return statusLabel(value);
-  if ((key === "created_at" || key === "updated_at") && value) return new Date(value).toLocaleString();
+  if ((key === "created_at" || key === "updated_at") && value) return formatDateTime(value);
   return value ?? "—";
 }
 
@@ -390,7 +395,7 @@ export function ErpInterfaceTablePage() {
       : field,
     );
   const toolbarActions: DataGridToolbarAction[] = [
-    { key: "refresh", label: "刷新", icon: <RefreshCw className="size-4" aria-hidden />, onClick: () => void listQuery.refetch() },
+    { key: "refresh", label: BUTTON_REFRESH, icon: <RefreshCw className="size-4" aria-hidden />, onClick: () => void listQuery.refetch() },
     { key: "detail", label: "详情", icon: <Eye className="size-4" aria-hidden />, disabled: (ctx) => ctx.selectedRowKeys.length !== 1, onClick: () => selected && setDetailId(selected.row_id) },
   ];
 

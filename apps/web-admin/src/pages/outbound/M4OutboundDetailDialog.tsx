@@ -20,6 +20,15 @@ import {
 } from "@wms/ui";
 import { formatDateTime } from "@/lib/format";
 import {
+  COLUMN_CREATED_AT,
+  COLUMN_DOCUMENT_TYPE,
+  COLUMN_PRODUCT_CODE,
+  COLUMN_TEMP_ZONE,
+  DOC_TYPE_PURCHASE_RETURN,
+  STATUS_COMPLETED,
+  STATUS_PENDING,
+} from "@/lib/ui-strings";
+import {
   statusLabel,
   type DetailTarget,
   type OutboundOrder,
@@ -112,7 +121,7 @@ function deliveryProviderLabel(value: string) {
 }
 
 function documentTypeLabel(value: string) {
-  return value === "purchase_return_outbound" ? "采购退货出库" : "销售出库";
+  return value === "purchase_return_outbound" ? DOC_TYPE_PURCHASE_RETURN : "销售出库";
 }
 
 function WaveDetail({ wave, orders }: { wave: OutboundWave; orders: OutboundOrder[] }) {
@@ -127,9 +136,9 @@ function WaveDetail({ wave, orders }: { wave: OutboundWave; orders: OutboundOrde
           ["明细行数", `${orders.reduce((sum, order) => sum + (order.lines ?? []).length, 0)}`],
           // 路径策略 / 温区 / 容量上限尚无真实字段：展示「-」，不得虚构
           ["路径策略", "-"],
-          ["温区", "-"],
+          [COLUMN_TEMP_ZONE, "-"],
           ["容量上限", "-"],
-          ["创建时间", formatDateTime(wave.created_at)],
+          [COLUMN_CREATED_AT, formatDateTime(wave.created_at)],
         ]}
       />
       <Lines title="波次订单" lines={orders.map((order) => ({
@@ -148,7 +157,7 @@ function ReturnDetail({ returnOrder }: { returnOrder: PurchaseReturnOrder }) {
           title="采购退货信息"
           rows={[
             ["采购退货单号", returnOrder.return_no],
-            ["单据类型", purchaseReturnDocumentTypeLabel(returnOrder.document_type)],
+            [COLUMN_DOCUMENT_TYPE, purchaseReturnDocumentTypeLabel(returnOrder.document_type)],
             ["原采购入库单", returnOrder.source_purchase_order_no],
             ["供应商", returnOrder.supplier_name],
             ["退货原因", returnOrder.reason],
@@ -159,7 +168,7 @@ function ReturnDetail({ returnOrder }: { returnOrder: PurchaseReturnOrder }) {
           title="商品与数量"
           rows={[
             ["当前状态", statusLabel(returnOrder.status)],
-            ["商品编码", returnOrder.product_code],
+            [COLUMN_PRODUCT_CODE, returnOrder.product_code],
             ["数量", `${returnOrder.qty} 件`],
           ]}
         />
@@ -198,7 +207,7 @@ function StatusRail({ labels, activeIndex }: { labels: string[]; activeIndex: nu
               <span className="text-sm font-semibold">{label}</span>
               <StatusBadge
                 status={done ? "completed" : active ? "in_progress" : "pending"}
-                label={done ? "已完成" : active ? "当前" : "待处理"}
+                label={done ? STATUS_COMPLETED : active ? "当前" : STATUS_PENDING}
                 size="sm"
               />
             </div>
@@ -286,7 +295,7 @@ function stageIndex(target: DetailTarget) {
 
 
 function purchaseReturnDocumentTypeLabel(value: PurchaseReturnOrder["document_type"]) {
-  return value === "purchase_return_outbound" ? "采购退货出库" : value;
+  return value === "purchase_return_outbound" ? DOC_TYPE_PURCHASE_RETURN : value;
 }
 
 function purchaseReturnApprovalSourceLabel(value: PurchaseReturnOrder["approval_source"] | string) {
@@ -295,7 +304,7 @@ function purchaseReturnApprovalSourceLabel(value: PurchaseReturnOrder["approval_
 }
 
 function totalPlannedQty(order: OutboundOrder) {
-  return (order.lines ?? []).reduce((sum, line) => sum + line.planned_qty, 0);
+  return (order.lines ?? []).reduce((sum, line) => sum + Number(line.planned_qty), 0);
 }
 
 function shortId(value: string) {

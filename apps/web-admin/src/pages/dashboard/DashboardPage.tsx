@@ -4,6 +4,7 @@ import { Button, Card, CardContent, PageHeader } from "@wms/ui";
 
 import type { AdminView } from "@/app-shell/admin-view";
 import type { CurrentUser } from "@/features/auth/auth-queries";
+import { COLUMN_OWNER } from "@/lib/ui-strings";
 
 const operationKpis = [
   { id: "pending-receiving", label: "待收货", hint: "待办接口未接入", icon: PackageCheck },
@@ -31,7 +32,7 @@ export function Dashboard({
 }: DashboardProps) {
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
-      <PageHeader title="运营总览" subtitle={`货主 ${currentUser.owner_code} · 实时待办接口未接入`} />
+      <PageHeader title="运营总览" subtitle={`${COLUMN_OWNER} ${currentUser.owner_code} · 实时待办接口未接入`} />
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
         <Card className="rounded-lg shadow-sm">
@@ -42,7 +43,7 @@ export function Dashboard({
               <p className="mt-1 text-sm text-muted-foreground">{currentUser.username}</p>
             </div>
             <div className="grid gap-3 text-sm">
-              <InfoRow label="货主" value={currentUser.owner_code} />
+              <InfoRow label={COLUMN_OWNER} value={currentUser.owner_code} />
               <InfoRow label="角色" value={currentUser.roles.join(" / ") || "未分配"} />
               <InfoRow label="权限数" value={`${currentUser.permissions.length}`} />
             </div>

@@ -59,9 +59,16 @@ import {
   validateUpstreamDeliveryFiles,
   type InboundDocumentEntryRow,
 } from "./inbound-document-entry-model";
+import {
+  BUTTON_REFRESH,
+  COLUMN_BATCH_NO,
+  COLUMN_CREATED_AT,
+  FIELD_KEYWORD,
+  LOADING_SAVING,
+} from "@/lib/ui-strings";
 
 export const m2InboundDocumentsQueryFields: QueryPanelField[] = [
-  { key: "keyword", label: "关键字", type: "text", placeholder: "ASN / 采购订单 / 供应商 / 商品 / 批号" },
+  { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "ASN / 采购订单 / 供应商 / 商品 / 批号" },
   { key: "actualReceivedAt", label: "实际收货时间", type: "dateRange" },
   { key: "supplierKeyword", label: "供应商", type: "text", placeholder: "供应商名称 / ID" },
 ];
@@ -195,7 +202,7 @@ export function M2InboundDocumentsPage() {
     },
     {
       key: "createdAt",
-      header: "创建时间",
+      header: COLUMN_CREATED_AT,
       width: 180,
       sortable: true,
       sortValue: (row) => row.createdAt,
@@ -217,7 +224,7 @@ export function M2InboundDocumentsPage() {
     ...(missingUpstreamDelivery ? [{ key: "missingUpstreamDelivery", label: "快捷筛选", value: "上游随货同行单不齐", text: "快捷筛选：上游随货同行单不齐" }] : []),
   ], [appliedQuery, missingDrugInspection, missingUpstreamDelivery]);
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新入库资料清单",
     disabled: documentsQuery.isFetching,
     onClick: () => void documentsQuery.refetch(),
@@ -431,7 +438,7 @@ export function M2InboundDocumentsPage() {
         <TabsList><TabsTrigger value="drug">药检单</TabsTrigger><TabsTrigger value="upstream">上游随货同行单</TabsTrigger></TabsList>
         <TabsContent value="drug" className="mt-4 grid gap-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="批号"><select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={selectedBatch} onChange={(event) => setSelectedBatch(event.target.value)}>{activeRow.batchNos.length ? activeRow.batchNos.map((batchNo) => <option key={batchNo}>{batchNo}</option>) : <option value="">待批号</option>}</select></Field>
+            <Field label={COLUMN_BATCH_NO}><select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={selectedBatch} onChange={(event) => setSelectedBatch(event.target.value)}>{activeRow.batchNos.length ? activeRow.batchNos.map((batchNo) => <option key={batchNo}>{batchNo}</option>) : <option value="">待批号</option>}</select></Field>
             <Field label="当前版本"><Input readOnly value={activeRow.drugInspectionVersion ? `v${activeRow.drugInspectionVersion}` : "未录入"} /></Field>
             <Field label="录入方式"><select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={drugSource} onChange={(event) => { setDrugSource(event.target.value as "upload" | "reuse"); setFiles([]); resetImagePreview(); }}><option value="upload">上传新文件</option><option value="reuse">复用已有药检单</option></select></Field>
             {drugSource === "upload" && <Field label="图片处理方式"><select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={processingMode} onChange={(event) => changeProcessingMode(event.target.value)}><option value="none">不处理</option><option value="color_enhance">原色增强</option><option value="black_white_enhance">黑白增强</option></select></Field>}
@@ -462,7 +469,7 @@ export function M2InboundDocumentsPage() {
             </Field>
           )}
           <VersionNote row={activeRow} kind="drug" />
-          <DialogFooter><DialogClose asChild><Button type="button" variant="outline">取消</Button></DialogClose><Button type="button" disabled={!selectedBatch || saveDrugInspection.isPending || previewStatus === "uploading" || previewStatus === "error"} onClick={() => void submitDrugInspection()}><FileUp className="size-4" aria-hidden />{saveDrugInspection.isPending ? "保存中..." : previewStatus === "uploading" ? "生成预览中..." : "保存药检单"}</Button></DialogFooter>
+          <DialogFooter><DialogClose asChild><Button type="button" variant="outline">取消</Button></DialogClose><Button type="button" disabled={!selectedBatch || saveDrugInspection.isPending || previewStatus === "uploading" || previewStatus === "error"} onClick={() => void submitDrugInspection()}><FileUp className="size-4" aria-hidden />{saveDrugInspection.isPending ? LOADING_SAVING : previewStatus === "uploading" ? "生成预览中..." : "保存药检单"}</Button></DialogFooter>
         </TabsContent>
         <TabsContent value="upstream" className="mt-4 grid gap-4">
           <div className="grid gap-4 md:grid-cols-3">

@@ -3,6 +3,7 @@ import type { components } from "@wms/api-client";
 
 import { ApiError } from "@/features/auth/auth-queries";
 import { api } from "@/lib/api";
+import { ERROR_INBOUND_ORDER_NOT_FOUND } from "@/lib/ui-strings";
 
 export type ReceivingOrder = components["schemas"]["ReceivingOrder"];
 export type ReceivingOrderPrintData = components["schemas"]["ReceivingOrderPrintData"];
@@ -83,8 +84,8 @@ async function getReceivingOrder(id: string): Promise<ReceivingOrder> {
   if (!result.data) {
     if (isDevMockNotFound(result.error) || result.response.status === 404) {
       throw new ApiError(
-        { code: "INBOUND_ORDER_NOT_FOUND", message: "未找到对应入库单，请刷新列表后重试", severity: "error", details: {}, trace_id: "web-admin" },
-        "未找到对应入库单，请刷新列表后重试",
+        { code: "INBOUND_ORDER_NOT_FOUND", message: ERROR_INBOUND_ORDER_NOT_FOUND, severity: "error", details: {}, trace_id: "web-admin" },
+        ERROR_INBOUND_ORDER_NOT_FOUND,
         result.response.status,
       );
     }
@@ -100,8 +101,8 @@ async function getReceivingOrderPrintData(id: string): Promise<ReceivingOrderPri
   if (!result.data) {
     if (isDevMockNotFound(result.error) || result.response.status === 404) {
       throw new ApiError(
-        { code: "INBOUND_ORDER_NOT_FOUND", message: "未找到对应入库单，请刷新列表后重试", severity: "error", details: {}, trace_id: "web-admin" },
-        "未找到对应入库单，请刷新列表后重试",
+        { code: "INBOUND_ORDER_NOT_FOUND", message: ERROR_INBOUND_ORDER_NOT_FOUND, severity: "error", details: {}, trace_id: "web-admin" },
+        ERROR_INBOUND_ORDER_NOT_FOUND,
         result.response.status,
       );
     }
@@ -115,7 +116,7 @@ async function getPutawayRecommendations(
   input: components["schemas"]["PutawayRecommendationQuery"],
 ): Promise<PutawayRecommendationResponse> {
   const result = await api.GET("/api/v1/inbound/receiving-orders/{id}/putaway-recommendations", {
-    params: { path: { id }, query: input },
+    params: { path: { id }, query: { ...input, qty: Number(input.qty) } },
   });
   if (!result.data) throw new ApiError(result.error, "读取推荐库位失败", result.response.status);
   return result.data;
@@ -260,7 +261,7 @@ export function usePutawayRecommendationsQuery(
   input: components["schemas"]["PutawayRecommendationQuery"],
   enabled = true,
 ) {
-  const inputReady = Boolean(input.product_code && input.batch_no && input.quality_status && input.qty > 0);
+  const inputReady = Boolean(input.product_code && input.batch_no && input.quality_status && Number(input.qty) > 0);
   return useQuery<PutawayRecommendationResponse, ApiError>({
     queryKey: id && inputReady ? putawayRecommendationsQueryKey(id, input) : [...receivingOrdersQueryKey, "putaway-recommendations", "none"],
     queryFn: () => getPutawayRecommendations(id ?? "", input),
