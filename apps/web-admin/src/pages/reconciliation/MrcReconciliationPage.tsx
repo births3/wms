@@ -55,6 +55,14 @@ import { MrcReconciliationIsolationDialog } from "./MrcReconciliationIsolationDi
 import { MrcReconciliationRuleDialog } from "./MrcReconciliationRuleDialog";
 import { errorText } from "@/lib/error-text";
 import { queryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
+import {
+  BUTTON_REFRESH,
+  COLUMN_BATCH_NO,
+  COLUMN_CREATED_AT,
+  COLUMN_PRODUCT_CODE,
+  LOADING_PROCESSING,
+  STATUS_PENDING,
+} from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 const differenceOptions = [
   { label: "WMS 多", value: "wms_more" },
@@ -62,7 +70,7 @@ const differenceOptions = [
   { label: "一致", value: "matched" },
 ];
 const resolutionOptions = [
-  { label: "待处理", value: "open" },
+  { label: STATUS_PENDING, value: "open" },
   { label: "等待库存调整", value: "adjustment_pending" },
   { label: "等待 ERP 回执", value: "erp_feedback_pending" },
   { label: "处理异常", value: "exception" },
@@ -72,10 +80,10 @@ const resolutionOptions = [
 ];
 
 const mRcReconciliationQueryFields: QueryPanelField[] = [
-  { key: "productCode", label: "商品编码", type: "text", placeholder: "按商品编码模糊查询" },
+  { key: "productCode", label: COLUMN_PRODUCT_CODE, type: "text", placeholder: "按商品编码模糊查询" },
   { key: "differenceType", label: "差异类型", type: "multiSelect", options: differenceOptions },
   { key: "resolutionStatus", label: "处理状态", type: "multiSelect", options: resolutionOptions },
-  { key: "batchNo", label: "批号", type: "text", placeholder: "按批号模糊查询" },
+  { key: "batchNo", label: COLUMN_BATCH_NO, type: "text", placeholder: "按批号模糊查询" },
 ];
 const mRcReconciliationCoreQueryFieldKeys = [
   "productCode",
@@ -84,8 +92,8 @@ const mRcReconciliationCoreQueryFieldKeys = [
 ];
 
 const columns: DataGridColumn<ReconciliationItem>[] = [
-  textColumn("product_code", "商品编码", 150),
-  textColumn("batch_no", "批号", 150),
+  textColumn("product_code", COLUMN_PRODUCT_CODE, 150),
+  textColumn("batch_no", COLUMN_BATCH_NO, 150),
   numberColumn("wms_qty", "WMS 在库数量"),
   numberColumn("erp_qty", "ERP 账面数量"),
   numberColumn("difference_qty", "差异数量"),
@@ -129,7 +137,7 @@ const columns: DataGridColumn<ReconciliationItem>[] = [
   },
   {
     key: "created_at",
-    header: "创建时间",
+    header: COLUMN_CREATED_AT,
     width: 180,
     render: (row) => new Date(row.created_at).toLocaleString("zh-CN", { hour12: false }),
   },
@@ -177,7 +185,7 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
         : "";
 
   const refreshAction: DataGridRefreshAction = {
-    label: "刷新",
+    label: BUTTON_REFRESH,
     description: "刷新真实对账差异",
     disabled: itemsQuery.isFetching,
     onClick: () => void refresh(),
@@ -275,13 +283,13 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
     if (!resolveDialog) return;
     const allocations = Object.entries(allocationQuantities)
       .filter(([, quantity]) => quantity.trim() !== "")
-      .map(([inventory_batch_id, quantity]) => ({ inventory_batch_id, quantity: Number(quantity) }));
+      .map(([inventory_batch_id, quantity]) => ({ inventory_batch_id, quantity }));
     if (resolveDialog.disposition === "erp_truth"
       && (allocations.length === 0
-        || allocations.some((allocation) => !Number.isInteger(allocation.quantity) || allocation.quantity <= 0)
-        || allocations.reduce((sum, allocation) => sum + allocation.quantity, 0)
-          !== Math.abs(resolveDialog.item.difference_qty))) {
-      setNotice({ type: "error", text: `库存分配必须为正整数，且合计等于差异绝对值 ${Math.abs(resolveDialog.item.difference_qty)}` });
+        || allocations.some((allocation) => !Number.isInteger(Number(allocation.quantity)) || Number(allocation.quantity) <= 0)
+        || allocations.reduce((sum, allocation) => sum + Number(allocation.quantity), 0)
+          !== Math.abs(Number(resolveDialog.item.difference_qty)))) {
+      setNotice({ type: "error", text: `库存分配必须为正整数，且合计等于差异绝对值 ${Math.abs(Number(resolveDialog.item.difference_qty))}` });
       return;
     }
     try {
@@ -453,7 +461,7 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
           </DialogHeader>
           {resolveDialog?.disposition === "erp_truth" && (
             <div className="grid gap-2 text-sm">
-              <span className="font-medium">库存批次分配（合计 {Math.abs(resolveDialog.item.difference_qty)}）</span>
+              <span className="font-medium">库存批次分配（合计 {Math.abs(Number(resolveDialog.item.difference_qty))}）</span>
               {(targetBatchesQuery.data ?? []).map((batch) => (
                 <label key={batch.id} className="grid grid-cols-[1fr_7rem] items-center gap-2">
                   <span>{batch.location_code} · 在库 {batch.qty_on_hand} · {qualityStatusLabel(batch.quality_status)}</span>
@@ -512,7 +520,7 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
               }
               onClick={() => void submitResolve()}
             >
-              {resolveMutation.isPending ? "处理中..." : "确认处理"}
+              {resolveMutation.isPending ? LOADING_PROCESSING : "确认处理"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -567,7 +575,7 @@ function numberColumn(
   key: "wms_qty" | "erp_qty" | "difference_qty",
   header: string,
 ): DataGridColumn<ReconciliationItem> {
-  return { key, header, width: 130, render: (row) => row[key].toLocaleString("zh-CN") };
+  return { key, header, width: 130, render: (row) => Number(row[key]).toLocaleString("zh-CN") };
 }
 
 function differenceLabel(value: string) {
@@ -577,7 +585,7 @@ function differenceLabel(value: string) {
 }
 
 function resolutionLabel(value: string) {
-  if (value === "open") return "待处理";
+  if (value === "open") return STATUS_PENDING;
   if (value === "adjustment_pending") return "等待库存调整";
   if (value === "erp_feedback_pending") return "等待 ERP 回执";
   if (value === "exception") return "处理异常";
