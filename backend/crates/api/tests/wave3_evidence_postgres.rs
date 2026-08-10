@@ -19,6 +19,9 @@ use wms_domain::{
 
 #[path = "support/auth.rs"]
 mod auth_support;
+mod postgres_test_support;
+
+use postgres_test_support::ensure_audit_partition;
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -316,6 +319,7 @@ async fn inbound_chain_persists_inventory_movement_and_audit_end_to_end(pool: Pg
         .with_ymd_and_hms(2026, 7, 12, 9, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let supplier_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
     sqlx::query("INSERT INTO suppliers (id,owner_id,supplier_code,supplier_name,uscc,status) VALUES ($1,$2,'SUP-CHAIN','链路供应商','USCC-CHAIN','active')")

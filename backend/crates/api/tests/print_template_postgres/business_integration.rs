@@ -196,6 +196,7 @@ async fn resolve_http_reports_unpublished_library_and_runtime_field_mismatch(poo
         .with_ymd_and_hms(2026, 7, 26, 19, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let openapi = serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI should serialize");
     let draft_library = repo
         .generate_field_library_draft(

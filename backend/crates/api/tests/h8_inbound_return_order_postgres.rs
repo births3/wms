@@ -129,7 +129,7 @@ async fn return_order_rest_maps_persists_batch_and_replays_one_resource(pool: Pg
         "customer_id": supplier_id,
         "supplier_id": null,
         "product_code": product_code,
-        "expected_qty": 2,
+        "expected_qty": "2",
         "expected_arrival_at": Utc::now() + Duration::days(1),
         "batch_no": "ERP-ORIGINAL-BATCH-001"
     });
@@ -166,7 +166,7 @@ async fn return_order_rest_maps_persists_batch_and_replays_one_resource(pool: Pg
     assert_eq!(replay["wms_resource_id"], first["wms_resource_id"]);
 
     let mut changed = body.clone();
-    changed["expected_qty"] = Value::from(3);
+    changed["expected_qty"] = Value::from("3");
     let conflict = app
         .oneshot(request(&changed, &idempotency_key))
         .await
@@ -262,7 +262,7 @@ async fn return_order_rest_rejects_unmapped_type_before_business_write(pool: PgP
         "customer_id": supplier_id,
         "supplier_id": null,
         "product_code": product_code,
-        "expected_qty": 1,
+        "expected_qty": "1",
         "expected_arrival_at": Utc::now() + Duration::days(1),
         "batch_no": "ERP-ORIGINAL-BATCH-002"
     });
@@ -312,7 +312,7 @@ async fn return_order_rest_rejects_missing_original_batch_before_message_write(p
         "customer_id": Uuid::new_v4(),
         "supplier_id": null,
         "product_code": "H8-RET-P-MISSING-BATCH",
-        "expected_qty": 1,
+        "expected_qty": "1",
         "expected_arrival_at": Utc::now() + Duration::days(1),
         "batch_no": ""
     });

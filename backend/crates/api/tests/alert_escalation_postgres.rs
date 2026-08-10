@@ -13,6 +13,9 @@ use wms_api::{
 };
 use wms_domain::{AlertEscalationLevelDraft, UpsertAlertEscalationRuleRequest};
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 #[derive(Clone, Default)]
 struct RecordingProvider {
     recipients: Arc<Mutex<Vec<String>>>,
@@ -37,6 +40,7 @@ async fn upsert_alert_escalation_rule_limits_levels_and_job_escalates_once_then_
         .with_ymd_and_hms(2026, 7, 15, 10, 0, 0)
         .single()
         .expect("fixed escalation timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     seed_owner_manager_and_h4(&pool, owner_id, manager_id).await;
     let ctx = AuthContext {
         user_id: manager_id,
@@ -148,6 +152,7 @@ async fn l3_repeats_every_24_hours_and_empty_off_hours_route_falls_back_to_syste
         .with_ymd_and_hms(2026, 7, 15, 22, 0, 0)
         .single()
         .expect("fixed off-hours timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     seed_owner_manager_and_h4(&pool, owner_id, manager_id).await;
     seed_system_admin(&pool, owner_id, admin_id).await;
     let ctx = AuthContext {

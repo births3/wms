@@ -5,6 +5,7 @@ async fn h8_product_change_replays_without_duplicate_update_or_audit(pool: PgPoo
         .with_ymd_and_hms(2026, 7, 23, 9, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     seed_product(
         &pool,
         owner_id,

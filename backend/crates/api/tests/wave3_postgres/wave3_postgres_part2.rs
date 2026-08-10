@@ -198,9 +198,9 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
     let closed: (i64, i64, i64, Option<String>, String, i64) = sqlx::query_as(
         r#"
         SELECT
-            receipt.actual_qty,
-            receipt.shortage_qty,
-            receipt.rejected_qty,
+            receipt.actual_qty::BIGINT,
+            receipt.shortage_qty::BIGINT,
+            receipt.rejected_qty::BIGINT,
             receipt.exception_note,
             orders.status,
             (SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $2 AND idempotency_key = 'idem-reject-1')
@@ -238,7 +238,7 @@ async fn receiving_order_reject_closes_order_and_replays_idempotently(pool: PgPo
         "外包装严重破损，整单拒收"
     );
     assert_eq!(audit_diff["after"]["status"], "closed_rejected");
-    assert_eq!(audit_diff["after"]["rejected_qty"], 10);
+    assert_eq!(audit_diff["after"]["rejected_qty"], "10.0000");
 
     let receiving_order = repo
         .create_receiving_order(

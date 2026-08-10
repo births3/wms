@@ -28,6 +28,9 @@ use wms_domain::{
     SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -63,6 +66,7 @@ async fn published_library(
     now: chrono::DateTime<Utc>,
     key: &str,
 ) -> wms_api::print_template::PrintFieldLibraryVersion {
+    ensure_audit_partition(pool, now).await;
     let openapi = serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI should serialize");
     let draft = repo
         .generate_field_library_draft(

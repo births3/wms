@@ -15,6 +15,9 @@ use wms_domain::{
     UpdateReceivingOrderRequest,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -170,6 +173,7 @@ async fn delete_receiving_order_is_owner_scoped_draft_only_and_audited(pool: PgP
         .with_ymd_and_hms(2026, 7, 11, 12, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
     let order = repo
         .create_receiving_order(

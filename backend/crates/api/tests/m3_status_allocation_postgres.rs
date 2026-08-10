@@ -369,7 +369,7 @@ async fn quarantined_inventory_is_not_allocated_to_outbound_wave(pool: PgPool) {
         r#"
         SELECT
             (SELECT quality_status FROM inventory_batches WHERE id = $1),
-            (SELECT qty_locked FROM inventory_batches WHERE id = $1),
+            (SELECT qty_locked::BIGINT FROM inventory_batches WHERE id = $1),
             (SELECT COUNT(*) FROM inventory_allocations WHERE owner_id = $2 AND outbound_order_id = $3)
         "#,
     )

@@ -7,6 +7,7 @@ async fn browser_print_masks_sensitive_data_and_counts_retries(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 26, 16, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let openapi = serde_json::to_value(ApiDoc::openapi()).expect("OpenAPI should serialize");
     let draft = repo
         .generate_field_library_draft(

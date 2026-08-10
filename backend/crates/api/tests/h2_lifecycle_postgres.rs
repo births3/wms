@@ -11,6 +11,9 @@ use wms_api::{
     },
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn audit_archive_cycle_is_idempotent_and_audited(pool: PgPool) {
     let owner_id = Uuid::new_v4();
@@ -18,6 +21,7 @@ async fn audit_archive_cycle_is_idempotent_and_audited(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 1, 1, 0, 0)
         .single()
         .expect("fixed UTC archive timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     for partition_start in ["2020-01-01", "2025-01-01"] {
         sqlx::query("SELECT create_audit_partition($1)")
             .bind(
@@ -64,6 +68,7 @@ async fn event_bus_delivers_by_pattern_and_dead_letters_after_retries(pool: PgPo
         .with_ymd_and_hms(2026, 7, 1, 2, 0, 0)
         .single()
         .expect("fixed UTC event timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     upsert_event_subscription(
         &pool,
         owner_id,
@@ -143,6 +148,7 @@ async fn event_bus_acknowledges_and_replays_deliveries(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 1, 2, 30, 0)
         .single()
         .expect("fixed UTC event timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     upsert_event_subscription(
         &pool,
         owner_id,
@@ -220,6 +226,7 @@ async fn audit_write_publishes_audit_event_to_subscribers(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 1, 3, 0, 0)
         .single()
         .expect("fixed UTC audit timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     upsert_event_subscription(
         &pool,
         owner_id,
@@ -284,6 +291,7 @@ async fn business_retention_policy_plans_archive_without_delete(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 1, 4, 0, 0)
         .single()
         .expect("fixed UTC retention timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     let policies = seed_default_business_retention_policies(&pool, owner_id, now)
         .await
         .expect("default policies should seed");

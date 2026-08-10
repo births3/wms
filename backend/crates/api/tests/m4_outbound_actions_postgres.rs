@@ -12,7 +12,10 @@ use wms_domain::{CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, Out
 
 #[path = "support/h9.rs"]
 mod h9_support;
+mod postgres_test_support;
+
 use h9_support::seed_outbound_route_binding;
+use postgres_test_support::ensure_audit_partition;
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -115,6 +118,7 @@ async fn create_confirmed_order(
     now: chrono::DateTime<Utc>,
     idempotency_key: &str,
 ) -> OutboundOrder {
+    ensure_audit_partition(pool, now).await;
     let customer_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
     let delivery_address_id =
@@ -435,7 +439,7 @@ async fn m4_release_wave_locks_inventory_creates_pick_tasks_and_rejects_released
         r#"SELECT
              (SELECT status FROM outbound_waves WHERE owner_id = $1 AND id = $2),
              (SELECT status FROM outbound_orders WHERE owner_id = $1 AND id = $3),
-             (SELECT qty_locked FROM inventory_batches WHERE owner_id = $1 AND product_code = 'P-RL-001' AND batch_no = 'B-RL-001'),
+             (SELECT qty_locked::BIGINT FROM inventory_batches WHERE owner_id = $1 AND product_code = 'P-RL-001' AND batch_no = 'B-RL-001'),
              (SELECT COUNT(*) FROM outbound_pick_tasks WHERE owner_id = $1 AND wave_id = $2),
              (SELECT COUNT(*) FROM inventory_allocations WHERE owner_id = $1 AND outbound_order_id = $3 AND status = 'locked'),
              (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'release_outbound_wave' AND resource_id = $2::text)"#,

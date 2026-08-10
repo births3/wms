@@ -8,6 +8,9 @@ use wms_api::{
 };
 use wms_domain::{CreateDockImportRequest, CreateDockRequest, UpdateDockRequest};
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -62,6 +65,7 @@ fn request(warehouse_id: Uuid, code: &str) -> CreateDockRequest {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn dock_create_and_list_respect_warehouse_owner_boundary(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
     let owner_id = Uuid::new_v4();
     let second_owner = Uuid::new_v4();
     let first_warehouse = warehouse(&pool, owner_id, "WH-1").await;
@@ -120,6 +124,7 @@ async fn dock_create_and_list_respect_warehouse_owner_boundary(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn dock_update_changes_status_and_maintenance_recovery_date(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
     let owner_id = Uuid::new_v4();
     let warehouse_id = warehouse(&pool, owner_id, "WH-1").await;
     let repo = PgDockRepository::new(pool.clone());
@@ -162,6 +167,7 @@ async fn dock_update_changes_status_and_maintenance_recovery_date(pool: PgPool) 
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn dock_import_is_transactional_and_delete_respects_active_appointments(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
     let owner_id = Uuid::new_v4();
     let warehouse_id = warehouse(&pool, owner_id, "WH-IMPORT").await;
     let repo = PgDockRepository::new(pool.clone());

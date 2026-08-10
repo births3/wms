@@ -16,6 +16,9 @@ use wms_api::{
 };
 use wms_domain::CreateAlertDefinitionRequest;
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 #[derive(Clone, Default)]
 struct RecordingProvider {
     recipients: Arc<Mutex<Vec<String>>>,
@@ -54,6 +57,7 @@ async fn h2_event_creates_notifies_and_silences_alert_instance(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 15, 8, 0, 0)
         .single()
         .expect("fixed alert timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     seed_owner_manager_and_h4(&pool, owner_id, manager_id).await;
     upsert_event_subscription(&pool, owner_id, "hal-alert-engine", "business.*", true, now)
         .await
@@ -185,6 +189,7 @@ async fn recipient_acknowledges_handles_closes_ignores_and_stale_alerts_auto_clo
         .with_ymd_and_hms(2026, 7, 15, 9, 0, 0)
         .single()
         .expect("fixed lifecycle timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     seed_owner_manager_and_h4(&pool, owner_id, manager_id).await;
     let definition_id: Uuid = sqlx::query_scalar(
         "SELECT id FROM alert_definitions WHERE owner_id = $1 ORDER BY alert_code LIMIT 1",
@@ -325,6 +330,7 @@ async fn h4_retry_exhaustion_marks_failure_and_creates_secondary_alert(pool: PgP
         .with_ymd_and_hms(2026, 7, 15, 10, 0, 0)
         .single()
         .expect("fixed retry timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     seed_owner_manager_and_h4(&pool, owner_id, manager_id).await;
     upsert_event_subscription(&pool, owner_id, "hal-alert-engine", "business.*", true, now)
         .await

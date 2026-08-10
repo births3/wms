@@ -13,6 +13,9 @@ use wms_domain::{
     RollbackAdminMenuRequest, UpdateAdminMenuNodeRequest, UpsertAdminMenuButtonPermissionRequest,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     ctx_with_permissions(
         owner_id,
@@ -61,6 +64,7 @@ async fn seeded_drug_inspection_menu_nodes_can_be_saved(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 26, 10, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
 
     let (published, _) = service
         .list_published_tree(&pool, &auth)
@@ -175,6 +179,7 @@ async fn admin_menu_draft_publish_batch_enable_rollback_is_idempotent_and_audite
         .with_ymd_and_hms(2026, 7, 5, 10, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
 
     let (published, version_no) = service
         .list_published_tree(&pool, &auth)

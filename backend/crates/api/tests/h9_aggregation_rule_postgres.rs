@@ -12,6 +12,9 @@ use wms_domain::{
     TestAggregationRuleRequest,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -426,7 +429,7 @@ async fn outbound_creation_persists_all_configurable_aggregation_fields(pool: Pg
             "line_no": 1,
             "product_code": "P-H9-007",
             "batch_no": "B-H9-007",
-            "planned_qty": 1
+            "planned_qty": "1"
         }]
     }))
     .expect("production request should deserialize");
@@ -488,6 +491,11 @@ async fn seed_scope(
     customer_id: Uuid,
     address_id: Uuid,
 ) {
+    let audit_time = Utc
+        .with_ymd_and_hms(2026, 7, 1, 0, 0, 0)
+        .single()
+        .expect("valid audit partition time");
+    ensure_audit_partition(pool, audit_time).await;
     sqlx::query(
         "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, 'H9007', 'H9 规则测试货主')",
     )

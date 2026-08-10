@@ -16,6 +16,9 @@ use wms_domain::{
     SYSTEM_DICTIONARY_DOCUMENT_TYPE, SYSTEM_DICTIONARY_PRINT_TEMPLATE_TYPE,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -53,11 +56,14 @@ async fn document_type_presets_are_queryable(pool: PgPool) {
     assert_eq!(
         codes,
         vec![
+            "other_inbound",
+            "other_outbound",
             "purchase_inbound",
             "purchase_return_outbound",
             "quality_liaison",
             "sales_outbound",
             "sales_return",
+            "sample_outbound",
             "stock_loss",
             "stock_surplus"
         ]
@@ -226,6 +232,7 @@ async fn print_template_type_create_update_disable_are_idempotent_and_audited(po
         .with_ymd_and_hms(2026, 7, 6, 10, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let request = UpsertSystemDictionaryItemRequest {
         owner_id: Some(owner_id),
         item_name: "货主商品标签".to_string(),
@@ -464,6 +471,7 @@ async fn special_drug_category_write_replays_once_and_is_queryable_with_one_audi
         .with_ymd_and_hms(2026, 7, 6, 9, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let request = UpsertSystemDictionaryItemRequest {
         owner_id: Some(owner_id),
         item_name: "货主管制药品".to_string(),

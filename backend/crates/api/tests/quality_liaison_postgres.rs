@@ -550,7 +550,7 @@ async fn approved_destruction_disposition_creates_msa_order_with_quality_source(
                     "action":"create_stock_loss",
                     "warehouse_id":warehouse_id,
                     "batch_id":batch_id,
-                    "quantity":2,
+                    "quantity":"2",
                     "reason_code":"destruction"
                 }),
             },
@@ -601,7 +601,7 @@ async fn approved_destruction_disposition_creates_msa_order_with_quality_source(
                     "action":"create_stock_loss",
                     "warehouse_id":warehouse_id,
                     "batch_id":batch_id,
-                    "quantity":11,
+                    "quantity":"11",
                     "reason_code":"destruction"
                 }),
             },

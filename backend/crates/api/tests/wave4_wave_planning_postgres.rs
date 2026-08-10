@@ -12,7 +12,10 @@ use wms_domain::{
 
 #[path = "support/h9.rs"]
 mod h9_support;
+mod postgres_test_support;
+
 use h9_support::seed_outbound_route_binding;
+use postgres_test_support::ensure_audit_partition;
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -147,7 +150,7 @@ async fn outbound_wave_release_persists_tasks_locks_audit_and_replays(pool: PgPo
              (SELECT COUNT(*) FROM outbound_pick_tasks WHERE owner_id = $1 AND wave_id = $2),
              (SELECT COALESCE(SUM(planned_qty), 0)::BIGINT FROM outbound_pick_tasks WHERE owner_id = $1 AND wave_id = $2),
              (SELECT MIN(location_code) FROM outbound_pick_tasks WHERE owner_id = $1 AND wave_id = $2),
-             (SELECT qty_locked FROM inventory_batches WHERE owner_id = $1 AND product_code = 'P-WAVE-001' AND batch_no = 'B-WAVE-001'),
+             (SELECT qty_locked::BIGINT FROM inventory_batches WHERE owner_id = $1 AND product_code = 'P-WAVE-001' AND batch_no = 'B-WAVE-001'),
              (SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = 'create_outbound_wave' AND resource_type = 'outbound_order')"#,
     )
     .bind(owner_id)
@@ -191,6 +194,7 @@ async fn h8_outbound_order_create_replays_without_duplicate_lines(pool: PgPool) 
         .with_ymd_and_hms(2026, 7, 23, 9, 30, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let customer_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
     let delivery_address_id =

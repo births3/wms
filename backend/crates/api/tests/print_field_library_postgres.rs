@@ -20,6 +20,9 @@ use wms_api::{
     ApiDoc,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -139,6 +142,7 @@ async fn openapi_draft_metadata_publish_versioning_and_audit_are_closed(pool: Pg
         .with_ymd_and_hms(2026, 7, 26, 13, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let openapi = current_openapi();
 
     let draft = repo

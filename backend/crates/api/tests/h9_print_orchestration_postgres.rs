@@ -20,6 +20,9 @@ use wms_domain::{
     PublishRouteBindingRequest, WeeklyCutoffSlot,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 const DELIVERY_NOTE_SUBJECT: &str = "print_document_category:delivery_note";
 
 fn at(month: u32, day: u32, hour: u32, minute: u32) -> DateTime<Utc> {
@@ -40,6 +43,7 @@ fn ctx(owner_id: Uuid) -> AuthContext {
 }
 
 async fn seed_scope(pool: &PgPool) -> (Uuid, Uuid, Uuid, Uuid) {
+    ensure_audit_partition(pool, at(7, 1, 0, 0)).await;
     let owner_id = Uuid::new_v4();
     let warehouse_id = Uuid::new_v4();
     let customer_id = Uuid::new_v4();

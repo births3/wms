@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-const STATIC_SCHEMA_FINGERPRINT: &str = "63fd1daab6ad7b04d1bea02b310e8ca7";
+const STATIC_SCHEMA_FINGERPRINT: &str = "17b77524e9efd043c014067c8f20aea6";
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: PgPool) {
@@ -19,7 +19,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL relations");
-    assert_eq!(static_table_count, 192);
+    assert_eq!(static_table_count, 195);
 
     let static_index_count: i64 = sqlx::query_scalar(
         r#"
@@ -37,7 +37,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL indexes");
-    assert_eq!(static_index_count, 564);
+    assert_eq!(static_index_count, 579);
 
     let fingerprint: String = sqlx::query_scalar(
         r#"
@@ -102,7 +102,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL constraints");
-    assert_eq!(constraint_count, 1159);
+    assert_eq!(constraint_count, 1175);
 
     let (permission_count, category_count, item_count): (i64, i64, i64) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM auth_permissions), (SELECT count(*) FROM system_dictionary_categories), (SELECT count(*) FROM system_dictionary_items)",
@@ -112,5 +112,5 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .expect("read migration seed rows");
     assert_eq!(permission_count, 126);
     assert_eq!(category_count, 11);
-    assert_eq!(item_count, 46);
+    assert_eq!(item_count, 49);
 }

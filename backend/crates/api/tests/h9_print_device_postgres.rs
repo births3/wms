@@ -11,6 +11,9 @@ use wms_domain::{
     UpdatePrinterRequest, UpdatePrinterTrayRequest,
 };
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid, permissions: &[&str]) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -23,6 +26,11 @@ fn ctx(owner_id: Uuid, permissions: &[&str]) -> AuthContext {
 }
 
 async fn seed_owner(pool: &PgPool, owner_id: Uuid, code: &str) {
+    let audit_time = Utc
+        .with_ymd_and_hms(2026, 7, 1, 0, 0, 0)
+        .single()
+        .expect("valid audit partition time");
+    ensure_audit_partition(pool, audit_time).await;
     sqlx::query(
         "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, 'H9 设备测试货主')",
     )

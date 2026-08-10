@@ -473,7 +473,7 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
     assert_eq!(execution_evidence.1, approval_id);
     let putaway_task: (String, String, String, i64, Uuid) = sqlx::query_as(
         r#"
-        SELECT task_type_code, status, product_code, planned_qty, source_doc_id
+        SELECT task_type_code, status, product_code, planned_qty::BIGINT, source_doc_id
           FROM warehouse_tasks
          WHERE owner_id = $1
            AND source_doc_type = 'receiving_order'

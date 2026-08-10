@@ -9,6 +9,9 @@ use wms_api::{
 };
 use wms_domain::{CreatePurchaseReturnRequest, PurchaseReturnOrder, RejectPurchaseReturnRequest};
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -75,6 +78,7 @@ async fn m4_purchase_return_full_lifecycle_with_audit_evidence(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 26, 9, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
 
     let created = create_return(&repo, &ctx, "PRTN-M4-LC-0001", now, "prtn-create-1").await;
     assert_eq!(created.status, "pending_approval");
@@ -169,6 +173,7 @@ async fn m4_purchase_return_create_rejects_duplicate_return_no(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 26, 10, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
 
     create_return(&repo, &ctx, "PRTN-M4-DUP-0001", now, "prtn-dup-1").await;
 
@@ -199,11 +204,12 @@ async fn m4_purchase_return_create_rejects_duplicate_return_no(pool: PgPool) {
 async fn m4_purchase_return_create_rejects_blank_required_fields(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = ctx(owner_id);
-    let repo = PgWave4Repository::new(pool);
+    let repo = PgWave4Repository::new(pool.clone());
     let now = Utc
         .with_ymd_and_hms(2026, 7, 26, 10, 30, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
 
     type BlankCase = (&'static str, fn(&mut CreatePurchaseReturnRequest));
     let blank_cases: [BlankCase; 5] = [
@@ -248,6 +254,7 @@ async fn m4_purchase_return_idempotent_replay_and_conflict(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 26, 11, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
 
     // 创建幂等重放：同键同请求返回同一单据且不重复落库。
     let request = create_request("PRTN-M4-IDEM-0001");
@@ -320,6 +327,7 @@ async fn m4_purchase_return_reject_requires_reason_and_cancels(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 26, 12, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let created = create_return(&repo, &ctx, "PRTN-M4-RJ-0001", now, "prtn-rj-create").await;
 
     // 空白驳回原因 → 422。
@@ -382,6 +390,7 @@ async fn m4_purchase_return_actions_reject_illegal_preconditions(pool: PgPool) {
         .with_ymd_and_hms(2026, 7, 26, 13, 0, 0)
         .single()
         .expect("valid time");
+    ensure_audit_partition(&pool, now).await;
     let created = create_return(&repo, &ctx, "PRTN-M4-ILL-0001", now, "prtn-ill-create").await;
 
     // pending_approval：拣货 / 复核 / 出库交接均为非法前置状态。

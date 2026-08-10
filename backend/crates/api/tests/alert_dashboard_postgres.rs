@@ -10,6 +10,9 @@ use wms_api::{
 };
 use wms_domain::{AlertInstanceListQuery, CreateAlertExportRequest};
 
+mod postgres_test_support;
+use postgres_test_support::ensure_audit_partition;
+
 #[derive(Clone, Default)]
 struct RecordingProvider {
     recipients: Arc<Mutex<Vec<String>>>,
@@ -32,6 +35,7 @@ async fn dashboard_statistics_gsp_report_and_excel_pdf_exports_are_audited(pool:
         .with_ymd_and_hms(2026, 7, 15, 12, 0, 0)
         .single()
         .expect("fixed dashboard timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     seed_owner_user(&pool, owner_id, user_id).await;
     let definition_id: Uuid = sqlx::query_scalar(
         "SELECT id FROM alert_definitions WHERE owner_id = $1 AND alert_code = 'qualification_expiry_30d'",
@@ -211,6 +215,7 @@ async fn queued_large_export_generates_at_most_100k_and_emails_download_link(poo
         .with_ymd_and_hms(2026, 7, 15, 13, 0, 0)
         .single()
         .expect("fixed async export timestamp should be valid");
+    ensure_audit_partition(&pool, now).await;
     seed_owner_user(&pool, owner_id, user_id).await;
     sqlx::query(
         r#"
