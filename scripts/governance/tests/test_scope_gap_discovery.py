@@ -82,7 +82,7 @@ def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_menu():
     assert result.gaps[0].severity == "block"
 
 
-def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_default_tree_or_route():
+def test_scope_gap_blocks_matrix_frontend_page_that_is_not_routed():
     from check_scope_gap_discovery import AdminNavigation, scan_scope_gaps
 
     result = scan_scope_gaps(
@@ -104,10 +104,7 @@ def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_default_tree_or_ro
     )
 
     assert not result.ok
-    assert [gap.kind for gap in result.gaps] == [
-        "frontend_page_not_in_default_menu_tree",
-        "frontend_page_not_routed",
-    ]
+    assert [gap.kind for gap in result.gaps] == ["frontend_page_not_routed"]
 
 
 def test_scope_gap_blocks_matrix_frontend_page_that_is_not_in_dev_mock_published_menu():
@@ -416,7 +413,7 @@ def test_scope_gap_navigation_reader_supports_split_app_shell_renderer():
     navigation = read_admin_navigation()
 
     assert "m1-products" in navigation.menu_sections
-    assert "m3-batches" in navigation.default_menu_tree
+    assert navigation.default_menu_tree == {"dashboard"}
     assert "m1-products" in navigation.routed_views
     assert "m3-batches" in navigation.routed_views
 

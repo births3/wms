@@ -20,6 +20,9 @@
 set shell := ["bash", "-cu"]
 set dotenv-load := true
 
+export CARGO_PROFILE_TEST_DEBUG := "0"
+export CARGO_PROFILE_TEST_INCREMENTAL := "false"
+
 # 仓库根目录的绝对路径（所有 worktree 内行为一致）
 ROOT := justfile_directory()
 MAIN_ROOT := "/home/test1/workspace/wms"
@@ -52,7 +55,7 @@ _t1-banner:
 
 _t1-fmt:
     @echo "  · Rust format check"
-    @cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+    @cargo fmt --manifest-path backend/Cargo.toml --all --check
 
 _t1-governance:
     @echo "  · governance T1 checks"
@@ -118,7 +121,7 @@ _t3-integration:
 _t3-governance-l3:
     @echo "  · governance T3 checks"
     @python3 scripts/governance/task_check.py --tier T3 --strict
-    @python3 scripts/governance/capture_visual_snapshots.py --port 15173 --start-server
+    @python3 scripts/governance/capture_visual_snapshots.py --port 15173 --start-server --if-stale
     @python3 scripts/governance/check_visual_regression.py
 
 # ============================================================

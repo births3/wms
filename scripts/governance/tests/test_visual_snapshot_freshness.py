@@ -1,4 +1,5 @@
 """视觉回归 freshness 使用内容摘要，不依赖文件时间。"""
+import json
 import os
 import sys
 from pathlib import Path
@@ -11,7 +12,12 @@ from check_baseline_completeness import (
     _pending_baseline_review_errors,
     _review_metadata_errors,
 )
-from capture_visual_snapshots import _capture
+from capture_visual_snapshots import (
+    _capture,
+    _capture_batch,
+    _pad_screenshot_to_window,
+    _snapshots_are_fresh,
+)
 
 
 def test_source_digest_changes_with_content(tmp_path):
@@ -53,6 +59,80 @@ def test_failed_capture_does_not_reuse_old_png(tmp_path):
 
     assert ok is False
     assert not output.exists()
+
+
+def test_batch_capture_reuses_one_playwright_process(monkeypatch, tmp_path):
+    calls = []
+
+    class Result:
+        returncode = 0
+        stderr = ""
+        stdout = json.dumps(
+            {
+                "results": [
+                    {"tab": "dashboard", "ok": True, "error": ""},
+                    {"tab": "m2-asn", "ok": True, "error": ""},
+                ]
+            }
+        )
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Result()
+
+    monkeypatch.setattr("capture_visual_snapshots.subprocess.run", run)
+    jobs = [
+        {
+            "tab": "dashboard",
+            "url_hash": "#dashboard",
+            "width": 1700,
+            "height": 1100,
+            "out_file": str(tmp_path / "dashboard.png"),
+        },
+        {
+            "tab": "m2-asn",
+            "url_hash": "#m2-asn",
+            "width": 1700,
+            "height": 1100,
+            "out_file": str(tmp_path / "m2-asn.png"),
+        },
+    ]
+
+    results = _capture_batch("/usr/bin/google-chrome", 15173, jobs)
+
+    assert results == {"dashboard": (True, ""), "m2-asn": (True, "")}
+    assert len(calls) == 1
+    payload = json.loads(calls[0][1]["input"])
+    assert payload["chrome"] == "/usr/bin/google-chrome"
+    assert payload["base_url"] == "http://127.0.0.1:15173/"
+    assert [job["tab"] for job in payload["jobs"]] == ["dashboard", "m2-asn"]
+
+
+def test_snapshot_freshness_requires_matching_digest_and_complete_files(tmp_path):
+    snapshots = [{"file": "dashboard.png"}, {"file": "m2-asn.png"}]
+    (tmp_path / "dashboard.png").write_bytes(b"png")
+
+    assert not _snapshots_are_fresh(snapshots, tmp_path, "same", "same")
+
+    (tmp_path / "m2-asn.png").write_bytes(b"png")
+
+    assert _snapshots_are_fresh(snapshots, tmp_path, "same", "same")
+    assert not _snapshots_are_fresh(snapshots, tmp_path, "old", "new")
+
+
+def test_pad_screenshot_to_window_preserves_content_and_adds_white_frame(tmp_path):
+    from PIL import Image
+
+    screenshot = tmp_path / "page.png"
+    Image.new("RGB", (2, 1), "red").save(screenshot)
+
+    ok, error = _pad_screenshot_to_window(screenshot, 2, 3)
+
+    assert (ok, error) == (True, "")
+    image = Image.open(screenshot).convert("RGB")
+    assert image.size == (2, 3)
+    assert image.getpixel((0, 0)) == (255, 0, 0)
+    assert image.getpixel((0, 2)) == (255, 255, 255)
 
 
 def test_changed_baseline_requires_review_metadata_in_same_manifest_hunk():
