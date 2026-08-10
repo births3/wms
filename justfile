@@ -112,7 +112,8 @@ _t3-banner:
 
 _t3-integration:
     @echo "  · L3-L5/L8/L11 integration tests"
-    @cargo test --manifest-path backend/Cargo.toml --workspace
+    # CARGO_PROFILE_DEV_DEBUG=0：preflight 编译不生成调试符号，target 体积降 50%+（磁盘受限环境可跑全量）
+    @CARGO_PROFILE_DEV_DEBUG=0 cargo test --manifest-path backend/Cargo.toml --workspace
     @python3 -m pytest scripts/governance/tests -q
     @pnpm --dir apps/web-admin run test:e2e:shell-dev
     @pnpm --dir apps/web-admin run test:e2e:h4-dev
