@@ -13,6 +13,9 @@ export type ApiKeyRotationResponse = components["schemas"]["ApiKeyRotationRespon
 export interface ApiKeyListParams {
   keyword?: string;
   status?: string;
+  /** 服务端页码（1 基）；提供时启用服务端分页，pageSize 缺省 20 */
+  page?: number;
+  pageSize?: number;
 }
 
 export const apiKeyQueryKey = ["h1", "api-keys"] as const;
@@ -26,6 +29,9 @@ export function useApiKeysQuery(params: ApiKeyListParams) {
           query: {
             q: emptyToUndefined(params.keyword),
             status: emptyToUndefined(params.status),
+            // 未显式分页的调用方（全量选项列表）请求上限 200 保持全量语义，避免被后端默认 20 截断
+            page: params.page ?? undefined,
+            page_size: params.page !== undefined ? (params.pageSize ?? 20) : 200,
           },
         },
       });

@@ -90,7 +90,9 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
   const canManage = currentUser.permissions.includes(ROLE_MANAGE_PERMISSION);
   const rolesQuery = useRolesQuery(canManage);
   const permissionsQuery = usePermissionsQuery(canManage);
-  const usersQuery = useRoleUsersQuery(canManage);
+  const [usersPageIndex, setUsersPageIndex] = React.useState(0);
+  const [usersPageSize, setUsersPageSize] = React.useState(20);
+  const usersQuery = useRoleUsersQuery(canManage, { page: usersPageIndex + 1, pageSize: usersPageSize });
   const createMutation = useCreateRoleMutation();
   const updateMutation = useUpdateRoleMutation();
   const deleteMutation = useDeleteRoleMutation();
@@ -98,7 +100,8 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
   const batchMutation = useBatchAssignRolesMutation();
   const createUserMutation = useCreateUserMutation();
   const roles = rolesQuery.data ?? [];
-  const users = usersQuery.data ?? [];
+  const users = usersQuery.data?.data ?? [];
+  const usersTotal = usersQuery.data?.page.total ?? users.length;
   const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
     usePageQueryState<QueryPanelValue>(defaultRoleQuery, normalizeRoleQuery);
   const [selectedRoleId, setSelectedRoleId] = React.useState<string | null>(null);
@@ -343,7 +346,7 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
       </div>
       <RoleDialog open={roleDialogOpen} form={roleForm} roles={roles} saving={createMutation.isPending || updateMutation.isPending} onOpenChange={setRoleDialogOpen} onFormChange={setRoleForm} onSave={() => void saveRole()} />
       <DeleteRoleDialog open={deleteDialogOpen} role={selectedRole} deleting={deleteMutation.isPending} onOpenChange={setDeleteDialogOpen} onDelete={() => void deleteSelectedRole()} />
-      <BatchAssignDialog open={batchDialogOpen} users={users} roles={roles} loading={usersQuery.isPending} selectedUserIds={selectedUserIds} selectedRoleIds={assignRoleIds} saving={batchMutation.isPending} onOpenChange={setBatchDialogOpen} onUsersChange={setSelectedUserIds} onRoleToggle={(id) => setAssignRoleIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} onSave={() => void saveBatchAssignments()} />
+      <BatchAssignDialog open={batchDialogOpen} users={users} roles={roles} loading={usersQuery.isPending} usersPageIndex={usersPageIndex} usersPageSize={usersPageSize} usersTotal={usersTotal} onUsersPageChange={setUsersPageIndex} onUsersPageSizeChange={(pageSize) => { setUsersPageSize(pageSize); setUsersPageIndex(0); }} selectedUserIds={selectedUserIds} selectedRoleIds={assignRoleIds} saving={batchMutation.isPending} onOpenChange={setBatchDialogOpen} onUsersChange={setSelectedUserIds} onRoleToggle={(id) => setAssignRoleIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} onSave={() => void saveBatchAssignments()} />
       <CreateUserDialog open={createUserDialogOpen} roles={roles} saving={createUserMutation.isPending} onOpenChange={setCreateUserDialogOpen} onSave={(form) => void saveUser(form)} />
     </section>
   );
@@ -490,6 +493,11 @@ function BatchAssignDialog({
   users,
   roles,
   loading,
+  usersPageIndex,
+  usersPageSize,
+  usersTotal,
+  onUsersPageChange,
+  onUsersPageSizeChange,
   selectedUserIds,
   selectedRoleIds,
   saving,
@@ -502,6 +510,11 @@ function BatchAssignDialog({
   users: RoleUser[];
   roles: Role[];
   loading: boolean;
+  usersPageIndex: number;
+  usersPageSize: number;
+  usersTotal: number;
+  onUsersPageChange: (pageIndex: number) => void;
+  onUsersPageSizeChange: (pageSize: number) => void;
   selectedUserIds: string[];
   selectedRoleIds: string[];
   saving: boolean;
@@ -520,7 +533,7 @@ function BatchAssignDialog({
       <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader><DialogTitle>批量授权</DialogTitle><DialogDescription>先选择用户，再勾选多个角色；提交后会原子替换这些用户在当前货主下的角色集合。</DialogDescription></DialogHeader>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="space-y-2"><h3 className="text-sm font-semibold">用户（已选 {selectedUserIds.length}）</h3>{loading ? <div className="rounded-md border border-dashed p-5 text-sm text-muted-foreground" role="status">加载用户列表...</div> : <DataGrid columns={columns} data={users} rowKey={(row) => row.user_id} selectedRowKeys={selectedUserIds} onSelectedRowKeysChange={onUsersChange} selectable storageKey="h1-role-permission-users" defaultPageSize={10} emptyTitle="暂无可授权用户" emptyDescription="当前货主没有可用用户。" tableClassName="min-w-[470px]" />}</div>
+          <div className="space-y-2"><h3 className="text-sm font-semibold">用户（已选 {selectedUserIds.length}）</h3>{loading ? <div className="rounded-md border border-dashed p-5 text-sm text-muted-foreground" role="status">加载用户列表...</div> : <DataGrid columns={columns} data={users} rowKey={(row) => row.user_id} selectedRowKeys={selectedUserIds} onSelectedRowKeysChange={onUsersChange} selectable storageKey="h1-role-permission-users" serverPagination={{ pageIndex: usersPageIndex, pageSize: usersPageSize, total: usersTotal, onPageChange: onUsersPageChange, onPageSizeChange: onUsersPageSizeChange }} emptyTitle="暂无可授权用户" emptyDescription="当前货主没有可用用户。" tableClassName="min-w-[470px]" />}</div>
           <div className="space-y-2"><h3 className="text-sm font-semibold">角色（已选 {selectedRoleIds.length}）</h3><div className="space-y-2 rounded-md border p-3">{roles.length === 0 ? <p className="text-sm text-muted-foreground">暂无角色</p> : roles.map((role) => <label key={role.id} className="flex items-start gap-2 text-sm"><Checkbox checked={selectedRoleIds.includes(role.id)} onCheckedChange={() => onRoleToggle(role.id)} /><span className="min-w-0"><span className="block truncate">{role.role_name}</span><span className="block font-mono text-xs text-muted-foreground">{role.role_code}</span></span></label>)}</div></div>
         </div>
         <DialogFooter><Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>取消</Button><Button type="button" disabled={saving || selectedUserIds.length === 0 || selectedRoleIds.length === 0} onClick={onSave}>{saving ? LOADING_SUBMITTING : "确认批量授权"}</Button></DialogFooter>

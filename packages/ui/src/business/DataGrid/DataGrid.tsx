@@ -28,6 +28,7 @@ import {
   toggleHiddenAction,
   type DataGridFloatingPanelPosition,
   type DataGridLogicState,
+  type DataGridPageResult,
 } from "./data-grid-logic";
 import { loadGridSettings, saveGridSettings } from "./data-grid-storage";
 import {
@@ -90,6 +91,7 @@ function DataGridInner<T>(
     columnPasteAction,
     showPrintAction = true,
     showExportAction = true,
+    serverPagination,
     className,
     tableClassName,
     maxHeight,
@@ -243,7 +245,7 @@ function DataGridInner<T>(
     };
   }, [actionSettingsOpen]);
 
-  const page = getDataGridPage({
+  const internalPage = getDataGridPage({
     data,
     columns,
     visibleColumns: settings.visibleColumns,
@@ -252,6 +254,15 @@ function DataGridInner<T>(
     pageIndex,
     pageSize: settings.pageSize,
   });
+  // 服务端分页受控模式：data 已是服务端返回的当前页数据，DataGrid 不自行切页（rows 取完整过滤/排序结果），分页展示与翻页事件由页脚 serverPagination 驱动
+  const page: DataGridPageResult<T> = serverPagination
+    ? {
+        ...internalPage,
+        rows: internalPage.filteredRows,
+        pageIndex: serverPagination.pageIndex,
+        total: serverPagination.total,
+      }
+    : internalPage;
   const columnFilters = settings.columnFilters;
   const visibleKeys = new Set(settings.visibleColumns);
   const copyableKeys = new Set(settings.copyableColumns);
@@ -485,6 +496,7 @@ function DataGridInner<T>(
         selectedCount={selectedKeys.length}
         pageSize={settings.pageSize}
         pageSizeOptions={safePageSizeOptions}
+        serverPagination={serverPagination}
         onExitSummary={() => setSummaryConfig(null)}
         onPageSizeChange={(pageSize) => setSettings((current) => ({ ...current, pageSize }))}
         onPageIndexChange={setPageIndex}

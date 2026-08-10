@@ -171,6 +171,8 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
   const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
     usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
+  const [pageIndex, setPageIndex] = React.useState(0);
+  const [pageSize, setPageSize] = React.useState(20);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [rotateOpen, setRotateOpen] = React.useState(false);
   const [rotateDays, setRotateDays] = React.useState("7");
@@ -178,11 +180,12 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
   const [notice, setNotice] = React.useState<Notice>(null);
   const keyword = queryString(appliedQuery.keyword);
   const status = queryString(appliedQuery.status);
-  const apiKeysQuery = useApiKeysQuery({ keyword, status });
+  const apiKeysQuery = useApiKeysQuery({ keyword, status, page: pageIndex + 1, pageSize });
   const createMutation = useCreateApiKeyMutation();
   const rotateMutation = useRotateApiKeyMutation();
   const revokeMutation = useRevokeApiKeyMutation();
   const rows = apiKeysQuery.data?.data ?? [];
+  const total = apiKeysQuery.data?.page.total ?? rows.length;
   const querySummaryItems = React.useMemo(
     () => buildQueryPanelSummaryItems(apiKeyQueryFields, appliedQuery),
     [appliedQuery],
@@ -233,10 +236,12 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
 
   function applyGridQueryState(queryState: unknown) {
     applyQuery(queryValueFromUnknown(queryState));
+    setPageIndex(0);
   }
 
   function clearGridQueryState() {
     resetQuery();
+    setPageIndex(0);
   }
 
   async function refresh() {
@@ -304,8 +309,8 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
         defaultVisibleFieldKeys={apiKeyCoreQueryFieldKeys}
         value={draftQuery}
         onValueChange={setDraftQuery}
-        onQuery={() => applyQuery(draftQuery)}
-        onReset={resetQuery}
+        onQuery={() => { applyQuery(draftQuery); setPageIndex(0); }}
+        onReset={() => { resetQuery(); setPageIndex(0); }}
       />
       <Card className="rounded-lg shadow-sm">
         <CardContent className="p-5">
@@ -317,6 +322,13 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
             selectable
             selectedRowKeys={selectedRowKeys}
             onSelectedRowKeysChange={setSelectedRowKeys}
+            serverPagination={{
+              pageIndex,
+              pageSize,
+              total,
+              onPageChange: (next) => { setPageIndex(next); setSelectedRowKeys([]); },
+              onPageSizeChange: (next) => { setPageSize(next); setPageIndex(0); setSelectedRowKeys([]); },
+            }}
             caption={apiKeysQuery.isPending ? "加载 API Key..." : undefined}
             emptyTitle={apiKeysQuery.isError ? "读取 API Key 失败" : "暂无 API Key"}
             emptyDescription={apiKeysQuery.isError ? errorText(apiKeysQuery.error, "请检查鉴权和数据库连接") : "请使用创建 Key 录入受控调用方"}

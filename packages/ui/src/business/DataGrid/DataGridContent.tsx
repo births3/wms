@@ -18,7 +18,12 @@ import type {
   DataGridPageResult,
 } from "./data-grid-logic";
 import type { DataGridSummaryTableResult, DataGridSummaryTableRow } from "./data-grid-summary";
-import type { DataGridColumn, DataGridContextMenuState, DataGridQuerySummaryItem } from "./data-grid-types";
+import type {
+  DataGridColumn,
+  DataGridContextMenuState,
+  DataGridQuerySummaryItem,
+  DataGridServerPagination,
+} from "./data-grid-types";
 
 /**
  * DataGridContent — 渲染 DataGrid 主体表格、筛选状态和浮层
@@ -56,6 +61,8 @@ export interface DataGridContentProps<T> {
   onPageSizeChange: (pageSize: number) => void;
   onPageIndexChange: (pageIndex: number) => void;
   onClearSelected: () => void;
+  /** 服务端分页受控模式透传给页脚；未提供时页脚走现有内存分页分支 */
+  serverPagination?: DataGridServerPagination;
   columnFilters: DataGridColumnFilters;
   filterSummaryFields: DataGridFilterSummaryField[];
   onClearColumnFilter: (key: string) => void;
@@ -134,6 +141,7 @@ export function DataGridContent<T>({
   onPageSizeChange,
   onPageIndexChange,
   onClearSelected,
+  serverPagination,
   columnFilters,
   filterSummaryFields,
   onClearColumnFilter,
@@ -242,6 +250,7 @@ export function DataGridContent<T>({
                 onPageSizeChange={onPageSizeChange}
                 onPageIndexChange={onPageIndexChange}
                 onClearSelected={onClearSelected}
+                serverPagination={serverPagination}
               />
             }
           />

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 export type Role = components["schemas"]["RoleResponse"];
 export type Permission = components["schemas"]["PermissionResponse"];
 export type RoleUser = components["schemas"]["RoleUserResponse"];
+export type RoleUserListResponse = components["schemas"]["RoleUserListResponse"];
 export type CreateRoleRequest = components["schemas"]["CreateRoleRequest"];
 export type UpdateRoleRequest = components["schemas"]["UpdateRoleRequest"];
 export type BatchAssignRolesRequest = components["schemas"]["BatchAssignRolesRequest"];
@@ -40,13 +41,27 @@ export function usePermissionsQuery(enabled = true) {
   });
 }
 
-export function useRoleUsersQuery(enabled = true) {
-  return useQuery<RoleUser[], ApiError>({
-    queryKey: [...rolePermissionQueryKey, "users"],
+export interface RoleUsersParams {
+  /** 服务端页码（1 基）；提供时启用服务端分页，pageSize 缺省 20 */
+  page?: number;
+  pageSize?: number;
+}
+
+export function useRoleUsersQuery(enabled = true, params: RoleUsersParams = {}) {
+  return useQuery<RoleUserListResponse, ApiError>({
+    queryKey: [...rolePermissionQueryKey, "users", params],
     queryFn: async () => {
-      const result = await api.GET("/api/v1/auth/users");
+      const result = await api.GET("/api/v1/auth/users", {
+        params: {
+          query: {
+            // 未显式分页的调用方（如双人矩阵确认人选项）请求上限 200 保持全量语义，避免被后端默认 20 截断
+            page: params.page ?? undefined,
+            page_size: params.page !== undefined ? (params.pageSize ?? 20) : 200,
+          },
+        },
+      });
       if (!result.data) throw new ApiError(result.error, "读取用户列表失败", result.response.status);
-      return result.data.items;
+      return result.data;
     },
     enabled,
     retry: false,

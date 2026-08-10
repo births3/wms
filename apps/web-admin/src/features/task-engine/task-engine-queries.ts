@@ -58,11 +58,26 @@ export function useTaskGroupsQuery() {
   });
 }
 
-export function useTaskWorkersQuery() {
+export interface TaskWorkersParams {
+  /** 服务端页码（1 基）；提供时启用服务端分页，pageSize 缺省 20 */
+  page?: number;
+  pageSize?: number;
+}
+
+export function useTaskWorkersQuery(params: TaskWorkersParams = {}) {
   return useQuery<components["schemas"]["TaskWorkerListResponse"], ApiError>({
-    queryKey: [...taskEngineQueryKey, "workers"],
+    queryKey: [...taskEngineQueryKey, "workers", params],
     queryFn: async () => {
-      const result = await api.GET("/api/v1/task-engine/workers");
+      const result = await api.GET("/api/v1/task-engine/workers", {
+        params: {
+          query: {
+            // 当前消费方（分派页成员选择 / 任务组成员勾选）需要完整人员集做资格判定与姓名映射，
+            // 未显式分页时请求上限 200 保持全量语义，避免被后端默认 20 截断
+            page: params.page ?? undefined,
+            page_size: params.page !== undefined ? (params.pageSize ?? 20) : 200,
+          },
+        },
+      });
       if (!result.data) throw new ApiError(result.error, "读取任务组人员失败", result.response.status);
       return result.data;
     },

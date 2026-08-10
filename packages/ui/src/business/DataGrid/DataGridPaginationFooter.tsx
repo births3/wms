@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
+import type { DataGridServerPagination } from "./data-grid-types";
 
 /**
  * DataGridPaginationFooter — DataGrid 分页页脚
@@ -29,6 +30,8 @@ export interface DataGridPaginationFooterProps {
   onPageSizeChange: (pageSize: number) => void;
   onPageIndexChange: (pageIndex: number) => void;
   onClearSelected: () => void;
+  /** 服务端分页受控模式：提供时展示值与翻页/每页条数事件完全由 serverPagination 驱动，内存分页 props 被忽略 */
+  serverPagination?: DataGridServerPagination;
 }
 
 export const DataGridPaginationFooter = React.forwardRef<HTMLDivElement, DataGridPaginationFooterProps>(
@@ -47,10 +50,39 @@ export const DataGridPaginationFooter = React.forwardRef<HTMLDivElement, DataGri
       onPageSizeChange,
       onPageIndexChange,
       onClearSelected,
+      serverPagination,
     },
     ref,
   ) => {
-    const currentPage = pageIndex + 1;
+    const server = serverPagination;
+    // 服务端受控分支：pageCount = ceil(total/pageSize)，rangeStart/rangeEnd 由 pageIndex/pageSize/total 计算
+    const effectivePageSize = server ? server.pageSize : pageSize;
+    const effectivePageCount = server ? Math.max(1, Math.ceil(server.total / effectivePageSize)) : pageCount;
+    const effectivePageIndex = server ? Math.min(Math.max(server.pageIndex, 0), effectivePageCount - 1) : pageIndex;
+    const effectiveTotal = server ? server.total : total;
+    const effectiveRangeStart = server
+      ? effectiveTotal === 0
+        ? 0
+        : effectivePageIndex * effectivePageSize + 1
+      : rangeStart;
+    const effectiveRangeEnd = server
+      ? Math.min((effectivePageIndex + 1) * effectivePageSize, effectiveTotal)
+      : rangeEnd;
+    const currentPage = effectivePageIndex + 1;
+
+    function handlePageSizeChange(value: number) {
+      if (server) {
+        if (server.onPageSizeChange) server.onPageSizeChange(value);
+        else onPageSizeChange(value);
+      } else {
+        onPageSizeChange(value);
+      }
+    }
+
+    function handlePageIndexChange(index: number) {
+      if (server) server.onPageChange(index);
+      else onPageIndexChange(index);
+    }
 
     return (
       <div
@@ -61,7 +93,7 @@ export const DataGridPaginationFooter = React.forwardRef<HTMLDivElement, DataGri
         )}
       >
         <span>
-          {rangeStart}-{rangeEnd} / 共 {total} 条
+          {effectiveRangeStart}-{effectiveRangeEnd} / 共 {effectiveTotal} 条
           {selectable && selectedCount > 0 ? ` · 已选 ${selectedCount} 条` : ""}
         </span>
         <div className="flex flex-wrap items-center gap-2">
@@ -70,7 +102,10 @@ export const DataGridPaginationFooter = React.forwardRef<HTMLDivElement, DataGri
               清空选择
             </Button>
           )}
-          <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number.parseInt(value, 10))}>
+          <Select
+            value={String(effectivePageSize)}
+            onValueChange={(value) => handlePageSizeChange(Number.parseInt(value, 10))}
+          >
             <SelectTrigger className="h-8 w-[116px]" aria-label="每页条数">
               <SelectValue />
             </SelectTrigger>
@@ -83,14 +118,14 @@ export const DataGridPaginationFooter = React.forwardRef<HTMLDivElement, DataGri
             </SelectContent>
           </Select>
           <span>
-            第 {currentPage} / {pageCount} 页
+            第 {currentPage} / {effectivePageCount} 页
           </span>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            disabled={pageIndex === 0}
-            onClick={() => onPageIndexChange(Math.max(0, pageIndex - 1))}
+            disabled={effectivePageIndex === 0}
+            onClick={() => handlePageIndexChange(Math.max(0, effectivePageIndex - 1))}
           >
             <ChevronLeft className="size-4" aria-hidden />
             上一页
@@ -99,8 +134,8 @@ export const DataGridPaginationFooter = React.forwardRef<HTMLDivElement, DataGri
             type="button"
             variant="outline"
             size="sm"
-            disabled={pageIndex >= pageCount - 1}
-            onClick={() => onPageIndexChange(Math.min(pageCount - 1, pageIndex + 1))}
+            disabled={effectivePageIndex >= effectivePageCount - 1}
+            onClick={() => handlePageIndexChange(Math.min(effectivePageCount - 1, effectivePageIndex + 1))}
           >
             下一页
             <ChevronRight className="size-4" aria-hidden />

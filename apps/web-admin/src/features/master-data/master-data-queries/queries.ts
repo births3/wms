@@ -78,6 +78,8 @@ export function useMasterDataRowsQuery(viewId: MasterDataViewId, enabled = true)
     queryKey: [...masterDataQueryKey, viewId],
     queryFn: () => listMasterDataRows(viewId),
     enabled,
+    // 列表接口当前为全量返回，缓存避免切换视图/重挂载重复拉取大表
+    staleTime: 30_000,
   });
 }
 

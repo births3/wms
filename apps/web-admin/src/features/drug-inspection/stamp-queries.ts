@@ -99,7 +99,7 @@ async function listCopyJobs(): Promise<DrugInspectionCustomerCopyJob[]> {
   if (!result.data) {
     throw new ApiError(result.error, "读取客户副本任务失败", result.response.status);
   }
-  return result.data;
+  return result.data.data;
 }
 
 async function listProcessingRules(): Promise<DrugInspectionProcessingRuleVersion[]> {

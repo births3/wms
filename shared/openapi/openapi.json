@@ -2672,6 +2672,30 @@
               "type": "string",
               "nullable": true
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
           }
         ],
         "responses": {
@@ -3766,6 +3790,32 @@
           "auth"
         ],
         "operationId": "list_role_users",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -5362,6 +5412,32 @@
           "cold-chain"
         ],
         "operationId": "list_pending_temperature_excursions",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "温度超标待处置列表",
@@ -6473,6 +6549,30 @@
               "type": "string",
               "nullable": true
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
           }
         ],
         "responses": {
@@ -6481,10 +6581,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DockAppointment"
-                  }
+                  "$ref": "#/components/schemas/DockAppointmentListResponse"
                 }
               }
             }
@@ -7341,16 +7438,39 @@
           "drug-inspection"
         ],
         "operationId": "list_drug_inspection_copy_jobs",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DrugInspectionCustomerCopyJob"
-                  }
+                  "$ref": "#/components/schemas/CopyJobListResponse"
                 }
               }
             }
@@ -7661,6 +7781,30 @@
             "schema": {
               "type": "boolean",
               "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
             }
           }
         ],
@@ -8976,16 +9120,39 @@
           "drug-inspection"
         ],
         "operationId": "list_drug_inspection_review_queue",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DrugInspectionReviewQueueEntry"
-                  }
+                  "$ref": "#/components/schemas/ReviewQueueListResponse"
                 }
               }
             }
@@ -10701,6 +10868,32 @@
           "inbound"
         ],
         "operationId": "list_receiving_orders",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "收货单列表",
@@ -13905,6 +14098,30 @@
               "type": "string",
               "nullable": true
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
           }
         ],
         "responses": {
@@ -14967,6 +15184,30 @@
               "format": "uuid",
               "nullable": true
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
           }
         ],
         "responses": {
@@ -15139,6 +15380,30 @@
             "schema": {
               "type": "string",
               "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
             }
           }
         ],
@@ -15735,6 +16000,32 @@
           "master-data"
         ],
         "operationId": "list_customers",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "客户列表",
@@ -16414,6 +16705,32 @@
           "master-data"
         ],
         "operationId": "list_locations",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "库位列表",
@@ -16697,6 +17014,32 @@
           "master-data"
         ],
         "operationId": "list_products",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "商品列表",
@@ -17023,6 +17366,32 @@
           "master-data"
         ],
         "operationId": "list_special_drug_categories",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "特殊药品分类列表",
@@ -17186,6 +17555,32 @@
           "master-data"
         ],
         "operationId": "list_suppliers",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "供应商列表",
@@ -17492,6 +17887,32 @@
           "master-data"
         ],
         "operationId": "list_warehouse_zones",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "库区列表",
@@ -17681,6 +18102,32 @@
           "master-data"
         ],
         "operationId": "list_warehouses",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "仓库列表",
@@ -20075,6 +20522,32 @@
           "print-devices"
         ],
         "operationId": "list_device_leases",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "设备租约列表（含释放模式快照与安全状态）",
@@ -22735,6 +23208,30 @@
               "format": "uuid",
               "nullable": true
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
           }
         ],
         "responses": {
@@ -22886,6 +23383,30 @@
               "type": "string",
               "format": "uuid",
               "nullable": true
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
             }
           }
         ],
@@ -28373,6 +28894,32 @@
           "task-engine"
         ],
         "operationId": "list_task_workers",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 1 开始；缺省为 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页条数；缺省为 20，上限 200",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "当前货主可加入任务组的有效人员",
@@ -32343,6 +32890,24 @@
           }
         }
       },
+      "CopyJobListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DrugInspectionCustomerCopyJob"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "CreateAdminMenuNodeRequest": {
         "type": "object",
         "description": "新增 H1 菜单节点请求。",
@@ -35025,7 +35590,8 @@
         "type": "object",
         "description": "H9 设备租约列表。",
         "required": [
-          "data"
+          "data",
+          "page"
         ],
         "properties": {
           "data": {
@@ -35033,6 +35599,9 @@
             "items": {
               "$ref": "#/components/schemas/DeviceLease"
             }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -35213,6 +35782,24 @@
           "window_start_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "DockAppointmentListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DockAppointment"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -41319,6 +41906,13 @@
             "type": "string",
             "description": "下一页游标；为空表示无更多数据。",
             "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "description": "满足查询条件的总记录数；未统计时缺省（向后兼容）。",
+            "nullable": true,
+            "minimum": 0
           }
         }
       },
@@ -42038,7 +42632,8 @@
         "type": "object",
         "description": "H9 组套实例列表。",
         "required": [
-          "data"
+          "data",
+          "page"
         ],
         "properties": {
           "data": {
@@ -42046,6 +42641,9 @@
             "items": {
               "$ref": "#/components/schemas/PrintSuiteInstance"
             }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -45253,6 +45851,24 @@
           }
         }
       },
+      "ReviewQueueListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "page"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DrugInspectionReviewQueueEntry"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
       "RoleListResponse": {
         "type": "object",
         "required": [
@@ -45311,14 +45927,18 @@
       "RoleUserListResponse": {
         "type": "object",
         "required": [
-          "items"
+          "data",
+          "page"
         ],
         "properties": {
-          "items": {
+          "data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RoleUserResponse"
             }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
@@ -45451,7 +46071,8 @@
         "type": "object",
         "description": "H9 线路绑定列表。",
         "required": [
-          "data"
+          "data",
+          "page"
         ],
         "properties": {
           "data": {
@@ -45459,6 +46080,9 @@
             "items": {
               "$ref": "#/components/schemas/RouteBinding"
             }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMeta"
           }
         }
       },
