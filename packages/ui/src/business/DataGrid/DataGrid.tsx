@@ -92,6 +92,7 @@ function DataGridInner<T>(
     showExportAction = true,
     className,
     tableClassName,
+    maxHeight,
     ...rest
   }: DataGridProps<T>,
   ref: React.ForwardedRef<HTMLDivElement>,
@@ -416,7 +417,8 @@ function DataGridInner<T>(
   const summaryTableStyle = { width: summaryTableWidth, minWidth: summaryTableWidth };
 
   return (
-    <div ref={rootRef} className={cn("space-y-3", className)} {...rest}>
+    // flex 撑满父容器：工具栏固定、表格区占剩余空间，页面级不滚动
+    <div ref={rootRef} className={cn("flex h-full min-h-0 flex-col gap-3", className)} {...rest}>
       <DataGridToolbar
         refreshAction={refreshAction}
         queryAction={queryAction}
@@ -468,6 +470,7 @@ function DataGridInner<T>(
         tableClassName={tableClassName}
         tableStyle={tableStyle}
         summaryTableStyle={summaryTableStyle}
+        maxHeight={maxHeight}
         caption={caption}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}

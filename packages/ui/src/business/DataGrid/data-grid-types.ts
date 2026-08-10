@@ -146,6 +146,8 @@ export interface DataGridProps<T>
     Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"> {
   columns: DataGridColumn<T>[];
   data: T[];
+  /** 表格区域最大高度（自建垂直滚动容器，表头/页脚/横向滚动条常驻）；默认 calc(100vh-15rem) */
+  maxHeight?: string | number;
   storageKey?: string;
   pageSizeOptions?: number[];
   defaultPageSize?: number;

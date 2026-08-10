@@ -3,7 +3,8 @@ import { cn } from "../lib/utils";
 
 export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+    // overflow-y-clip：横向滚动容器不拦截 thead/页脚的垂直 sticky（clip 不产生滚动上下文）
+    <div className="relative w-full overflow-x-auto overflow-y-clip">
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   )

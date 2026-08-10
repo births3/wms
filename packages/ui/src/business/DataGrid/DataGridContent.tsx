@@ -36,6 +36,8 @@ export interface DataGridContentProps<T> {
   tableClassName?: string;
   tableStyle: React.CSSProperties;
   summaryTableStyle: React.CSSProperties;
+  /** 表格区域最大高度（自建垂直滚动容器）；string 直接作 max-height，number 按 px */
+  maxHeight?: string | number;
   caption?: React.ReactNode;
   emptyTitle?: React.ReactNode;
   emptyDescription?: React.ReactNode;
@@ -113,6 +115,7 @@ export function DataGridContent<T>({
   tableClassName,
   tableStyle,
   summaryTableStyle,
+  maxHeight,
   caption,
   emptyTitle,
   emptyDescription,
@@ -187,57 +190,63 @@ export function DataGridContent<T>({
 }: DataGridContentProps<T>) {
   return (
     <>
-      {summaryTable ? (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary">
-            <span>已显示汇总结果，共 {summaryTable.rows.length} 个分组</span>
-            <Button type="button" variant="outline" size="sm" className="h-8" onClick={onExitSummary}>
-              退出汇总
-            </Button>
-          </div>
-          <DataTable<DataGridSummaryTableRow>
+      {/* 自建垂直滚动容器：flex 撑满父容器时精确占剩余；父无高度约束时 max-h 兜底限制（页面级不滚动） */}
+      <div
+        className="min-h-0 flex-1 overflow-auto max-h-[calc(100vh-23rem)]"
+        style={maxHeight !== undefined ? { maxHeight } : undefined}
+      >
+        {summaryTable ? (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary">
+              <span>已显示汇总结果，共 {summaryTable.rows.length} 个分组</span>
+              <Button type="button" variant="outline" size="sm" className="h-8" onClick={onExitSummary}>
+                退出汇总
+              </Button>
+            </div>
+            <DataTable<DataGridSummaryTableRow>
+              className="overflow-visible"
+              columns={summaryColumns}
+              data={summaryTable.rows}
+              rowKey={(row) => row.__summaryKey}
+              tableClassName={cn("table-fixed", tableClassName)}
+              tableStyle={summaryTableStyle}
+              caption={caption}
+              emptyTitle={emptyTitle}
+              emptyDescription={emptyDescription}
+            />
+          </>
+        ) : (
+          <DataTable
             className="overflow-visible"
-            columns={summaryColumns}
-            data={summaryTable.rows}
-            rowKey={(row) => row.__summaryKey}
+            columns={finalColumns}
+            data={page.rows}
+            rowKey={rowKey}
             tableClassName={cn("table-fixed", tableClassName)}
-            tableStyle={summaryTableStyle}
+            tableStyle={tableStyle}
+            selectedKey={selectedKey}
+            onRowClick={onRowClick}
             caption={caption}
             emptyTitle={emptyTitle}
             emptyDescription={emptyDescription}
+            footer={
+              <DataGridPaginationFooter
+                rangeStart={page.rangeStart}
+                rangeEnd={page.rangeEnd}
+                total={page.total}
+                selectable={selectable}
+                selectedCount={selectedCount}
+                pageSize={pageSize}
+                pageSizeOptions={pageSizeOptions}
+                pageIndex={page.pageIndex}
+                pageCount={page.pageCount}
+                onPageSizeChange={onPageSizeChange}
+                onPageIndexChange={onPageIndexChange}
+                onClearSelected={onClearSelected}
+              />
+            }
           />
-        </>
-      ) : (
-        <DataTable
-          className="overflow-visible"
-          columns={finalColumns}
-          data={page.rows}
-          rowKey={rowKey}
-          tableClassName={cn("table-fixed", tableClassName)}
-          tableStyle={tableStyle}
-          selectedKey={selectedKey}
-          onRowClick={onRowClick}
-          caption={caption}
-          emptyTitle={emptyTitle}
-          emptyDescription={emptyDescription}
-          footer={
-            <DataGridPaginationFooter
-              rangeStart={page.rangeStart}
-              rangeEnd={page.rangeEnd}
-              total={page.total}
-              selectable={selectable}
-              selectedCount={selectedCount}
-              pageSize={pageSize}
-              pageSizeOptions={pageSizeOptions}
-              pageIndex={page.pageIndex}
-              pageCount={page.pageCount}
-              onPageSizeChange={onPageSizeChange}
-              onPageIndexChange={onPageIndexChange}
-              onClearSelected={onClearSelected}
-            />
-          }
-        />
-      )}
+        )}
+      </div>
       <DataGridFilterChips
         className="border-primary/30 bg-primary/5 text-primary"
         filters={columnFilters}
