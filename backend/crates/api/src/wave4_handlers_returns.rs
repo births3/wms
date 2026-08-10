@@ -41,6 +41,7 @@ async fn list_purchase_returns_handler(
         page: PageMeta {
             count: data.len() as u32,
             next_cursor: None,
+            total: None,
         },
         data,
     }))

@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::common::PageMeta;
+
 /// H9 授权人工截单命令。
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct ManualDeliveryNoteCutoffRequest {
@@ -122,6 +124,7 @@ pub struct RouteBinding {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct RouteBindingListResponse {
     pub data: Vec<RouteBinding>,
+    pub page: PageMeta,
 }
 
 /// 截单计划匹配层级；枚举顺序不代表运行优先级。

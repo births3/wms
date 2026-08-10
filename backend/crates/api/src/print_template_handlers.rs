@@ -365,6 +365,7 @@ async fn list_print_field_definitions_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))
@@ -383,6 +384,7 @@ async fn list_print_field_libraries_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))
@@ -406,6 +408,7 @@ async fn list_print_templates_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))
@@ -443,6 +446,7 @@ async fn list_print_template_versions_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))

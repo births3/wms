@@ -131,6 +131,7 @@ async fn list_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len().min(u32::MAX as usize) as u32,
+            total: None,
         },
         data,
     }))

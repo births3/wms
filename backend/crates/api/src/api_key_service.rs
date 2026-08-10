@@ -4,8 +4,7 @@ use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    ApiKey, ApiKeyListResponse, ApiKeyRotationResponse, CreateApiKeyRequest, RotateApiKeyRequest,
-    API_KEY_SCOPES,
+    ApiKey, ApiKeyRotationResponse, CreateApiKeyRequest, RotateApiKeyRequest, API_KEY_SCOPES,
 };
 
 use crate::{
@@ -36,13 +35,17 @@ impl ApiKeyService {
         ctx: &AuthContext,
         keyword: Option<String>,
         status: Option<String>,
-    ) -> Result<ApiKeyListResponse, ApiKeyServiceError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<ApiKey>, i64), ApiKeyServiceError> {
         self.repository
             .list(
                 ctx.owner_id,
                 &ApiKeyListQuery {
                     keyword: clean(keyword),
                     status: clean(status),
+                    page: Some(page),
+                    page_size: Some(page_size),
                 },
             )
             .await

@@ -99,6 +99,7 @@ impl PgWechatNotifyService {
             page: PageMeta {
                 next_cursor: None,
                 count: rows.len() as u32,
+                total: None,
             },
             data: rows.into_iter().map(Into::into).collect(),
         })
@@ -581,6 +582,7 @@ impl PgWechatNotifyService {
             page: PageMeta {
                 next_cursor: None,
                 count: rows.len() as u32,
+                total: None,
             },
             data: rows.into_iter().map(Into::into).collect(),
         })

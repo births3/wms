@@ -245,6 +245,7 @@ impl PgWave3Repository {
             page: PageMeta {
                 next_cursor: None,
                 count,
+                total: None,
             },
         })
     }

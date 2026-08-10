@@ -467,13 +467,15 @@ async fn generate_maintenance_tasks_for_near_expiry_batches(pool: sqlx::PgPool) 
         .await
         .expect("generate");
     assert!(created >= 1);
-    let tasks = repository
+    let (tasks, _total) = repository
         .list_maintenance_tasks(
             &ctx(owner_id),
             wms_domain::MaintenanceTaskQuery {
                 status: Some("pending".to_string()),
                 ..wms_domain::MaintenanceTaskQuery::default()
             },
+            1,
+            20,
         )
         .await
         .expect("list");

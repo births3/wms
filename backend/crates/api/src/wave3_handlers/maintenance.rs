@@ -5,10 +5,41 @@ use axum::{
     Json, Router,
 };
 use chrono::Utc;
+use serde::Deserialize;
+use uuid::Uuid;
 use wms_domain::{
     CreateMaintenanceRecordRequest, MaintenanceRecordListResponse, MaintenanceRecordQuery,
     MaintenanceTaskListResponse, MaintenanceTaskQuery, PageMeta,
 };
+
+/// 养护任务列表查询：过滤条件 + offset 分页（page 从 1 起，默认 1；page_size 默认 20，上限 200）。
+#[derive(Debug, Deserialize)]
+pub(super) struct MaintenanceTaskListQuery {
+    task_id: Option<Uuid>,
+    batch_id: Option<Uuid>,
+    status: Option<String>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+/// 养护记录列表查询：过滤条件 + offset 分页（page 从 1 起，默认 1；page_size 默认 20，上限 200）。
+#[derive(Debug, Deserialize)]
+pub(super) struct MaintenanceRecordListQuery {
+    task_id: Option<Uuid>,
+    batch_id: Option<Uuid>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+fn list_page(page: Option<u32>) -> u32 {
+    page.filter(|value| *value >= 1).unwrap_or(1)
+}
+
+fn list_page_size(page_size: Option<u32>) -> u32 {
+    page_size
+        .filter(|value| *value >= 1)
+        .map_or(20, |value| value.min(200))
+}
 
 use super::{
     require_any_permission, AuditWriteRequest, AuthContext, PgWave3Repository, Wave3AppState,
@@ -38,15 +69,27 @@ pub(super) fn apply_maintenance_routes(router: Router<Wave3AppState>) -> Router<
 async fn list_maintenance_tasks_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
-    Query(query): Query<MaintenanceTaskQuery>,
+    Query(query): Query<MaintenanceTaskListQuery>,
 ) -> Result<Json<MaintenanceTaskListResponse>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.read", "m3.maintenance.write"])?;
     let repository = maintenance_repository(&state)?;
-    let data = repository.list_maintenance_tasks(&ctx, query).await?;
+    let (data, total) = repository
+        .list_maintenance_tasks(
+            &ctx,
+            MaintenanceTaskQuery {
+                task_id: query.task_id,
+                batch_id: query.batch_id,
+                status: query.status,
+            },
+            list_page(query.page),
+            list_page_size(query.page_size),
+        )
+        .await?;
     Ok(Json(MaintenanceTaskListResponse {
         page: PageMeta {
             count: data.len() as u32,
             next_cursor: None,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
         },
         data,
     }))
@@ -66,15 +109,26 @@ async fn generate_maintenance_tasks_handler(
 async fn list_maintenance_records_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
-    Query(query): Query<MaintenanceRecordQuery>,
+    Query(query): Query<MaintenanceRecordListQuery>,
 ) -> Result<Json<MaintenanceRecordListResponse>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.read", "m3.maintenance.write"])?;
     let repository = maintenance_repository(&state)?;
-    let data = repository.list_maintenance_records(&ctx, query).await?;
+    let (data, total) = repository
+        .list_maintenance_records(
+            &ctx,
+            MaintenanceRecordQuery {
+                task_id: query.task_id,
+                batch_id: query.batch_id,
+            },
+            list_page(query.page),
+            list_page_size(query.page_size),
+        )
+        .await?;
     Ok(Json(MaintenanceRecordListResponse {
         page: PageMeta {
             count: data.len() as u32,
             next_cursor: None,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
         },
         data,
     }))

@@ -268,6 +268,7 @@ fn menu_tree_response(tree: Vec<AdminMenuNode>, version_no: Option<i64>) -> Admi
         page: PageMeta {
             next_cursor: None,
             count,
+            total: None,
         },
     }
 }

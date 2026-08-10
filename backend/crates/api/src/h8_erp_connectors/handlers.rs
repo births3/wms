@@ -92,6 +92,7 @@ async fn list_connectors(
         page: PageMeta {
             next_cursor: None,
             count: len as u32,
+            total: None,
         },
     }))
 }

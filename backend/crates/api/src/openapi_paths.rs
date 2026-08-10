@@ -1,7 +1,10 @@
+pub(crate) use crate::dock_appointment_handlers::DockAppointmentListResponse;
 pub use crate::document_numbering::{
     DocumentNumberRule, DocumentNumberRuleListResponse, SetDocumentNumberRuleEnabledRequest,
     UpsertDocumentNumberRuleRequest,
 };
+pub(crate) use crate::drug_inspection_document_handlers::ReviewQueueListResponse;
+pub(crate) use crate::drug_inspection_stamp_handlers::CopyJobListResponse;
 pub use crate::print_template::{
     GeneratePrintFieldLibraryDraftRequest, PrintFieldDefinition, PrintFieldDefinitionListResponse,
     PrintFieldLibraryListResponse, PrintFieldLibrarySummary, PrintFieldLibraryVersion, PrintRecord,

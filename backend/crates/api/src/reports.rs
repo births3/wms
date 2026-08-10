@@ -29,6 +29,7 @@ impl ReportService {
             page: PageMeta {
                 next_cursor: None,
                 count: rows.len().min(limit as usize) as u32,
+                total: None,
             },
             rows,
         }
@@ -65,6 +66,7 @@ impl ReportService {
             page: PageMeta {
                 next_cursor: None,
                 count: rows.len().min(limit as usize) as u32,
+                total: None,
             },
             rows,
         }

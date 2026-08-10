@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::common::PageMeta;
+
 /// H9 物理打印站点：打印机、纸盒、设备租约与 Print Agent（US-H9-012）的资源边界。
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct PrintSite {
@@ -169,6 +171,7 @@ pub struct DeviceLease {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct DeviceLeaseListResponse {
     pub data: Vec<DeviceLease>,
+    pub page: PageMeta,
 }
 
 /// 人工释放设备租约：专用权限 + 原因必填 + 二次确认。

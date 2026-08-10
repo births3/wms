@@ -6,15 +6,16 @@ use axum::{
     Json, Router,
 };
 use chrono::NaiveDate;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 use wms_domain::{
     CreateDrugInspectionCorrectionRequest, CreateDrugInspectionVersionRequest,
-    CreateUpstreamDeliveryVersionRequest, DrugInspectionDocumentValidationError, ErrorResponse,
-    ReuseDrugInspectionReportRequest, ReviewDrugInspectionVersionRequest,
-    UpdateDrugInspectionDraftRequest, UpsertDrugInspectionRequirementRuleRequest,
+    CreateUpstreamDeliveryVersionRequest, DrugInspectionDocumentValidationError,
+    DrugInspectionReviewQueueEntry, ErrorResponse, PageMeta, ReuseDrugInspectionReportRequest,
+    ReviewDrugInspectionVersionRequest, UpdateDrugInspectionDraftRequest,
+    UpsertDrugInspectionRequirementRuleRequest,
 };
 
 use crate::{
@@ -145,6 +146,34 @@ struct InboundDocumentListQuery {
     missing_drug_inspection: bool,
     #[serde(default)]
     missing_upstream_delivery: bool,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+/// 列表接口分页查询参数（offset 分页），契约与 M1 主数据列表一致。
+#[derive(Deserialize)]
+pub(crate) struct ListPageQuery {
+    /// 页码，从 1 开始；缺省为 1。
+    pub(crate) page: Option<u32>,
+    /// 每页条数；缺省为 20，上限 200 钳制。
+    pub(crate) page_size: Option<u32>,
+}
+
+/// 解析 offset 分页参数：page 从 1 起（缺省 1），page_size 缺省 20、上限 200 钳制。
+pub(crate) fn page_and_page_size(page: Option<u32>, page_size: Option<u32>) -> (u32, u32) {
+    (
+        page.filter(|p| *p >= 1).unwrap_or(1),
+        page_size.filter(|s| *s >= 1).map_or(20, |s| s.min(200)),
+    )
+}
+
+/// 组装 offset 分页元数据（total 为满足过滤条件的总记录数）。
+pub(crate) fn page_meta(count: usize, total: i64) -> wms_domain::PageMeta {
+    wms_domain::PageMeta {
+        next_cursor: None,
+        count: count as u32,
+        total: Some(total.clamp(0, u32::MAX as i64) as u32),
+    }
 }
 
 #[derive(Deserialize)]
@@ -168,7 +197,8 @@ async fn list_inbound_documents(
 ) -> Result<Json<wms_domain::InboundDocumentEntryListResponse>, DrugInspectionDocumentHandlerError>
 {
     ctx.require_permission(M_DI_DOCUMENT_READ_PERMISSION)?;
-    state
+    let (page, page_size) = page_and_page_size(query.page, query.page_size);
+    let (data, total) = state
         .repository
         .list_inbound_documents(
             ctx.owner_id,
@@ -178,10 +208,15 @@ async fn list_inbound_documents(
                 missing_drug_inspection: query.missing_drug_inspection,
                 missing_upstream_delivery: query.missing_upstream_delivery,
             },
+            page,
+            page_size,
         )
-        .await
-        .map(Json)
-        .map_err(Into::into)
+        .await?;
+    let count = data.len();
+    Ok(Json(wms_domain::InboundDocumentEntryListResponse {
+        data,
+        page: page_meta(count, total),
+    }))
 }
 
 async fn create_version(
@@ -259,18 +294,28 @@ async fn find_reusable_report(
         .map_err(Into::into)
 }
 
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct ReviewQueueListResponse {
+    data: Vec<DrugInspectionReviewQueueEntry>,
+    page: PageMeta,
+}
+
 async fn list_review_queue(
     ctx: AuthContext,
     State(state): State<DrugInspectionDocumentAppState>,
-) -> Result<Json<Vec<wms_domain::DrugInspectionReviewQueueEntry>>, DrugInspectionDocumentHandlerError>
-{
+    Query(query): Query<ListPageQuery>,
+) -> Result<Json<ReviewQueueListResponse>, DrugInspectionDocumentHandlerError> {
     ctx.require_permission(M_DI_DOCUMENT_REVIEW_PERMISSION)?;
-    state
+    let (page, page_size) = page_and_page_size(query.page, query.page_size);
+    let (data, total) = state
         .repository
-        .list_review_queue(ctx.owner_id)
-        .await
-        .map(Json)
-        .map_err(Into::into)
+        .list_review_queue(ctx.owner_id, page, page_size)
+        .await?;
+    let count = data.len();
+    Ok(Json(ReviewQueueListResponse {
+        data,
+        page: page_meta(count, total),
+    }))
 }
 
 async fn list_report_versions(

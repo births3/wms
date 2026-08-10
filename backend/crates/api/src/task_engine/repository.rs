@@ -6,8 +6,27 @@ impl PgTaskEngineRepository {
     pub async fn list_worker_candidates(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<wms_domain::TaskWorker>, TaskEngineError> {
-        sqlx::query_as::<_, (Uuid, String, String)>(
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<wms_domain::TaskWorker>, i64), TaskEngineError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(*)
+              FROM auth_users auth_user
+              JOIN auth_user_owner_bindings binding ON binding.user_id = auth_user.id
+             WHERE binding.owner_id = $1
+               AND binding.is_active
+               AND auth_user.status = 'active'
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_database_error)?;
+        let data = sqlx::query_as::<_, (Uuid, String, String)>(
             r#"
             SELECT auth_user.id, auth_user.username, auth_user.display_name
               FROM auth_users auth_user
@@ -16,9 +35,12 @@ impl PgTaskEngineRepository {
                AND binding.is_active
                AND auth_user.status = 'active'
              ORDER BY auth_user.display_name, auth_user.username, auth_user.id
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map(|rows| {
@@ -30,7 +52,8 @@ impl PgTaskEngineRepository {
                 })
                 .collect()
         })
-        .map_err(map_database_error)
+        .map_err(map_database_error)?;
+        Ok((data, total))
     }
 
     pub async fn list_task_groups(

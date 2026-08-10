@@ -6,6 +6,29 @@ struct NearExpiryReportQuery {
     warning_days: Option<String>,
 }
 
+/// 库存批次列表分页查询参数（offset 分页，语义与 M1 MasterDataListQuery 一致）。
+#[derive(Debug, Deserialize)]
+pub(crate) struct InventoryBatchListQuery {
+    #[serde(flatten)]
+    pub(crate) filter: InventoryBatchQuery,
+    /// 页码，从 1 开始；缺省为 1。
+    pub(crate) page: Option<u32>,
+    /// 每页条数；缺省为 20，上限 200（越界钳制而非报错）。
+    pub(crate) page_size: Option<u32>,
+}
+
+impl InventoryBatchListQuery {
+    fn page(&self) -> u32 {
+        self.page.filter(|page| *page >= 1).unwrap_or(1)
+    }
+
+    fn page_size(&self) -> u32 {
+        self.page_size
+            .filter(|size| *size >= 1)
+            .map_or(20, |size| size.min(200))
+    }
+}
+
 async fn near_expiry_report_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
@@ -37,6 +60,7 @@ async fn near_expiry_report_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))
@@ -91,15 +115,17 @@ async fn putaway_receiving_order_handler(
 async fn list_inventory_batches_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
-    Query(query): Query<InventoryBatchQuery>,
+    Query(query): Query<InventoryBatchListQuery>,
 ) -> Result<Json<InventoryBatchListResponse>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.read", "m3.write"])?;
-    let production_from = parse_inventory_batch_date_filter(query.production_from.as_ref())?;
-    let production_to = parse_inventory_batch_date_filter(query.production_to.as_ref())?;
-    let expiry_from = parse_inventory_batch_date_filter(query.expiry_from.as_ref())?;
-    let expiry_to = parse_inventory_batch_date_filter(query.expiry_to.as_ref())?;
-    let created_from = parse_inventory_batch_datetime_filter(query.created_from.as_ref())?;
-    let created_to = parse_inventory_batch_datetime_filter(query.created_to.as_ref())?;
+    let page = query.page();
+    let page_size = query.page_size();
+    let production_from = parse_inventory_batch_date_filter(query.filter.production_from.as_ref())?;
+    let production_to = parse_inventory_batch_date_filter(query.filter.production_to.as_ref())?;
+    let expiry_from = parse_inventory_batch_date_filter(query.filter.expiry_from.as_ref())?;
+    let expiry_to = parse_inventory_batch_date_filter(query.filter.expiry_to.as_ref())?;
+    let created_from = parse_inventory_batch_datetime_filter(query.filter.created_from.as_ref())?;
+    let created_to = parse_inventory_batch_datetime_filter(query.filter.created_to.as_ref())?;
     if production_from.zip(production_to).is_some_and(|(from, to)| from > to) {
         return Err(Wave3RepositoryError::InvalidDate(
             "production_from_after_production_to".to_string(),
@@ -129,8 +155,8 @@ async fn list_inventory_batches_handler(
         }
     }
     if let Some(repository) = &state.wave3_repository {
-        let batches = repository
-            .list_inventory_batches_with_query(&ctx, query)
+        let (batches, total) = repository
+            .list_inventory_batches_with_query(&ctx, query.filter, page, page_size)
             .await?;
         let count = batches.len() as u32;
         return Ok(Json(InventoryBatchListResponse {
@@ -138,6 +164,7 @@ async fn list_inventory_batches_handler(
             page: PageMeta {
                 next_cursor: None,
                 count,
+                total: Some(total.clamp(0, u32::MAX as i64) as u32),
             },
         }));
     }
@@ -149,7 +176,7 @@ async fn list_inventory_batches_handler(
             .filter(|batch| {
                 inventory_batch_matches_query(
                     batch,
-                    &query,
+                    &query.filter,
                     production_from,
                     production_to,
                     expiry_from,
@@ -169,12 +196,20 @@ async fn list_inventory_batches_handler(
                 .then_with(|| left.id.cmp(&right.id))
         });
     }
-    let count = batches.len() as u32;
+    let total = batches.len() as u32;
+    let offset = ((page - 1) as usize) * (page_size as usize);
+    let data = batches
+        .into_iter()
+        .skip(offset)
+        .take(page_size as usize)
+        .collect::<Vec<_>>();
+    let count = data.len() as u32;
     Ok(Json(InventoryBatchListResponse {
-        data: batches,
+        data,
         page: PageMeta {
             next_cursor: None,
             count,
+            total: Some(total),
         },
     }))
 }
@@ -490,7 +525,7 @@ async fn isolate_expired_inventory_batches_handler(
         let count = outcome.value.len() as u32;
         return Ok(Json(InventoryBatchListResponse {
             data: outcome.value,
-            page: PageMeta { next_cursor: None, count },
+            page: PageMeta {next_cursor: None, count, total: None },
         }));
     }
     let batches = {
@@ -511,6 +546,6 @@ async fn isolate_expired_inventory_batches_handler(
     let count = batches.len() as u32;
     Ok(Json(InventoryBatchListResponse {
         data: batches,
-        page: PageMeta { next_cursor: None, count },
+        page: PageMeta {next_cursor: None, count, total: None },
     }))
 }

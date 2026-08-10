@@ -166,6 +166,7 @@ async fn list_dual_person_policy_rules_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))

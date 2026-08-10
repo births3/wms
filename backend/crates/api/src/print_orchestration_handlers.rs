@@ -15,7 +15,7 @@ use wms_domain::{
     AggregationRuleVersionListResponse, CategoryPdfOutputListResponse, CategoryPdfPreparation,
     CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest, CreatePrintSuiteDraftRequest,
     CutoffPlan, CutoffPlanListResponse, DeliveryNoteCandidateListResponse, DeliveryNoteGroup,
-    DeliveryNoteGroupListResponse, ErrorResponse, ManualDeliveryNoteCutoffRequest,
+    DeliveryNoteGroupListResponse, ErrorResponse, ManualDeliveryNoteCutoffRequest, PageMeta,
     PrintDocumentCategoryListResponse, PrintSuiteInstanceListResponse, PrintSuiteTestResult,
     PrintSuiteVersion, PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
     RouteBindingListResponse, SelectCategoryPdfsRequest, TestAggregationRuleRequest,
@@ -62,9 +62,44 @@ struct WarehouseFilter {
     warehouse_id: Option<Uuid>,
 }
 
+/// 线路绑定列表分页查询参数（offset 分页）。
+#[derive(Debug, Deserialize)]
+struct RouteBindingListQuery {
+    warehouse_id: Option<Uuid>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+impl RouteBindingListQuery {
+    fn page(&self) -> u32 {
+        self.page.filter(|p| *p >= 1).unwrap_or(1)
+    }
+
+    fn page_size(&self) -> u32 {
+        self.page_size
+            .filter(|s| *s >= 1)
+            .map_or(20, |s| s.min(200))
+    }
+}
+
+/// 组套实例列表分页查询参数（offset 分页）。
 #[derive(Debug, Deserialize)]
 struct SuiteInstanceFilter {
     group_id: Option<Uuid>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+impl SuiteInstanceFilter {
+    fn page(&self) -> u32 {
+        self.page.filter(|p| *p >= 1).unwrap_or(1)
+    }
+
+    fn page_size(&self) -> u32 {
+        self.page_size
+            .filter(|s| *s >= 1)
+            .map_or(20, |s| s.min(200))
+    }
 }
 
 impl PrintOrchestrationAppState {
@@ -330,15 +365,17 @@ async fn publish_route_binding_handler(
 async fn list_route_bindings_handler(
     ctx: AuthContext,
     State(state): State<PrintOrchestrationAppState>,
-    Query(query): Query<WarehouseFilter>,
+    Query(query): Query<RouteBindingListQuery>,
 ) -> Result<Json<RouteBindingListResponse>, PrintOrchestrationHandlerError> {
     ctx.require_permission(READ_PERMISSION)?;
-    Ok(Json(
-        state
-            .service
-            .list_route_bindings(&ctx, query.warehouse_id)
-            .await?,
-    ))
+    let (data, total) = state
+        .service
+        .list_route_bindings(&ctx, query.warehouse_id, query.page(), query.page_size())
+        .await?;
+    Ok(Json(RouteBindingListResponse {
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
+        data,
+    }))
 }
 
 async fn create_cutoff_plan_handler(
@@ -581,12 +618,22 @@ async fn list_print_suite_instances_handler(
     Query(query): Query<SuiteInstanceFilter>,
 ) -> Result<Json<PrintSuiteInstanceListResponse>, PrintOrchestrationHandlerError> {
     ctx.require_permission(READ_PERMISSION)?;
-    Ok(Json(
-        state
-            .service
-            .list_print_suite_instances(&ctx, query.group_id)
-            .await?,
-    ))
+    let (data, total) = state
+        .service
+        .list_print_suite_instances(&ctx, query.group_id, query.page(), query.page_size())
+        .await?;
+    Ok(Json(PrintSuiteInstanceListResponse {
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
+        data,
+    }))
+}
+
+fn page_with_total(count: usize, total: u32) -> PageMeta {
+    PageMeta {
+        next_cursor: None,
+        count: count as u32,
+        total: Some(total),
+    }
 }
 
 fn idempotency_key_from_headers(

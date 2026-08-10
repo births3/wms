@@ -253,6 +253,7 @@ async fn list_carriers_handler(
         page: PageMeta {
             count: data.len() as u32,
             next_cursor: None,
+            total: None,
         },
         data,
     }))
@@ -384,6 +385,7 @@ async fn list_routing_rules_handler(
         page: PageMeta {
             count: data.len() as u32,
             next_cursor: None,
+            total: None,
         },
         data,
     }))

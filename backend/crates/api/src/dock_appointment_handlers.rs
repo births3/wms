@@ -12,7 +12,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use wms_domain::{
     ArriveDockAppointmentRequest, CancelDockAppointmentRequest, CreateDockAppointmentRequest,
-    DockAppointment, ErrorResponse, UpdateDockAppointmentRequest,
+    DockAppointment, ErrorResponse, PageMeta, UpdateDockAppointmentRequest,
 };
 
 use crate::{
@@ -31,6 +31,26 @@ struct DockAppointmentListQuery {
     from: Option<DateTime<Utc>>,
     to: Option<DateTime<Utc>>,
     status: Option<String>,
+    /// 页码，从 1 起；缺省 1。
+    page: Option<u32>,
+    /// 每页条数；缺省 20，上限 200。
+    page_size: Option<u32>,
+}
+
+fn dock_appointment_page(page: Option<u32>) -> u32 {
+    page.filter(|page| *page >= 1).unwrap_or(1)
+}
+
+fn dock_appointment_page_size(page_size: Option<u32>) -> u32 {
+    page_size
+        .filter(|page_size| *page_size >= 1)
+        .map_or(20, |page_size| page_size.min(200))
+}
+
+#[derive(serde::Serialize, utoipa::ToSchema)]
+pub(crate) struct DockAppointmentListResponse {
+    data: Vec<DockAppointment>,
+    page: PageMeta,
 }
 
 #[derive(Clone, Debug)]
@@ -202,7 +222,7 @@ async fn list_dock_appointments_handler(
     ctx: AuthContext,
     State(state): State<DockAppointmentAppState>,
     Query(query): Query<DockAppointmentListQuery>,
-) -> Result<Json<Vec<DockAppointment>>, DockAppointmentHandlerError> {
+) -> Result<Json<DockAppointmentListResponse>, DockAppointmentHandlerError> {
     ctx.require_permission(DOCK_APPOINTMENT_WRITE_PERMISSION)?;
     let DockAppointmentListQuery {
         warehouse_id,
@@ -210,13 +230,30 @@ async fn list_dock_appointments_handler(
         from,
         to,
         status,
+        page,
+        page_size,
     } = query;
-    Ok(Json(
-        state
-            .repository
-            .list(&ctx, warehouse_id, dock_id, from, to, status)
-            .await?,
-    ))
+    let (data, total) = state
+        .repository
+        .list(
+            &ctx,
+            warehouse_id,
+            dock_id,
+            from,
+            to,
+            status,
+            dock_appointment_page(page),
+            dock_appointment_page_size(page_size),
+        )
+        .await?;
+    Ok(Json(DockAppointmentListResponse {
+        page: PageMeta {
+            next_cursor: None,
+            count: data.len() as u32,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
+        },
+        data,
+    }))
 }
 
 async fn create_dock_appointment_handler(

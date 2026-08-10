@@ -9,10 +9,9 @@ use uuid::Uuid;
 use wms_domain::{
     CreatePrintSuiteDraftRequest, DeliveryNoteGroup, PrintDocumentCategory,
     PrintDocumentCategoryListResponse, PrintSuiteFileBinding, PrintSuiteInstance,
-    PrintSuiteInstanceItem, PrintSuiteInstanceListResponse, PrintSuiteItem,
-    PrintSuiteItemReadiness, PrintSuiteReadyPolicy, PrintSuiteScope, PrintSuiteSourceMode,
-    PrintSuiteTestResult, PrintSuiteTestSample, PrintSuiteVersion, PrintSuiteVersionListResponse,
-    TestPrintSuiteRequest,
+    PrintSuiteInstanceItem, PrintSuiteItem, PrintSuiteItemReadiness, PrintSuiteReadyPolicy,
+    PrintSuiteScope, PrintSuiteSourceMode, PrintSuiteTestResult, PrintSuiteTestSample,
+    PrintSuiteVersion, PrintSuiteVersionListResponse, TestPrintSuiteRequest,
 };
 
 use crate::{
@@ -575,8 +574,28 @@ impl PgPrintOrchestrationRepository {
         &self,
         ctx: &AuthContext,
         group_id: Option<Uuid>,
-    ) -> Result<PrintSuiteInstanceListResponse, PrintOrchestrationError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<PrintSuiteInstance>, i64), PrintOrchestrationError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(*)
+              FROM h9_print_suite_instances instance
+              JOIN h9_delivery_note_groups grp
+                ON grp.owner_id = instance.owner_id AND grp.id = instance.group_id
+             WHERE instance.owner_id = $1
+               AND ($2::uuid IS NULL OR instance.group_id = $2)
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(group_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, InstanceRow>(
             r#"
             SELECT instance.id, instance.owner_id, instance.group_id,
@@ -592,10 +611,13 @@ impl PgPrintOrchestrationRepository {
              WHERE instance.owner_id = $1
                AND ($2::uuid IS NULL OR instance.group_id = $2)
              ORDER BY instance.created_at DESC, instance.id
+             LIMIT $3 OFFSET $4
             "#,
         )
         .bind(ctx.owner_id)
         .bind(group_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&mut *tx)
         .await
         .map_err(map_db_error)?;
@@ -605,7 +627,7 @@ impl PgPrintOrchestrationRepository {
             data.push(map_instance(row, items)?);
         }
         tx.commit().await.map_err(map_db_error)?;
-        Ok(PrintSuiteInstanceListResponse { data })
+        Ok((data, total))
     }
 
     /// US-H9-008 AC7/AC8: freezes suite version, rule version, source-document

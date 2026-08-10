@@ -71,10 +71,24 @@ impl PgWave3Repository {
         })
     }
 
+    /// offset 分页列表（契约见 docs/api/api-pagination-standards.md）：
+    /// 主列表 SQL 加 LIMIT/OFFSET + 同过滤 count(*)，返回 (本页数据, 总条数)。
+    /// 明细拉取保持按单（本页单数），分页后 N+1 范围缩小到本页，语义不变。
     pub async fn list_receiving_orders(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<ReceivingOrder>, Wave3RepositoryError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<ReceivingOrder>, i64), Wave3RepositoryError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM receiving_orders WHERE owner_id = $1")
+                .bind(ctx.owner_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, ReceivingOrderRow>(
             r#"
             SELECT id, owner_id, receipt_no, document_type, supplier_id, warehouse_id,
@@ -82,9 +96,12 @@ impl PgWave3Repository {
               FROM receiving_orders
              WHERE owner_id = $1
              ORDER BY updated_at DESC, receipt_no
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
@@ -96,7 +113,7 @@ impl PgWave3Repository {
                 .await?;
             orders.push(map_receiving_order(row, lines));
         }
-        Ok(orders)
+        Ok((orders, total))
     }
 
     pub async fn receive_receiving_order_with_audit(

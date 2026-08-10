@@ -18,6 +18,10 @@ pub(crate) fn list_task_groups() {}
     get,
     path = "/api/v1/task-engine/workers",
     tag = "task-engine",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
     responses(
         (status = 200, description = "当前货主可加入任务组的有效人员", body = TaskWorkerListResponse),
         (status = 401, description = "未登录", body = ErrorResponse),

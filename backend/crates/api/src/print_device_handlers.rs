@@ -1,20 +1,21 @@
 //! US-H9-011 print device HTTP handlers: sites, printers, trays and leases.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, patch, post},
     Json, Router,
 };
 use chrono::Utc;
+use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     CreatePrintSiteRequest, CreatePrinterRequest, CreatePrinterTrayRequest,
-    CreateSiteOwnerMappingRequest, DeviceLease, DeviceLeaseListResponse, ErrorResponse, PrintSite,
-    PrintSiteListResponse, PrintSiteOwnerMapping, PrintSiteOwnerMappingListResponse, Printer,
-    PrinterListResponse, PrinterTestPrint, PrinterTray, PrinterTrayListResponse,
+    CreateSiteOwnerMappingRequest, DeviceLease, DeviceLeaseListResponse, ErrorResponse, PageMeta,
+    PrintSite, PrintSiteListResponse, PrintSiteOwnerMapping, PrintSiteOwnerMappingListResponse,
+    Printer, PrinterListResponse, PrinterTestPrint, PrinterTray, PrinterTrayListResponse,
     ReleaseDeviceLeaseRequest, TestPrintRequest, UpdatePrinterRequest, UpdatePrinterTrayRequest,
 };
 
@@ -436,12 +437,43 @@ async fn test_print_handler(
     Ok(Json(result.value))
 }
 
+/// 设备租约列表分页查询参数（offset 分页）。
+#[derive(Debug, Deserialize)]
+struct LeaseListQuery {
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+impl LeaseListQuery {
+    fn page(&self) -> u32 {
+        self.page.filter(|p| *p >= 1).unwrap_or(1)
+    }
+
+    fn page_size(&self) -> u32 {
+        self.page_size
+            .filter(|s| *s >= 1)
+            .map_or(20, |s| s.min(200))
+    }
+}
+
 async fn list_leases_handler(
     ctx: AuthContext,
     State(state): State<PrintDeviceAppState>,
+    Query(query): Query<LeaseListQuery>,
 ) -> Result<Json<DeviceLeaseListResponse>, PrintDeviceHandlerError> {
     ctx.require_permission(READ_PERMISSION)?;
-    Ok(Json(state.service.list_leases(&ctx).await?))
+    let (data, total) = state
+        .service
+        .list_leases(&ctx, query.page(), query.page_size())
+        .await?;
+    Ok(Json(DeviceLeaseListResponse {
+        page: PageMeta {
+            next_cursor: None,
+            count: data.len() as u32,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
+        },
+        data,
+    }))
 }
 
 async fn release_lease_handler(

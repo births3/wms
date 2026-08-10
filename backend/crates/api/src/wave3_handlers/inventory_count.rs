@@ -55,6 +55,7 @@ async fn list_inventory_counts_handler(
         page: wms_domain::PageMeta {
             count: data.len() as u32,
             next_cursor: None,
+            total: None,
         },
         data,
     }))

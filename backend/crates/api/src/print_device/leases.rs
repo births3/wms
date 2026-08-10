@@ -4,9 +4,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wms_domain::{
-    validate_release_device_lease, DeviceLease, DeviceLeaseListResponse, ReleaseDeviceLeaseRequest,
-};
+use wms_domain::{validate_release_device_lease, DeviceLease, ReleaseDeviceLeaseRequest};
 
 use crate::operation_context::OperationContext as AuthContext;
 
@@ -21,7 +19,22 @@ impl PrintDeviceService {
     pub async fn list_leases(
         &self,
         ctx: &AuthContext,
-    ) -> Result<DeviceLeaseListResponse, PrintDeviceError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<DeviceLease>, i64), PrintDeviceError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(*)
+              FROM h9_device_leases lease
+              JOIN h9_printers printer ON printer.id = lease.printer_id
+            "#,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, LeaseRow>(
             r#"
             SELECT lease.id, lease.site_id, lease.printer_id, printer.printer_name,
@@ -31,8 +44,11 @@ impl PrintDeviceService {
               FROM h9_device_leases lease
               JOIN h9_printers printer ON printer.id = lease.printer_id
              ORDER BY lease.assigned_at DESC, lease.id
+             LIMIT $1 OFFSET $2
             "#,
         )
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
@@ -51,7 +67,7 @@ impl PrintDeviceService {
                 Err(error) => return Err(error),
             }
         }
-        Ok(DeviceLeaseListResponse { data })
+        Ok((data, total))
     }
 
     /// Manually releases one active lease.

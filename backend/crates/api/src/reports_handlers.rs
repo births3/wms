@@ -155,6 +155,7 @@ async fn query_report_handler(
         page: PageMeta {
             next_cursor: None,
             count: rows.len().min(limit as usize) as u32,
+            total: None,
         },
         rows,
     }))
@@ -331,6 +332,7 @@ fn map_gsp_ledger(
         page: PageMeta {
             next_cursor: None,
             count: mapped.len() as u32,
+            total: None,
         },
         rows: mapped,
     }

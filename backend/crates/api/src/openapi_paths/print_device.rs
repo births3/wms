@@ -244,6 +244,10 @@ pub(crate) fn test_print_printer() {}
 #[utoipa::path(
     get,
     path = "/api/v1/print-devices/leases",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")
+    ),
     responses(
         (status = 200, description = "设备租约列表（含释放模式快照与安全状态）", body = DeviceLeaseListResponse),
         (status = 401, description = "未登录", body = ErrorResponse),

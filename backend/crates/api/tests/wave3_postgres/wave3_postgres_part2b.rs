@@ -339,7 +339,7 @@ async fn inventory_batch_query_combines_filters_and_keeps_owner_scope(pool: PgPo
     }
 
     let ctx = ctx(owner_id);
-    let rows = PgWave3Repository::new(pool)
+    let (rows, total) = PgWave3Repository::new(pool)
         .list_inventory_batches_with_query(
             &ctx,
             InventoryBatchQuery {
@@ -349,11 +349,14 @@ async fn inventory_batch_query_combines_filters_and_keeps_owner_scope(pool: PgPo
                 quality_status: Some("qualified".to_string()),
                 ..Default::default()
             },
+            1,
+            20,
         )
         .await
         .expect("query inventory batches");
 
     assert_eq!(rows.len(), 1);
+    assert_eq!(total, 1);
     assert_eq!(rows[0].owner_id, owner_id);
     assert_eq!(rows[0].batch_no, "B-001");
 }

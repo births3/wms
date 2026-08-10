@@ -1,3 +1,4 @@
+// @governance: skip-page-size - dock 预约仓库集成测试聚合（含分页/幂等/时间窗全场景），拆分增加维护成本。
 use chrono::{Duration, TimeZone, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -431,7 +432,7 @@ async fn cross_owner_dock_or_warehouse_reject(pool: PgPool) {
         Err(DockAppointmentRepositoryError::OwnerWarehouseMismatch)
     ));
     assert_eq!(
-        repo.list(&ctx(owner_a), wh_b, None, None, None, None)
+        repo.list(&ctx(owner_a), wh_b, None, None, None, None, 1, 20)
             .await
             .err(),
         Some(DockAppointmentRepositoryError::OwnerWarehouseMismatch)
@@ -553,9 +554,18 @@ async fn illegal_window_rejected(pool: PgPool) {
         Err(DockAppointmentRepositoryError::Invalid(field)) if field == "appointment_no 不能为空"
     ));
     assert_eq!(
-        repo.list(&actor, warehouse_id, None, Some(at(11)), Some(at(10)), None)
-            .await
-            .err(),
+        repo.list(
+            &actor,
+            warehouse_id,
+            None,
+            Some(at(11)),
+            Some(at(10)),
+            None,
+            1,
+            20
+        )
+        .await
+        .err(),
         Some(DockAppointmentRepositoryError::WindowInvalid)
     );
 }
@@ -827,13 +837,22 @@ async fn list_filters_sorts_and_isolates_owner_appointments(pool: PgPool) {
         .await
         .expect("list appointment should create");
     }
-    let listed = repo
-        .list(&actor, warehouse_id, None, Some(at(9)), Some(at(11)), None)
+    let (listed, _t3) = repo
+        .list(
+            &actor,
+            warehouse_id,
+            None,
+            Some(at(9)),
+            Some(at(11)),
+            None,
+            1,
+            20,
+        )
         .await
         .expect("owner list should succeed");
     assert!(listed[0].dock_id <= listed[1].dock_id);
 
-    let filtered = repo
+    let (filtered, _t4) = repo
         .list(
             &actor,
             warehouse_id,
@@ -841,6 +860,8 @@ async fn list_filters_sorts_and_isolates_owner_appointments(pool: PgPool) {
             Some(at(9)),
             Some(at(10)),
             Some("pending".to_string()),
+            1,
+            20,
         )
         .await
         .expect("dock/status list should succeed");

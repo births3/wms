@@ -116,6 +116,7 @@ impl PgInventoryStatusConfigRepository {
             page: wms_domain::PageMeta {
                 next_cursor: None,
                 count: data.len() as u32,
+                total: None,
             },
             data,
         })

@@ -4,10 +4,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
-use wms_domain::{
-    ApiKey, ApiKeyListResponse, ApiKeyRotationResponse, CreateApiKeyRequest, PageMeta,
-    RotateApiKeyRequest,
-};
+use wms_domain::{ApiKey, ApiKeyRotationResponse, CreateApiKeyRequest, RotateApiKeyRequest};
 
 use crate::{
     audit::{append_event, append_event_in_tx, AuditDiff, AuditWriteRequest},
@@ -29,7 +26,24 @@ impl ApiKeyRepository {
         &self,
         owner_id: Uuid,
         query: &ApiKeyListQuery,
-    ) -> Result<ApiKeyListResponse, ApiKeyRepositoryError> {
+    ) -> Result<(Vec<ApiKey>, i64), ApiKeyRepositoryError> {
+        let page = query.page.unwrap_or(1).max(1);
+        let page_size = query.page_size.unwrap_or(20).clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(*) FROM auth_api_keys
+             WHERE owner_id = $1
+               AND ($2::text IS NULL OR caller_name ILIKE '%' || $2 || '%' OR purpose ILIKE '%' || $2 || '%')
+               AND ($3::text IS NULL OR status = $3)
+            "#,
+        )
+        .bind(owner_id)
+        .bind(query.keyword.as_deref())
+        .bind(query.status.as_deref())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(db_error)?;
         let rows = sqlx::query_as::<_, ApiKeyRow>(
             r#"
             SELECT id, owner_id, caller_name, purpose, warehouse_ids, scopes,
@@ -42,12 +56,15 @@ impl ApiKeyRepository {
              WHERE owner_id = $1
                AND ($2::text IS NULL OR caller_name ILIKE '%' || $2 || '%' OR purpose ILIKE '%' || $2 || '%')
                AND ($3::text IS NULL OR status = $3)
-             ORDER BY created_at DESC
+             ORDER BY created_at DESC, id DESC
+             LIMIT $4 OFFSET $5
             "#,
         )
         .bind(owner_id)
         .bind(query.keyword.as_deref())
         .bind(query.status.as_deref())
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(db_error)?;
@@ -55,15 +72,7 @@ impl ApiKeyRepository {
             .into_iter()
             .map(|row| row.into_api_key(None))
             .collect::<Vec<_>>();
-        let count = u32::try_from(data.len())
-            .map_err(|_| ApiKeyRepositoryError::Serialize("API Key 列表过大".to_string()))?;
-        Ok(ApiKeyListResponse {
-            data,
-            page: PageMeta {
-                next_cursor: None,
-                count,
-            },
-        })
+        Ok((data, total))
     }
 
     pub async fn create(
@@ -537,6 +546,10 @@ impl ApiKeyRepository {
 pub struct ApiKeyListQuery {
     pub keyword: Option<String>,
     pub status: Option<String>,
+    /// 页码，从 1 起；缺省 1。
+    pub page: Option<u32>,
+    /// 每页条数；缺省 20，上限 200。
+    pub page_size: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug)]

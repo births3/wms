@@ -283,14 +283,38 @@ pub fn postgres_outbound(pool: PgPool) -> Router {
     wave4_router(Wave4AppState::with_postgres(pool))
 }
 
+#[derive(Clone, Debug, Default, Deserialize)]
+struct PendingExcursionsQuery {
+    /// 页码，从 1 起；缺省 1。
+    page: Option<u32>,
+    /// 每页条数；缺省 20，上限 200。
+    page_size: Option<u32>,
+}
+
+fn pending_excursions_page(query: &PendingExcursionsQuery) -> u32 {
+    query.page.filter(|page| *page >= 1).unwrap_or(1)
+}
+
+fn pending_excursions_page_size(query: &PendingExcursionsQuery) -> u32 {
+    query
+        .page_size
+        .filter(|page_size| *page_size >= 1)
+        .map_or(20, |page_size| page_size.min(200))
+}
+
 async fn list_pending_temperature_excursions_handler(
     ctx: AuthContext,
     State(state): State<Wave4AppState>,
+    Query(query): Query<PendingExcursionsQuery>,
 ) -> Result<Json<TemperatureExcursionEventListResponse>, Wave4HandlerError> {
     ctx.require_permission("m5.write")?;
-    let events = state
+    let (events, total) = state
         .wave4_repository
-        .list_pending_temperature_excursions(&ctx)
+        .list_pending_temperature_excursions(
+            &ctx,
+            pending_excursions_page(&query),
+            pending_excursions_page_size(&query),
+        )
         .await?;
     let count = events.len() as u32;
     Ok(Json(TemperatureExcursionEventListResponse {
@@ -298,6 +322,7 @@ async fn list_pending_temperature_excursions_handler(
         page: PageMeta {
             next_cursor: None,
             count,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
         },
     }))
 }
@@ -402,6 +427,7 @@ async fn list_driver_today_tasks_handler(
         page: PageMeta {
             next_cursor: None,
             count: 0,
+            total: None,
         },
     }))
 }
@@ -434,8 +460,9 @@ mod review_tests;
 
 #[cfg(test)]
 mod tests {
+    use axum::extract::{Query, State};
     use axum::http::HeaderMap;
-    use axum::{extract::State, Json};
+    use axum::Json;
     use chrono::{NaiveDate, TimeZone, Utc};
     use sqlx::PgPool;
     use uuid::Uuid;
@@ -448,7 +475,7 @@ mod tests {
         create_outbound_order_handler, create_traceability_outbound_report_handler,
         dispose_temperature_excursion_handler, get_store_dashboard_handler,
         list_driver_today_tasks_handler, list_pending_temperature_excursions_handler, wave4_router,
-        Wave4AppState, Wave4HandlerError,
+        PendingExcursionsQuery, Wave4AppState, Wave4HandlerError,
     };
     use crate::{
         auth::{AuthContext, AuthError},
@@ -713,21 +740,28 @@ mod tests {
         )
         .await;
 
-        let denied_result =
-            list_pending_temperature_excursions_handler(denied, State(state.clone()))
-                .await
-                .expect_err("m5.write should be required");
+        let denied_result = list_pending_temperature_excursions_handler(
+            denied,
+            State(state.clone()),
+            Query(PendingExcursionsQuery::default()),
+        )
+        .await
+        .expect_err("m5.write should be required");
         assert!(matches!(
             denied_result,
             Wave4HandlerError::Auth(AuthError::PermissionDenied(permission))
                 if permission == "m5.write"
         ));
 
-        let Json(pending) =
-            list_pending_temperature_excursions_handler(authorized.clone(), State(state.clone()))
-                .await
-                .expect("pending list should load");
+        let Json(pending) = list_pending_temperature_excursions_handler(
+            authorized.clone(),
+            State(state.clone()),
+            Query(PendingExcursionsQuery::default()),
+        )
+        .await
+        .expect("pending list should load");
         assert_eq!(pending.page.count, 1);
+        assert_eq!(pending.page.total, Some(1));
         assert_eq!(pending.data[0].id, event_id);
 
         let Json(disposition) = dispose_temperature_excursion_handler(

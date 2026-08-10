@@ -279,7 +279,7 @@ pub(crate) fn preview_print_template() {}
 #[allow(dead_code)]
 pub(crate) fn record_print_template() {}
 
-#[utoipa::path(get, path = "/api/v1/inbound/receiving-orders", tag = "inbound", responses((status = 200, description = "收货单列表", body = ReceivingOrderListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/inbound/receiving-orders", tag = "inbound", params(("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"), ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")), responses((status = 200, description = "收货单列表", body = ReceivingOrderListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_receiving_orders() {}
 
@@ -351,7 +351,7 @@ pub(crate) fn putaway_receiving_order() {}
 #[allow(dead_code)]
 pub(crate) fn recommend_putaway_locations() {}
 
-#[utoipa::path(get, path = "/api/v1/inventory/batches", tag = "inventory", params(("q" = Option<String>, Query, description = "商品名称/编码、批号、库位或容器模糊匹配"), ("product_code" = Option<String>, Query, description = "商品编码模糊匹配"), ("batch_no" = Option<String>, Query, description = "批号模糊匹配"), ("location_code" = Option<String>, Query, description = "库位编码模糊匹配"), ("location_type" = Option<String>, Query, description = "库位类型精确匹配"), ("zone_code" = Option<String>, Query, description = "库区编码精确匹配"), ("temperature_zone" = Option<String>, Query, description = "温区精确匹配"), ("quality_status" = Option<String>, Query, description = "质量状态精确匹配"), ("production_from" = Option<String>, Query, description = "生产日期起始日，格式 YYYY-MM-DD"), ("production_to" = Option<String>, Query, description = "生产日期截止日，格式 YYYY-MM-DD"), ("expiry_from" = Option<String>, Query, description = "有效期起始日，格式 YYYY-MM-DD"), ("expiry_to" = Option<String>, Query, description = "有效期截止日，格式 YYYY-MM-DD"), ("created_from" = Option<String>, Query, description = "创建时间起点，RFC3339"), ("created_to" = Option<String>, Query, description = "创建时间终点，RFC3339")), responses((status = 200, description = "库存批次列表", body = InventoryBatchListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/inventory/batches", tag = "inventory", params(("q" = Option<String>, Query, description = "商品名称/编码、批号、库位或容器模糊匹配"), ("product_code" = Option<String>, Query, description = "商品编码模糊匹配"), ("batch_no" = Option<String>, Query, description = "批号模糊匹配"), ("location_code" = Option<String>, Query, description = "库位编码模糊匹配"), ("location_type" = Option<String>, Query, description = "库位类型精确匹配"), ("zone_code" = Option<String>, Query, description = "库区编码精确匹配"), ("temperature_zone" = Option<String>, Query, description = "温区精确匹配"), ("quality_status" = Option<String>, Query, description = "质量状态精确匹配"), ("production_from" = Option<String>, Query, description = "生产日期起始日，格式 YYYY-MM-DD"), ("production_to" = Option<String>, Query, description = "生产日期截止日，格式 YYYY-MM-DD"), ("expiry_from" = Option<String>, Query, description = "有效期起始日，格式 YYYY-MM-DD"), ("expiry_to" = Option<String>, Query, description = "有效期截止日，格式 YYYY-MM-DD"), ("created_from" = Option<String>, Query, description = "创建时间起点，RFC3339"), ("created_to" = Option<String>, Query, description = "创建时间终点，RFC3339"), ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"), ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")), responses((status = 200, description = "库存批次列表", body = InventoryBatchListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_inventory_batches() {}
 
@@ -639,7 +639,7 @@ pub(crate) fn ingest_temperature_reading() {}
 #[allow(dead_code)]
 pub(crate) fn ingest_temperature_excursion() {}
 
-#[utoipa::path(get, path = "/api/v1/cold-chain/excursions/pending-disposition", tag = "cold-chain", responses((status = 200, description = "温度超标待处置列表", body = TemperatureExcursionEventListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/cold-chain/excursions/pending-disposition", tag = "cold-chain", params(("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"), ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")), responses((status = 200, description = "温度超标待处置列表", body = TemperatureExcursionEventListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_pending_temperature_excursions() {}
 
@@ -739,7 +739,7 @@ pub(crate) fn ingest_transit_temperature() {}
 #[allow(dead_code)]
 pub(crate) fn confirm_container_recovery() {}
 
-#[utoipa::path(get, path = "/api/v1/auth/api-keys", tag = "auth", params(("q" = Option<String>, Query, description = "调用方名称或用途"), ("status" = Option<String>, Query, description = "active / revoked / temporarily_disabled")), responses((status = 200, description = "当前货主 API Key 列表", body = ApiKeyListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "仅系统管理员可访问", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/auth/api-keys", tag = "auth", params(("q" = Option<String>, Query, description = "调用方名称或用途"), ("status" = Option<String>, Query, description = "active / revoked / temporarily_disabled"), ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"), ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")), responses((status = 200, description = "当前货主 API Key 列表", body = ApiKeyListResponse), (status = 401, description = "未登录", body = ErrorResponse), (status = 403, description = "仅系统管理员可访问", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_api_keys() {}
 

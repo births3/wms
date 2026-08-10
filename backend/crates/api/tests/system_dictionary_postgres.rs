@@ -507,8 +507,8 @@ async fn special_drug_category_write_replays_once_and_is_queryable_with_one_audi
     assert_eq!(created.value.id, replay.value.id);
     assert!(replay.replayed);
 
-    let categories = master_data
-        .list_special_drug_categories(&ctx)
+    let (categories, _total) = master_data
+        .list_special_drug_categories(&ctx, 1, 20)
         .await
         .expect("special drug categories should query through postgres");
     let category = categories

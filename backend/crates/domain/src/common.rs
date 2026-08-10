@@ -28,12 +28,15 @@ pub(crate) fn free_form_json_schema() -> Object {
 }
 
 /// 分页信息。
-#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct PageMeta {
     /// 下一页游标；为空表示无更多数据。
     pub next_cursor: Option<String>,
     /// 本页数量。
     pub count: u32,
+    /// 满足查询条件的总记录数；未统计时缺省（向后兼容）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total: Option<u32>,
 }
 
 /// 健康检查响应。

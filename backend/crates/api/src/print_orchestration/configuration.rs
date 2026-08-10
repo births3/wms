@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
-use wms_domain::{PublishRouteBindingRequest, RouteBinding, RouteBindingListResponse};
+use wms_domain::{PublishRouteBindingRequest, RouteBinding};
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
@@ -40,7 +40,34 @@ impl PgPrintOrchestrationRepository {
         &self,
         ctx: &AuthContext,
         warehouse_id: Option<Uuid>,
-    ) -> Result<RouteBindingListResponse, PrintOrchestrationError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<RouteBinding>, i64), PrintOrchestrationError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(*)
+              FROM h9_route_bindings binding
+              JOIN warehouses warehouse
+                ON warehouse.owner_id = binding.owner_id
+               AND warehouse.id = binding.warehouse_id
+              JOIN customers customer
+                ON customer.owner_id = binding.owner_id
+               AND customer.id = binding.customer_id
+              JOIN customer_addresses address
+                ON address.owner_id = binding.owner_id
+               AND address.id = binding.delivery_address_id
+             WHERE binding.owner_id = $1
+               AND ($2::uuid IS NULL OR binding.warehouse_id = $2)
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(warehouse_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, RouteBindingRow>(
             r#"
             SELECT binding.id, binding.owner_id, binding.warehouse_id,
@@ -64,16 +91,17 @@ impl PgPrintOrchestrationRepository {
              WHERE binding.owner_id = $1
                AND ($2::uuid IS NULL OR binding.warehouse_id = $2)
              ORDER BY binding.effective_from DESC, binding.id
+             LIMIT $3 OFFSET $4
             "#,
         )
         .bind(ctx.owner_id)
         .bind(warehouse_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(RouteBindingListResponse {
-            data: rows.into_iter().map(RouteBinding::from).collect(),
-        })
+        Ok((rows.into_iter().map(RouteBinding::from).collect(), total))
     }
 
     pub(super) async fn publish_route_binding(

@@ -175,7 +175,7 @@ async fn inventory_query_returns_location_snapshot_and_supports_product_and_temp
     )
     .await;
 
-    let rows = repo
+    let (rows, _total) = repo
         .list_inventory_batches_with_query(
             &ctx(owner_id),
             InventoryBatchQuery {
@@ -183,6 +183,8 @@ async fn inventory_query_returns_location_snapshot_and_supports_product_and_temp
                 temperature_zone: Some("normal".to_string()),
                 ..InventoryBatchQuery::default()
             },
+            1,
+            200,
         )
         .await
         .expect("query enriched inventory snapshot");
@@ -335,7 +337,7 @@ async fn near_expiry_query_filters_owner_and_orders_by_expiry(pool: PgPool) {
     )
     .await;
 
-    let rows = repo
+    let (rows, _total) = repo
         .list_inventory_batches_with_query(
             &owner_ctx,
             wms_domain::InventoryBatchQuery {
@@ -343,6 +345,8 @@ async fn near_expiry_query_filters_owner_and_orders_by_expiry(pool: PgPool) {
                 expiry_to: Some("2026-08-31".to_string()),
                 ..Default::default()
             },
+            1,
+            200,
         )
         .await
         .expect("near-expiry query should succeed");
@@ -414,7 +418,7 @@ async fn inventory_query_combines_filters_without_cross_owner_rows(pool: PgPool)
         .expect("seed query batch");
     }
 
-    let rows = repo
+    let (rows, _total) = repo
         .list_inventory_batches_with_query(
             &owner_ctx,
             wms_domain::InventoryBatchQuery {
@@ -426,6 +430,8 @@ async fn inventory_query_combines_filters_without_cross_owner_rows(pool: PgPool)
                 expiry_to: Some("2027-12-31".to_string()),
                 ..Default::default()
             },
+            1,
+            200,
         )
         .await
         .expect("combined inventory query should succeed");
@@ -472,7 +478,7 @@ async fn inventory_query_filters_location_type_and_zone_without_cross_owner_rows
     )
     .await;
 
-    let rows = repo
+    let (rows, _total) = repo
         .list_inventory_batches_with_query(
             &owner_ctx,
             wms_domain::InventoryBatchQuery {
@@ -480,6 +486,8 @@ async fn inventory_query_filters_location_type_and_zone_without_cross_owner_rows
                 zone_code: Some("ZONE-TARGET".to_string()),
                 ..Default::default()
             },
+            1,
+            200,
         )
         .await
         .expect("location metadata query should succeed");
@@ -488,7 +496,7 @@ async fn inventory_query_filters_location_type_and_zone_without_cross_owner_rows
     assert_eq!(rows[0].id, target_id);
     assert_eq!(rows[0].owner_id, owner_id);
 
-    let rows_with_blank_filters = repo
+    let (rows_with_blank_filters, _t1) = repo
         .list_inventory_batches_with_query(
             &owner_ctx,
             wms_domain::InventoryBatchQuery {
@@ -496,18 +504,22 @@ async fn inventory_query_filters_location_type_and_zone_without_cross_owner_rows
                 zone_code: Some(String::new()),
                 ..Default::default()
             },
+            1,
+            200,
         )
         .await
         .expect("blank location metadata filters should be ignored");
     assert_eq!(rows_with_blank_filters.len(), 2);
 
-    let rows_with_unknown_filter = repo
+    let (rows_with_unknown_filter, _t2) = repo
         .list_inventory_batches_with_query(
             &owner_ctx,
             wms_domain::InventoryBatchQuery {
                 location_type: Some("unknown".to_string()),
                 ..Default::default()
             },
+            1,
+            200,
         )
         .await
         .expect("unknown location metadata filter should return empty");
@@ -586,7 +598,7 @@ async fn inventory_query_filters_production_and_created_date_ranges(pool: PgPool
         .expect("seed date filter batch");
     }
 
-    let rows = repo
+    let (rows, _total) = repo
         .list_inventory_batches_with_query(
             &owner_ctx,
             wms_domain::InventoryBatchQuery {
@@ -596,6 +608,8 @@ async fn inventory_query_filters_production_and_created_date_ranges(pool: PgPool
                 created_to: Some("2026-06-30T23:59:59Z".to_string()),
                 ..Default::default()
             },
+            1,
+            200,
         )
         .await
         .expect("date range inventory query should succeed");

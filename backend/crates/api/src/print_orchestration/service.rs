@@ -7,9 +7,9 @@ use wms_domain::{
     CreateAggregationRuleDraftRequest, CreateCutoffPlanRequest, CreatePrintSuiteDraftRequest,
     CutoffPlan, CutoffPlanListResponse, DeliveryNoteCandidateListResponse,
     DeliveryNoteGroupListResponse, ManualDeliveryNoteCutoffRequest,
-    PrintDocumentCategoryListResponse, PrintSuiteInstanceListResponse, PrintSuiteTestResult,
-    PrintSuiteVersion, PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
-    RouteBindingListResponse, TestAggregationRuleRequest, TestPrintSuiteRequest,
+    PrintDocumentCategoryListResponse, PrintSuiteInstance, PrintSuiteTestResult, PrintSuiteVersion,
+    PrintSuiteVersionListResponse, PublishRouteBindingRequest, RouteBinding,
+    TestAggregationRuleRequest, TestPrintSuiteRequest,
 };
 
 use crate::file_attachment::FileAttachmentService;
@@ -93,8 +93,12 @@ impl PrintOrchestrationService {
         &self,
         ctx: &AuthContext,
         warehouse_id: Option<uuid::Uuid>,
-    ) -> Result<RouteBindingListResponse, PrintOrchestrationError> {
-        self.repository.list_route_bindings(ctx, warehouse_id).await
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<RouteBinding>, i64), PrintOrchestrationError> {
+        self.repository
+            .list_route_bindings(ctx, warehouse_id, page, page_size)
+            .await
     }
 
     /// Lists confirmed, route-frozen orders that have not been cut off.
@@ -350,9 +354,11 @@ impl PrintOrchestrationService {
         &self,
         ctx: &AuthContext,
         group_id: Option<uuid::Uuid>,
-    ) -> Result<PrintSuiteInstanceListResponse, PrintOrchestrationError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<PrintSuiteInstance>, i64), PrintOrchestrationError> {
         self.repository
-            .list_print_suite_instances(ctx, group_id)
+            .list_print_suite_instances(ctx, group_id, page, page_size)
             .await
     }
 

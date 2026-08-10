@@ -133,6 +133,7 @@ nav:
     - H3 API 文档与对接说明: api/h3-api-access.md
     - H3 OpenAPI curl 示例: api/curl-examples.md
     - H3 OpenAPI 变更日志: api/openapi-changelog.md
+    - H3 API 列表分页统一规范: api/api-pagination-standards.md
     - H-DOCK 月台预约管理 (W4-5 可选): domain/user-stories-h-dock-management.md
     - H-AL 告警引擎 (W1+): domain/user-stories-h-alert.md
   - 设计决策:

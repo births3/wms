@@ -9,6 +9,8 @@ use super::*;
         ("task_id" = Option<uuid::Uuid>, Query, description = "养护任务 ID"),
         ("batch_id" = Option<uuid::Uuid>, Query, description = "库存批次 ID"),
         ("status" = Option<String>, Query, description = "任务状态：pending/completed"),
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
     ),
     responses(
         (status = 200, description = "养护任务列表", body = MaintenanceTaskListResponse),
@@ -26,6 +28,8 @@ pub(crate) fn list_maintenance_tasks() {}
     params(
         ("task_id" = Option<uuid::Uuid>, Query, description = "养护任务 ID"),
         ("batch_id" = Option<uuid::Uuid>, Query, description = "库存批次 ID"),
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
     ),
     responses(
         (status = 200, description = "养护记录列表", body = MaintenanceRecordListResponse),
