@@ -73,9 +73,19 @@ export const productCoreColumns: DataGridColumn<MasterDataRow>[] = [
     header: "储存条件",
     width: 160,
     minWidth: 140,
-    filterValue: (row) => `${row.extraLabel} ${row.extraValue}`,
+    filterValue: (row) => row.extraValue,
     copyValue: (row) => row.extraValue,
-    filter: { type: "text" },
+    // filterValue 返回 row.extraValue（storageConditionDisplayLabel 转换后的中文展示值），
+    // options value 必须与之一致，否则筛选永远不匹配且 dataGridFilterConfigForData 会剔除全部选项
+    filter: {
+      type: "multiSelect",
+      options: [
+        { value: "冷冻", label: "冷冻" },
+        { value: "冷藏", label: "冷藏" },
+        { value: "阴凉", label: "阴凉" },
+        { value: "常温", label: "常温" },
+      ],
+    },
     render: (row) => row.extraValue || "-",
   },
 ];

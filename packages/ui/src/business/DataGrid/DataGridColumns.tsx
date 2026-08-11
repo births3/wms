@@ -92,6 +92,10 @@ export function buildDataGridColumns<T>({
   onPageSelected,
   onRowSelected,
 }: BuildDataGridColumnsOptions<T>): DataTableColumn<T>[] {
+  // 序号列（__rowNumber）占 effectiveVisibleColumns 的 index 0，但右键菜单/区域选择/粘贴
+  // 共享的 visibleColumns 不含序号列（__select 复选框列同样不参与）。回调与高亮统一换算为
+  // 数据列索引，避免区域复制/求和/粘贴目标错位一列；序号列自身不参与这些交互。
+  const hasRowNumberColumn = visibleColumns[0]?.key === "__rowNumber";
   const tableColumns: DataTableColumn<T>[] = visibleColumns.map((column, columnIndex) => {
     const sourceRender = column.render;
     const columnCanCopy = column.copyable !== false && copyableKeys.has(column.key);
@@ -99,6 +103,7 @@ export function buildDataGridColumns<T>({
     const frozenLeft = frozenColumnOffsets[column.key];
     const frozen = frozenLeft !== undefined;
     const frozenBaseClassName = "sticky shadow-[1px_0_0_hsl(var(--border))]";
+    const dataColumnIndex = column.key === "__rowNumber" ? -1 : columnIndex - (hasRowNumberColumn ? 1 : 0);
 
     return {
       ...column,
@@ -111,9 +116,13 @@ export function buildDataGridColumns<T>({
           }
         : undefined,
       cellProps: (_row, rowIndex) => ({
-        onContextMenu: (event) => onOpenContextMenu(event, rowIndex, columnIndex),
-        onMouseDown: (event) => onStartCellAreaSelection(event, rowIndex, columnIndex),
-        onMouseEnter: () => onUpdateCellAreaSelection(rowIndex, columnIndex),
+        ...(dataColumnIndex >= 0
+          ? {
+              onContextMenu: (event) => onOpenContextMenu(event, rowIndex, dataColumnIndex),
+              onMouseDown: (event) => onStartCellAreaSelection(event, rowIndex, dataColumnIndex),
+              onMouseEnter: () => onUpdateCellAreaSelection(rowIndex, dataColumnIndex),
+            }
+          : {}),
         style: frozen ? { left: frozenLeft } : undefined,
         className: cn(
           frozen && "z-20 bg-background",
@@ -122,8 +131,8 @@ export function buildDataGridColumns<T>({
           selectedAreaBounds &&
             rowIndex >= selectedAreaBounds.top &&
             rowIndex <= selectedAreaBounds.bottom &&
-            columnIndex >= selectedAreaBounds.left &&
-            columnIndex <= selectedAreaBounds.right &&
+            dataColumnIndex >= selectedAreaBounds.left &&
+            dataColumnIndex <= selectedAreaBounds.right &&
             "bg-primary/10 ring-1 ring-inset ring-primary/30",
         ),
         "data-datagrid-cell": `${rowIndex}:${column.key}`,

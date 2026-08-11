@@ -46,6 +46,8 @@ export interface DataTableProps<T> extends Omit<React.HTMLAttributes<HTMLDivElem
   selectedKey?: string;
   /** 行点击回调 */
   onRowClick?: (row: T, idx: number) => void;
+  /** 行双击回调（查看详情等） */
+  onRowDoubleClick?: (row: T, idx: number) => void;
   /** 表格上方注释（行数 / 排序说明） */
   caption?: React.ReactNode;
   /** 翻页槽（footer） */
@@ -61,6 +63,7 @@ export function DataTable<T>({
   rowKey,
   selectedKey,
   onRowClick,
+  onRowDoubleClick,
   caption,
   footer,
   emptyTitle,
@@ -125,7 +128,8 @@ export function DataTable<T>({
                     key={key}
                     data-state={selected ? "selected" : undefined}
                     onClick={onRowClick ? () => onRowClick(row, idx) : undefined}
-                    className={onRowClick ? "cursor-pointer" : ""}
+                    onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row, idx) : undefined}
+                    className={onRowClick || onRowDoubleClick ? "cursor-pointer" : ""}
                   >
                     {columns.map((col) => {
                       const { className: cellClassName, style: cellStyle, ...cellProps } = col.cellProps?.(row, idx) ?? {};

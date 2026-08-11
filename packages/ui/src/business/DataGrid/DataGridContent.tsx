@@ -7,13 +7,10 @@ import { DataGridActionSettingsPanel, type DataGridActionSettingItem } from "./D
 import { DataGridContextMenu } from "./DataGridContextMenu";
 import { DataGridExportDialog } from "./DataGridExportDialog";
 import { DataGridFieldSettingsPanel } from "./DataGridFieldSettingsPanel";
-import { DataGridFilterChips } from "./DataGridFilterChips";
 import { DataGridPaginationFooter } from "./DataGridPaginationFooter";
 import { DataGridSummaryDialog, type DataGridSummaryConfig } from "./DataGridSummaryDialog";
 import type { DataGridExportFormat } from "./data-grid-export";
-import type { DataGridFilterSummaryField } from "./data-grid-filter-summary";
 import type {
-  DataGridColumnFilters,
   DataGridFloatingPanelPosition,
   DataGridPageResult,
 } from "./data-grid-logic";
@@ -53,6 +50,7 @@ export interface DataGridContentProps<T> {
   rowKey: (row: T) => string;
   selectedKey?: string;
   onRowClick?: DataTableProps<T>["onRowClick"];
+  onRowDoubleClick?: DataTableProps<T>["onRowDoubleClick"];
   selectable: boolean;
   selectedCount: number;
   pageSize: number;
@@ -63,10 +61,6 @@ export interface DataGridContentProps<T> {
   onClearSelected: () => void;
   /** 服务端分页受控模式透传给页脚；未提供时页脚走现有内存分页分支 */
   serverPagination?: DataGridServerPagination;
-  columnFilters: DataGridColumnFilters;
-  filterSummaryFields: DataGridFilterSummaryField[];
-  onClearColumnFilter: (key: string) => void;
-  onClearColumnFilters: () => void;
   querySummaryItems: DataGridQuerySummaryItem[];
   onClearQueryState?: () => void;
   fieldsOpen: boolean;
@@ -133,6 +127,7 @@ export function DataGridContent<T>({
   rowKey,
   selectedKey,
   onRowClick,
+  onRowDoubleClick,
   selectable,
   selectedCount,
   pageSize,
@@ -142,10 +137,6 @@ export function DataGridContent<T>({
   onPageIndexChange,
   onClearSelected,
   serverPagination,
-  columnFilters,
-  filterSummaryFields,
-  onClearColumnFilter,
-  onClearColumnFilters,
   querySummaryItems,
   onClearQueryState,
   fieldsOpen,
@@ -233,6 +224,7 @@ export function DataGridContent<T>({
             tableStyle={tableStyle}
             selectedKey={selectedKey}
             onRowClick={onRowClick}
+            onRowDoubleClick={onRowDoubleClick}
             caption={caption}
             emptyTitle={emptyTitle}
             emptyDescription={emptyDescription}
@@ -256,13 +248,6 @@ export function DataGridContent<T>({
           />
         )}
       </div>
-      <DataGridFilterChips
-        className="border-primary/30 bg-primary/5 text-primary"
-        filters={columnFilters}
-        fields={filterSummaryFields}
-        onClearFilter={onClearColumnFilter}
-        onClearAll={onClearColumnFilters}
-      />
       {querySummaryItems.length > 0 ? (
         <div
           aria-label="业务查询条件"

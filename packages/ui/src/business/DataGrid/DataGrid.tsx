@@ -2,7 +2,9 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 import type { DataGridSummaryConfig } from "./DataGridSummaryDialog";
 import { DataGridContent } from "./DataGridContent";
+import { DataGridDetailDialog } from "./DataGridDetailDialog";
 import type { DataGridActionSettingItem } from "./DataGridActionSettingsPanel";
+import { DataGridFilterChips } from "./DataGridFilterChips";
 import { DataGridToolbar } from "./DataGridToolbar";
 import { clearDataGridFilterKey } from "./data-grid-filter-summary";
 import {
@@ -34,7 +36,9 @@ import { loadGridSettings, saveGridSettings } from "./data-grid-storage";
 import {
   defaultColumnWidth,
   defaultPageSizeOptions,
+  type DataGridActionDisabled,
   type DataGridColumn,
+  type DataGridDetailAction,
   type DataGridProps,
 } from "./data-grid-types";
 import { buildDataGridColumns } from "./DataGridColumns";
@@ -61,6 +65,7 @@ function DataGridInner<T>(
     rowKey,
     selectedKey,
     onRowClick,
+    onRowDoubleClick,
     caption,
     emptyTitle,
     emptyDescription,
@@ -92,6 +97,7 @@ function DataGridInner<T>(
     showPrintAction = true,
     showExportAction = true,
     serverPagination,
+    showRowNumber = true,
     className,
     tableClassName,
     maxHeight,
@@ -115,13 +121,28 @@ function DataGridInner<T>(
     const values = pageSizeOptions.filter((value, index, source) => value > 0 && source.indexOf(value) === index);
     return values.length > 0 ? values : defaultPageSizeOptions;
   }, [pageSizeSignature]);
+  // 内置"查看"：未传 detailAction 时默认提供（通用详情对话框）；双击行同样打开
+  const [builtinDetailRow, setBuiltinDetailRow] = React.useState<T | null>(null);
+  const effectiveDetailAction: DataGridDetailAction | undefined = detailAction ?? (selectable ? {
+    label: "查看",
+    description: "查看选中记录详情",
+    disabled: (({ selectedRowKeys: keys }: { selectedRowKeys: string[] }) => keys.length !== 1) as DataGridActionDisabled,
+    onClick: ({ selectedRowKeys: keys }) => {
+      const row = keys.length === 1 ? data.find((item) => rowKey(item) === keys[0]) : undefined;
+      if (row) setBuiltinDetailRow(row);
+    },
+  } : undefined);
+  // 行双击：页面未传 onRowDoubleClick 时回退打开内置详情对话框
+  const handleRowDoubleClick: (row: T, idx: number) => void = onRowDoubleClick
+    ? onRowDoubleClick
+    : (row: T) => setBuiltinDetailRow(row);
   const actionDescriptors = React.useMemo(
     () =>
       buildDataGridActionDescriptors({
         refreshAction,
         queryAction,
         createAction,
-        detailAction,
+        detailAction: effectiveDetailAction,
         editAction,
         deleteAction,
         disableAction,
@@ -138,7 +159,7 @@ function DataGridInner<T>(
       refreshAction,
       queryAction,
       createAction,
-      detailAction,
+      effectiveDetailAction,
       editAction,
       deleteAction,
       disableAction,
@@ -274,6 +295,21 @@ function DataGridInner<T>(
   const orderedHideableColumns = orderedColumns.filter((column) => column.hideable !== false);
   const fixedColumns = orderedColumns.filter((column) => column.hideable === false);
   const visibleColumns = [...orderedHideableColumns.filter((column) => visibleKeys.has(column.key)), ...fixedColumns];
+  // 默认序号列（行号，跨页连续）；hideable false 不参与字段面板/筛选/排序
+  const rowNumberColumn: DataGridColumn<T> = {
+    key: "__rowNumber",
+    header: "#",
+    width: 56,
+    minWidth: 48,
+    hideable: false,
+    copyable: false,
+    sortable: false,
+    filter: false,
+    align: "center",
+    className: "text-xs text-muted-foreground",
+    render: (_row, idx) => (serverPagination?.pageIndex ?? pageIndex) * (serverPagination?.pageSize ?? settings.pageSize) + idx + 1,
+  };
+  const effectiveVisibleColumns = showRowNumber ? [rowNumberColumn, ...visibleColumns] : visibleColumns;
   const frozenColumnOffsets = dataGridFrozenColumnOffsets(visibleColumns, frozenKeys, defaultColumnWidth);
   const summaryTable = summaryConfig
     ? buildDataGridSummaryTable(visibleColumns, page.filteredRows, summaryConfig.groupColumnKeys, summaryConfig.selections)
@@ -346,6 +382,17 @@ function DataGridInner<T>(
     }));
   }
 
+  function clearColumnFilter(key: string) {
+    setSettings((current) => ({
+      ...current,
+      columnFilters: clearDataGridFilterKey(current.columnFilters, key),
+    }));
+  }
+
+  function clearColumnFilters() {
+    setSettings((current) => ({ ...current, columnFilters: {} }));
+  }
+
   function setSelectedKeys(keys: string[]) {
     if (!selectedRowKeys) setInternalSelectedRowKeys(keys);
     onSelectedRowKeysChange?.(keys);
@@ -386,7 +433,7 @@ function DataGridInner<T>(
   }
 
   const finalColumns = buildDataGridColumns({
-    visibleColumns,
+    visibleColumns: effectiveVisibleColumns,
     data,
     rowKey,
     copyableKeys,
@@ -430,11 +477,18 @@ function DataGridInner<T>(
   return (
     // flex 撑满父容器：工具栏固定、表格区占剩余空间，页面级不滚动
     <div ref={rootRef} className={cn("flex h-full min-h-0 flex-col gap-3", className)} {...rest}>
+      <DataGridFilterChips
+        className="border-primary/30 bg-primary/5 text-primary"
+        filters={columnFilters}
+        fields={filterSummaryFields}
+        onClearFilter={clearColumnFilter}
+        onClearAll={clearColumnFilters}
+      />
       <DataGridToolbar
         refreshAction={refreshAction}
         queryAction={queryAction}
         createAction={createAction}
-        detailAction={detailAction}
+        detailAction={effectiveDetailAction}
         editAction={editAction}
         deleteAction={deleteAction}
         disableAction={disableAction}
@@ -492,6 +546,7 @@ function DataGridInner<T>(
         rowKey={rowKey}
         selectedKey={selectedKey}
         onRowClick={onRowClick}
+        onRowDoubleClick={handleRowDoubleClick}
         selectable={selectable}
         selectedCount={selectedKeys.length}
         pageSize={settings.pageSize}
@@ -501,12 +556,6 @@ function DataGridInner<T>(
         onPageSizeChange={(pageSize) => setSettings((current) => ({ ...current, pageSize }))}
         onPageIndexChange={setPageIndex}
         onClearSelected={() => setSelectedKeys([])}
-        columnFilters={columnFilters}
-        filterSummaryFields={filterSummaryFields}
-        onClearColumnFilter={(key) =>
-          setSettings((current) => ({ ...current, columnFilters: clearDataGridFilterKey(current.columnFilters, key) }))
-        }
-        onClearColumnFilters={() => setSettings((current) => ({ ...current, columnFilters: {} }))}
         querySummaryItems={querySummaryItems}
         onClearQueryState={onClearQueryState}
         fieldsOpen={fieldsOpen}
@@ -560,6 +609,13 @@ function DataGridInner<T>(
         onExportFileNameChange={setExportFileName}
         onExportFormatChange={setExportFormat}
         onConfirmExport={confirmExport}
+      />
+      <DataGridDetailDialog
+        row={builtinDetailRow}
+        columns={visibleColumns}
+        rowKey={rowKey}
+        open={builtinDetailRow !== null}
+        onOpenChange={(open) => { if (!open) setBuiltinDetailRow(null); }}
       />
     </div>
   );

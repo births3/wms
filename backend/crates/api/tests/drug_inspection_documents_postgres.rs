@@ -1,3 +1,4 @@
+// @governance: skip-page-size - 药检文档全生命周期集成测试聚合（上传/复核/复制任务/分页断言），拆分破坏场景链完整性。
 use axum::{
     body::{to_bytes, Body},
     http::{header::CONTENT_TYPE, Request, StatusCode},
@@ -17,6 +18,7 @@ use wms_api::{
     },
     drug_inspection_document_repository::PgDrugInspectionDocumentRepository,
     drug_inspection_document_repository::PgDrugInspectionStampRepository,
+    drug_inspection_stamp_handlers::{drug_inspection_stamp_router, DrugInspectionStampAppState},
 };
 use wms_domain::{
     ApproveDrugInspectionCopyOversizeRequest, CreateDrugInspectionStampVersionRequest,
@@ -524,6 +526,23 @@ async fn report_upload_review_reuse_and_correction_preserve_version_chain(pool: 
         "pending_confirmation"
     );
 
+    let queue = app
+        .clone()
+        .oneshot(json_request(
+            "GET",
+            "/api/v1/drug-inspection/review-queue",
+            uploader.clone(),
+            None,
+            json!({}),
+        ))
+        .await
+        .expect("review queue should respond");
+    assert_eq!(queue.status(), StatusCode::OK);
+    let queue_body = response_json(queue).await;
+    assert_eq!(queue_body["page"]["count"], 1);
+    assert_eq!(queue_body["page"]["total"], 1);
+    assert_eq!(queue_body["data"][0]["version"]["id"], first_version_id);
+
     let self_review = app
         .clone()
         .oneshot(json_request(
@@ -563,7 +582,10 @@ async fn report_upload_review_reuse_and_correction_preserve_version_chain(pool: 
         .await
         .expect("list should respond");
     assert_eq!(partial_list.status(), StatusCode::OK);
-    let rows = response_json(partial_list).await["data"]
+    let list_body = response_json(partial_list).await;
+    assert_eq!(list_body["page"]["count"], 2);
+    assert_eq!(list_body["page"]["total"], 2);
+    let rows = list_body["data"]
         .as_array()
         .expect("list data should exist")
         .clone();
@@ -692,6 +714,54 @@ async fn report_upload_review_reuse_and_correction_preserve_version_chain(pool: 
     .await
     .expect("report lifecycle audit and idempotency evidence should query");
     assert_eq!(evidence, (7, 7));
+
+    let queue_after = app
+        .clone()
+        .oneshot(json_request(
+            "GET",
+            "/api/v1/drug-inspection/review-queue",
+            uploader,
+            None,
+            json!({}),
+        ))
+        .await
+        .expect("empty review queue should respond");
+    assert_eq!(queue_after.status(), StatusCode::OK);
+    let queue_after_body = response_json(queue_after).await;
+    assert_eq!(queue_after_body["page"]["count"], 0);
+    assert_eq!(queue_after_body["page"]["total"], 0);
+    assert_eq!(
+        queue_after_body["data"]
+            .as_array()
+            .expect("queue data should exist")
+            .len(),
+        0
+    );
+
+    let stamp_app = drug_inspection_stamp_router(DrugInspectionStampAppState::with_local_storage(
+        pool.clone(),
+        std::env::temp_dir(),
+    ));
+    let copy_reviewer = context(
+        fixture.owner_id,
+        fixture.reviewer_id,
+        &["m-di.stamp.review"],
+    );
+    let copy_list = stamp_app
+        .clone()
+        .oneshot(json_request(
+            "GET",
+            "/api/v1/drug-inspection/customer-copy-jobs?page_size=99999",
+            copy_reviewer,
+            None,
+            json!({}),
+        ))
+        .await
+        .expect("copy jobs list should respond");
+    assert_eq!(copy_list.status(), StatusCode::OK);
+    let copy_body = response_json(copy_list).await;
+    assert_eq!(copy_body["page"]["count"], 2);
+    assert_eq!(copy_body["page"]["total"], 2);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

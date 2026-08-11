@@ -1,3 +1,4 @@
+// 治理登记：Redis 黑名单 —— 会话登出写入 Redis 黑名单（黑名单校验在 API 层）
 import * as React from "react";
 import {
   Button,
@@ -108,7 +109,6 @@ export function H1SessionPage({ currentUser }: H1SessionPageProps) {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="H1 登录会话"
-        subtitle="Token 失效、设备会话与管理员强制踢人 · Redis 黑名单直至 token 到期"
       />
 
       <Card className="rounded-lg border-primary/20 bg-primary/5 shadow-sm">
