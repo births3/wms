@@ -27,6 +27,7 @@ export default defineConfig(({ command }) => {
       host: "0.0.0.0",
       port: 9002,
       strictPort: true,
+      allowedHosts: ["wms.wzsghdyf.com"],
       proxy: devApiProxyUrl
         ? {
             "/api": {
