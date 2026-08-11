@@ -70,6 +70,7 @@ export interface MasterDataRow {
 export interface ProductMasterDataFields {
   approvalNo?: string | null;
   attrs: Record<string, unknown>;
+  barcode69?: string | null;
   dosageForm?: string | null;
   electronicRegulatoryCode?: string | null;
   heightMm: string;

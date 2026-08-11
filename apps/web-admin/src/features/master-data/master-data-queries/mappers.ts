@@ -79,6 +79,7 @@ export function productRow(item: Product): MasterDataRow {
     productFields: {
       approvalNo: item.approval_no,
       attrs: item.attrs,
+      barcode69: item.barcode_69,
       dosageForm: item.dosage_form,
       electronicRegulatoryCode: item.electronic_regulatory_code,
       heightMm: numericText(item.height_mm),

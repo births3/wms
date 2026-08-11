@@ -6,6 +6,7 @@ import {
   buildQueryPanelSummaryItems,
   buildLocationBatchPreview,
   type DataGridCreateAction,
+  type DataGridDetailAction,
   type DataGridDisableAction,
   type DataGridEditAction,
   type DataGridRefreshAction,
@@ -29,6 +30,7 @@ import {
   type CreateSupplierRequest,
   type MasterDataRow,
   type MasterDataViewId,
+  specialDrugCategoryDictCode,
 } from "@/features/master-data/master-data-queries";
 import {
   LocationBatchDialog,
@@ -50,6 +52,7 @@ import {
   MasterDataSourceActions,
   type MasterDataSourceActionsHandle,
 } from "./MasterDataSourceActions";
+import { ProductDetailDialog } from "./ProductDetailDialog";
 import { productColumns } from "./ProductEditTable";
 import {
   baseMasterDataColumns,
@@ -159,6 +162,14 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
     viewId === "m1-locations",
   );
   const locationTypeOptions = locationTypeOptionsQuery.data ?? [];
+  const specialDrugCategoryOptions = useSystemDictionaryItemOptionsQuery(
+    specialDrugCategoryDictCode,
+    viewId === "m1-products",
+  ).data ?? [];
+  const specialDrugCategoryLabels = React.useMemo(
+    () => new Map(specialDrugCategoryOptions),
+    [specialDrugCategoryOptions],
+  );
   const temperatureZoneOptions = useSystemDictionaryItemOptionsQuery("temperature_zone", viewId === "m1-zones").data ?? [];
   const qualityColorOptions = useSystemDictionaryItemOptionsQuery("quality_color", viewId === "m1-zones").data ?? [];
   const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
@@ -168,6 +179,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const [disablingId, setDisablingId] = React.useState<string | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = React.useState<string[]>([]);
   const [printTarget, setPrintTarget] = React.useState<H9BusinessPrintTarget | null>(null);
+  const [detailTarget, setDetailTarget] = React.useState<MasterDataRow | null>(null);
   const [crudTarget, setCrudTarget] = React.useState<MasterDataCrudTarget | null>(null);
   const supplierActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
   const customerActionsRef = React.useRef<MasterDataSourceActionsHandle>(null);
@@ -230,7 +242,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const baseGridColumns = masterDataColumns(viewId, baseMasterDataColumns, locationMasterDataColumns);
   const gridColumns =
     viewId === "m1-products"
-      ? productColumns(baseGridColumns)
+      ? productColumns(baseGridColumns, specialDrugCategoryLabels)
       : isMasterDataCrudView(viewId)
         ? masterDataCrudColumns(baseGridColumns, viewId, openCrudEdit, disableCrudRow, disablingId)
         : baseGridColumns;
@@ -397,6 +409,17 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
             }
           : undefined
     : undefined;
+  const gridDetailAction: DataGridDetailAction | undefined = viewId === "m1-products"
+    ? {
+        label: "查看",
+        description: "查看选中商品详情",
+        disabled: ({ selectedRowKeys: keys }) => keys.length !== 1,
+        onClick: ({ selectedRowKeys: keys }) => {
+          setRowActionError(null);
+          setDetailTarget(selectedRowFrom(keys));
+        },
+      }
+    : undefined;
   const gridEditAction: DataGridEditAction | undefined = canWrite &&
     isMasterDataCrudView(viewId)
       ? {
@@ -557,6 +580,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         exportFileBaseName={meta.title}
         refreshAction={gridRefreshAction}
         createAction={gridCreateAction}
+        detailAction={gridDetailAction}
         editAction={gridEditAction}
         disableAction={gridDisableAction}
         toolbarActions={gridToolbarActions}
@@ -610,6 +634,13 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
           if (!next) setPrintTarget(null);
         }}
         onPrinted={(target) => setLastEvent(`${target.description}已登记打印结果`)}
+      />
+      <ProductDetailDialog
+        row={detailTarget}
+        specialDrugCategoryLabels={specialDrugCategoryLabels}
+        onOpenChange={(open) => {
+          if (!open) setDetailTarget(null);
+        }}
       />
     </section>
   );
