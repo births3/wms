@@ -184,18 +184,15 @@ export function nextM2InboundSelectedId(
 }
 
 export function inboundPageMeta(mode: M2InboundMode) {
-  const meta: Record<M2InboundMode, { title: string; subtitle: string }> = {
+  const meta: Record<M2InboundMode, { title: string }> = {
     receiving: {
       title: "M2 收货管理",
-      subtitle: "ASN 接收 · 到货登记 · 实到/缺货/拒收",
     },
     inspecting: {
       title: "M2 验收管理",
-      subtitle: "批号效期验收 · 追溯码 · 双人签字",
     },
     putaway: {
       title: "M2 上架管理",
-      subtitle: "库位确认 · 商品批号 · 数量上架",
     },
   };
   return meta[mode];

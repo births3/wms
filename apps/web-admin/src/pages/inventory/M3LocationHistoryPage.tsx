@@ -219,7 +219,6 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
     <div className="space-y-4">
       <PageHeader
         title="M3 库位历史追踪"
-        subtitle="按库位反查商品/批号变动、风险与导出证据"
       />
       <QueryPanel
         fields={m3LocationHistoryQueryFields}

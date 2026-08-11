@@ -466,7 +466,6 @@ export function H9PrintTemplatePage({ currentUser }: { currentUser: CurrentUser 
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="H9 打印模板"
-        subtitle="字段库、模板类型和 hiprint 模板设计入口"
         actions={canOpenFieldLibrary ? (
           <Button type="button" variant="outline" onClick={() => setFieldLibraryOpen(true)}>
             <Database className="size-4" aria-hidden />

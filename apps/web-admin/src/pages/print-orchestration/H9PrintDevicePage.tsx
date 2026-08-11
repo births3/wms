@@ -356,7 +356,6 @@ export function H9PrintDevicePage({ currentUser }: { currentUser: CurrentUser })
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="设备·Print Agent 管理"
-        subtitle="物理打印站点、货主仓映射、打印机、纸盒与设备租约；Print Agent 注册在 US-H9-012 接入本页"
         actions={notice ? <span className="self-center text-sm text-muted-foreground" role="status">{notice}</span> : undefined}
       />
       <QueryPanel

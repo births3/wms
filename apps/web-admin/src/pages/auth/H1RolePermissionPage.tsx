@@ -283,7 +283,7 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
   if (!canManage) {
     return (
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-        <PageHeader title="H1 角色权限" subtitle="角色、权限矩阵与用户批量授权" />
+        <PageHeader title="H1 角色权限" />
         <Card><CardContent className="p-6 text-sm text-muted-foreground" role="alert">当前账号没有 h1.roles.manage 权限，角色权限操作已隐藏。</CardContent></Card>
       </section>
     );
@@ -291,7 +291,7 @@ export function H1RolePermissionPage({ currentUser }: { currentUser: CurrentUser
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="H1 角色权限" subtitle="角色、权限矩阵与用户批量授权；写入由 h1.roles.manage 控制" />
+      <PageHeader title="H1 角色权限" />
       {notice ? <NoticePanel notice={notice} /> : null}
       <QueryPanel
         fields={h1RoleQueryFields}

@@ -301,7 +301,7 @@ export function H1AdminMenuPage() {
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="H1 菜单管理" subtitle="三层菜单、草稿发布、版本回滚和按钮权限点" />
+        <PageHeader title="H1 菜单管理" />
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" disabled={draftQuery.isFetching} onClick={() => void draftQuery.refetch()}>
             <RefreshCw className="size-4" aria-hidden />刷新

@@ -14,8 +14,6 @@ const devMock = fs.readFileSync(
   "utf8",
 );
 
-assert.match(page, /ERP 权威商品投影/);
-assert.match(page, /本页只读/);
 assert.doesNotMatch(page, /ProductBatchImportDialog/);
 assert.doesNotMatch(page, /ProductCreateDialog/);
 assert.doesNotMatch(api, /batchCreateProducts/);

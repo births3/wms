@@ -176,14 +176,6 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
   const busy = isolationMutation.isPending || resolveMutation.isPending || ruleMutation.isPending;
   const canExecute = currentUser.permissions.includes("rc.reconciliation.execute");
   const canResolve = currentUser.permissions.includes("rc.reconciliation.resolve");
-  const permissionHint = !canExecute && !canResolve
-    ? " · 当前账号只读"
-    : !canResolve
-      ? " · 当前账号不可处置差异"
-      : !canExecute
-        ? " · 当前账号不可维护频率"
-        : "";
-
   const refreshAction: DataGridRefreshAction = {
     label: BUTTON_REFRESH,
     description: "刷新真实对账差异",
@@ -335,7 +327,6 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="M-RC 库存对账"
-        subtitle={`当前货主 ${currentUser.owner_code} · 待处理表示真实对账已发现差异但尚未选择处置方式${permissionHint}`}
       />
       {ruleQuery.isError && (
         <div

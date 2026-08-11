@@ -139,7 +139,7 @@ export function M3InventoryCountPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="M3 库存盘点" subtitle="创建盘点单、提交实盘并审批调整" />
+      <PageHeader title="M3 库存盘点" />
       <QueryPanel
         fields={m3CountQueryFields}
         defaultVisibleFieldKeys={m3CountCoreQueryFieldKeys}

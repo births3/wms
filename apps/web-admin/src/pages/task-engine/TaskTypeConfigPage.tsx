@@ -87,7 +87,7 @@ export function TaskTypeConfigPage() {
   const disableAction: DataGridDisableAction = { label: selectedRow?.enabled ? STATUS_DISABLED : STATUS_ENABLED, description: "切换任务类型状态", disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy, onClick: () => { if (selectedRow) openToggleWith(selectedRow); } };
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-    <PageHeader title="M-TE 任务类型配置" subtitle="维护预置与自定义任务类型的调度参数" />
+    <PageHeader title="M-TE 任务类型配置" />
     <PriorityRuleCard />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
     <QueryPanel fields={queryFields} defaultVisibleFieldKeys={mteTaskTypeCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />

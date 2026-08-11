@@ -12,7 +12,7 @@ const queryGovernance = JSON.parse(read("src/pages/page-query-core-fields.json")
 
 for (const token of [
   "页面设计契约", "<QueryPanel", "<DataGrid", "alertDashboardQueryFields",
-  "alertDashboardCoreQueryFieldKeys", "每 5 秒刷新", "导出 Excel", "GSP 告警生命周期报表",
+  "alertDashboardCoreQueryFieldKeys", "导出 Excel", "GSP 告警生命周期报表",
 ]) assert.match(dashboard, new RegExp(token));
 
 for (const token of [

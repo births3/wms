@@ -6,7 +6,6 @@ const root = path.resolve(new URL("..", import.meta.url).pathname);
 const page = fs.readFileSync(path.join(root, "src/pages/master-data/M1MasterDataPage.tsx"), "utf8");
 const table = fs.readFileSync(path.join(root, "src/pages/master-data/ProductEditTable.tsx"), "utf8");
 
-assert.match(page, /ERP 权威商品投影/);
 assert.doesNotMatch(page, /ProductEditDialog/);
 assert.doesNotMatch(page, /useProductEditDialog/);
 assert.doesNotMatch(table, /onEdit/);

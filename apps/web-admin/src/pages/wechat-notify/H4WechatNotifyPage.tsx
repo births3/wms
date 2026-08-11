@@ -168,7 +168,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   if (mode === "settings") {
     return (
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-        <PageHeader title="H4 参数设置" subtitle="企业微信应用、回调、密钥别名和重试参数" />
+        <PageHeader title="H4 参数设置" />
         <NoticePanel notice={settingsDialog.open ? null : notice} />
         <QueryPanel
           fields={h4WechatSettingsQueryFields}
@@ -232,7 +232,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   if (mode === "records") {
     return (
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-        <PageHeader title="H4 发送记录" subtitle="企业微信通知发送、失败排查与手动重发" />
+        <PageHeader title="H4 发送记录" />
         <NoticePanel notice={notice} />
         <QueryPanel
           fields={h4NotificationRecordQueryFields}
@@ -288,7 +288,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="H4 通知配置" subtitle="配置企业微信事件、模板、接收人和启停状态" />
+      <PageHeader title="H4 通知配置" />
       <NoticePanel notice={configDialog.open || sendDialog.open ? null : notice} />
       <QueryPanel
         fields={h4NotificationConfigQueryFields}

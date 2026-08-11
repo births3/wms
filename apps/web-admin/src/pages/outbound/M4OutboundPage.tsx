@@ -108,7 +108,7 @@ interface M4OutboundPageProps {
 
 const m4OutboundQueryFields: QueryPanelField[] = [
   { key: "keyword", label: FIELD_KEYWORD, type: "text" },
-  { key: "statusFilter", label: COLUMN_STATUS, type: "multiSelect" },
+  { key: "statusFilter", label: COLUMN_STATUS, type: "select" },
 ];
 const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
 
@@ -612,7 +612,6 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title={meta.title}
-        subtitle={meta.subtitle}
       />
       {lastEvent && (
         <div

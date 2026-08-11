@@ -75,7 +75,7 @@ export function TaskDispatchPage() {
   ];
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-    <PageHeader title="M-TE 任务调度" subtitle="统一查看、分派、下发和处置仓内物理任务" />
+    <PageHeader title="M-TE 任务调度" />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
     <QueryPanel fields={mteTaskDispatchQueryFields} defaultVisibleFieldKeys={mteTaskDispatchCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />
     <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">自动刷新<select aria-label="自动刷新" className="h-9 rounded-md border border-input bg-background px-3 text-foreground" value={refreshInterval} onChange={(event) => setRefreshInterval(Number(event.target.value))}><option value="0">关闭</option><option value="5000">每 5 秒</option><option value="15000">每 15 秒</option><option value="30000">每 30 秒</option></select></label>

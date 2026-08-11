@@ -113,7 +113,6 @@ export function M2InboundDashboardPage({ currentOwner, onBack }: M2InboundDashbo
     <section className="space-y-4 p-6">
       <PageHeader
         title="M2 入库进度看板"
-        subtitle="US-M2-008 · 真实接口只读聚合，异常状态高亮"
         actions={
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 text-xs text-muted-foreground">

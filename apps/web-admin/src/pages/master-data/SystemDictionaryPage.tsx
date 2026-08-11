@@ -31,7 +31,6 @@ import { PrintTemplateTypeFields } from "./PrintTemplateTypeFields";
 
 interface SystemDictionaryMeta {
   title: string;
-  subtitle: string;
   emptyTitle: string;
   emptyDescription?: string;
 }
@@ -206,7 +205,6 @@ export function M1SystemDictionaryPage({ meta, currentUser }: M1SystemDictionary
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title={meta.title}
-        subtitle={meta.subtitle}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {lastEvent && (

@@ -215,7 +215,7 @@ const columns: DataGridColumn<PutawayStrategyProfile>[] = [
   },
 ];
 
-export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUser }) {
+export function M2PutawayStrategyPage() {
   const profilesQuery = usePutawayStrategyProfilesQuery();
   const saveMutation = useUpsertPutawayStrategyProfileMutation();
   const [selected, setSelected] = React.useState<string[]>([]);
@@ -319,7 +319,6 @@ export function M2PutawayStrategyPage({ currentUser }: { currentUser: CurrentUse
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8" data-testid="m2-putaway-strategy-page">
       <PageHeader
         title="M2 上架策略"
-        subtitle={`当前货主 ${currentUser.owner_code} · 配置规则优先级、启停、Top N 与仓库/品类绑定`}
       />
       {notice && (
         <div

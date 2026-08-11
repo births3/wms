@@ -127,7 +127,7 @@ export function M3MaintenancePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="M3 在库养护" subtitle="计划生成、现场结果提交与异常隔离" />
+      <PageHeader title="M3 在库养护" />
       <QueryPanel
         fields={m3MaintenanceQueryFields}
         defaultVisibleFieldKeys={m3MaintenanceCoreQueryFieldKeys}

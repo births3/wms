@@ -217,7 +217,6 @@ export function H2AuditTrailPage() {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="H2 审计追踪"
-        subtitle="append-only 审计作业查询 · GET /api/v1/audit/events"
       />
 
       <QueryPanel
@@ -279,7 +278,6 @@ export function H3ApiContractPage() {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="H3 OpenAPI 契约"
-        subtitle="契约门户 · 文档入口 · 前端类型同步说明"
       />
 
       <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">

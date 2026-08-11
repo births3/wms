@@ -385,9 +385,6 @@ export function ErpConnectorConfigPage({
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="H8 ERP 连接"
-        subtitle={`集成中心 · US-H8-001 · ${filteredRows.length}/${rows.length} 条 · ${
-          canWrite ? "可维护" : "只读"
-        } · 不落明文凭据`}
         actions={
           onBack ? (
             <Button variant="outline" onClick={onBack}>

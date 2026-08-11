@@ -32,7 +32,7 @@ export function Dashboard({
 }: DashboardProps) {
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
-      <PageHeader title="运营总览" subtitle={`${COLUMN_OWNER} ${currentUser.owner_code} · 实时待办接口未接入`} />
+      <PageHeader title="运营总览" />
 
       <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
         <Card className="rounded-lg shadow-sm">

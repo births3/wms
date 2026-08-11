@@ -202,7 +202,6 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="配置中心"
-        subtitle={`Feature Flag · 读取源：${sourceLabel(flagsQuery.data?.source ?? "unknown")} · ${filteredFlags.length}/${flags.length} 条`}
         actions={
           <Button variant="outline" onClick={onBack}>
             返回

@@ -60,7 +60,7 @@ export function M3InventoryStatusConfigPage({ currentUser }: { currentUser: Curr
   function update(key: keyof Form, value: string | boolean) { setForm((current) => ({ ...current, [key]: value })); }
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-    <PageHeader title="M3 库存状态管理" subtitle={`当前货主 ${currentUser.owner_code} · 展示全局规则与当前货主覆盖规则`} />
+    <PageHeader title="M3 库存状态管理" />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
     {statusError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{statusError}</div>}
     <QueryPanel fields={queryFields} defaultVisibleFieldKeys={defaultVisibleFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />

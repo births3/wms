@@ -166,7 +166,6 @@ export function DrugInspectionReviewPage() {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="药检单审核"
-        subtitle="逐份核对权威原件、处理方式和检验结论；上传人与审核人必须不同。"
       />
       {notice && <NoticeBox notice={notice} />}
       <QueryPanel

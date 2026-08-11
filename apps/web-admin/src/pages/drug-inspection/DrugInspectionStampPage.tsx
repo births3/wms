@@ -418,7 +418,6 @@ export function DrugInspectionStampPage() {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="药检图章配置"
-        subtitle="上传透明 PNG，在样例药检单上拖动和等比例缩放；另一名质量负责人审核后才会用于客户副本。"
       />
       {notice && (
         <div

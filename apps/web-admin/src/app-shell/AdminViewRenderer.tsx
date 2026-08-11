@@ -81,7 +81,7 @@ export function renderAdminView(
     return <M1MasterDataPage currentUser={currentUser} viewId={masterDataViewId} onBack={() => navigateTo("dashboard")} />;
   }
   if (view === "dock-management") return <DockManagementPage />;
-  if (view === "m-di-platforms") return <DrugInspectionPlatformPage currentUser={currentUser} />;
+  if (view === "m-di-platforms") return <DrugInspectionPlatformPage />;
   if (view === "m2-inbound-documents") return <M2InboundDocumentsPage />;
   if (view === "m-di-review") return <DrugInspectionReviewPage />;
   if (view === "m-di-stamp") return <DrugInspectionStampPage />;
@@ -95,7 +95,7 @@ export function renderAdminView(
     );
   }
   if (view === "m2-putaway-strategy") {
-    return <M2PutawayStrategyPage currentUser={currentUser} />;
+    return <M2PutawayStrategyPage />;
   }
   if (view === "m3-batches") {
     return (

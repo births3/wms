@@ -398,7 +398,7 @@ export function M2InboundDocumentsPage() {
   }
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-    <PageHeader title="入库资料录入" subtitle="按实际收货时间核对药检单和上游随货同行单；录入结果写入正式资料版本与审计记录。" />
+    <PageHeader title="入库资料录入" />
     {notice && <div role={notice.kind === "error" ? "alert" : "status"} className={cn("rounded-md border px-3 py-2 text-sm", notice.kind === "error" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-wms-success/30 bg-wms-success/10 text-wms-success")}>{notice.text}</div>}
     <QueryPanel
       fields={m2InboundDocumentsQueryFields}

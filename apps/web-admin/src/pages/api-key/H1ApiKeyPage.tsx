@@ -301,7 +301,6 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="H1 API Key 生命周期"
-        subtitle={`当前货主 ${currentUser.owner_code} · 创建、轮换、吊销和调用审计均按 owner 隔离`}
       />
       <NoticePanel notice={notice} />
       <QueryPanel

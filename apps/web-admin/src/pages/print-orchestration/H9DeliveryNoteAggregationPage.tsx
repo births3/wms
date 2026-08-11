@@ -310,7 +310,6 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
         title="作业·随货同行单归集"
-        subtitle="冻结送货线路，按客户优先、线路其次、货主加仓库兜底的截单计划归集订单"
         actions={notice ? <span className="self-center text-sm text-muted-foreground" role="status">{notice}</span> : undefined}
       />
       <QueryPanel

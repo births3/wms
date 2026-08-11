@@ -16,10 +16,10 @@ export type DetailTarget =
 
 export function pageMeta(mode: M4OutboundMode) {
   const map = {
-    orders: { title: "M4 出库订单管理", subtitle: "订单校验 · 双单号 · 作废申请", createAction: "create-order" as const, createLabel: "新建出库单" },
-    waves: { title: "M4 波次规划", subtitle: "波次合并 · 库存锁定 · 路径策略", createAction: "create-wave" as const, createLabel: "新建波次" },
-    review: { title: "M4 复核发货", subtitle: "包装站复核 · 打印 · 发货交接", createAction: null, createLabel: "" },
-    returns: { title: "M4 采购退货出库", subtitle: "退供应商申请 · 审批 · 拣货复核 · 出库交接", createAction: "create-return" as const, createLabel: "新建采购退货单" },
+    orders: { title: "M4 出库订单管理", createAction: "create-order" as const, createLabel: "新建出库单" },
+    waves: { title: "M4 波次规划", createAction: "create-wave" as const, createLabel: "新建波次" },
+    review: { title: "M4 复核发货", createAction: null, createLabel: "" },
+    returns: { title: "M4 采购退货出库", createAction: "create-return" as const, createLabel: "新建采购退货单" },
   };
   return map[mode];
 }

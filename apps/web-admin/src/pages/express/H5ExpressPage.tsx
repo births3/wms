@@ -288,7 +288,7 @@ export function H5ExpressPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="H5 快递对接" subtitle="配置与运单作业分区：快递商 / 选择规则配置，下单 / 轨迹 / 取消 / 面单打印" />
+      <PageHeader title="H5 快递对接" />
       <NoticePanel notice={notice} />
       <QueryPanel
         fields={queryFields}

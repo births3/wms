@@ -657,7 +657,6 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
         <PageHeader
           title={pageMeta.title}
-          subtitle={pageMeta.subtitle}
           actions={
             <div className="flex flex-wrap gap-2">
               {lastEvent && (

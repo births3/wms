@@ -12,7 +12,6 @@ assert.match(pageSource, /DataGrid/, "H5 快递对接必须使用公共 DataGrid
 assert.match(pageSource, /useCancelExpressWaybillMutation/, "H5 快递对接必须暴露取消运单动作");
 assert.match(pageSource, /title="运单作业"/, "H5 必须提供独立运单作业区");
 assert.match(pageSource, /打印面单/, "H5 运单作业区必须提供打印面单");
-assert.match(pageSource, /配置与运单作业|运单作业独立分区/, "H5 副标题必须体现配置与运单作业分区");
 assert.match(apiSource, /\/api\/v1\/express\/waybills\/\{waybill_no\}\/cancel/, "H5 前端必须调用取消运单 API");
 assert.ok(
   devMock.includes("/api\\/v1\\/express\\/waybills\\/([^/]+)\\/cancel"),
