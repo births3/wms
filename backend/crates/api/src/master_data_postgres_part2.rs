@@ -522,8 +522,9 @@ async fn load_master_data_before(
                     SELECT id, owner_id, product_code, product_name, specification,
                            dosage_form, storage_condition, special_drug_category,
                            approval_no, manufacturer, udi_code,
-                           electronic_regulatory_code, length_mm, width_mm, height_mm,
-                           volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                           electronic_regulatory_code, barcode_69, length_mm, width_mm,
+                           height_mm, volume_cm3, weight_g, source, attrs, status,
+                           created_at, updated_at
                       FROM products
                      WHERE owner_id = $1 AND id = $2
               ) t
@@ -655,6 +656,7 @@ impl From<ProductRow> for Product {
             manufacturer: row.manufacturer,
             udi_code: row.udi_code,
             electronic_regulatory_code: row.electronic_regulatory_code,
+            barcode_69: row.barcode_69,
             length_mm: row.length_mm,
             width_mm: row.width_mm,
             height_mm: row.height_mm,

@@ -108,6 +108,7 @@ fn controlled_product_request(
         special_drug_category_code: Some(special_drug_category_code.to_string()),
         udi_code: None,
         electronic_regulatory_code: None,
+        barcode_69: None,
         length_mm: None,
         width_mm: None,
         height_mm: None,

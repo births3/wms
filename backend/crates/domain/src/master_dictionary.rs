@@ -28,6 +28,8 @@ pub struct Product {
     pub udi_code: Option<String>,
     /// 电子监管码关联。
     pub electronic_regulatory_code: Option<String>,
+    /// 69 码（中国商品条码）。
+    pub barcode_69: Option<String>,
     /// 单品长度（毫米）。
     pub length_mm: Option<f64>,
     /// 单品宽度（毫米）。
@@ -67,6 +69,7 @@ pub struct CreateProductRequest {
     pub special_drug_category_code: Option<String>,
     pub udi_code: Option<String>,
     pub electronic_regulatory_code: Option<String>,
+    pub barcode_69: Option<String>,
     pub length_mm: Option<f64>,
     pub width_mm: Option<f64>,
     pub height_mm: Option<f64>,
@@ -113,6 +116,12 @@ pub struct UpdateProductRequest {
         skip_serializing_if = "Option::is_none"
     )]
     pub electronic_regulatory_code: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub barcode_69: Option<Option<String>>,
     #[serde(
         default,
         deserialize_with = "deserialize_present_nullable",

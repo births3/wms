@@ -299,6 +299,7 @@ async fn product_request(
                 .then_some(special_drug_category.value),
             udi_code: body.udi_code.clone(),
             electronic_regulatory_code: body.electronic_regulatory_code.clone(),
+            barcode_69: None,
             length_mm: body.length_mm,
             width_mm: body.width_mm,
             height_mm: body.height_mm,

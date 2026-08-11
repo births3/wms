@@ -358,6 +358,7 @@ fn empty_update_product_request() -> UpdateProductRequest {
         special_drug_category_code: None,
         udi_code: None,
         electronic_regulatory_code: None,
+        barcode_69: None,
         length_mm: None,
         width_mm: None,
         height_mm: None,

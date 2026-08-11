@@ -164,6 +164,7 @@ impl MasterDataStore {
             manufacturer: req.manufacturer,
             udi_code: req.udi_code.map(|value| value.trim().to_string()),
             electronic_regulatory_code: req.electronic_regulatory_code,
+            barcode_69: req.barcode_69.map(|value| value.trim().to_string()),
             length_mm: req.length_mm,
             width_mm: req.width_mm,
             height_mm: req.height_mm,
@@ -248,6 +249,9 @@ impl MasterDataStore {
             }
             if let Some(value) = req.electronic_regulatory_code {
                 product.electronic_regulatory_code = value;
+            }
+            if let Some(value) = req.barcode_69 {
+                product.barcode_69 = value;
             }
             if let Some(value) = physical.length_mm {
                 product.length_mm = value;
@@ -738,6 +742,11 @@ pub(crate) fn validate_update_product_fields(
             .is_some_and(|value| value.trim().is_empty())
         || req
             .electronic_regulatory_code
+            .as_ref()
+            .and_then(Option::as_deref)
+            .is_some_and(|value| value.trim().is_empty())
+        || req
+            .barcode_69
             .as_ref()
             .and_then(Option::as_deref)
             .is_some_and(|value| value.trim().is_empty())

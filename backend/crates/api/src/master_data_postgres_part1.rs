@@ -55,6 +55,7 @@ struct ProductRow {
     manufacturer: Option<String>,
     udi_code: Option<String>,
     electronic_regulatory_code: Option<String>,
+    barcode_69: Option<String>,
     length_mm: Option<f64>,
     width_mm: Option<f64>,
     height_mm: Option<f64>,
@@ -289,8 +290,9 @@ impl PgMasterDataReadRepository {
             r#"
             SELECT id, owner_id, product_code, product_name, specification, dosage_form,
                    storage_condition, special_drug_category, approval_no, manufacturer,
-                   udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
-                   volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                   udi_code, electronic_regulatory_code, barcode_69, length_mm, width_mm,
+                   height_mm, volume_cm3, weight_g, source, attrs, status, created_at,
+                   updated_at
               FROM products
              WHERE owner_id = $1
              ORDER BY updated_at DESC, product_code
@@ -326,8 +328,9 @@ impl PgMasterDataReadRepository {
             r#"
             SELECT id, owner_id, product_code, product_name, specification, dosage_form,
                    storage_condition, special_drug_category, approval_no, manufacturer,
-                   udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
-                   volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                   udi_code, electronic_regulatory_code, barcode_69, length_mm, width_mm,
+                   height_mm, volume_cm3, weight_g, source, attrs, status, created_at,
+                   updated_at
               FROM products
              WHERE owner_id = $1 AND product_code = $2
             "#,
@@ -457,12 +460,13 @@ impl PgMasterDataReadRepository {
             INSERT INTO products (
                 id, owner_id, product_code, product_name, specification, dosage_form,
                 storage_condition, special_drug_category, approval_no, manufacturer,
-                udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
-                volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                udi_code, electronic_regulatory_code, barcode_69, length_mm, width_mm,
+                height_mm, volume_cm3, weight_g, source, attrs, status, created_at,
+                updated_at
             )
             VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                $14, $15, $16, $17, $18, $19, $20, $21, $21
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                $15, $16, $17, $18, $19, $20, $21, $22, $22
             )
             ON CONFLICT (owner_id, product_code) DO UPDATE
             SET product_name = EXCLUDED.product_name,
@@ -474,6 +478,7 @@ impl PgMasterDataReadRepository {
                 manufacturer = EXCLUDED.manufacturer,
                 udi_code = EXCLUDED.udi_code,
                 electronic_regulatory_code = EXCLUDED.electronic_regulatory_code,
+                barcode_69 = EXCLUDED.barcode_69,
                 length_mm = EXCLUDED.length_mm,
                 width_mm = EXCLUDED.width_mm,
                 height_mm = EXCLUDED.height_mm,
@@ -488,8 +493,9 @@ impl PgMasterDataReadRepository {
               AND EXCLUDED.status = 'active'
             RETURNING id, owner_id, product_code, product_name, specification, dosage_form,
                       storage_condition, special_drug_category, approval_no, manufacturer,
-                      udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
-                      volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                      udi_code, electronic_regulatory_code, barcode_69, length_mm, width_mm,
+                      height_mm, volume_cm3, weight_g, source, attrs, status, created_at,
+                      updated_at
             "#,
         )
         .bind(id)
@@ -504,6 +510,7 @@ impl PgMasterDataReadRepository {
         .bind(&req.manufacturer)
         .bind(udi_code)
         .bind(&req.electronic_regulatory_code)
+        .bind(&req.barcode_69)
         .bind(req.length_mm)
         .bind(req.width_mm)
         .bind(req.height_mm)
@@ -635,17 +642,19 @@ impl PgMasterDataReadRepository {
                 INSERT INTO products (
                     id, owner_id, product_code, product_name, specification, dosage_form,
                     storage_condition, special_drug_category, approval_no, manufacturer,
-                    udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
-                    volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                    udi_code, electronic_regulatory_code, barcode_69, length_mm, width_mm,
+                    height_mm, volume_cm3, weight_g, source, attrs, status, created_at,
+                    updated_at
                 )
                 VALUES (
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                    $14, $15, $16, $17, $18, $19, 'active', $20, $20
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                    $15, $16, $17, $18, $19, $20, 'active', $21, $21
                 )
                 RETURNING id, owner_id, product_code, product_name, specification, dosage_form,
                           storage_condition, special_drug_category, approval_no, manufacturer,
-                          udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm,
-                          volume_cm3, weight_g, source, attrs, status, created_at, updated_at
+                          udi_code, electronic_regulatory_code, barcode_69, length_mm,
+                          width_mm, height_mm, volume_cm3, weight_g, source, attrs, status,
+                          created_at, updated_at
                 "#,
             )
             .bind(id)
@@ -660,6 +669,7 @@ impl PgMasterDataReadRepository {
             .bind(&req.manufacturer)
             .bind(udi_code)
             .bind(&req.electronic_regulatory_code)
+            .bind(&req.barcode_69)
             .bind(req.length_mm)
             .bind(req.width_mm)
             .bind(req.height_mm)

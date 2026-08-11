@@ -30,6 +30,7 @@ fn complete_product_request() -> CreateProductRequest {
         special_drug_category_code: Some("none".to_string()),
         udi_code: Some("06912345678901".to_string()),
         electronic_regulatory_code: Some("REG-2026-0001".to_string()),
+        barcode_69: Some("690123456789012".to_string()),
         length_mm: Some(120.0),
         width_mm: Some(80.0),
         height_mm: Some(50.0),
@@ -97,6 +98,11 @@ async fn complete_product_contract_is_atomic_and_idempotent(pool: PgPool) {
     );
     assert!(created.packaging_levels[0].is_base);
     assert!(created.packaging_levels[1].is_default);
+    assert_eq!(
+        created.barcode_69.as_deref(),
+        Some("690123456789012"),
+        "barcode_69 should round-trip through create"
+    );
 
     let replay = repo
         .create_product(&ctx, request, Utc::now(), "product-contract-key")
@@ -161,6 +167,7 @@ async fn product_packaging_update_replaces_levels_and_replays(pool: PgPool) {
         special_drug_category_code: None,
         udi_code: None,
         electronic_regulatory_code: None,
+        barcode_69: None,
         length_mm: Some(Some(100.0)),
         width_mm: Some(Some(60.0)),
         height_mm: Some(Some(40.0)),
@@ -264,6 +271,7 @@ async fn product_update_normalizes_udi_before_owner_unique_check(pool: PgPool) {
                 special_drug_category_code: None,
                 udi_code: Some(Some(format!(" {} ", first.udi_code.expect("first UDI")))),
                 electronic_regulatory_code: None,
+                barcode_69: None,
                 length_mm: None,
                 width_mm: None,
                 height_mm: None,
@@ -313,6 +321,7 @@ async fn product_update_can_clear_nullable_contract_fields(pool: PgPool) {
                 special_drug_category_code: None,
                 udi_code: Some(None),
                 electronic_regulatory_code: Some(None),
+                barcode_69: Some(None),
                 length_mm: Some(None),
                 width_mm: Some(None),
                 height_mm: Some(None),
@@ -333,6 +342,7 @@ async fn product_update_can_clear_nullable_contract_fields(pool: PgPool) {
     assert_eq!(cleared.manufacturer, None);
     assert_eq!(cleared.udi_code, None);
     assert_eq!(cleared.electronic_regulatory_code, None);
+    assert_eq!(cleared.barcode_69, None);
     assert_eq!(cleared.length_mm, None);
     assert_eq!(cleared.width_mm, None);
     assert_eq!(cleared.height_mm, None);

@@ -118,6 +118,7 @@ impl PgMasterDataReadRepository {
                 erp_goods_id=$23, product_code=$3, product_name=$4, specification=$5, dosage_form=$6,
                 storage_condition=$7, special_drug_category=$8, approval_no=$9,
                 manufacturer=$10, udi_code=$11, electronic_regulatory_code=$12,
+                barcode_69=$24,
                 length_mm=$13, width_mm=$14, height_mm=$15, volume_cm3=$16,
                 weight_g=$17, source=$18, attrs=$19, status=$20,
                 erp_source_version=$21, updated_at=$22, version=version+1
@@ -129,9 +130,10 @@ impl PgMasterDataReadRepository {
                 owner_id,id,erp_goods_id,erp_source_version,product_code,product_name,
                 specification,dosage_form,storage_condition,special_drug_category,
                 approval_no,manufacturer,udi_code,electronic_regulatory_code,
+                barcode_69,
                 length_mm,width_mm,height_mm,volume_cm3,weight_g,source,attrs,status,
                 created_at,updated_at
-            ) VALUES ($1,$2,$23,$21,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$22,$22)
+            ) VALUES ($1,$2,$23,$21,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$24,$13,$14,$15,$16,$17,$18,$19,$20,$22,$22)
             RETURNING id
             "#
         };
@@ -159,6 +161,7 @@ impl PgMasterDataReadRepository {
             .bind(source_version)
             .bind(now)
             .bind(entity_id)
+            .bind(&req.barcode_69)
             .fetch_one(&mut *tx)
             .await
             .map_err(|error| map_catalog_write_error(error, req.product_code.trim()))?;
