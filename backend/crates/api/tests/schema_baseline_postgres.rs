@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-const STATIC_SCHEMA_FINGERPRINT: &str = "17b77524e9efd043c014067c8f20aea6";
+const STATIC_SCHEMA_FINGERPRINT: &str = "5c01f8fde911a383a88ae0d730c621d8";
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: PgPool) {
@@ -37,7 +37,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL indexes");
-    assert_eq!(static_index_count, 579);
+    assert_eq!(static_index_count, 588);
 
     let fingerprint: String = sqlx::query_scalar(
         r#"
