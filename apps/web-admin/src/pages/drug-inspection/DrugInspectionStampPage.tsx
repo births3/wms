@@ -58,7 +58,7 @@ export const drugInspectionStampQueryFields: QueryPanelField[] = [
   {
     key: "status",
     label: COLUMN_STATUS,
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: FILTER_ALL, value: "" },
       { label: "待发布审核", value: "pending_review" },

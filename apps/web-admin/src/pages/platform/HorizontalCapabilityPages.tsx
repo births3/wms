@@ -31,7 +31,7 @@ const h2AuditQueryFields: QueryPanelField[] = [
   {
     key: "resourceType",
     label: "对象类型",
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: "入库单", value: "receiving_order" },
       { label: "托盘", value: "pallet" },

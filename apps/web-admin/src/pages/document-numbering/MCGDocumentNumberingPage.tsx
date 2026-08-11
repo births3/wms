@@ -67,7 +67,7 @@ function buildMcgDocumentNumberQueryFields(
   return [{
     key: "documentType",
     label: COLUMN_DOCUMENT_TYPE,
-    type: "select",
+    type: "multiSelect",
     options: [{ label: FILTER_ALL, value: "" }, ...documentTypeOptions],
   }];
 }

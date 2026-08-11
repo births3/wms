@@ -61,7 +61,7 @@ export const h8ErpMessageQueryFields: QueryPanelField[] = [
   {
     key: "direction",
     label: "方向",
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: "入站", value: "inbound" },
       { label: "出站", value: "outbound" },
@@ -70,13 +70,13 @@ export const h8ErpMessageQueryFields: QueryPanelField[] = [
   {
     key: "message_type",
     label: "消息类型",
-    type: "select",
+    type: "multiSelect",
     options: messageTypeOptions,
   },
   {
     key: "channel",
     label: "通道",
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: "REST", value: "rest" },
       { label: "接口表", value: "interface_table" },
@@ -85,7 +85,7 @@ export const h8ErpMessageQueryFields: QueryPanelField[] = [
   {
     key: "status",
     label: "状态",
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: "待处理", value: "pending" },
       { label: "处理中", value: "processing" },
@@ -97,7 +97,7 @@ export const h8ErpMessageQueryFields: QueryPanelField[] = [
     ],
   },
   { key: "connector_code", label: "连接编码", type: "text" },
-  { key: "warehouse_id", label: "仓库", type: "select", options: [] },
+  { key: "warehouse_id", label: "仓库", type: "multiSelect", options: [] },
   { key: "external_ref", label: "外部业务标识", type: "text" },
   { key: "idempotency_key", label: "幂等键（Idempotency-Key）", type: "text" },
   { key: "correlation_id", label: "关联标识（Correlation）", type: "text" },

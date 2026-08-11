@@ -21,7 +21,7 @@ const statusLabels: Record<string, string> = { pending_release: "待释放", pen
 
 const mteTaskDispatchQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "任务号 / 来源单号 / 商品" },
-  { key: "status", label: "状态", type: "select", options: [{ label: "全部", value: "" }, ...Object.entries(statusLabels).map(([value, label]) => ({ label, value }))] },
+  { key: "status", label: "状态", type: "multiSelect", options: [{ label: "全部", value: "" }, ...Object.entries(statusLabels).map(([value, label]) => ({ label, value }))] },
   { key: "taskTypeCode", label: "任务类型", type: "text", placeholder: "pick / putaway / loading" },
   { key: "warehouseId", label: "仓库 ID", type: "text", placeholder: "warehouse_id" },
 ];

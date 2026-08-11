@@ -43,7 +43,7 @@ export const m3CountQueryFields: QueryPanelField[] = [
   {
     key: "status",
     label: "状态",
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: "全部", value: "" },
       { label: "盘点中", value: "in_progress" },

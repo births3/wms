@@ -99,13 +99,21 @@ export function DataGridHeaderCell<T>({
             type="button"
             variant={dataGridFilterActive(filterValue) ? "secondary" : "ghost"}
             size="icon"
-            className="size-7 shrink-0"
-            aria-label={`筛选${label}`}
+            className={cn(
+              "size-7 shrink-0",
+              // 激活筛选：主题色突出显示（填充底 + 主色图标），与未筛选列明显区分
+              dataGridFilterActive(filterValue) &&
+                "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary",
+            )}
+            aria-label={`筛选${label}${dataGridFilterActive(filterValue) ? "（已启用）" : ""}`}
             aria-expanded={filterOpen}
             onClick={() => onToggleFilter(column.key)}
             data-datagrid-popover
           >
-            <Filter className="size-3.5" aria-hidden />
+            <Filter
+              className={cn("size-3.5", dataGridFilterActive(filterValue) && "fill-current")}
+              aria-hidden
+            />
           </Button>
           {filterOpen && filterPanelPosition && typeof document !== "undefined"
             ? createPortal(

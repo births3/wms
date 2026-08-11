@@ -43,7 +43,7 @@ export const m3MaintenanceQueryFields: QueryPanelField[] = [
   {
     key: "status",
     label: COLUMN_STATUS,
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: FILTER_ALL, value: "" },
       { label: "待执行", value: "pending" },

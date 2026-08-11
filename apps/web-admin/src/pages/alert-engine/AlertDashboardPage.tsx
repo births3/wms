@@ -27,8 +27,8 @@ import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const alertDashboardQueryFields: QueryPanelField[] = [
   { key: "alertCode", label: "告警类型", type: "text", placeholder: "告警编码" },
-  { key: "severity", label: "级别", type: "select", options: severityOptions(true) },
-  { key: "status", label: COLUMN_STATUS, type: "select", options: statusOptions(true) },
+  { key: "severity", label: "级别", type: "multiSelect", options: severityOptions(true) },
+  { key: "status", label: COLUMN_STATUS, type: "multiSelect", options: statusOptions(true) },
   { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "text", placeholder: FIELD_WAREHOUSE_ID },
   { key: "triggeredAt", label: "触发时间", type: "dateRange" },
 ];

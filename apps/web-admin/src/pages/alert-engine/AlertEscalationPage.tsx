@@ -31,7 +31,7 @@ import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const alertEscalationQueryFields: QueryPanelField[] = [
   { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "规则编码 / 名称" },
-  { key: "enabled", label: COLUMN_STATUS, type: "select", options: [{ label: FILTER_ALL, value: "" }, { label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }] },
+  { key: "enabled", label: COLUMN_STATUS, type: "multiSelect", options: [{ label: FILTER_ALL, value: "" }, { label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }] },
   { key: "handlerRole", label: "值班角色", type: "text", placeholder: "角色编码" },
 ];
 export const alertEscalationCoreQueryFieldKeys = ["keyword", "enabled"];

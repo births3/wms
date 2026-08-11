@@ -31,7 +31,7 @@ import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const queryFields: QueryPanelField[] = [
   { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "编码 / 名称" },
-  { key: "status", label: COLUMN_STATUS, type: "select", options: [{ label: FILTER_ALL, value: "" }, { label: STATUS_ENABLED, value: "enabled" }, { label: STATUS_DISABLED, value: "disabled" }] },
+  { key: "status", label: COLUMN_STATUS, type: "multiSelect", options: [{ label: FILTER_ALL, value: "" }, { label: STATUS_ENABLED, value: "enabled" }, { label: STATUS_DISABLED, value: "disabled" }] },
 ];
 const mteTaskTypeCoreQueryFieldKeys = ["keyword", "status"];
 const statusOptions = [{ label: STATUS_ENABLED, value: "enabled" }, { label: STATUS_DISABLED, value: "disabled" }];

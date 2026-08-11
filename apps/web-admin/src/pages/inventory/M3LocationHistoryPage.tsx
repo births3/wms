@@ -40,7 +40,7 @@ export const m3LocationHistoryQueryFields: QueryPanelField[] = [
   {
     key: "days",
     label: "回溯天数",
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: "近 7 天", value: "7" },
       { label: "近 30 天", value: "30" },

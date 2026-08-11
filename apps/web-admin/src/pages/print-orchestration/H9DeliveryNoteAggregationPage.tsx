@@ -564,11 +564,11 @@ function buildH9DeliveryNoteQueryFields(
   addressOptions: Array<{ value: string; label: string }>,
 ): QueryPanelField[] {
   return [
-    { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "select", options: warehouseOptions },
+    { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "multiSelect", options: warehouseOptions },
     { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "订单号 / 随货同行单号 / 客户" },
-    { key: "customerId", label: "客户", type: "select", options: customerOptions },
+    { key: "customerId", label: "客户", type: "multiSelect", options: customerOptions },
     { key: "routeCode", label: "线路", type: "text", placeholder: "线路编码" },
-    { key: "deliveryAddressId", label: "送货地址", type: "select", options: addressOptions },
+    { key: "deliveryAddressId", label: "送货地址", type: "multiSelect", options: addressOptions },
   ];
 }
 

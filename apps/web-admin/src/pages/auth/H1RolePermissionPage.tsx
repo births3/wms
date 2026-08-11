@@ -78,7 +78,7 @@ const DATA_SCOPE_OPTIONS = [
 
 const h1RoleQueryFields: QueryPanelField[] = [
   { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "角色编码 / 名称", ariaLabel: "搜索角色" },
-  { key: "dataScope", label: "数据范围", type: "select", options: DATA_SCOPE_OPTIONS },
+  { key: "dataScope", label: "数据范围", type: "multiSelect", options: DATA_SCOPE_OPTIONS },
 ];
 const h1RoleCoreQueryFieldKeys = ["keyword"];
 

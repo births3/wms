@@ -73,7 +73,7 @@ import { usePageQueryState } from "@/lib/use-page-query-state";
  */
 
 export const dockQueryFields: QueryPanelField[] = [
-  { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "select", options: [] },
+  { key: "warehouseId", label: COLUMN_WAREHOUSE, type: "multiSelect", options: [] },
   { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "月台编号 / 位置说明" },
   {
     key: "status",

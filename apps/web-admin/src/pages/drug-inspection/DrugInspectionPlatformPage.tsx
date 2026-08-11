@@ -17,7 +17,7 @@ import {
 import { BUTTON_REFRESH, COLUMN_CREATED_AT, COLUMN_STATUS, COLUMN_UPDATED_AT, FILTER_ALL, LOADING_SAVING, STATUS_DISABLED } from "@/lib/ui-strings";
 
 const queryFields: QueryPanelField[] = [{
-  key: "status", label: "平台状态", type: "select", options: [
+  key: "status", label: "平台状态", type: "multiSelect", options: [
     { label: FILTER_ALL, value: "" }, { label: "已对接", value: "connected" },
     { label: "测试中", value: "testing" }, { label: STATUS_DISABLED, value: "disabled" },
   ],

@@ -115,11 +115,11 @@ function businessValue(row: H8ErpInterfaceTableRow, key: string): string {
 }
 
 export const h8ErpInterfaceTableQueryFields: QueryPanelField[] = [
-  { key: "connector_id", label: "连接", type: "select", options: [{ label: "请选择", value: "" }] },
+  { key: "connector_id", label: "连接", type: "multiSelect", options: [{ label: "请选择", value: "" }] },
   {
     key: "table_key",
     label: "接口表",
-    type: "select",
+    type: "multiSelect",
     options: TABLES.map(([value, label]) => ({ value, label: `${label}（${value}）` })),
   },
   { key: "sync_status", label: "同步状态", type: "multiSelect", options: [] },

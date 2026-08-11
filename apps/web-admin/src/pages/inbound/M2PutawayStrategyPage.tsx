@@ -68,7 +68,7 @@ export const queryFields: QueryPanelField[] = [
   {
     key: "status",
     label: COLUMN_STATUS,
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: FILTER_ALL, value: "" },
       { label: STATUS_ENABLED, value: "active" },
@@ -78,7 +78,7 @@ export const queryFields: QueryPanelField[] = [
   {
     key: "isDefault",
     label: "默认方案",
-    type: "select",
+    type: "multiSelect",
     options: [
       { label: FILTER_ALL, value: "" },
       { label: "是", value: "yes" },

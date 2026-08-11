@@ -14,8 +14,8 @@ type Form = { scope: "owner" | "global"; fromStatus: string; toStatus: string; a
 type Notice = { kind: "success" | "error"; text: string } | null;
 const queryFields: QueryPanelField[] = [
   { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "起始状态 / 目标状态 / 审批来源" },
-  { key: "scope", label: FIELD_SCOPE, type: "select", options: [{ label: "全部", value: "" }, { label: "当前货主", value: "owner" }, { label: "全局", value: "global" }] },
-  { key: "status", label: COLUMN_STATUS, type: "select", options: [{ label: "全部", value: "" }, { label: "允许", value: "enabled" }, { label: "禁止", value: "disabled" }] },
+  { key: "scope", label: FIELD_SCOPE, type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "当前货主", value: "owner" }, { label: "全局", value: "global" }] },
+  { key: "status", label: COLUMN_STATUS, type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "允许", value: "enabled" }, { label: "禁止", value: "disabled" }] },
 ];
 const defaultVisibleFieldKeys = ["keyword", "scope", "status"];
 const columns: DataGridColumn<InventoryStatusTransition>[] = [

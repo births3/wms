@@ -28,8 +28,8 @@ import { usePageQueryState } from "@/lib/use-page-query-state";
 
 export const alertDefinitionQueryFields: QueryPanelField[] = [
   { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "编码 / 名称 / 事件类型" },
-  { key: "enabled", label: COLUMN_STATUS, type: "select", options: [{ label: FILTER_ALL, value: "" }, { label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }] },
-  { key: "severity", label: "级别", type: "select", options: [{ label: FILTER_ALL, value: "" }, { label: "提示", value: "info" }, { label: "警告", value: "warning" }, { label: "严重", value: "critical" }] },
+  { key: "enabled", label: COLUMN_STATUS, type: "multiSelect", options: [{ label: FILTER_ALL, value: "" }, { label: STATUS_ENABLED, value: "true" }, { label: STATUS_DISABLED, value: "false" }] },
+  { key: "severity", label: "级别", type: "multiSelect", options: [{ label: FILTER_ALL, value: "" }, { label: "提示", value: "info" }, { label: "警告", value: "warning" }, { label: "严重", value: "critical" }] },
 ];
 export const alertDefinitionCoreQueryFieldKeys = ["keyword", "enabled"];
 

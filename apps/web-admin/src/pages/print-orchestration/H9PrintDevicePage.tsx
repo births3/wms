@@ -692,11 +692,11 @@ function buildH9PrintDeviceQueryFields(
 ): QueryPanelField[] {
   return [
     { key: "keyword", label: FIELD_KEYWORD, type: "text", placeholder: "站点 / 打印机 / 租约令牌" },
-    { key: "siteId", label: "站点", type: "select", options: siteOptions },
+    { key: "siteId", label: "站点", type: "multiSelect", options: siteOptions },
     {
       key: "connectionType",
       label: "连接类型",
-      type: "select",
+      type: "multiSelect",
       options: [
         { value: "network", label: "网络" },
         { value: "usb", label: "USB（单机）" },

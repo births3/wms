@@ -108,7 +108,7 @@ interface M4OutboundPageProps {
 
 const m4OutboundQueryFields: QueryPanelField[] = [
   { key: "keyword", label: FIELD_KEYWORD, type: "text" },
-  { key: "statusFilter", label: COLUMN_STATUS, type: "select" },
+  { key: "statusFilter", label: COLUMN_STATUS, type: "multiSelect" },
 ];
 const m4OutboundCoreQueryFieldKeys = ["keyword", "statusFilter"];
 

@@ -20,7 +20,7 @@ import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const mteTaskGroupQueryFields: QueryPanelField[] = [
   { key: "keyword", label: "关键字", type: "text", placeholder: "任务组编码 / 名称" },
-  { key: "status", label: "状态", type: "select", options: [{ label: "全部", value: "" }, { label: "启用", value: "enabled" }, { label: "停用", value: "disabled" }] },
+  { key: "status", label: "状态", type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "启用", value: "enabled" }, { label: "停用", value: "disabled" }] },
   { key: "warehouseId", label: "仓库 ID", type: "text", placeholder: "按 warehouse_id 筛选" },
 ];
 const mteTaskGroupCoreQueryFieldKeys = ["keyword", "status"];
