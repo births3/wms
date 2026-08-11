@@ -25,13 +25,41 @@ impl PrintDeviceService {
         let page = page.max(1);
         let page_size = page_size.clamp(1, 200);
         let offset = ((page - 1) as i64) * (page_size as i64);
+        // 站点可见性必须先于分页落地：先算出调用方可见的站点集合，count(*) 与主查询
+        // 共用同一 `site_id = ANY($1)` 过滤，保证 total 与可见行一一对应、分页切片连续。
+        // （可见性判定只依赖站点本身，无需逐租约行判断。）
+        let visible_sites: Vec<Uuid> = {
+            let site_ids: Vec<Uuid> =
+                sqlx::query_scalar("SELECT DISTINCT site_id FROM h9_device_leases")
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(map_db_error)?;
+            let mut visible = Vec::with_capacity(site_ids.len());
+            for site_id in site_ids {
+                match require_site_permission(
+                    &self.pool,
+                    ctx,
+                    site_id,
+                    PRINT_DEVICE_READ_PERMISSION,
+                )
+                .await
+                {
+                    Ok(_) => visible.push(site_id),
+                    Err(PrintDeviceError::OwnerPermissionRequired) => {}
+                    Err(error) => return Err(error),
+                }
+            }
+            visible
+        };
         let total: i64 = sqlx::query_scalar(
             r#"
             SELECT count(*)
               FROM h9_device_leases lease
               JOIN h9_printers printer ON printer.id = lease.printer_id
+             WHERE lease.site_id = ANY($1)
             "#,
         )
+        .bind(&visible_sites)
         .fetch_one(&self.pool)
         .await
         .map_err(map_db_error)?;
@@ -43,10 +71,12 @@ impl PrintDeviceService {
                    lease.acquired_at, lease.released_at, lease.release_reason
               FROM h9_device_leases lease
               JOIN h9_printers printer ON printer.id = lease.printer_id
+             WHERE lease.site_id = ANY($1)
              ORDER BY lease.assigned_at DESC, lease.id
-             LIMIT $1 OFFSET $2
+             LIMIT $2 OFFSET $3
             "#,
         )
+        .bind(&visible_sites)
         .bind(page_size as i64)
         .bind(offset)
         .fetch_all(&self.pool)

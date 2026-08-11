@@ -383,8 +383,16 @@ async function ensureReceivingClerks(page: import("@playwright/test").Page) {
         body: JSON.stringify({ role_code: "receiving_clerk", role_name: "收货员", data_scope: "warehouse", parent_role_id: null }),
       }) as { id: string; role_code: string };
     }
-    const users = await request("/api/v1/auth/users") as { items: Array<{ user_id: string; username: string }> };
-    let firstSigner = users.items.find((user) => user.username === "m2-e2e-receiving-clerk-first");
+    // GET /api/v1/auth/users 已分页（默认 page_size=20，上限 200）：逐页拉全量再按 username 查找，
+    // 避免第 1 页之外既有用户被漏掉。
+    const users = [] as Array<{ user_id: string; username: string }>;
+    for (let pageIndex = 1; ; pageIndex++) {
+      const page = await request(`/api/v1/auth/users?page=${pageIndex}&page_size=200`) as { data: Array<{ user_id: string; username: string }>; page: { total?: number } };
+      users.push(...page.data);
+      const total = page.page.total ?? users.length;
+      if (users.length >= total || page.data.length === 0) break;
+    }
+    let firstSigner = users.find((user) => user.username === "m2-e2e-receiving-clerk-first");
     if (!firstSigner) {
       firstSigner = await request("/api/v1/auth/users", {
         method: "POST",
@@ -392,7 +400,7 @@ async function ensureReceivingClerks(page: import("@playwright/test").Page) {
         body: JSON.stringify({ username: "m2-e2e-receiving-clerk-first", display_name: "M2 E2E 第一收货员", phone: "13900000001", password: "CorrectHorse1!", role_ids: [receivingRole.id] }),
       }) as { user_id: string; username: string };
     }
-    let secondSigner = users.items.find((user) => user.username === "m2-e2e-receiving-clerk");
+    let secondSigner = users.find((user) => user.username === "m2-e2e-receiving-clerk");
     if (!secondSigner) {
       secondSigner = await request("/api/v1/auth/users", {
         method: "POST",
