@@ -228,7 +228,16 @@ pub(crate) fn batch_assign_roles() {}
 #[allow(dead_code)]
 pub(crate) fn list_permissions() {}
 
-#[utoipa::path(get, path = "/api/v1/auth/users", tag = "auth", responses((status = 200, body = RoleUserListResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/users",
+    tag = "auth",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
+    responses((status = 200, body = RoleUserListResponse), (status = 401, body = ErrorResponse), (status = 403, body = ErrorResponse)),
+)]
 #[allow(dead_code)]
 pub(crate) fn list_role_users() {}
 
@@ -423,6 +432,10 @@ pub(crate) fn plan_business_retention_archive_job() {}
     get,
     path = "/api/v1/master-data/products",
     tag = "master-data",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
     responses(
         (status = 200, description = "商品列表", body = ProductListResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
@@ -503,7 +516,16 @@ pub(crate) fn update_product() {}
 #[allow(dead_code)]
 pub(crate) fn delete_product() {}
 
-#[utoipa::path(get, path = "/api/v1/master-data/suppliers", tag = "master-data", responses((status = 200, description = "供应商列表", body = SupplierListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/v1/master-data/suppliers",
+    tag = "master-data",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
+    responses((status = 200, description = "供应商列表", body = SupplierListResponse), (status = 401, description = "未登录", body = ErrorResponse)),
+)]
 #[allow(dead_code)]
 pub(crate) fn list_suppliers() {}
 
@@ -537,7 +559,16 @@ pub(crate) fn update_supplier() {}
 #[allow(dead_code)]
 pub(crate) fn delete_supplier() {}
 
-#[utoipa::path(get, path = "/api/v1/master-data/customers", tag = "master-data", responses((status = 200, description = "客户列表", body = CustomerListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/v1/master-data/customers",
+    tag = "master-data",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
+    responses((status = 200, description = "客户列表", body = CustomerListResponse), (status = 401, description = "未登录", body = ErrorResponse)),
+)]
 #[allow(dead_code)]
 pub(crate) fn list_customers() {}
 
@@ -570,7 +601,16 @@ pub(crate) fn update_customer() {}
 #[allow(dead_code)]
 pub(crate) fn delete_customer() {}
 
-#[utoipa::path(get, path = "/api/v1/master-data/warehouses", tag = "master-data", responses((status = 200, description = "仓库列表", body = WarehouseListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/v1/master-data/warehouses",
+    tag = "master-data",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
+    responses((status = 200, description = "仓库列表", body = WarehouseListResponse), (status = 401, description = "未登录", body = ErrorResponse)),
+)]
 #[allow(dead_code)]
 pub(crate) fn list_warehouses() {}
 
@@ -586,7 +626,16 @@ pub(crate) fn update_warehouse() {}
 #[allow(dead_code)]
 pub(crate) fn delete_warehouse() {}
 
-#[utoipa::path(get, path = "/api/v1/master-data/warehouse-zones", tag = "master-data", responses((status = 200, description = "库区列表", body = WarehouseZoneListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/v1/master-data/warehouse-zones",
+    tag = "master-data",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
+    responses((status = 200, description = "库区列表", body = WarehouseZoneListResponse), (status = 401, description = "未登录", body = ErrorResponse)),
+)]
 #[allow(dead_code)]
 pub(crate) fn list_warehouse_zones() {}
 
@@ -602,7 +651,16 @@ pub(crate) fn update_warehouse_zone() {}
 #[allow(dead_code)]
 pub(crate) fn delete_warehouse_zone() {}
 
-#[utoipa::path(get, path = "/api/v1/master-data/locations", tag = "master-data", responses((status = 200, description = "库位列表", body = LocationListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/v1/master-data/locations",
+    tag = "master-data",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200"),
+    ),
+    responses((status = 200, description = "库位列表", body = LocationListResponse), (status = 401, description = "未登录", body = ErrorResponse)),
+)]
 #[allow(dead_code)]
 pub(crate) fn list_locations() {}
 
@@ -622,7 +680,7 @@ pub(crate) fn update_location() {}
 #[allow(dead_code)]
 pub(crate) fn delete_location() {}
 
-#[utoipa::path(get, path = "/api/v1/master-data/special-drug-categories", tag = "master-data", responses((status = 200, description = "特殊药品分类列表", body = SpecialDrugCategoryListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
+#[utoipa::path(get, path = "/api/v1/master-data/special-drug-categories", tag = "master-data", params(("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"), ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")), responses((status = 200, description = "特殊药品分类列表", body = SpecialDrugCategoryListResponse), (status = 401, description = "未登录", body = ErrorResponse)))]
 #[allow(dead_code)]
 pub(crate) fn list_special_drug_categories() {}
 

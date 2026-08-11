@@ -479,20 +479,54 @@ pub fn wave3_router(state: Wave3AppState) -> Router {
         .with_state(state)
 }
 
+/// 入库单列表分页查询参数（offset 分页，契约见 docs/api/api-pagination-standards.md）。
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct ReceivingOrderListQuery {
+    /// 页码，从 1 开始；缺省为 1。
+    pub page: Option<u32>,
+    /// 每页条数；缺省为 20，上限 200。
+    pub page_size: Option<u32>,
+}
+
+impl ReceivingOrderListQuery {
+    fn page(&self) -> u32 {
+        self.page.filter(|p| *p >= 1).unwrap_or(1)
+    }
+
+    fn page_size(&self) -> u32 {
+        self.page_size.filter(|s| *s >= 1).unwrap_or(20).min(200)
+    }
+}
+
 async fn list_receiving_orders_handler(
     ctx: AuthContext,
     State(state): State<Wave3AppState>,
+    Query(query): Query<ReceivingOrderListQuery>,
 ) -> Result<Json<ReceivingOrderListResponse>, Wave3HandlerError> {
-    let data = if let Some(repository) = &state.wave3_repository {
-        repository.list_receiving_orders(&ctx).await?
+    let page = query.page();
+    let page_size = query.page_size();
+    let (data, total) = if let Some(repository) = &state.wave3_repository {
+        repository
+            .list_receiving_orders(&ctx, page, page_size)
+            .await?
     } else {
+        // 内存兜底路径：与 SQL 路径同语义做内存分页（page/page_size 已钳制）。
         let store = state.inbound_store.lock().await;
-        store.list(&ctx)
+        let rows = store.list(&ctx);
+        let total = rows.len() as i64;
+        let start = ((page - 1) as usize) * (page_size as usize);
+        let data = rows
+            .into_iter()
+            .skip(start)
+            .take(page_size as usize)
+            .collect();
+        (data, total)
     };
     Ok(Json(ReceivingOrderListResponse {
         page: PageMeta {
             count: data.len() as u32,
             next_cursor: None,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
         },
         data,
     }))

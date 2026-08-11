@@ -201,11 +201,12 @@ async fn task_main_chain_enforces_qualification_state_machine_and_idempotency(po
     let outsider = worker_ctx(owner_id, outsider_id);
     let now = Utc::now();
 
-    let worker_candidates = repository
-        .list_worker_candidates(&manager)
+    let (worker_candidates, total) = repository
+        .list_worker_candidates(&manager, 1, 20)
         .await
         .expect("task group worker candidates should query");
     assert_eq!(worker_candidates.len(), 3);
+    assert_eq!(total, 3);
     assert!(worker_candidates
         .iter()
         .any(|worker| worker.user_id == worker_id));

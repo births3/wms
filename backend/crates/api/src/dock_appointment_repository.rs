@@ -82,7 +82,7 @@ impl PgDockAppointmentRepository {
         Self { pool }
     }
 
-    /// 查询当前货主在指定仓库范围内的月台预约。
+    /// 查询当前货主在指定仓库范围内的月台预约（offset 分页）。
     pub async fn list(
         &self,
         ctx: &AuthContext,
@@ -91,7 +91,9 @@ impl PgDockAppointmentRepository {
         from: Option<DateTime<Utc>>,
         to: Option<DateTime<Utc>>,
         status: Option<String>,
-    ) -> Result<Vec<DockAppointment>, DockAppointmentRepositoryError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<DockAppointment>, i64), DockAppointmentRepositoryError> {
         if let (Some(from), Some(to)) = (from, to) {
             if from > to {
                 return Err(DockAppointmentRepositoryError::WindowInvalid);
@@ -111,8 +113,23 @@ impl PgDockAppointmentRepository {
             return Err(DockAppointmentRepositoryError::OwnerWarehouseMismatch);
         }
 
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM dock_appointments a JOIN warehouses w ON w.id=a.warehouse_id WHERE a.owner_id=$1 AND a.warehouse_id=$2 AND w.owner_id=$1 AND w.status='active' AND ($3::UUID IS NULL OR a.dock_id=$3) AND ($4::TIMESTAMPTZ IS NULL OR a.window_end_at > $4) AND ($5::TIMESTAMPTZ IS NULL OR a.window_start_at < $5) AND ($6::TEXT IS NULL OR a.status=$6)",
+        )
+        .bind(ctx.owner_id)
+        .bind(warehouse_id)
+        .bind(dock_id)
+        .bind(from)
+        .bind(to)
+        .bind(status.as_deref())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, DockAppointmentRow>(
-            "SELECT a.id, a.dock_id, a.owner_id, a.warehouse_id, a.status, a.appointment_no, a.document_type, a.document_no, a.window_start_at, a.window_end_at, a.vehicle_plate_no, a.vehicle_type, a.driver_name, a.driver_phone, a.supersedes_id, a.created_at, a.updated_at, a.version, a.arrived_at, a.arrival_deviation_minutes FROM dock_appointments a JOIN warehouses w ON w.id=a.warehouse_id WHERE a.owner_id=$1 AND a.warehouse_id=$2 AND w.owner_id=$1 AND w.status='active' AND ($3::UUID IS NULL OR a.dock_id=$3) AND ($4::TIMESTAMPTZ IS NULL OR a.window_end_at > $4) AND ($5::TIMESTAMPTZ IS NULL OR a.window_start_at < $5) AND ($6::TEXT IS NULL OR a.status=$6) ORDER BY a.window_start_at ASC, a.dock_id ASC, a.id ASC",
+            "SELECT a.id, a.dock_id, a.owner_id, a.warehouse_id, a.status, a.appointment_no, a.document_type, a.document_no, a.window_start_at, a.window_end_at, a.vehicle_plate_no, a.vehicle_type, a.driver_name, a.driver_phone, a.supersedes_id, a.created_at, a.updated_at, a.version, a.arrived_at, a.arrival_deviation_minutes FROM dock_appointments a JOIN warehouses w ON w.id=a.warehouse_id WHERE a.owner_id=$1 AND a.warehouse_id=$2 AND w.owner_id=$1 AND w.status='active' AND ($3::UUID IS NULL OR a.dock_id=$3) AND ($4::TIMESTAMPTZ IS NULL OR a.window_end_at > $4) AND ($5::TIMESTAMPTZ IS NULL OR a.window_start_at < $5) AND ($6::TEXT IS NULL OR a.status=$6) ORDER BY a.window_start_at ASC, a.dock_id ASC, a.id ASC LIMIT $7 OFFSET $8",
         )
         .bind(ctx.owner_id)
         .bind(warehouse_id)
@@ -120,11 +137,13 @@ impl PgDockAppointmentRepository {
         .bind(from)
         .bind(to)
         .bind(status)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
 
-        Ok(rows.into_iter().map(DockAppointment::from).collect())
+        Ok((rows.into_iter().map(DockAppointment::from).collect(), total))
     }
 
     pub async fn create_with_audit(

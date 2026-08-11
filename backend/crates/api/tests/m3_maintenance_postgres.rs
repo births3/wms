@@ -128,18 +128,20 @@ async fn maintenance_tasks_and_records_are_owner_scoped_and_written_atomically(p
     assert_eq!(result.value.batch_id, batch_id);
     assert_eq!(result.value.conclusion, "normal");
 
-    let tasks = repository
-        .list_maintenance_tasks(&context, MaintenanceTaskQuery::default())
+    let (tasks, total) = repository
+        .list_maintenance_tasks(&context, MaintenanceTaskQuery::default(), 1, 20)
         .await
         .expect("maintenance tasks should be queryable");
     assert_eq!(tasks.len(), 1);
+    assert_eq!(total, 1);
     assert_eq!(tasks[0].status, "completed");
 
-    let records = repository
-        .list_maintenance_records(&context, MaintenanceRecordQuery::default())
+    let (records, total) = repository
+        .list_maintenance_records(&context, MaintenanceRecordQuery::default(), 1, 20)
         .await
         .expect("maintenance records should be queryable");
     assert_eq!(records.len(), 1);
+    assert_eq!(total, 1);
     assert_eq!(records[0].id, result.value.id);
 
     let counts: (i64, i64, i64) = sqlx::query_as(

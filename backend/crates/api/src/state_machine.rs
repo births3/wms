@@ -97,6 +97,7 @@ async fn list_state_machines_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))

@@ -47,7 +47,7 @@ export function useDockAppointmentsQuery(warehouseId: string | null) {
         params: { query: { warehouse_id: warehouseId, from: window.from, to: window.to } },
       });
       if (!result.data) throw new ApiError(result.error, "读取月台预约失败", result.response.status);
-      return result.data;
+      return result.data.data;
     },
     enabled: Boolean(warehouseId),
     retry: false,

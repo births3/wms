@@ -238,16 +238,42 @@ async fn upsert_priority_rule_handler(
     Ok(Json(outcome.value))
 }
 
+/// 可用人员列表分页查询参数（offset 分页）。
+#[derive(Clone, Debug, serde::Deserialize)]
+struct WorkerListQuery {
+    /// 页码，从 1 开始；缺省为 1。
+    page: Option<u32>,
+    /// 每页条数；缺省为 20，上限 200。
+    page_size: Option<u32>,
+}
+
+impl WorkerListQuery {
+    fn page(&self) -> u32 {
+        self.page.filter(|p| *p >= 1).unwrap_or(1)
+    }
+
+    fn page_size(&self) -> u32 {
+        self.page_size
+            .filter(|s| *s >= 1)
+            .map_or(20, |s| s.min(200))
+    }
+}
+
 async fn list_task_workers_handler(
     ctx: AuthContext,
     State(state): State<TaskEngineAppState>,
+    Query(query): Query<WorkerListQuery>,
 ) -> Result<Json<TaskWorkerListResponse>, TaskEngineHandlerError> {
     ctx.require_permission(GROUP_WRITE_PERMISSION)?;
-    let data = state.repository.list_worker_candidates(&ctx).await?;
+    let (data, total) = state
+        .repository
+        .list_worker_candidates(&ctx, query.page(), query.page_size())
+        .await?;
     Ok(Json(TaskWorkerListResponse {
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
         },
         data,
     }))
@@ -263,6 +289,7 @@ async fn list_task_groups_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))
@@ -304,6 +331,7 @@ async fn list_tasks_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))

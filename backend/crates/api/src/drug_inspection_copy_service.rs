@@ -81,15 +81,29 @@ impl DrugInspectionCopyService {
     pub async fn list_jobs(
         &self,
         owner_id: Uuid,
-    ) -> Result<Vec<DrugInspectionCustomerCopyJob>, DrugInspectionCopyServiceError> {
-        sqlx::query_as::<_, CopyJobRow>(
-            "SELECT id, owner_id, report_version_id, status, attempt_count, last_error, created_at, started_at, finished_at, updated_at FROM drug_inspection_customer_copy_jobs WHERE owner_id = $1 ORDER BY created_at DESC",
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<DrugInspectionCustomerCopyJob>, i64), DrugInspectionCopyServiceError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM drug_inspection_customer_copy_jobs WHERE owner_id = $1",
         )
         .bind(owner_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+        let rows = sqlx::query_as::<_, CopyJobRow>(
+            "SELECT id, owner_id, report_version_id, status, attempt_count, last_error, created_at, started_at, finished_at, updated_at FROM drug_inspection_customer_copy_jobs WHERE owner_id = $1 ORDER BY created_at DESC, id LIMIT $2 OFFSET $3",
+        )
+        .bind(owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
-        .map(|rows| rows.into_iter().map(Into::into).collect())
-        .map_err(map_db_error)
+        .map_err(map_db_error)?;
+        Ok((rows.into_iter().map(Into::into).collect(), total))
     }
 
     pub async fn approve_oversize(

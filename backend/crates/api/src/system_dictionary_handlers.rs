@@ -316,6 +316,7 @@ fn item_list_response(items: Vec<SystemDictionaryItem>) -> SystemDictionaryItemL
         page: PageMeta {
             next_cursor: None,
             count: items.len() as u32,
+            total: None,
         },
         data: items,
     }

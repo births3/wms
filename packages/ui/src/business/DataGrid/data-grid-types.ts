@@ -141,11 +141,27 @@ export interface DataGridQuerySummaryItem {
   text: string;
 }
 
+/** 服务端分页受控模式配置：提供时页脚按服务端值展示，翻页/改每页条数回调服务端 */
+export interface DataGridServerPagination {
+  /** 服务端页码（0 基） */
+  pageIndex: number;
+  /** 服务端每页条数 */
+  pageSize: number;
+  /** 服务端记录总数 */
+  total: number;
+  /** 翻页回调（0 基页码，由服务端返回当前页数据） */
+  onPageChange: (pageIndex: number) => void;
+  /** 每页条数变更回调（可选；未提供时回退内部 onPageSizeChange） */
+  onPageSizeChange?: (pageSize: number) => void;
+}
+
 export interface DataGridProps<T>
   extends Omit<DataTableProps<T>, "columns" | "data" | "footer">,
     Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"> {
   columns: DataGridColumn<T>[];
   data: T[];
+  /** 表格区域最大高度（自建垂直滚动容器，表头/页脚/横向滚动条常驻）；默认 calc(100vh-15rem) */
+  maxHeight?: string | number;
   storageKey?: string;
   pageSizeOptions?: number[];
   defaultPageSize?: number;
@@ -173,6 +189,8 @@ export interface DataGridProps<T>
   columnPasteAction?: DataGridPasteAction<T>;
   showPrintAction?: boolean;
   showExportAction?: boolean;
+  /** 服务端分页受控模式：提供时页脚按 serverPagination 的值展示（pageCount/rangeStart/rangeEnd 由 pageIndex/pageSize/total 计算），翻页与改每页条数回调服务端；data 需为当前页数据（DataGrid 不自行切页）。未提供时保持现有内存分页行为不变 */
+  serverPagination?: DataGridServerPagination;
 }
 
 export const defaultPageSizeOptions = [10, 20, 50, 100];

@@ -83,7 +83,11 @@ pub(crate) fn publish_route_binding() {}
 #[utoipa::path(
     get,
     path = "/api/v1/print-orchestration/route-bindings",
-    params(("warehouse_id" = Option<uuid::Uuid>, Query, description = "可选仓库筛选")),
+    params(
+        ("warehouse_id" = Option<uuid::Uuid>, Query, description = "可选仓库筛选"),
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")
+    ),
     responses(
         (status = 200, description = "线路绑定列表", body = RouteBindingListResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
@@ -372,7 +376,11 @@ pub(crate) fn disable_print_suite() {}
 #[utoipa::path(
     get,
     path = "/api/v1/print-orchestration/suite-instances",
-    params(("group_id" = Option<uuid::Uuid>, Query, description = "可选随货同行单归集组筛选")),
+    params(
+        ("group_id" = Option<uuid::Uuid>, Query, description = "可选随货同行单归集组筛选"),
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")
+    ),
     responses(
         (status = 200, description = "冻结组套实例列表（含组套版本、规则版本、源单据快照与逐项策略）", body = PrintSuiteInstanceListResponse),
         (status = 401, description = "未登录", body = ErrorResponse),

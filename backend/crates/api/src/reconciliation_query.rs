@@ -206,6 +206,7 @@ impl PgReconciliationRepository {
             page: PageMeta {
                 count: data.len() as u32,
                 next_cursor,
+                total: None,
             },
             data,
         })

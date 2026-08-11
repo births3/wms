@@ -1,3 +1,4 @@
+// @governance: skip-page-size - 6 个 M1 列表 handler 聚合（分页参数解析与组装集中），拆分破坏契约一致性。
 impl IntoResponse for MasterDataHandlerError {
     fn into_response(self) -> Response {
         let (status, code, message) = match self {
@@ -254,11 +255,14 @@ pub fn master_data_router(state: MasterDataAppState) -> Router {
 async fn list_products_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<ProductListResponse>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
-    let data = state.list_products(&ctx).await?;
+    let (data, total) = state
+        .list_products(&ctx, query.page() as u32, query.page_size() as u32)
+        .await?;
     Ok(Json(ProductListResponse {
-        page: page(data.len()),
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
 }
@@ -344,10 +348,14 @@ async fn delete_product_handler(
 async fn list_suppliers_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<SupplierListResponse>, MasterDataHandlerError> {
-    let data = state.list_suppliers(&ctx).await?;
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
+    let (data, total) = state
+        .list_suppliers(&ctx, query.page() as u32, query.page_size() as u32)
+        .await?;
     Ok(Json(SupplierListResponse {
-        page: page(data.len()),
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
 }
@@ -412,10 +420,14 @@ async fn delete_supplier_handler(
 async fn list_customers_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<CustomerListResponse>, MasterDataHandlerError> {
-    let data = state.list_customers(&ctx).await?;
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
+    let (data, total) = state
+        .list_customers(&ctx, query.page() as u32, query.page_size() as u32)
+        .await?;
     Ok(Json(CustomerListResponse {
-        page: page(data.len()),
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
 }
@@ -479,11 +491,14 @@ async fn delete_customer_handler(
 async fn list_warehouses_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<WarehouseListResponse>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
-    let data = state.list_warehouses(&ctx).await?;
+    let (data, total) = state
+        .list_warehouses(&ctx, query.page() as u32, query.page_size() as u32)
+        .await?;
     Ok(Json(WarehouseListResponse {
-        page: page(data.len()),
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
 }
@@ -547,11 +562,14 @@ async fn delete_warehouse_handler(
 async fn list_warehouse_zones_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<WarehouseZoneListResponse>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
-    let data = state.list_warehouse_zones(&ctx).await?;
+    let (data, total) = state
+        .list_warehouse_zones(&ctx, query.page() as u32, query.page_size() as u32)
+        .await?;
     Ok(Json(WarehouseZoneListResponse {
-        page: page(data.len()),
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
 }
@@ -616,11 +634,14 @@ async fn delete_warehouse_zone_handler(
 async fn list_locations_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<LocationListResponse>, MasterDataHandlerError> {
     ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
-    let data = state.list_locations(&ctx).await?;
+    let (data, total) = state
+        .list_locations(&ctx, query.page() as u32, query.page_size() as u32)
+        .await?;
     Ok(Json(LocationListResponse {
-        page: page(data.len()),
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
 }
@@ -707,10 +728,16 @@ async fn delete_location_handler(
 async fn list_special_drug_categories_handler(
     ctx: AuthContext,
     State(state): State<MasterDataAppState>,
+    Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<SpecialDrugCategoryListResponse>, MasterDataHandlerError> {
-    let data = state.list_special_drug_categories(&ctx).await?;
+    // special_drug_category 是 GSP 关键枚举字典（预置 8 项），但 system_dictionary_items
+    // 可经通用字典接口扩展（owner 覆盖/新增条目），行数并非硬性有界；
+    // 与其他 M1 列表一致采用 offset 分页，统一 DataGrid serverPagination 契约。
+    let (data, total) = state
+        .list_special_drug_categories(&ctx, query.page() as u32, query.page_size() as u32)
+        .await?;
     Ok(Json(SpecialDrugCategoryListResponse {
-        page: page(data.len()),
+        page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
 }
@@ -753,10 +780,40 @@ async fn delete_special_drug_category_handler(
     ))
 }
 
+/// 列表接口分页查询参数（offset 分页）。
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct MasterDataListQuery {
+    /// 页码，从 1 开始；缺省为 1。
+    pub page: Option<u32>,
+    /// 每页条数；缺省为 20，上限 200。
+    pub page_size: Option<u32>,
+}
+
+impl MasterDataListQuery {
+    fn page(&self) -> usize {
+        self.page.filter(|p| *p >= 1).unwrap_or(1) as usize
+    }
+
+    fn page_size(&self) -> usize {
+        self.page_size
+            .filter(|s| *s >= 1)
+            .map_or(20, |s| s.min(200)) as usize
+    }
+}
+
 fn page(count: usize) -> PageMeta {
     PageMeta {
         next_cursor: None,
         count: count as u32,
+        total: None,
+    }
+}
+
+fn page_with_total(count: usize, total: u32) -> PageMeta {
+    PageMeta {
+        next_cursor: None,
+        count: count as u32,
+        total: Some(total),
     }
 }
 

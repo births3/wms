@@ -62,6 +62,7 @@ impl PgWave3Repository {
             page: PageMeta {
                 next_cursor: None,
                 count,
+                total: None,
             },
         })
     }
@@ -94,7 +95,7 @@ impl PgWave3Repository {
         .map_err(map_db_error)?;
 
         let mut ranked = stats;
-        ranked.sort_by(|a, b| b.1.cmp(&a.1));
+        ranked.sort_by_key(|(_, qty)| std::cmp::Reverse(*qty));
         let total: wms_domain::Quantity = ranked.iter().map(|(_, qty)| *qty).sum();
         let mut cumulative = wms_domain::Quantity::ZERO;
         let mut tx = self.begin().await?;

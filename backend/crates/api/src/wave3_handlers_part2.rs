@@ -1,3 +1,5 @@
+use super::InventoryBatchListQuery;
+
 async fn seed_receiving_verifiers(pool: &sqlx::PgPool, owner_id: uuid::Uuid, user_ids: &[uuid::Uuid]) {
     sqlx::query(
         "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, '收货验收处理器测试货主') ON CONFLICT (id) DO NOTHING",
@@ -298,9 +300,13 @@ async fn postgres_inventory_query_and_status_change_are_scoped_idempotent_and_au
     let Json(list) = list_inventory_batches_handler(
         authorized.clone(),
         State(state.clone()),
-        Query(InventoryBatchQuery {
+        Query(InventoryBatchListQuery {
+            filter: InventoryBatchQuery {
             product_code: Some("P-001".to_string()),
             ..InventoryBatchQuery::default()
+        },
+            page: None,
+            page_size: None,
         }),
     )
     .await
@@ -653,10 +659,14 @@ async fn inventory_batch_date_query_filters_and_sorts_in_memory() {
     let Json(list) = list_inventory_batches_handler(
         authorized,
         State(state),
-        Query(InventoryBatchQuery {
+        Query(InventoryBatchListQuery {
+            filter: InventoryBatchQuery {
             expiry_from: Some(from_date.format("%Y-%m-%d").to_string()),
             expiry_to: Some(to_date.format("%Y-%m-%d").to_string()),
             ..Default::default()
+        },
+            page: None,
+            page_size: None,
         }),
     )
     .await
@@ -676,10 +686,14 @@ async fn inventory_batch_date_query_rejects_reversed_ranges() {
     let production_error = list_inventory_batches_handler(
         authorized.clone(),
         State(state.clone()),
-        Query(InventoryBatchQuery {
+        Query(InventoryBatchListQuery {
+            filter: InventoryBatchQuery {
             production_from: Some("2026-02-01".to_string()),
             production_to: Some("2026-01-01".to_string()),
             ..Default::default()
+        },
+            page: None,
+            page_size: None,
         }),
     )
     .await
@@ -695,10 +709,14 @@ async fn inventory_batch_date_query_rejects_reversed_ranges() {
     let created_error = list_inventory_batches_handler(
         authorized,
         State(state),
-        Query(InventoryBatchQuery {
+        Query(InventoryBatchListQuery {
+            filter: InventoryBatchQuery {
             created_from: Some("2026-07-01T00:00:00Z".to_string()),
             created_to: Some("2026-06-01T00:00:00Z".to_string()),
             ..Default::default()
+        },
+            page: None,
+            page_size: None,
         }),
     )
     .await
@@ -728,7 +746,7 @@ async fn inventory_batches_handler_reads_config_center_smoke_flag_and_fails_clos
     let missing_before_migration = list_inventory_batches_handler(
         authorized.clone(),
         State(state.clone()),
-        Query(InventoryBatchQuery::default()),
+        Query(InventoryBatchListQuery { filter: InventoryBatchQuery::default(), page: None, page_size: None }),
     )
     .await
     .expect_err("config-center source should fail closed before migration");
@@ -747,7 +765,7 @@ async fn inventory_batches_handler_reads_config_center_smoke_flag_and_fails_clos
     let Json(list) = list_inventory_batches_handler(
         authorized,
         State(state),
-        Query(InventoryBatchQuery::default()),
+        Query(InventoryBatchListQuery { filter: InventoryBatchQuery::default(), page: None, page_size: None }),
     )
     .await
     .expect("migrated config-center smoke flag should allow inventory list");

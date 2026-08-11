@@ -192,6 +192,7 @@ pub struct PrintSuiteInstance {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 pub struct PrintSuiteInstanceListResponse {
     pub data: Vec<PrintSuiteInstance>,
+    pub page: PageMeta,
 }
 
 /// H9 分类 PDF 产物；稳定事实只保存 H-FILE ID、版本与哈希，不保存临时访问 URL。

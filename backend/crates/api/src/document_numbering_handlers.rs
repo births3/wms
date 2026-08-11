@@ -172,6 +172,7 @@ async fn list_document_number_rules_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))
@@ -249,6 +250,7 @@ async fn list_document_number_allocations_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))

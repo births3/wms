@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
+use wms_domain::PageMeta;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateRoleRequest {
@@ -82,7 +83,8 @@ pub struct RoleUserResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct RoleUserListResponse {
-    pub items: Vec<RoleUserResponse>,
+    pub data: Vec<RoleUserResponse>,
+    pub page: PageMeta,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

@@ -271,7 +271,20 @@ impl PgMasterDataReadRepository {
         Self { pool }
     }
 
-    pub async fn list_products(&self, ctx: &AuthContext) -> Result<Vec<Product>, MasterDataError> {
+    pub async fn list_products(
+        &self,
+        ctx: &AuthContext,
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Product>, i64), MasterDataError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar("SELECT count(*) FROM products WHERE owner_id = $1")
+            .bind(ctx.owner_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, ProductRow>(
             r#"
             SELECT id, owner_id, product_code, product_name, specification, dosage_form,
@@ -281,15 +294,18 @@ impl PgMasterDataReadRepository {
               FROM products
              WHERE owner_id = $1
              ORDER BY updated_at DESC, product_code
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
         let mut levels = load_product_packaging_levels_by_owner(&self.pool, ctx.owner_id).await?;
         let mut traces = load_product_mapping_traces_by_owner(&self.pool, ctx.owner_id).await?;
-        Ok(rows
+        let items = rows
             .into_iter()
             .map(|row| {
                 let mut product = Product::from(row);
@@ -297,7 +313,8 @@ impl PgMasterDataReadRepository {
                 product.mapping_traces = traces.remove(&product.id).unwrap_or_default();
                 product
             })
-            .collect())
+            .collect();
+        Ok((items, total))
     }
 
     pub async fn get_product_by_code(
@@ -695,7 +712,17 @@ impl PgMasterDataReadRepository {
     pub async fn list_suppliers(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Supplier>, MasterDataError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Supplier>, i64), MasterDataError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar("SELECT count(*) FROM suppliers WHERE owner_id = $1")
+            .bind(ctx.owner_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, SupplierRow>(
             r#"
             SELECT id, owner_id, supplier_code, supplier_name, uscc, contact_name, source,
@@ -703,32 +730,48 @@ impl PgMasterDataReadRepository {
               FROM suppliers
              WHERE owner_id = $1
              ORDER BY updated_at DESC, supplier_code
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows.into_iter().map(Supplier::from).collect())
+        Ok((rows.into_iter().map(Supplier::from).collect(), total))
     }
 
     pub async fn list_customers(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Customer>, MasterDataError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Customer>, i64), MasterDataError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar("SELECT count(*) FROM customers WHERE owner_id = $1")
+            .bind(ctx.owner_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, CustomerRow>(
             r#"
             SELECT id, owner_id, customer_code, customer_name, license_no, source, status, created_at, updated_at
               FROM customers
              WHERE owner_id = $1
              ORDER BY updated_at DESC, customer_code
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows.into_iter().map(Customer::from).collect())
+        Ok((rows.into_iter().map(Customer::from).collect(), total))
     }
 
     pub async fn create_supplier(
@@ -897,26 +940,50 @@ impl PgMasterDataReadRepository {
     pub async fn list_warehouses(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Warehouse>, MasterDataError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Warehouse>, i64), MasterDataError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar("SELECT count(*) FROM warehouses WHERE owner_id = $1")
+            .bind(ctx.owner_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, WarehouseRow>(
             r#"
             SELECT id, owner_id, warehouse_code, warehouse_name, warehouse_type, status, created_at, updated_at
               FROM warehouses
              WHERE owner_id = $1
              ORDER BY updated_at DESC, warehouse_code
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows.into_iter().map(Warehouse::from).collect())
+        Ok((rows.into_iter().map(Warehouse::from).collect(), total))
     }
 
     pub async fn list_locations(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Location>, MasterDataError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Location>, i64), MasterDataError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM warehouse_locations WHERE owner_id = $1")
+                .bind(ctx.owner_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, LocationRow>(
             r#"
             SELECT id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no,
@@ -925,13 +992,16 @@ impl PgMasterDataReadRepository {
               FROM warehouse_locations
              WHERE owner_id = $1
              ORDER BY updated_at DESC, location_code
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows.into_iter().map(Location::from).collect())
+        Ok((rows.into_iter().map(Location::from).collect(), total))
     }
 
     pub async fn batch_create_locations(
@@ -1023,6 +1093,7 @@ impl PgMasterDataReadRepository {
             page: PageMeta {
                 next_cursor: None,
                 count: locations.len() as u32,
+                total: None,
             },
             data: locations,
         };
@@ -1060,7 +1131,34 @@ impl PgMasterDataReadRepository {
     pub async fn list_special_drug_categories(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<SpecialDrugCategory>, MasterDataError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<SpecialDrugCategory>, i64), MasterDataError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let now = Utc::now();
+        // total = 去重后的字典条目数；与下方列表查询 scope_rank = 1 的行数等价
+        // （每个 item_code 恰保留一行：货主覆盖优先，否则全局项）。
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(DISTINCT item.item_code)
+              FROM system_dictionary_items item
+              JOIN system_dictionary_categories category
+                ON category.dict_code = item.dict_code
+               AND category.enabled = TRUE
+             WHERE item.dict_code = $1
+               AND (item.owner_id IS NULL OR item.owner_id = $2)
+               AND (item.effective_from IS NULL OR item.effective_from <= $3)
+               AND (item.effective_to IS NULL OR item.effective_to > $3)
+            "#,
+        )
+        .bind(SPECIAL_DRUG_CATEGORY_DICT)
+        .bind(ctx.owner_id)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, SpecialDrugCategoryRow>(
             r#"
             WITH scoped_items AS (
@@ -1092,15 +1190,18 @@ impl PgMasterDataReadRepository {
               FROM scoped_items
              WHERE scope_rank = 1
              ORDER BY item_code
+             LIMIT $4 OFFSET $5
             "#,
         )
         .bind(SPECIAL_DRUG_CATEGORY_DICT)
         .bind(ctx.owner_id)
-        .bind(Utc::now())
+        .bind(now)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows
+        Ok((rows
             .into_iter()
             .map(|row| SpecialDrugCategory {
                 id: row.id,
@@ -1116,6 +1217,7 @@ impl PgMasterDataReadRepository {
                 created_at: row.created_at,
                 updated_at: row.updated_at,
             })
-            .collect())
+            .collect(),
+        total))
     }
 }

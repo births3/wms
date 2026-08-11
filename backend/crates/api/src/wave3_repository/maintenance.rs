@@ -64,8 +64,33 @@ impl PgWave3Repository {
         &self,
         ctx: &AuthContext,
         query: MaintenanceTaskQuery,
-    ) -> Result<Vec<MaintenanceTask>, Wave3RepositoryError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<MaintenanceTask>, i64), Wave3RepositoryError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
         let status = query.status.filter(|value| !value.trim().is_empty());
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(*)
+              FROM inventory_maintenance_tasks AS task
+              JOIN inventory_batches AS batch
+                ON batch.id = task.inventory_batch_id
+               AND batch.owner_id = task.owner_id
+             WHERE task.owner_id = $1
+               AND ($2::UUID IS NULL OR task.id = $2)
+               AND ($3::UUID IS NULL OR task.inventory_batch_id = $3)
+               AND ($4::TEXT IS NULL OR task.status = $4)
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(query.task_id)
+        .bind(query.batch_id)
+        .bind(status.as_deref())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, MaintenanceTaskRow>(
             r#"
             SELECT task.id,
@@ -91,16 +116,19 @@ impl PgWave3Repository {
                AND ($3::UUID IS NULL OR task.inventory_batch_id = $3)
                AND ($4::TEXT IS NULL OR task.status = $4)
              ORDER BY task.planned_at ASC, task.id ASC
+             LIMIT $5 OFFSET $6
             "#,
         )
         .bind(ctx.owner_id)
         .bind(query.task_id)
         .bind(query.batch_id)
         .bind(status.as_deref())
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows.into_iter().map(map_maintenance_task).collect())
+        Ok((rows.into_iter().map(map_maintenance_task).collect(), total))
     }
 
     pub async fn generate_maintenance_tasks(
@@ -211,7 +239,27 @@ impl PgWave3Repository {
         &self,
         ctx: &AuthContext,
         query: MaintenanceRecordQuery,
-    ) -> Result<Vec<MaintenanceRecord>, Wave3RepositoryError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<MaintenanceRecord>, i64), Wave3RepositoryError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            r#"
+            SELECT count(*)
+              FROM inventory_maintenance_records
+             WHERE owner_id = $1
+               AND ($2::UUID IS NULL OR task_id = $2)
+               AND ($3::UUID IS NULL OR inventory_batch_id = $3)
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(query.task_id)
+        .bind(query.batch_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, MaintenanceRecordRow>(
             r#"
             SELECT id, task_id, owner_id, inventory_batch_id, product_code, batch_no,
@@ -223,15 +271,21 @@ impl PgWave3Repository {
                AND ($2::UUID IS NULL OR task_id = $2)
                AND ($3::UUID IS NULL OR inventory_batch_id = $3)
              ORDER BY performed_at DESC, id DESC
+             LIMIT $4 OFFSET $5
             "#,
         )
         .bind(ctx.owner_id)
         .bind(query.task_id)
         .bind(query.batch_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
-        Ok(rows.into_iter().map(map_maintenance_record).collect())
+        Ok((
+            rows.into_iter().map(map_maintenance_record).collect(),
+            total,
+        ))
     }
 
     pub async fn create_maintenance_record_with_audit(

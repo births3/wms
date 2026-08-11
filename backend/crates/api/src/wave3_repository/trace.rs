@@ -245,6 +245,7 @@ impl PgWave3Repository {
             page: PageMeta {
                 next_cursor: None,
                 count,
+                total: None,
             },
         })
     }
@@ -421,6 +422,6 @@ fn build_product_shares(movements: &[InventoryMovement]) -> Vec<LocationHistoryP
         }
     }
     let mut shares: Vec<_> = map.into_values().collect();
-    shares.sort_by(|left, right| right.event_count.cmp(&left.event_count));
+    shares.sort_by_key(|share| std::cmp::Reverse(share.event_count));
     shares
 }

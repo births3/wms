@@ -230,6 +230,7 @@ async fn list_messages(
         page: PageMeta {
             next_cursor,
             count: len as u32,
+            total: None,
         },
     }))
 }

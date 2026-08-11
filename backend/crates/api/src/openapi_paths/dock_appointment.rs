@@ -10,10 +10,12 @@ use super::*;
         ("dock_id" = Option<uuid::Uuid>, Query, description = "月台 ID"),
         ("from" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "查询窗口起点（RFC3339）"),
         ("to" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "查询窗口终点（RFC3339）"),
-        ("status" = Option<String>, Query, description = "预约状态")
+        ("status" = Option<String>, Query, description = "预约状态"),
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")
     ),
     responses(
-        (status = 200, description = "查询月台预约列表", body = [DockAppointment]),
+        (status = 200, description = "查询月台预约列表", body = DockAppointmentListResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 404, description = "仓库或月台不存在", body = ErrorResponse),

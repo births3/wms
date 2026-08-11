@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::HeaderMap,
     routing::{get, put},
     Json, Router,
@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
+use wms_domain::PageMeta;
 
 use crate::{
     audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
@@ -124,12 +125,53 @@ async fn list_permissions(
     Ok(Json(PermissionListResponse { items }))
 }
 
+/// 角色用户列表分页查询参数（offset 分页）。
+#[derive(Clone, Debug, serde::Deserialize)]
+struct RoleUserListQuery {
+    /// 页码，从 1 开始；缺省为 1。
+    page: Option<u32>,
+    /// 每页条数；缺省为 20，上限 200。
+    page_size: Option<u32>,
+}
+
+impl RoleUserListQuery {
+    fn page(&self) -> u32 {
+        self.page.filter(|p| *p >= 1).unwrap_or(1)
+    }
+
+    fn page_size(&self) -> u32 {
+        self.page_size
+            .filter(|s| *s >= 1)
+            .map_or(20, |s| s.min(200))
+    }
+}
+
 async fn list_role_users(
     ctx: AuthContext,
     State(state): State<RoleManagementState>,
+    Query(query): Query<RoleUserListQuery>,
 ) -> Result<Json<RoleUserListResponse>, RoleError> {
     ctx.require_permission(ROLE_MANAGE_PERMISSION)?;
-    let items = sqlx::query_as::<_, (Uuid, String, String, Vec<Uuid>)>(
+    let page = query.page().max(1);
+    let page_size = query.page_size().clamp(1, 200);
+    let offset = ((page - 1) as i64) * (page_size as i64);
+    let total: i64 = sqlx::query_scalar(
+        r#"
+        SELECT count(*)
+          FROM (
+               SELECT user_row.id
+                 FROM auth_user_owner_bindings binding
+                 JOIN auth_users user_row ON user_row.id = binding.user_id
+                WHERE binding.owner_id = $1
+                  AND binding.is_active
+                GROUP BY user_row.id
+          ) bound_users
+        "#,
+    )
+    .bind(ctx.owner_id)
+    .fetch_one(&state.pool)
+    .await?;
+    let items: Vec<RoleUserResponse> = sqlx::query_as::<_, (Uuid, String, String, Vec<Uuid>)>(
         r#"
         SELECT user_row.id, user_row.username, user_row.display_name,
                COALESCE(
@@ -144,10 +186,13 @@ async fn list_role_users(
          WHERE binding.owner_id = $1
            AND binding.is_active
          GROUP BY user_row.id, user_row.username, user_row.display_name
-         ORDER BY user_row.username
+         ORDER BY user_row.username, user_row.id
+         LIMIT $2 OFFSET $3
         "#,
     )
     .bind(ctx.owner_id)
+    .bind(page_size as i64)
+    .bind(offset)
     .fetch_all(&state.pool)
     .await?
     .into_iter()
@@ -160,7 +205,14 @@ async fn list_role_users(
         },
     )
     .collect();
-    Ok(Json(RoleUserListResponse { items }))
+    Ok(Json(RoleUserListResponse {
+        page: PageMeta {
+            next_cursor: None,
+            count: items.len() as u32,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
+        },
+        data: items,
+    }))
 }
 
 async fn create_role(

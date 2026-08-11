@@ -495,7 +495,19 @@ pub async fn ship_outbound_order(
     pub async fn list_pending_temperature_excursions(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<TemperatureExcursionEvent>, Wave4RepositoryError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<TemperatureExcursionEvent>, i64), Wave4RepositoryError> {
+        let page = page.max(1);
+        let page_size = page_size.clamp(1, 200);
+        let offset = ((page - 1) as i64) * (page_size as i64);
+        let total: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM temperature_excursion_events WHERE owner_id = $1 AND status = 'pending_disposition'",
+        )
+        .bind(ctx.owner_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, TemperatureExcursionEventRow>(
             r#"
             SELECT id, owner_id, external_event_id, device_code, location_code,
@@ -504,14 +516,20 @@ pub async fn ship_outbound_order(
               FROM temperature_excursion_events
              WHERE owner_id = $1 AND status = 'pending_disposition'
              ORDER BY created_at DESC, external_event_id ASC
+             LIMIT $2 OFFSET $3
             "#,
         )
         .bind(ctx.owner_id)
+        .bind(page_size as i64)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
 
-        Ok(rows.into_iter().map(map_temperature_excursion).collect())
+        Ok((
+            rows.into_iter().map(map_temperature_excursion).collect(),
+            total,
+        ))
     }
 
     pub async fn dispose_temperature_excursion_and_quarantine_batches(

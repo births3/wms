@@ -111,7 +111,7 @@ export function DualPersonPolicyMatrix({ categories }: { categories: SystemDicti
           </MatrixSelect>
           <MatrixSelect label="矩阵确认人" value={confirmerId} onChange={setConfirmerId}>
             <option value="">请选择另一名确认人</option>
-            {(users.data ?? []).map((user) => (
+            {(users.data?.data ?? []).map((user) => (
               <option key={user.user_id} value={user.user_id}>
                 {user.display_name} · {user.username}
               </option>

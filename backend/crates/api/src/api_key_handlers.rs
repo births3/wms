@@ -49,6 +49,20 @@ pub fn api_key_router(state: ApiKeyManagementState) -> Router {
 pub struct ApiKeyListParams {
     pub q: Option<String>,
     pub status: Option<String>,
+    /// 页码，从 1 起；缺省 1。
+    pub page: Option<u32>,
+    /// 每页条数；缺省 20，上限 200。
+    pub page_size: Option<u32>,
+}
+
+fn api_key_page(page: Option<u32>) -> u32 {
+    page.filter(|page| *page >= 1).unwrap_or(1)
+}
+
+fn api_key_page_size(page_size: Option<u32>) -> u32 {
+    page_size
+        .filter(|page_size| *page_size >= 1)
+        .map_or(20, |page_size| page_size.min(200))
 }
 
 async fn list_api_keys(
@@ -57,12 +71,25 @@ async fn list_api_keys(
     Query(params): Query<ApiKeyListParams>,
 ) -> Result<Json<wms_domain::ApiKeyListResponse>, ApiKeyHandlerError> {
     ctx.require_permission(API_KEY_MANAGE_PERMISSION)?;
-    state
+    let (data, total) = state
         .service
-        .list(&ctx, params.q, params.status)
-        .await
-        .map(Json)
-        .map_err(Into::into)
+        .list(
+            &ctx,
+            params.q,
+            params.status,
+            api_key_page(params.page),
+            api_key_page_size(params.page_size),
+        )
+        .await?;
+    let count = data.len() as u32;
+    Ok(Json(wms_domain::ApiKeyListResponse {
+        page: wms_domain::PageMeta {
+            next_cursor: None,
+            count,
+            total: Some(total.clamp(0, u32::MAX as i64) as u32),
+        },
+        data,
+    }))
 }
 
 async fn create_api_key(

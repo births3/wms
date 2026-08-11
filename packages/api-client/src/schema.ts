@@ -6296,6 +6296,10 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        CopyJobListResponse: {
+            data: components["schemas"]["DrugInspectionCustomerCopyJob"][];
+            page: components["schemas"]["PageMeta"];
+        };
         /** @description 新增 H1 菜单节点请求。 */
         CreateAdminMenuNodeRequest: {
             button_permissions: components["schemas"]["UpsertAdminMenuButtonPermissionRequest"][];
@@ -7132,6 +7136,7 @@ export interface components {
         /** @description H9 设备租约列表。 */
         DeviceLeaseListResponse: {
             data: components["schemas"]["DeviceLease"][];
+            page: components["schemas"]["PageMeta"];
         };
         DisableSystemDictionaryItemRequest: {
             disabled_reason?: string | null;
@@ -7191,6 +7196,10 @@ export interface components {
             window_end_at: string;
             /** Format: date-time */
             window_start_at: string;
+        };
+        DockAppointmentListResponse: {
+            data: components["schemas"]["DockAppointment"][];
+            page: components["schemas"]["PageMeta"];
         };
         DocumentNumberAllocation: {
             counter_key: string;
@@ -9098,6 +9107,11 @@ export interface components {
             count: number;
             /** @description 下一页游标；为空表示无更多数据。 */
             next_cursor?: string | null;
+            /**
+             * Format: int32
+             * @description 满足查询条件的总记录数；未统计时缺省（向后兼容）。
+             */
+            total?: number | null;
         };
         /** @enum {string} */
         ParameterMappingStatus: "matched" | "unmatched" | "ambiguous";
@@ -9328,6 +9342,7 @@ export interface components {
         /** @description H9 组套实例列表。 */
         PrintSuiteInstanceListResponse: {
             data: components["schemas"]["PrintSuiteInstance"][];
+            page: components["schemas"]["PageMeta"];
         };
         /** @description H9 打印组套版本中的一条打印项。 */
         PrintSuiteItem: {
@@ -10415,6 +10430,10 @@ export interface components {
             /** Format: uuid */
             second_reviewer_id?: string | null;
         };
+        ReviewQueueListResponse: {
+            data: components["schemas"]["DrugInspectionReviewQueueEntry"][];
+            page: components["schemas"]["PageMeta"];
+        };
         RoleListResponse: {
             items: components["schemas"]["RoleResponse"][];
         };
@@ -10431,7 +10450,8 @@ export interface components {
             role_name: string;
         };
         RoleUserListResponse: {
-            items: components["schemas"]["RoleUserResponse"][];
+            data: components["schemas"]["RoleUserResponse"][];
+            page: components["schemas"]["PageMeta"];
         };
         RoleUserResponse: {
             display_name: string;
@@ -10478,6 +10498,7 @@ export interface components {
         /** @description H9 线路绑定列表。 */
         RouteBindingListResponse: {
             data: components["schemas"]["RouteBinding"][];
+            page: components["schemas"]["PageMeta"];
         };
         SavePrintTemplateRequest: {
             designer_version: string;
@@ -13469,6 +13490,10 @@ export interface operations {
                 q?: string | null;
                 /** @description active / revoked / temporarily_disabled */
                 status?: string | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -14297,7 +14322,12 @@ export interface operations {
     };
     list_role_users: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -15500,7 +15530,12 @@ export interface operations {
     };
     list_pending_temperature_excursions: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -16351,6 +16386,10 @@ export interface operations {
                 to?: string | null;
                 /** @description 预约状态 */
                 status?: string | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -16364,7 +16403,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DockAppointment"][];
+                    "application/json": components["schemas"]["DockAppointmentListResponse"];
                 };
             };
             /** @description 未登录 */
@@ -17026,7 +17065,12 @@ export interface operations {
     };
     list_drug_inspection_copy_jobs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -17038,7 +17082,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DrugInspectionCustomerCopyJob"][];
+                    "application/json": components["schemas"]["CopyJobListResponse"];
                 };
             };
             401: {
@@ -17240,6 +17284,10 @@ export interface operations {
                 missing_drug_inspection?: boolean | null;
                 /** @description 仅上游随货同行单不齐 */
                 missing_upstream_delivery?: boolean | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -18180,7 +18228,12 @@ export interface operations {
     };
     list_drug_inspection_review_queue: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -18192,7 +18245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DrugInspectionReviewQueueEntry"][];
+                    "application/json": components["schemas"]["ReviewQueueListResponse"];
                 };
             };
             401: {
@@ -19375,7 +19428,12 @@ export interface operations {
     };
     list_receiving_orders: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -21583,6 +21641,10 @@ export interface operations {
                 created_from?: string | null;
                 /** @description 创建时间终点，RFC3339 */
                 created_to?: string | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -22356,6 +22418,10 @@ export interface operations {
                 task_id?: string | null;
                 /** @description 库存批次 ID */
                 batch_id?: string | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -22482,6 +22548,10 @@ export interface operations {
                 batch_id?: string | null;
                 /** @description 任务状态：pending/completed */
                 status?: string | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -22955,7 +23025,12 @@ export interface operations {
     };
     list_customers: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -23457,7 +23532,12 @@ export interface operations {
     };
     list_locations: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -23668,7 +23748,12 @@ export interface operations {
     };
     list_products: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -23911,7 +23996,12 @@ export interface operations {
     };
     list_special_drug_categories: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -24041,7 +24131,12 @@ export interface operations {
     };
     list_suppliers: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -24270,7 +24365,12 @@ export interface operations {
     };
     list_warehouse_zones: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -24409,7 +24509,12 @@ export interface operations {
     };
     list_warehouses: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -26207,7 +26312,12 @@ export interface operations {
     };
     list_device_leases: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -28179,6 +28289,10 @@ export interface operations {
             query?: {
                 /** @description 可选仓库筛选 */
                 warehouse_id?: string | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -28292,6 +28406,10 @@ export interface operations {
             query?: {
                 /** @description 可选随货同行单归集组筛选 */
                 group_id?: string | null;
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
             };
             header?: never;
             path?: never;
@@ -32453,7 +32571,12 @@ export interface operations {
     };
     list_task_workers: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 页码，从 1 开始；缺省为 1 */
+                page?: number | null;
+                /** @description 每页条数；缺省为 20，上限 200 */
+                page_size?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;

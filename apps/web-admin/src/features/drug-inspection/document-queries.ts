@@ -313,7 +313,7 @@ async function listReviewQueue(): Promise<DrugInspectionReviewQueueEntry[]> {
   if (!result.data) {
     throw new ApiError(result.error, "读取药检单审核队列失败", result.response.status);
   }
-  return result.data;
+  return result.data.data;
 }
 
 async function listReportVersions(

@@ -151,12 +151,13 @@ async fn products_are_read_from_postgres_by_owner(pool: PgPool) {
     )
     .await;
 
-    let rows = PgMasterDataReadRepository::new(pool)
-        .list_products(&ctx(owner_id))
+    let (rows, total) = PgMasterDataReadRepository::new(pool)
+        .list_products(&ctx(owner_id), 1, 20)
         .await
         .expect("owner products should load");
 
     assert_eq!(rows.len(), 1);
+    assert_eq!(total, 1);
     assert_eq!(rows[0].product_code, "P-M1-001");
     assert_eq!(rows[0].spec, "10ml*1支");
     assert_eq!(

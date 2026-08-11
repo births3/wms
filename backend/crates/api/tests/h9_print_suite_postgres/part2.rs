@@ -229,12 +229,12 @@ async fn single_instance(
     scope: &Scope,
     group_id: Uuid,
 ) -> wms_domain::PrintSuiteInstance {
-    let instances = service
-        .list_print_suite_instances(&scope.actor, Some(group_id))
+    let (instances, _total) = service
+        .list_print_suite_instances(&scope.actor, Some(group_id), 1, 20)
         .await
         .expect("instance query should work");
-    assert_eq!(instances.data.len(), 1, "expected exactly one instance");
-    instances.data.into_iter().next().expect("one instance")
+    assert_eq!(instances.len(), 1, "expected exactly one instance");
+    instances.into_iter().next().expect("one instance")
 }
 
 async fn seed_scope(pool: &PgPool) -> Scope {

@@ -61,6 +61,7 @@ impl PgDrugInspectionRepository {
             page: PageMeta {
                 next_cursor: None,
                 count,
+                total: None,
             },
         })
     }

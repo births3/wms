@@ -10,7 +10,9 @@ use super::*;
         ("received_from" = Option<chrono::NaiveDate>, Query, description = "实际收货开始日期"),
         ("received_to" = Option<chrono::NaiveDate>, Query, description = "实际收货结束日期"),
         ("missing_drug_inspection" = Option<bool>, Query, description = "仅药检单不齐"),
-        ("missing_upstream_delivery" = Option<bool>, Query, description = "仅上游随货同行单不齐")
+        ("missing_upstream_delivery" = Option<bool>, Query, description = "仅上游随货同行单不齐"),
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")
     ),
     responses(
         (status = 200, body = InboundDocumentEntryListResponse),
@@ -42,8 +44,12 @@ pub(crate) fn find_reusable_drug_inspection_report() {}
     get,
     path = "/api/v1/drug-inspection/review-queue",
     tag = "drug-inspection",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")
+    ),
     responses(
-        (status = 200, body = [DrugInspectionReviewQueueEntry]),
+        (status = 200, body = ReviewQueueListResponse),
         (status = 401, body = ErrorResponse),
         (status = 403, body = ErrorResponse)
     )
@@ -318,8 +324,12 @@ pub(crate) fn review_drug_inspection_stamp_version() {}
     get,
     path = "/api/v1/drug-inspection/customer-copy-jobs",
     tag = "drug-inspection",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，从 1 开始；缺省为 1"),
+        ("page_size" = Option<u32>, Query, description = "每页条数；缺省为 20，上限 200")
+    ),
     responses(
-        (status = 200, body = [DrugInspectionCustomerCopyJob]),
+        (status = 200, body = CopyJobListResponse),
         (status = 401, body = ErrorResponse),
         (status = 403, body = ErrorResponse)
     )

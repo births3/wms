@@ -3,7 +3,7 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, patch, post},
@@ -52,6 +52,21 @@ pub enum MasterDataHandlerError {
     StoreUnavailable,
 }
 
+/// 内存存储兜底路径的等价分页：按 page/page_size 切片并返回总数。
+fn memory_page<T>(all: Vec<T>, page: u32, page_size: u32) -> (Vec<T>, i64) {
+    let total = all.len() as i64;
+    let page = page.max(1);
+    let page_size = page_size.clamp(1, 200);
+    let offset = ((page - 1) as usize) * (page_size as usize);
+    (
+        all.into_iter()
+            .skip(offset)
+            .take(page_size as usize)
+            .collect(),
+        total,
+    )
+}
+
 impl Default for MasterDataAppState {
     fn default() -> Self {
         Self {
@@ -92,11 +107,14 @@ impl MasterDataAppState {
     async fn list_products(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Product>, MasterDataHandlerError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Product>, i64), MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.list_products(ctx).await?);
+            return Ok(repository.list_products(ctx, page, page_size).await?);
         }
-        Ok(self.read_store()?.list_products(ctx))
+        let all = self.read_store()?.list_products(ctx);
+        Ok(memory_page(all, page, page_size))
     }
 
     async fn create_product(
@@ -144,21 +162,27 @@ impl MasterDataAppState {
     async fn list_suppliers(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Supplier>, MasterDataHandlerError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Supplier>, i64), MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.list_suppliers(ctx).await?);
+            return Ok(repository.list_suppliers(ctx, page, page_size).await?);
         }
-        Ok(self.read_store()?.list_suppliers(ctx))
+        let all = self.read_store()?.list_suppliers(ctx);
+        Ok(memory_page(all, page, page_size))
     }
 
     async fn list_customers(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Customer>, MasterDataHandlerError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Customer>, i64), MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.list_customers(ctx).await?);
+            return Ok(repository.list_customers(ctx, page, page_size).await?);
         }
-        Ok(self.read_store()?.list_customers(ctx))
+        let all = self.read_store()?.list_customers(ctx);
+        Ok(memory_page(all, page, page_size))
     }
 
     async fn create_supplier(
@@ -226,21 +250,27 @@ impl MasterDataAppState {
     async fn list_warehouses(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Warehouse>, MasterDataHandlerError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Warehouse>, i64), MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.list_warehouses(ctx).await?);
+            return Ok(repository.list_warehouses(ctx, page, page_size).await?);
         }
-        Ok(self.read_store()?.list_warehouses(ctx))
+        let all = self.read_store()?.list_warehouses(ctx);
+        Ok(memory_page(all, page, page_size))
     }
 
     async fn list_locations(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<Location>, MasterDataHandlerError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<Location>, i64), MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.list_locations(ctx).await?);
+            return Ok(repository.list_locations(ctx, page, page_size).await?);
         }
-        Ok(self.read_store()?.list_locations(ctx))
+        let all = self.read_store()?.list_locations(ctx);
+        Ok(memory_page(all, page, page_size))
     }
 
     async fn create_warehouse(
@@ -292,9 +322,13 @@ impl MasterDataAppState {
     async fn list_warehouse_zones(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<WarehouseZone>, MasterDataHandlerError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<WarehouseZone>, i64), MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.list_warehouse_zones(ctx).await?);
+            return Ok(repository
+                .list_warehouse_zones(ctx, page, page_size)
+                .await?);
         }
         Err(MasterDataHandlerError::PostgresReadNotImplemented)
     }
@@ -364,11 +398,16 @@ impl MasterDataAppState {
     async fn list_special_drug_categories(
         &self,
         ctx: &AuthContext,
-    ) -> Result<Vec<SpecialDrugCategory>, MasterDataHandlerError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<(Vec<SpecialDrugCategory>, i64), MasterDataHandlerError> {
         if let Some(repository) = &self.read_repository {
-            return Ok(repository.list_special_drug_categories(ctx).await?);
+            return Ok(repository
+                .list_special_drug_categories(ctx, page, page_size)
+                .await?);
         }
-        Ok(self.read_store()?.list_special_drug_categories(ctx))
+        let all = self.read_store()?.list_special_drug_categories(ctx);
+        Ok(memory_page(all, page, page_size))
     }
 }
 

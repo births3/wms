@@ -251,11 +251,12 @@ async fn suite_resolution_prefers_address_customer_route_then_default(pool: PgPo
         .expect("default suite should disable");
     let order = seed_order(&pool, &scope, "SO-H9-008-R05", Some("INV-H9-008-R05")).await;
     let group = cutoff(&service, &scope, order, "h9-suite-res-g5").await;
-    let instances = service
-        .list_print_suite_instances(&scope.actor, Some(group))
+    let (instances, total) = service
+        .list_print_suite_instances(&scope.actor, Some(group), 1, 20)
         .await
         .expect("instance query should work");
-    assert!(instances.data.is_empty());
+    assert!(instances.is_empty());
+    assert_eq!(total, 0);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -266,6 +266,7 @@ fn page_meta(len: usize) -> PageMeta {
     PageMeta {
         next_cursor: None,
         count: len as u32,
+        total: None,
     }
 }
 

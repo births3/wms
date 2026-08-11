@@ -132,6 +132,7 @@ async fn list_task_types_handler(
         page: PageMeta {
             next_cursor: None,
             count: data.len() as u32,
+            total: None,
         },
         data,
     }))

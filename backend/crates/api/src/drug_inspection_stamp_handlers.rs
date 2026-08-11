@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -11,13 +11,14 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     ApproveDrugInspectionCopyOversizeRequest, CreateDrugInspectionStampVersionRequest,
-    DrugInspectionDocumentValidationError, ErrorResponse,
+    DrugInspectionCustomerCopyJob, DrugInspectionDocumentValidationError, ErrorResponse, PageMeta,
     PublishDrugInspectionProcessingRuleRequest, ReviewDrugInspectionStampVersionRequest,
 };
 
 use crate::{
     auth::{AuthContext, AuthError},
     drug_inspection_copy_service::{DrugInspectionCopyService, DrugInspectionCopyServiceError},
+    drug_inspection_document_handlers::{page_and_page_size, page_meta, ListPageQuery},
     drug_inspection_document_repository::{
         DrugInspectionDocumentRepositoryError, PgDrugInspectionStampRepository,
     },
@@ -136,17 +137,28 @@ async fn review_stamp_version(
         .map_err(Into::into)
 }
 
+#[derive(serde::Serialize, utoipa::ToSchema)]
+pub(crate) struct CopyJobListResponse {
+    data: Vec<DrugInspectionCustomerCopyJob>,
+    page: PageMeta,
+}
+
 async fn list_copy_jobs(
     ctx: AuthContext,
     State(state): State<DrugInspectionStampAppState>,
-) -> Result<Json<Vec<wms_domain::DrugInspectionCustomerCopyJob>>, StampHandlerError> {
+    Query(query): Query<ListPageQuery>,
+) -> Result<Json<CopyJobListResponse>, StampHandlerError> {
     ctx.require_permission(M_DI_STAMP_REVIEW_PERMISSION)?;
-    state
+    let (page, page_size) = page_and_page_size(query.page, query.page_size);
+    let (data, total) = state
         .copies
-        .list_jobs(ctx.owner_id)
-        .await
-        .map(Json)
-        .map_err(Into::into)
+        .list_jobs(ctx.owner_id, page, page_size)
+        .await?;
+    let count = data.len();
+    Ok(Json(CopyJobListResponse {
+        data,
+        page: page_meta(count, total),
+    }))
 }
 
 async fn list_processing_rules(
