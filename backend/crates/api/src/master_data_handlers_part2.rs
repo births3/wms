@@ -731,6 +731,7 @@ async fn list_special_drug_categories_handler(
     State(state): State<MasterDataAppState>,
     Query(query): Query<MasterDataListQuery>,
 ) -> Result<Json<SpecialDrugCategoryListResponse>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
     // special_drug_category 是 GSP 关键枚举字典（预置 8 项），但 system_dictionary_items
     // 可经通用字典接口扩展（owner 覆盖/新增条目），行数并非硬性有界；
     // 与其他 M1 列表一致采用 offset 分页，统一 DataGrid serverPagination 契约。

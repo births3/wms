@@ -97,6 +97,47 @@ async fn missing_dock_permission_is_rejected_by_api_layer() {
     assert_eq!(json_body(response).await["code"], "AUTH-005");
 }
 
+fn list_request(ctx: AuthContext) -> Request<Body> {
+    let mut request = Request::builder()
+        .method("GET")
+        .uri(format!(
+            "/api/v1/dock-appointments?warehouse_id={}&page=1&page_size=20",
+            Uuid::new_v4()
+        ))
+        .body(Body::empty())
+        .expect("list request should build");
+    request.extensions_mut().insert(ctx);
+    request
+}
+
+#[tokio::test]
+async fn list_route_is_permission_gated_like_write_routes() {
+    let app = dock_appointment_router(DockAppointmentAppState::with_postgres(lazy_pool()));
+    let response = app
+        .oneshot(list_request(context(&["dock.read"])))
+        .await
+        .expect("router should respond");
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(json_body(response).await["code"], "AUTH-005");
+}
+
+#[tokio::test]
+async fn list_request_reaches_repository_boundary() {
+    let app = dock_appointment_router(DockAppointmentAppState::with_postgres(lazy_pool()));
+    let response = app
+        .oneshot(list_request(context(&["dock.manage"])))
+        .await
+        .expect("router should respond");
+
+    // API 边界测试：分页参数解析与权限校验通过后，持久化失败码证明查询已进入 repository。
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        json_body(response).await["code"],
+        "H_DOCK_PERSISTENCE_FAILED"
+    );
+}
+
 #[tokio::test]
 async fn valid_request_reaches_repository_boundary() {
     let app = dock_appointment_router(DockAppointmentAppState::with_postgres(lazy_pool()));

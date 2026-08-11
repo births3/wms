@@ -837,7 +837,7 @@ async fn list_filters_sorts_and_isolates_owner_appointments(pool: PgPool) {
         .await
         .expect("list appointment should create");
     }
-    let (listed, _t3) = repo
+    let (listed, t3) = repo
         .list(
             &actor,
             warehouse_id,
@@ -851,8 +851,9 @@ async fn list_filters_sorts_and_isolates_owner_appointments(pool: PgPool) {
         .await
         .expect("owner list should succeed");
     assert!(listed[0].dock_id <= listed[1].dock_id);
+    assert_eq!(t3, 2);
 
-    let (filtered, _t4) = repo
+    let (filtered, t4) = repo
         .list(
             &actor,
             warehouse_id,
@@ -866,4 +867,5 @@ async fn list_filters_sorts_and_isolates_owner_appointments(pool: PgPool) {
         .await
         .expect("dock/status list should succeed");
     assert_eq!(filtered.len(), 1);
+    assert_eq!(t4, 1);
 }

@@ -195,6 +195,7 @@ async fn product_list_route_reads_postgres_by_owner(pool: PgPool) {
     );
 
     let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/api/v1/master-data/products")
@@ -212,9 +213,53 @@ async fn product_list_route_reads_postgres_by_owner(pool: PgPool) {
     let payload: ProductListResponse =
         serde_json::from_slice(&body).expect("response should be product list");
     assert_eq!(payload.page.count, 1);
+    assert_eq!(payload.page.total, Some(1));
     assert_eq!(payload.data.len(), 1);
     assert_eq!(payload.data[0].product_code, "P-M1-101");
     assert_eq!(payload.data[0].attrs["source"], "api_import");
+
+    // 翻页边界：page=2 返回空页但 total 仍为 1。
+    let page_two = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/master-data/products?page=2&page_size=1")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should respond");
+    assert_eq!(page_two.status(), StatusCode::OK);
+    let page_two_body = to_bytes(page_two.into_body(), usize::MAX)
+        .await
+        .expect("body should read");
+    let page_two_payload: ProductListResponse =
+        serde_json::from_slice(&page_two_body).expect("response should be product list");
+    assert_eq!(page_two_payload.page.count, 0);
+    assert_eq!(page_two_payload.page.total, Some(1));
+    assert!(page_two_payload.data.is_empty());
+
+    // 翻页边界：page_size 越界（>200）钳制到上限后仍正常返回。
+    let clamped = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/master-data/products?page_size=99999")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("router should respond");
+    assert_eq!(clamped.status(), StatusCode::OK);
+    let clamped_body = to_bytes(clamped.into_body(), usize::MAX)
+        .await
+        .expect("body should read");
+    let clamped_payload: ProductListResponse =
+        serde_json::from_slice(&clamped_body).expect("response should be product list");
+    assert_eq!(clamped_payload.page.count, 1);
+    assert_eq!(clamped_payload.page.total, Some(1));
+    assert_eq!(clamped_payload.data.len(), 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
