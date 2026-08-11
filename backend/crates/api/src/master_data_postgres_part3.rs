@@ -6,7 +6,7 @@ impl PgMasterDataReadRepository {
         id: Uuid,
     ) -> Result<Product, MasterDataError> {
         let row = sqlx::query_as::<_, ProductRow>(
-            "SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, udi_code, electronic_regulatory_code, length_mm, width_mm, height_mm, volume_cm3, weight_g, source, attrs, status, created_at, updated_at FROM products WHERE owner_id = $1 AND id = $2",
+            "SELECT id, owner_id, product_code, product_name, specification, dosage_form, storage_condition, special_drug_category, approval_no, manufacturer, udi_code, electronic_regulatory_code, barcode_69, length_mm, width_mm, height_mm, volume_cm3, weight_g, source, attrs, status, created_at, updated_at FROM products WHERE owner_id = $1 AND id = $2",
         )
         .bind(ctx.owner_id)
         .bind(id)
@@ -120,6 +120,12 @@ impl PgMasterDataReadRepository {
             .map(|value| value.trim().to_string());
         let electronic_regulatory_code_present = req.electronic_regulatory_code.is_some();
         let electronic_regulatory_code = req.electronic_regulatory_code.clone().flatten();
+        let barcode_69_present = req.barcode_69.is_some();
+        let barcode_69 = req
+            .barcode_69
+            .clone()
+            .flatten()
+            .map(|value| value.trim().to_string());
         let row = sqlx::query_as::<_, ProductRow>(
             r#"UPDATE products SET
                 product_name = COALESCE($3, product_name),
@@ -134,19 +140,20 @@ impl PgMasterDataReadRepository {
                 attrs = CASE WHEN $15 IS NULL THEN attrs ELSE attrs || $15 END,
                 udi_code = CASE WHEN $16 THEN $17 ELSE udi_code END,
                 electronic_regulatory_code = CASE WHEN $18 THEN $19 ELSE electronic_regulatory_code END,
-                length_mm = CASE WHEN $20 THEN $21 ELSE length_mm END,
-                width_mm = CASE WHEN $22 THEN $23 ELSE width_mm END,
-                height_mm = CASE WHEN $24 THEN $25 ELSE height_mm END,
-                volume_cm3 = CASE WHEN $26 THEN $27 ELSE volume_cm3 END,
-                weight_g = CASE WHEN $28 THEN $29 ELSE weight_g END,
-                updated_at = $30,
+                barcode_69 = CASE WHEN $20 THEN $21 ELSE barcode_69 END,
+                length_mm = CASE WHEN $22 THEN $23 ELSE length_mm END,
+                width_mm = CASE WHEN $24 THEN $25 ELSE width_mm END,
+                height_mm = CASE WHEN $26 THEN $27 ELSE height_mm END,
+                volume_cm3 = CASE WHEN $28 THEN $29 ELSE volume_cm3 END,
+                weight_g = CASE WHEN $30 THEN $31 ELSE weight_g END,
+                updated_at = $32,
                 version = version + 1
               WHERE owner_id = $1 AND id = $2
               RETURNING id, owner_id, product_code, product_name, specification,
                         dosage_form, storage_condition, special_drug_category, approval_no,
-                        manufacturer, udi_code, electronic_regulatory_code, length_mm,
-                        width_mm, height_mm, volume_cm3, weight_g, source, attrs, status,
-                        created_at, updated_at"#,
+                        manufacturer, udi_code, electronic_regulatory_code, barcode_69,
+                        length_mm, width_mm, height_mm, volume_cm3, weight_g, source,
+                        attrs, status, created_at, updated_at"#,
         )
         .bind(ctx.owner_id).bind(id).bind(req.product_name)
         .bind(approval_no_present).bind(approval_no).bind(req.spec)
@@ -156,6 +163,7 @@ impl PgMasterDataReadRepository {
         .bind(storage_condition).bind(source).bind(req.attrs)
         .bind(udi_code_present).bind(udi_code)
         .bind(electronic_regulatory_code_present).bind(electronic_regulatory_code)
+        .bind(barcode_69_present).bind(barcode_69)
         .bind(physical.length_mm.is_some()).bind(physical.length_mm.flatten())
         .bind(physical.width_mm.is_some()).bind(physical.width_mm.flatten())
         .bind(physical.height_mm.is_some()).bind(physical.height_mm.flatten())
@@ -674,7 +682,7 @@ impl PgMasterDataReadRepository {
             .await
             .map_err(map_db_error)?;
         let rows = sqlx::query_as::<_, WarehouseZoneRow>(
-            "SELECT id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status, created_at, updated_at FROM warehouse_zones WHERE owner_id = $1 ORDER BY updated_at DESC, zone_code LIMIT $2 OFFSET $3",
+            "SELECT id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status, created_at, updated_at FROM warehouse_zones WHERE owner_id = $1 ORDER BY updated_at DESC, zone_code, id LIMIT $2 OFFSET $3",
         ).bind(ctx.owner_id).bind(page_size as i64).bind(offset).fetch_all(&self.pool).await.map_err(map_db_error)?;
         Ok((rows.into_iter().map(WarehouseZone::from).collect(), total))
     }
