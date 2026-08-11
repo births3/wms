@@ -6671,6 +6671,7 @@ export interface components {
             attrs: {
                 [key: string]: unknown;
             };
+            barcode_69?: string | null;
             dosage_form?: string | null;
             electronic_regulatory_code?: string | null;
             /** Format: double */
@@ -9628,6 +9629,8 @@ export interface components {
             attrs: {
                 [key: string]: unknown;
             };
+            /** @description 69 码（中国商品条码）。 */
+            barcode_69?: string | null;
             /**
              * Format: date-time
              * @description 创建时间。
@@ -11278,6 +11281,7 @@ export interface components {
             attrs?: {
                 [key: string]: unknown;
             };
+            barcode_69?: string | null;
             dosage_form?: string | null;
             electronic_regulatory_code?: string | null;
             /** Format: double */
