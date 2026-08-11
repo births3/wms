@@ -86,6 +86,10 @@ def _git(args: list[str]) -> tuple[int, str]:
 
 
 def validate_message(sha: str, msg: str) -> CommitIssue:
+    # git/gitea 生成的 merge commit（"Merge ... into ..."）header 由工具产生，
+    # 不适用仓库手工提交格式约定；跳过校验。
+    if msg.startswith("Merge ") and " into " in msg.splitlines()[0]:
+        return CommitIssue(sha=sha, header=msg.splitlines()[0] if msg.splitlines() else msg, issues=[])
     issues: list[str] = []
     if not msg.strip():
         return CommitIssue(sha=sha, header="", issues=["empty commit message"])
