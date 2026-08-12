@@ -3,7 +3,8 @@ import { cn } from "../lib/utils";
 
 export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    // overflow-y-clip：横向滚动容器不拦截 thead/页脚的垂直 sticky（clip 不产生滚动上下文）
+    // 横向滚动容器：overflow-y-clip 与 overflow-x-auto 配对时按 CSS 规范计算为 hidden（滚动容器），
+    // 会拦截内部 sticky；本组件不依赖 sticky 穿透，垂直滚动由外层容器负责。
     <div className="relative w-full overflow-x-auto overflow-y-clip">
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>

@@ -12,6 +12,8 @@ export {
   SelectItem,
 } from "./select";
 export { Checkbox } from "./checkbox";
+export { ScrollBar } from "./scroll-bar";
+export type { ScrollBarProps } from "./scroll-bar";
 export {
   Table,
   TableHeader,

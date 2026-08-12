@@ -162,8 +162,7 @@ export interface DataGridProps<T>
   data: T[];
   /** 默认显示序号列（行号，跨页连续）；传 false 关闭 */
   showRowNumber?: boolean;
-  /** 表格区域最大高度（自建垂直滚动容器，表头/页脚/横向滚动条常驻）；默认 calc(100vh-15rem) */
-  maxHeight?: string | number;
+  // maxHeight 继承自 DataTableProps：默认按视口测量（悬停表格滚轮滚动列表数据）；传值覆盖测量
   storageKey?: string;
   pageSizeOptions?: number[];
   defaultPageSize?: number;

@@ -33,6 +33,7 @@
 - mkdocs 文档站点（site/）+ 业务故事/ADR/合规/治理多视角导航。
 
 ### Changed
+- DataGrid 滚动体系组件化：横向滚轮提取为 `@wms/ui` ScrollBar 基础组件（aria 值/键盘操作/滑块刷新盲区修复）；纵向滚动收进 DataTable 内部自管（视口测量替代 `calc(100vh-23rem)` 魔法数），悬停表格滚轮只滚列表数据、页面不因表格内容滚动；汇总表分支补齐横向滚动能力；表头吸顶生效。
 - ADR-0004 已被 ADR-0007 取代（v0.3 路线边界对齐：5 波次明确化）。
 - ADR-0016 v3.2 回写 Wave 2 W2.G：配置中心 Feature Flag API、静态完成门禁、预发布 runtime evidence 门禁；无稳定 dev/staging 时不得伪造证据。
 - 所有 27 个故事文件加"测试要求"声明（写操作 L4+L5+L8+L11，读操作 L4+L8）。

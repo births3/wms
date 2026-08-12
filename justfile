@@ -36,6 +36,9 @@ ISSUE_AGENT_CRON_TAG := "wms-issue-agent-watchdog"
 SESSION_CLOSEOUT_LOG := MAIN_ROOT / ".codex/session-closeout/watch.log"
 SESSION_CLOSEOUT_PID := MAIN_ROOT / ".codex/session-closeout/watch.pid"
 SESSION_CLOSEOUT_CRON_TAG := "wms-session-closeout-watchdog"
+DEV_ENV_FILE := ROOT / "deploy/env/dev-h2.env"
+DEV_COMPOSE_FILE := ROOT / "deploy/docker-compose.dev-h2.yml"
+DEV_SERVICES_SCRIPT := ROOT / "scripts/dev/wms_dev_services.py"
 
 # 默认显示帮助
 default:
@@ -88,6 +91,9 @@ _t2-unit-tests:
     @node packages/ui/tests/dialog-dismiss.test.ts
     @node packages/ui/tests/data-grid-views.test.ts
     @node packages/ui/tests/query-panel-quick-filters.test.ts
+    @node packages/ui/tests/scroll-bar-math.test.ts
+    @node packages/ui/tests/viewport-math.test.ts
+    @node packages/ui/tests/scroll-bar-wiring.test.ts
     @node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
 
 _t2-contract-static:
@@ -436,6 +442,72 @@ customer-portal-real-e2e:
     PORTAL_DATABASE_URL="$test_url" \
       PORTAL_H_FILE_STORAGE_ROOT="${PORTAL_H_FILE_STORAGE_ROOT:-$PWD/artifacts/screenshot-portal/real-web/customer-portal/storage}" \
       pnpm --dir apps/customer-portal run test:e2e:real
+
+# 开发应用服务依赖：PostgreSQL、Redis、MinIO；不会构建应用镜像
+dev-infra:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    env_file="{{DEV_ENV_FILE}}"
+    compose_file="{{DEV_COMPOSE_FILE}}"
+    test -f "$env_file" || { echo "缺少 $env_file，请先复制 dev-h2.env.example" >&2; exit 2; }
+    secret_file="{{ROOT}}/deploy/secrets/wms_dev_h2_db_password.txt"
+    set -a
+    source "$env_file"
+    set +a
+    : "${WMS_DEV_H2_DB_PASSWORD:?WMS_DEV_H2_DB_PASSWORD is required}"
+    test -s "$secret_file" || {
+      echo "缺少 $secret_file" >&2
+      exit 2
+    }
+    test "$(cat "$secret_file")" = "$WMS_DEV_H2_DB_PASSWORD" || {
+      echo "数据库 secret 文件与 dev-h2.env 不一致" >&2
+      exit 2
+    }
+    : "${WMS_HFILE_ACCESS_KEY:?WMS_HFILE_ACCESS_KEY is required}"
+    : "${WMS_HFILE_SECRET_KEY:?WMS_HFILE_SECRET_KEY is required}"
+    docker compose --env-file "$env_file" -f "$compose_file" \
+      up -d --no-build --wait --wait-timeout 60 \
+      postgres-dev-h2 redis-dev-h2 minio-dev-h2
+    docker compose --env-file "$env_file" -f "$compose_file" \
+      run --rm minio-init-dev-h2
+
+# 开发数据库迁移：只迁移，不启动应用服务
+dev-migrate:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    env_file="{{DEV_ENV_FILE}}"
+    test -f "$env_file" || { echo "缺少 $env_file" >&2; exit 2; }
+    set -a
+    source "$env_file"
+    set +a
+    : "${WMS_DEV_H2_DB_PASSWORD:?WMS_DEV_H2_DB_PASSWORD is required}"
+    db_password_url="$(python3 -c 'import os; from urllib.parse import quote; print(quote(os.environ["WMS_DEV_H2_DB_PASSWORD"], safe=""))')"
+    export WMS_DB_URL="${WMS_DB_URL:-postgres://wms_dev_h2:${db_password_url}@127.0.0.1:${WMS_DEV_H2_DB_PORT:-15432}/wms_dev_h2}"
+    cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-db-migrate
+
+# 开发应用服务：宿主机 cargo/node 运行，源码变化后只重启对应服务
+dev-services services="api,render":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just dev-infra
+    just dev-migrate
+    set -a
+    source "{{DEV_ENV_FILE}}"
+    set +a
+    exec python3 "{{DEV_SERVICES_SCRIPT}}" run \
+      --root "{{ROOT}}" \
+      --services "{{services}}"
+
+# 开发应用服务配置/命令预览，不启动进程
+dev-services-describe services="api,render":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -a
+    source "{{DEV_ENV_FILE}}"
+    set +a
+    python3 "{{DEV_SERVICES_SCRIPT}}" describe \
+      --root "{{ROOT}}" \
+      --services "{{services}}"
 
 # 管理端 9002 当前占用状态
 dev-web-status:

@@ -7,7 +7,9 @@ import {
   TableHead,
   TableCell,
 } from "../../ui/table";
+import { ScrollBar } from "../../ui/scroll-bar";
 import { EmptyState } from "../EmptyState";
+import { useScrollAreaMaxHeight } from "./use-scroll-area-max-height";
 
 /**
  * DataTable — 通用数据表格（基于 ui/Table，含选中态/hover/空状态/翻页槽）
@@ -15,7 +17,8 @@ import { EmptyState } from "../EmptyState";
  * 层级：Layer 2 业务复合
  * 关联故事：所有列表型管理页（H1 角色/API Key/会话 / H2 审计/归档 / M2 ASN / M4 订单 等）
  * Wave：Wave 0.5 起步，全 Wave 复用
- * 业务约束：行点击触发 onRowClick；列定义对齐 columns[].align；空时展示 EmptyState；翻页放 footer
+ * 业务约束：行点击触发 onRowClick；列定义对齐 columns[].align；空时展示 EmptyState；翻页放 footer；
+ *   列表自管纵向滚动（视口测量高度），悬停表格滚轮只滚列表数据；横向由 ScrollBar 自绘滚动条控制。
  *
  * @example
  *   <DataTable columns={[{key:"time",header:"时间"}]} data={[...]} rowKey="id" onRowClick={...} />
@@ -40,6 +43,8 @@ export interface DataTableProps<T> extends Omit<React.HTMLAttributes<HTMLDivElem
   /** 表格元素样式（用于最小宽度等布局控制） */
   tableClassName?: string;
   tableStyle?: React.CSSProperties;
+  /** 滚动区最大高度：默认按视口测量（悬停表格滚轮滚动列表数据、页面不滚动）；传值覆盖测量 */
+  maxHeight?: string | number;
   /** 用于 key & 选中比对（必填） */
   rowKey: (row: T) => string;
   /** 选中的行 key */
@@ -68,24 +73,46 @@ export function DataTable<T>({
   footer,
   emptyTitle,
   emptyDescription,
+  maxHeight,
   className,
   tableClassName,
   tableStyle,
   ...rest
 }: DataTableProps<T>) {
-  const [hScrollContainer, setHScrollContainer] = React.useState<HTMLDivElement | null>(null);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollAreaRef = React.useRef<HTMLDivElement | null>(null);
+  const bottomBarRef = React.useRef<HTMLDivElement | null>(null);
+  const tableRef = React.useRef<HTMLTableElement | null>(null);
+  // state 承载滚动容器节点：ref 突变不触发重渲染，ScrollBar 的 container prop 依赖节点就绪
+  const [scrollAreaNode, setScrollAreaNode] = React.useState<HTMLDivElement | null>(null);
+  const [hScrollable, setHScrollable] = React.useState(false);
+  const measuredMaxHeight = useScrollAreaMaxHeight(maxHeight, scrollAreaRef, bottomBarRef, rootRef);
+  // 动态：显式 maxHeight 优先，否则用视口测量兜底
+  const effectiveMaxHeight = maxHeight !== undefined ? maxHeight : measuredMaxHeight;
 
   return (
-    <div className={cn("rounded-md border bg-background overflow-hidden font-sans", className)} {...rest}>
+    <div
+      ref={rootRef}
+      className={cn("flex min-h-0 flex-col rounded-md border bg-background overflow-hidden font-sans", className)}
+      {...rest}
+    >
       {caption && (
         <div className="px-4 py-2.5 text-xs text-muted-foreground border-b bg-muted/40">{caption}</div>
       )}
-      {/* overflow-y-clip：横向滚动容器不拦截 thead/页脚的垂直 sticky；原生滚动条隐藏（由页脚固定横滚轮控制） */}
+      {/*
+        单滚动容器双轴同滚：thead sticky top 直接粘附本容器（表头吸顶）；
+        WebKit 用 ::-webkit-scrollbar:horizontal 只隐藏横向原生条、保留纵向条；
+        Firefox 无逐轴控制，scrollbar-width:none 整体隐藏（滚轮/自绘横滚条不受影响）。
+      */}
       <div
-        ref={setHScrollContainer}
-        className="relative w-full overflow-x-auto overflow-y-clip [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        ref={(node) => {
+          scrollAreaRef.current = node;
+          setScrollAreaNode(node);
+        }}
+        className="min-h-0 flex-1 overflow-auto overscroll-contain [&::-webkit-scrollbar:horizontal]:hidden [scrollbar-width:none]"
+        style={effectiveMaxHeight !== undefined ? { maxHeight: effectiveMaxHeight } : undefined}
       >
-        <table className={cn("w-full caption-bottom text-sm", tableClassName)} style={tableStyle}>
+        <table ref={tableRef} className={cn("w-full caption-bottom text-sm", tableClassName)} style={tableStyle}>
           <colgroup>
             {columns.map((col) => (
               <col key={col.key} style={columnStyle(col)} />
@@ -158,87 +185,17 @@ export function DataTable<T>({
           </TableBody>
         </table>
       </div>
-      {footer && (
-        <>
-          {/* 页脚吸底留白：sticky footer 滚动经过时遮住的是空位而非最后一行数据 */}
-          <div aria-hidden className="h-12" />
-          <div className="sticky bottom-0 z-10 -mt-12 border-t bg-background/95 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur">
-            <DataTableHScrollBar container={hScrollContainer} />
-            {footer}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/**
- * DataTableHScrollBar — 横向滚动条（固定在页脚内）
- *
- * 宽表横向溢出时显示；点击轨道跳转、拖动滑块滚动。原生横向滚动条已隐藏，由本组件统一控制。
- */
-function DataTableHScrollBar({ container }: { container: HTMLDivElement | null }) {
-  const [view, setView] = React.useState({ left: 0, scrollable: false, ratio: 1 });
-  const dragRef = React.useRef<{ startX: number; startLeft: number } | null>(null);
-
-  React.useEffect(() => {
-    if (!container) return;
-    const update = () =>
-      setView({
-        left: container.scrollLeft,
-        scrollable: container.scrollWidth > container.clientWidth,
-        ratio: container.clientWidth / container.scrollWidth,
-      });
-    update();
-    container.addEventListener("scroll", update, { passive: true });
-    const observer = new ResizeObserver(update);
-    observer.observe(container);
-    return () => {
-      container.removeEventListener("scroll", update);
-      observer.disconnect();
-    };
-  }, [container]);
-
-  if (!container || !view.scrollable) return null;
-
-  const maxLeft = container.scrollWidth - container.clientWidth;
-  const thumbWidth = Math.max(view.ratio * 100, 6);
-  const thumbLeft = maxLeft > 0 ? (view.left / maxLeft) * (100 - thumbWidth) : 0;
-
-  const jumpTo = (clientX: number) => {
-    const rect = container.getBoundingClientRect();
-    const pct = (clientX - rect.left) / rect.width;
-    container.scrollLeft = pct * maxLeft;
-  };
-
-  return (
-    <div
-      role="scrollbar"
-      aria-orientation="horizontal"
-      className="relative h-2.5 w-full cursor-pointer touch-none select-none"
-      onPointerDown={(event) => {
-        const onThumb = Boolean((event.target as HTMLElement).closest("[data-thumb]"));
-        if (onThumb) {
-          dragRef.current = { startX: event.clientX, startLeft: container.scrollLeft };
-          event.currentTarget.setPointerCapture(event.pointerId);
-        } else {
-          jumpTo(event.clientX);
-        }
-      }}
-      onPointerMove={(event) => {
-        if (!dragRef.current) return;
-        const dx = event.clientX - dragRef.current.startX;
-        container.scrollLeft = dragRef.current.startLeft + dx * view.ratio;
-      }}
-      onPointerUp={() => {
-        dragRef.current = null;
-      }}
-    >
+      {/* 底部栏常驻：横滚轮在上、翻页在下；无 footer 且无横向溢出时整体隐藏（汇总表分支） */}
       <div
-        data-thumb
-        className="absolute top-0 bottom-0 rounded-full bg-muted-foreground/30 transition-colors hover:bg-muted-foreground/50"
-        style={{ left: `${thumbLeft}%`, width: `${thumbWidth}%` }}
-      />
+        ref={bottomBarRef}
+        className={cn(
+          "shrink-0 border-t bg-background/95 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur",
+          !footer && !hScrollable && "hidden",
+        )}
+      >
+        <ScrollBar container={scrollAreaNode} contentRef={tableRef} onScrollableChange={setHScrollable} />
+        {footer}
+      </div>
     </div>
   );
 }

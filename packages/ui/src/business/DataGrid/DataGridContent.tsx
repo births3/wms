@@ -189,65 +189,62 @@ export function DataGridContent<T>({
 }: DataGridContentProps<T>) {
   return (
     <>
-      {/* 自建垂直滚动容器：flex 撑满父容器时精确占剩余；父无高度约束时 max-h 兜底限制（页面级不滚动） */}
-      <div
-        className="min-h-0 flex-1 overflow-auto max-h-[calc(100vh-23rem)]"
-        style={maxHeight !== undefined ? { maxHeight } : undefined}
-      >
-        {summaryTable ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary">
-              <span>已显示汇总结果，共 {summaryTable.rows.length} 个分组</span>
-              <Button type="button" variant="outline" size="sm" className="h-8" onClick={onExitSummary}>
-                退出汇总
-              </Button>
-            </div>
-            <DataTable<DataGridSummaryTableRow>
-              className="overflow-visible"
-              columns={summaryColumns}
-              data={summaryTable.rows}
-              rowKey={(row) => row.__summaryKey}
-              tableClassName={cn("table-fixed", tableClassName)}
-              tableStyle={summaryTableStyle}
-              caption={caption}
-              emptyTitle={emptyTitle}
-              emptyDescription={emptyDescription}
-            />
-          </>
-        ) : (
-          <DataTable
-            className="overflow-visible"
-            columns={finalColumns}
-            data={page.rows}
-            rowKey={rowKey}
+      {/* 纵向滚动由 DataTable 内部自管（视口测量高度），本层只做 flex 布局 */}
+      {summaryTable ? (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary">
+            <span>已显示汇总结果，共 {summaryTable.rows.length} 个分组</span>
+            <Button type="button" variant="outline" size="sm" className="h-8" onClick={onExitSummary}>
+              退出汇总
+            </Button>
+          </div>
+          <DataTable<DataGridSummaryTableRow>
+            className="flex-1"
+            maxHeight={maxHeight}
+            columns={summaryColumns}
+            data={summaryTable.rows}
+            rowKey={(row) => row.__summaryKey}
             tableClassName={cn("table-fixed", tableClassName)}
-            tableStyle={tableStyle}
-            selectedKey={selectedKey}
-            onRowClick={onRowClick}
-            onRowDoubleClick={onRowDoubleClick}
+            tableStyle={summaryTableStyle}
             caption={caption}
             emptyTitle={emptyTitle}
             emptyDescription={emptyDescription}
-            footer={
-              <DataGridPaginationFooter
-                rangeStart={page.rangeStart}
-                rangeEnd={page.rangeEnd}
-                total={page.total}
-                selectable={selectable}
-                selectedCount={selectedCount}
-                pageSize={pageSize}
-                pageSizeOptions={pageSizeOptions}
-                pageIndex={page.pageIndex}
-                pageCount={page.pageCount}
-                onPageSizeChange={onPageSizeChange}
-                onPageIndexChange={onPageIndexChange}
-                onClearSelected={onClearSelected}
-                serverPagination={serverPagination}
-              />
-            }
           />
-        )}
-      </div>
+        </>
+      ) : (
+        <DataTable
+          className="flex-1"
+          maxHeight={maxHeight}
+          columns={finalColumns}
+          data={page.rows}
+          rowKey={rowKey}
+          tableClassName={cn("table-fixed", tableClassName)}
+          tableStyle={tableStyle}
+          selectedKey={selectedKey}
+          onRowClick={onRowClick}
+          onRowDoubleClick={onRowDoubleClick}
+          caption={caption}
+          emptyTitle={emptyTitle}
+          emptyDescription={emptyDescription}
+          footer={
+            <DataGridPaginationFooter
+              rangeStart={page.rangeStart}
+              rangeEnd={page.rangeEnd}
+              total={page.total}
+              selectable={selectable}
+              selectedCount={selectedCount}
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              pageIndex={page.pageIndex}
+              pageCount={page.pageCount}
+              onPageSizeChange={onPageSizeChange}
+              onPageIndexChange={onPageIndexChange}
+              onClearSelected={onClearSelected}
+              serverPagination={serverPagination}
+            />
+          }
+        />
+      )}
       {querySummaryItems.length > 0 ? (
         <div
           aria-label="业务查询条件"
