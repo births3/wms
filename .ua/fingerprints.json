@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "70f1ade3786e1dc722ba0419779f1dc36a16c975",
-  "generatedAt": "2026-08-12T12:42:37.481Z",
+  "gitCommitHash": "07a8f9a8e751af191406b8e67ab26a861df4902f",
+  "generatedAt": "2026-08-12T18:01:38.231Z",
   "files": {
     ".agents/skills/wms-execution-retrospective/SKILL.md": {
       "filePath": ".agents/skills/wms-execution-retrospective/SKILL.md",
@@ -2441,7 +2441,7 @@
     },
     "apps/web-admin/dev-mocks/web-admin-dev-mock-core-common.ts": {
       "filePath": "apps/web-admin/dev-mocks/web-admin-dev-mock-core-common.ts",
-      "contentHash": "3e17b9af853a3a46d96cd4f4a25c4efb9f4f5cebdaa7edfa97ad0437afe0c24f",
+      "contentHash": "6c33bb6f82d6e1a5cfd0f7108fd3ca433793ffec4cbe5c1ee794d19e7a6c0fc4",
       "functions": [
         {
           "name": "handleFeatureFlagRequest",
@@ -2556,7 +2556,7 @@
             "value"
           ],
           "exported": false,
-          "lineCount": 18
+          "lineCount": 32
         },
         {
           "name": "devOrderFromCreateRequest",
@@ -2793,7 +2793,7 @@
         "asBoolean",
         "asDocumentType"
       ],
-      "totalLines": 621,
+      "totalLines": 635,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/dev-mocks/web-admin-dev-mock-core.ts": {
@@ -3096,7 +3096,7 @@
     },
     "apps/web-admin/dev-mocks/web-admin-dev-mock-model.ts": {
       "filePath": "apps/web-admin/dev-mocks/web-admin-dev-mock-model.ts",
-      "contentHash": "bc44fa346af1998030946f1803d045c2e686536a6d96e270cc8cf7944ae06ba5",
+      "contentHash": "035658fb2d6eec57e9a17bc59df6d8440ed6728058a63e4f9e580919d6d6224e",
       "functions": [
         {
           "name": "devLoginDefaults",
@@ -3122,15 +3122,26 @@
         }
       ],
       "classes": [],
-      "imports": [],
+      "imports": [
+        {
+          "source": "./web-admin-dev-mock-model-seeds",
+          "specifiers": [
+            "devLoginPassword",
+            "devOwnerId",
+            "devUserId"
+          ]
+        },
+        {
+          "source": "./web-admin-dev-mock-receiving-model",
+          "specifiers": [
+            "DevReceivingPrintData"
+          ]
+        }
+      ],
       "exports": [
+        "DevReceivingPrintData",
         "devMockEnabled",
-        "devOwnerId",
-        "devUserId",
-        "devWarehouseId",
-        "devLocationId",
         "devSeedOrderCount",
-        "devLoginPassword",
         "devLoginDefaults",
         "devCreatedOrders",
         "devReceivingPrintData",
@@ -3143,17 +3154,11 @@
         "devPrintTemplateVersions",
         "devSeedOrderStatusOverrides",
         "devUser",
-        "devProduct",
-        "devSeedProducts",
-        "devSupplier",
-        "devCustomer",
-        "devWarehouse",
-        "devLocation",
         "devSystemDictionaryItemsByCode",
         "devFeatureFlagSource",
         "devFeatureFlags"
       ],
-      "totalLines": 825,
+      "totalLines": 555,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/dev-mocks/web-admin-dev-mock-print-inventory.ts": {
@@ -3717,7 +3722,7 @@
     },
     "apps/web-admin/package.json": {
       "filePath": "apps/web-admin/package.json",
-      "contentHash": "80ca73790614ea8c581d4da86748a115b1cefd011c6379d7f43506c15244115a",
+      "contentHash": "ab15cfab614f0bd246fb05b9f7ec647d1538eff06f046c0d731104dea2965b50",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -4515,7 +4520,7 @@
     },
     "apps/web-admin/self-checks/m2-inbound-detail-view-model-self-check.mjs": {
       "filePath": "apps/web-admin/self-checks/m2-inbound-detail-view-model-self-check.mjs",
-      "contentHash": "b5b2df01ee19acdf03ead0cac4e284bd9efd64c214121441b31febbc424c8fc0",
+      "contentHash": "e16d6b142aeae5af10c1356f5f754da8667d57f19bd9aad01391ff4dd2cc91cc",
       "functions": [],
       "classes": [],
       "imports": [
@@ -4523,6 +4528,12 @@
           "source": "node:assert/strict",
           "specifiers": [
             "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
           ]
         },
         {
@@ -4538,7 +4549,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 91,
+      "totalLines": 167,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/self-checks/m2-inbound-documents-page-self-check.mjs": {
@@ -7786,7 +7797,7 @@
     },
     "apps/web-admin/src/features/inbound/inbound-queries.ts": {
       "filePath": "apps/web-admin/src/features/inbound/inbound-queries.ts",
-      "contentHash": "3515496513b589a1edb88137c8909b37b248778536b46d37b9e04cceea592aef",
+      "contentHash": "a62012cdb92e46221c849f2a67b12c0b218d6bd9a873bc2eeaeda142bf0cd627",
       "functions": [
         {
           "name": "receivingOrderQueryKey",
@@ -8048,6 +8059,12 @@
           "specifiers": [
             "api"
           ]
+        },
+        {
+          "source": "@/lib/ui-strings",
+          "specifiers": [
+            "ERROR_INBOUND_ORDER_NOT_FOUND"
+          ]
         }
       ],
       "exports": [
@@ -8065,7 +8082,7 @@
         "useSignReceivingOrderMutation",
         "usePutawayReceivingOrderMutation"
       ],
-      "totalLines": 338,
+      "totalLines": 340,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/src/features/inbound/putaway-strategy-queries.ts": {
@@ -15761,7 +15778,7 @@
     },
     "apps/web-admin/src/pages/inbound/M2InboundDetailDialog.tsx": {
       "filePath": "apps/web-admin/src/pages/inbound/M2InboundDetailDialog.tsx",
-      "contentHash": "5264cb75bcf38595ac789c8b665f10b1b59f437f590058dc54104f9505ddcf39",
+      "contentHash": "6365d6ca09e96dbfbfefee69f3625ce2b2e510540b962e2f52c57f3ad6e2c711",
       "functions": [
         {
           "name": "M2InboundDetailDialog",
@@ -15769,7 +15786,7 @@
             "{ order, currentOwner, defaultStage, open, onOpenChange }"
           ],
           "exported": true,
-          "lineCount": 58
+          "lineCount": 60
         },
         {
           "name": "Section",
@@ -15850,7 +15867,18 @@
         {
           "source": "@/features/inbound/inbound-queries",
           "specifiers": [
+            "useReceivingOrderPrintDataQuery",
             "ReceivingOrder"
+          ]
+        },
+        {
+          "source": "@/lib/ui-strings",
+          "specifiers": [
+            "COLUMN_DOCUMENT_TYPE",
+            "COLUMN_OWNER",
+            "COLUMN_WAREHOUSE",
+            "STATUS_COMPLETED",
+            "STATUS_PENDING"
           ]
         },
         {
@@ -15890,20 +15918,20 @@
       "exports": [
         "M2InboundDetailDialog"
       ],
-      "totalLines": 269,
+      "totalLines": 281,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx": {
       "filePath": "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
-      "contentHash": "3a62088699d8fa27cb0ca8e84b3561b05d3f242c34e89fc50948ee174f32b1fc",
+      "contentHash": "b2fb2d09aa6668eb2d5a025d365967825410fb6cb4a8edf8b8f7d7532ca949d9",
       "functions": [
         {
           "name": "M2InboundDialogs",
           "params": [
-            "{\n  activeDialog,\n  orderId,\n  orderReceiptNo,\n  hasOrder,\n  pending,\n  errorMessage,\n  productTemperatureAttribute,\n  derivedTemperatureControl,\n  createForm,\n  receiveForm,\n  rejectForm,\n  inspectForm,\n  inspectExamples,\n  signForm,\n  secondSignature,\n  dualSignRequiredByStrategy,\n  dualPolicyDescription,\n  putawayForm,\n  setActiveDialog,\n  setCreateForm,\n  setReceiveForm,\n  setRejectForm,\n  setInspectForm,\n  setSignForm,\n  setPutawayForm,\n  clearPutawayValidationError,\n  submitCreate,\n  submitReceive,\n  submitReject,\n  submitInspect,\n  submitPutaway,\n}"
+            "{\n  activeDialog,\n  orderId,\n  orderReceiptNo,\n  orderExpectedQty,\n  salesReturn,\n  hasOrder,\n  pending,\n  errorMessage,\n  productTemperatureAttribute,\n  derivedTemperatureControl,\n  createForm,\n  receiveForm,\n  rejectForm,\n  inspectForm,\n  inspectExamples,\n  signForm,\n  secondSignature,\n  dualSignRequiredByStrategy,\n  dualPolicyDescription,\n  putawayForm,\n  setActiveDialog,\n  setCreateForm,\n  setReceiveForm,\n  setRejectForm,\n  setInspectForm,\n  setSignForm,\n  setPutawayForm,\n  clearPutawayValidationError,\n  submitCreate,\n  submitReceive,\n  submitReject,\n  submitInspect,\n  submitPutaway,\n}"
           ],
           "exported": true,
-          "lineCount": 326
+          "lineCount": 367
         },
         {
           "name": "recommendationReason",
@@ -16007,6 +16035,15 @@
           ]
         },
         {
+          "source": "@/lib/ui-strings",
+          "specifiers": [
+            "COLUMN_DOCUMENT_TYPE",
+            "COLUMN_QUALITY_STATUS",
+            "FIELD_PLATE_NO",
+            "FIELD_WAREHOUSE_ID"
+          ]
+        },
+        {
           "source": "./m2-inbound-document-type",
           "specifiers": [
             "InboundDocumentType"
@@ -16021,10 +16058,11 @@
         }
       ],
       "exports": [
+        "NO_INBOUND_ORDER_SELECTED",
         "M2InboundDialogs",
         "isColdChainTemperatureControl"
       ],
-      "totalLines": 583,
+      "totalLines": 642,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/src/pages/inbound/M2InboundDocumentsPage.tsx": {
@@ -16368,7 +16406,7 @@
     },
     "apps/web-admin/src/pages/inbound/M2InboundPage.tsx": {
       "filePath": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
-      "contentHash": "852230585cb29331449cd2b1f87ebfb9ac56e10911ca4b0134decea0712a6d32",
+      "contentHash": "eca642adf0103018865ea3837c1357c0ac9f8227393fa0fc45282d12efba2bf9",
       "functions": [
         {
           "name": "M2InboundPage",
@@ -16376,7 +16414,7 @@
             "{ mode, currentOwner }"
           ],
           "exported": true,
-          "lineCount": 605
+          "lineCount": 604
         },
         {
           "name": "sameStringArray",
@@ -16426,8 +16464,6 @@
         {
           "source": "@wms/ui",
           "specifiers": [
-            "Button",
-            "PageHeader",
             "QueryPanel",
             "buildQueryPanelSummaryItems",
             "QueryPanelField"
@@ -16470,7 +16506,6 @@
           "source": "./M2InboundDialogs",
           "specifiers": [
             "M2InboundDialogs",
-            "isColdChainTemperatureControl",
             "CreateFormState",
             "InboundDialog",
             "InspectFormExamples",
@@ -16496,7 +16531,8 @@
         {
           "source": "./m2-inbound-document-type",
           "specifiers": [
-            "createAsnBatchNo"
+            "createAsnBatchNo",
+            "inboundDocumentTypeOf"
           ]
         },
         {
@@ -16530,9 +16566,15 @@
           ]
         },
         {
-          "source": "./M2InboundDashboardPage",
+          "source": "@/lib/ui-strings",
           "specifiers": [
-            "M2InboundDashboardPage"
+            "BUTTON_ADD",
+            "BUTTON_REFRESH",
+            "COLUMN_CREATED_AT",
+            "COLUMN_DOCUMENT_TYPE",
+            "COLUMN_OWNER",
+            "COLUMN_STATUS",
+            "FIELD_KEYWORD"
           ]
         },
         {
@@ -16546,7 +16588,7 @@
         "M2InboundMode",
         "M2InboundPage"
       ],
-      "totalLines": 788,
+      "totalLines": 795,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/src/pages/inbound/M2InboundPrintDialog.tsx": {
@@ -17011,7 +17053,7 @@
     },
     "apps/web-admin/src/pages/inbound/m2-inbound-detail-view-model.ts": {
       "filePath": "apps/web-admin/src/pages/inbound/m2-inbound-detail-view-model.ts",
-      "contentHash": "dbfb3b32d8dfc92a2ede911d7ee278a9b9dc197929ce7899f5b30ab23ef31755",
+      "contentHash": "552a20813bdb6fcad9c45420c7b6121a2cf53db56cb111689abaa8a9edfd9e94",
       "functions": [
         {
           "name": "inboundDetailStageIndex",
@@ -17026,10 +17068,54 @@
           "params": [
             "stage",
             "expectedQty",
-            "currentStage"
+            "currentStage",
+            "receipt"
           ],
           "exported": true,
-          "lineCount": 52
+          "lineCount": 44
+        },
+        {
+          "name": "receivingRows",
+          "params": [
+            "expectedQty",
+            "receipt"
+          ],
+          "returnType": "Array<[string, string]>",
+          "exported": false,
+          "lineCount": 47
+        },
+        {
+          "name": "fieldValue",
+          "params": [
+            "value",
+            "fallback"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "maskedValue",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "quantityValue",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "dateTimeValue",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 14
         },
         {
           "name": "productInfoRows",
@@ -17096,9 +17182,22 @@
       "classes": [],
       "imports": [
         {
-          "source": "@/features/inbound/inbound-queries",
+          "source": "../../features/inbound/inbound-queries.ts",
           "specifiers": [
-            "ReceivingOrder"
+            "ReceivingOrder",
+            "ReceivingOrderReceipt"
+          ]
+        },
+        {
+          "source": "../../lib/ui-strings.ts",
+          "specifiers": [
+            "COLUMN_BATCH_NO",
+            "COLUMN_PRODUCT_CODE",
+            "COLUMN_QUALITY_STATUS",
+            "FIELD_VALIDITY",
+            "STATUS_COMPLETED",
+            "STATUS_PENDING",
+            "STATUS_PENDING_INPUT"
           ]
         }
       ],
@@ -17113,7 +17212,7 @@
         "batchInfoRows",
         "orderLicenseRows"
       ],
-      "totalLines": 211,
+      "totalLines": 293,
       "hasStructuralAnalysis": true
     },
     "apps/web-admin/src/pages/inbound/m2-inbound-document-type.ts": {
@@ -25049,7 +25148,7 @@
     },
     "apps/web-admin/tsconfig.json": {
       "filePath": "apps/web-admin/tsconfig.json",
-      "contentHash": "6b8aeb3e4fa02221c111530dc35df0711e702a3530d26be0f3f5c0fdc2f2480f",
+      "contentHash": "06fc3a0270a34a94ba45583ffafb2df45675d4e11de9a9e3f4d1534ebe0cb451",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -58377,7 +58476,7 @@
     },
     "backend/crates/api/src/openapi_doc.rs": {
       "filePath": "backend/crates/api/src/openapi_doc.rs",
-      "contentHash": "9fb813fa85149202632a91d18c2ed1e9f1edc013491e52536f3f2c3ce9f6d7c0",
+      "contentHash": "2a38e51912adb65a7fa512cb64e780fd8e9a46eec1e1f4f0496405bb8e024765",
       "functions": [],
       "classes": [
         {
@@ -58393,7 +58492,9 @@
           "source": "crate::h8_inbound",
           "specifiers": [
             "H8AsnInboundRequest",
+            "H8AsnLineInput",
             "H8InboundResponse",
+            "H8OutboundLineInput",
             "H8OutboundOrderInboundRequest",
             "H8PhysicalDimensionsInput",
             "H8ProductChangeInboundRequest",
@@ -58474,12 +58575,12 @@
       "exports": [
         "ApiDoc"
       ],
-      "totalLines": 1040,
+      "totalLines": 1046,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/openapi_paths.rs": {
       "filePath": "backend/crates/api/src/openapi_paths.rs",
-      "contentHash": "115d87496ea90be77f136fb8a9791e3a0a4c2cd7c844a42417133afbaff41691",
+      "contentHash": "8e467e6b06932775ff61e0de0414b125518150d839fc29a3a42baf4f6b0e012e",
       "functions": [
         {
           "name": "_dock_appointment_openapi_type_use",
@@ -58517,12 +58618,30 @@
       "classes": [],
       "imports": [
         {
+          "source": "crate::dock_appointment_handlers",
+          "specifiers": [
+            "DockAppointmentListResponse"
+          ]
+        },
+        {
           "source": "crate::document_numbering",
           "specifiers": [
             "DocumentNumberRule",
             "DocumentNumberRuleListResponse",
             "SetDocumentNumberRuleEnabledRequest",
             "UpsertDocumentNumberRuleRequest"
+          ]
+        },
+        {
+          "source": "crate::drug_inspection_document_handlers",
+          "specifiers": [
+            "ReviewQueueListResponse"
+          ]
+        },
+        {
+          "source": "crate::drug_inspection_stamp_handlers",
+          "specifiers": [
+            "CopyJobListResponse"
           ]
         },
         {
@@ -58815,6 +58934,7 @@
             "ReviewOutboundOrderRequest",
             "RollbackAdminMenuRequest",
             "RotateApiKeyRequest",
+            "SalesReturnReceivingBatch",
             "SendH4NotificationRequest",
             "ShipOutboundOrderRequest",
             "ShippedCustomerHint",
@@ -59224,7 +59344,7 @@
         }
       ],
       "exports": [],
-      "totalLines": 265,
+      "totalLines": 268,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/openapi_paths/alert_definition.rs": {
@@ -79016,7 +79136,7 @@
     },
     "backend/crates/api/src/wave3_handlers_part2.rs": {
       "filePath": "backend/crates/api/src/wave3_handlers_part2.rs",
-      "contentHash": "c8d6c6bd8902727d2ad449619d0d1e0ed3becc4a6e7d487707dc5fa21e538c5e",
+      "contentHash": "4afaccaa2995653c0e89d2b1885e4516063e64c8b722c0bc94cb4fc8bf9be699",
       "functions": [
         {
           "name": "seed_receiving_verifiers",
@@ -79034,7 +79154,7 @@
             "pool"
           ],
           "exported": false,
-          "lineCount": 185
+          "lineCount": 188
         },
         {
           "name": "postgres_inventory_query_and_status_change_are_scoped_idempotent_and_audited",
@@ -79042,7 +79162,7 @@
             "pool"
           ],
           "exported": false,
-          "lineCount": 118
+          "lineCount": 122
         },
         {
           "name": "postgres_cold_chain_reading_uses_external_api_key_idempotency_and_audit",
@@ -79076,13 +79196,13 @@
           "name": "inventory_batch_date_query_filters_and_sorts_in_memory",
           "params": [],
           "exported": false,
-          "lineCount": 37
+          "lineCount": 48
         },
         {
           "name": "inventory_batch_date_query_rejects_reversed_ranges",
           "params": [],
           "exported": false,
-          "lineCount": 43
+          "lineCount": 51
         },
         {
           "name": "inventory_batches_handler_reads_config_center_smoke_flag_and_fails_closed",
@@ -79092,9 +79212,16 @@
         }
       ],
       "classes": [],
-      "imports": [],
+      "imports": [
+        {
+          "source": "super",
+          "specifiers": [
+            "InventoryBatchListQuery"
+          ]
+        }
+      ],
       "exports": [],
-      "totalLines": 750,
+      "totalLines": 778,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/wave3_handlers_part3.rs": {
@@ -79862,7 +79989,7 @@
     },
     "backend/crates/api/src/wave3_repository.rs": {
       "filePath": "backend/crates/api/src/wave3_repository.rs",
-      "contentHash": "4988bc0b39de78356de69e62f00611cbd2b646a4806894c7fd45ba31b1185a9c",
+      "contentHash": "7a87cd09f16d904fb0330e3e0b6bad2a45f93bcf79c4096698cd5bc655e3f06c",
       "functions": [
         {
           "name": "from",
@@ -79949,6 +80076,7 @@
             "InvalidReason",
             "MissingRequiredField",
             "TemperatureExcursionRequiresDisposition",
+            "PendingErpCancel",
             "SupplierQualificationExpired",
             "MissingApprovalSource",
             "RecallAlreadyActive",
@@ -79979,7 +80107,7 @@
             "Serialize"
           ],
           "exported": true,
-          "lineCount": 75
+          "lineCount": 76
         },
         {
           "name": "ReceivingOrderRow",
@@ -80263,6 +80391,13 @@
           ]
         },
         {
+          "source": "inventory_seed",
+          "specifiers": [
+            "ErpInventorySeedItem",
+            "ErpInventorySeedSnapshot"
+          ]
+        },
+        {
           "source": "mappings",
           "specifiers": [
             "map_cold_chain_device",
@@ -80289,7 +80424,7 @@
         "IdempotentMutation",
         "Wave3RepositoryError"
       ],
-      "totalLines": 338,
+      "totalLines": 342,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/wave3_repository/abc.rs": {
@@ -82373,7 +82508,7 @@
     },
     "backend/crates/api/src/wave3_repository_helpers.rs": {
       "filePath": "backend/crates/api/src/wave3_repository_helpers.rs",
-      "contentHash": "9d01f52d3385b51b76836da1694b38bde5b3d73648a4603cf78b40da279f00a1",
+      "contentHash": "4de8467a5e2d31bf5aecd9525d7bb8e2ca7ef489d3780304ed0cc5392a1321f2",
       "functions": [
         {
           "name": "lock_receiving_order",
@@ -82574,15 +82709,6 @@
           "lineCount": 8
         },
         {
-          "name": "validate_receiving_gsp_fields",
-          "params": [
-            "req"
-          ],
-          "returnType": "Result<(), Wave3RepositoryError>",
-          "exported": false,
-          "lineCount": 46
-        },
-        {
           "name": "order_requires_cold_chain",
           "params": [
             "tx",
@@ -82649,12 +82775,12 @@
         }
       ],
       "exports": [],
-      "totalLines": 683,
+      "totalLines": 636,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/wave3_repository_part1.rs": {
       "filePath": "backend/crates/api/src/wave3_repository_part1.rs",
-      "contentHash": "dc790f058876b869c06503b59814cb7d22b0348ac40bb798e2b2325848af5d0d",
+      "contentHash": "6ea52c7dbf8086253e3da32ee801e306cf3081b42c8a1d4a8fdd8257c46f74a7",
       "functions": [
         {
           "name": "new",
@@ -82692,11 +82818,13 @@
         {
           "name": "list_receiving_orders",
           "params": [
-            "ctx"
+            "ctx",
+            "page",
+            "page_size"
           ],
-          "returnType": "Result<Vec<ReceivingOrder>, Wave3RepositoryError>",
+          "returnType": "Result<(Vec<ReceivingOrder>, i64), Wave3RepositoryError>",
           "exported": true,
-          "lineCount": 27
+          "lineCount": 41
         },
         {
           "name": "receive_receiving_order_with_audit",
@@ -82710,7 +82838,7 @@
           ],
           "returnType": "Result<IdempotentMutation<ReceivingOrderReceipt>, Wave3RepositoryError>",
           "exported": true,
-          "lineCount": 154
+          "lineCount": 180
         },
         {
           "name": "reject_receiving_order",
@@ -82751,7 +82879,7 @@
         "reject_receiving_order",
         "reject_receiving_order_with_audit"
       ],
-      "totalLines": 392,
+      "totalLines": 435,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/wave3_repository_part1b.rs": {
@@ -94098,15 +94226,15 @@
     },
     "backend/crates/api/tests/m2_deferred_closeout_postgres_included/part2.rs": {
       "filePath": "backend/crates/api/tests/m2_deferred_closeout_postgres_included/part2.rs",
-      "contentHash": "13384f9aa74af1de1a1835cd159046b65bac4eaf23658b6d74837c94ca7c1ff6",
+      "contentHash": "5a7d83eecf727f5f8672806bb8b6759832c56af0332bdf0183f0d2f21ac9b685",
       "functions": [
         {
-          "name": "sales_return_inspection_updates_each_batch_line",
+          "name": "sales_return_batch_rejection_keeps_unrejected_quantities_inspectable",
           "params": [
             "pool"
           ],
           "exported": false,
-          "lineCount": 104
+          "lineCount": 123
         },
         {
           "name": "putaway_is_partial_until_all_accepted_quantity_is_committed",
@@ -94114,7 +94242,7 @@
             "pool"
           ],
           "exported": false,
-          "lineCount": 125
+          "lineCount": 128
         },
         {
           "name": "create_is_idempotent_and_audited_in_the_postgres_path",
@@ -94144,7 +94272,7 @@
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 378,
+      "totalLines": 400,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/tests/m2_smart_putaway_postgres.rs": {
@@ -99380,7 +99508,7 @@
     },
     "backend/crates/api/tests/wave3_evidence_postgres.rs": {
       "filePath": "backend/crates/api/tests/wave3_evidence_postgres.rs",
-      "contentHash": "0d55defd9e585a0b4fe163d5481684517dabcfaf9316d38703a71bd3ed382665",
+      "contentHash": "e7bbcae459ea777915be61623d1d3ddcba407ef84ac1e56c85c9a5151a618752",
       "functions": [
         {
           "name": "ctx",
@@ -99473,7 +99601,7 @@
             "pool"
           ],
           "exported": false,
-          "lineCount": 167
+          "lineCount": 171
         },
         {
           "name": "ingest_cold_chain_readings_and_excursions_replay_without_duplicate_audit",
@@ -99544,10 +99672,16 @@
             "ReceivingReceiptDetails",
             "SignInspectionRequest"
           ]
+        },
+        {
+          "source": "postgres_test_support",
+          "specifiers": [
+            "ensure_audit_partition"
+          ]
         }
       ],
       "exports": [],
-      "totalLines": 718,
+      "totalLines": 725,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs": {
@@ -109464,7 +109598,7 @@
     },
     "backend/crates/domain/src/operations.rs": {
       "filePath": "backend/crates/domain/src/operations.rs",
-      "contentHash": "26d32849de89cd444912553c888208dcf62f5684f231e3031a68be6ef7171d72",
+      "contentHash": "0efffd8d185d4590ff022e1703d1063b92a7230281e3f5937e66f570e411d10a",
       "functions": [
         {
           "name": "default_notify_on_no_location",
@@ -109501,12 +109635,13 @@
             "details"
           ],
           "exported": true,
-          "lineCount": 11
+          "lineCount": 14
         },
         {
           "name": "ReceivingReceiptDetails",
           "methods": [],
           "properties": [
+            "delivery_qty",
             "temperature_control_method",
             "vehicle_no",
             "origin",
@@ -109519,10 +109654,24 @@
             "contact_phone",
             "contact_id_no",
             "seal_checked",
-            "filing_checked"
+            "filing_checked",
+            "second_receiver_id",
+            "sales_return_batches"
           ],
           "exported": true,
-          "lineCount": 28
+          "lineCount": 46
+        },
+        {
+          "name": "SalesReturnReceivingBatch",
+          "methods": [],
+          "properties": [
+            "batch_no",
+            "quantity",
+            "rejected_qty",
+            "reject_reason"
+          ],
+          "exported": true,
+          "lineCount": 9
         },
         {
           "name": "RejectReceivingOrderRequest",
@@ -109617,7 +109766,7 @@
             "occurred_at"
           ],
           "exported": true,
-          "lineCount": 12
+          "lineCount": 15
         },
         {
           "name": "InspectReceivingOrderRequest",
@@ -109638,7 +109787,7 @@
             "approval_no"
           ],
           "exported": true,
-          "lineCount": 24
+          "lineCount": 27
         },
         {
           "name": "ReceivingInspectionRecord",
@@ -109657,7 +109806,7 @@
             "occurred_at"
           ],
           "exported": true,
-          "lineCount": 16
+          "lineCount": 19
         },
         {
           "name": "SignInspectionRequest",
@@ -109711,7 +109860,7 @@
             "lpn_code"
           ],
           "exported": true,
-          "lineCount": 11
+          "lineCount": 12
         },
         {
           "name": "PutawayRecommendationQuery",
@@ -109724,7 +109873,7 @@
             "limit"
           ],
           "exported": true,
-          "lineCount": 7
+          "lineCount": 8
         },
         {
           "name": "PutawayLocationRecommendation",
@@ -109754,7 +109903,7 @@
             "data"
           ],
           "exported": true,
-          "lineCount": 9
+          "lineCount": 10
         },
         {
           "name": "PutawayRecord",
@@ -109772,7 +109921,7 @@
             "occurred_at"
           ],
           "exported": true,
-          "lineCount": 13
+          "lineCount": 14
         },
         {
           "name": "InventoryBatch",
@@ -109809,7 +109958,7 @@
             "updated_at"
           ],
           "exported": true,
-          "lineCount": 31
+          "lineCount": 33
         },
         {
           "name": "InventoryBatchQuery",
@@ -109858,7 +110007,7 @@
             "source_receiving_order_id"
           ],
           "exported": true,
-          "lineCount": 11
+          "lineCount": 12
         },
         {
           "name": "ReceivingDashboardQuery",
@@ -109883,7 +110032,7 @@
             "abnormal"
           ],
           "exported": true,
-          "lineCount": 7
+          "lineCount": 8
         },
         {
           "name": "ReceivingDashboardResponse",
@@ -110003,7 +110152,7 @@
             "expiry_date"
           ],
           "exported": true,
-          "lineCount": 32
+          "lineCount": 33
         },
         {
           "name": "InventoryStatusChange",
@@ -110069,7 +110218,7 @@
             "total_qty_delta"
           ],
           "exported": true,
-          "lineCount": 6
+          "lineCount": 7
         },
         {
           "name": "LocationHistoryResponse",
@@ -110123,11 +110272,18 @@
           "specifiers": [
             "ReceivingOrder"
           ]
+        },
+        {
+          "source": "crate",
+          "specifiers": [
+            "Quantity"
+          ]
         }
       ],
       "exports": [
         "ReceiveReceivingOrderRequest",
         "ReceivingReceiptDetails",
+        "SalesReturnReceivingBatch",
         "RejectReceivingOrderRequest",
         "CancelReceivingOrderRequest",
         "ForceCloseShortageRequest",
@@ -110167,7 +110323,7 @@
         "LocationHistoryProductShare",
         "LocationHistoryResponse"
       ],
-      "totalLines": 515,
+      "totalLines": 567,
       "hasStructuralAnalysis": true
     },
     "backend/crates/domain/src/print_device.rs": {
@@ -116795,7 +116951,7 @@
     },
     "docs/governance/quality-matrix.md": {
       "filePath": "docs/governance/quality-matrix.md",
-      "contentHash": "e7934e695b2903d9bf424e66504f490eea48427b6622b0fb8af53b9fda3a6571",
+      "contentHash": "9ae65d13933fe2d68b1b08c04a550fa17bbfcc78a209576c0dd3ecc951ead75d",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -117915,12 +118071,12 @@
     },
     "governance/quality-matrix.toml": {
       "filePath": "governance/quality-matrix.toml",
-      "contentHash": "e6c52276063e2431b4d2ba47974a24cb60ef0dc616eb8713ac4242fa0359f16c",
+      "contentHash": "79d6d7b1772896aa0c5a44435b6d69a4eafce1612cd6aee9925e313a67a9076e",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 5915,
+      "totalLines": 5941,
       "hasStructuralAnalysis": true
     },
     "governance/redis-usage-inventory.toml": {
@@ -117975,12 +118131,12 @@
     },
     "justfile": {
       "filePath": "justfile",
-      "contentHash": "d67828a6acd78dfb68c09bb8799e258b9a36d5344cf32f99199860849bd03bf2",
+      "contentHash": "ce4cf77e2504f8ac8cebe63bf0a12b73cbd79816e7c288feaa7ea86228c03f68",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 1349,
+      "totalLines": 1521,
       "hasStructuralAnalysis": false
     },
     "lefthook.yml": {
@@ -171554,12 +171710,12 @@
     },
     "shared/openapi/openapi.json": {
       "filePath": "shared/openapi/openapi.json",
-      "contentHash": "2e9d17ea6f00c1812060cd143ccad16ff4f36ae2c37f66b6d26a07c6f7857109",
+      "contentHash": "fbeea140e95e0c6110f7728d9eaa33c1483381669aed90910c378ce6fb1b4ee4",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 49487,
+      "totalLines": 50320,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/h8_erp_interface_tables/repository_tests.rs": {
@@ -171629,6 +171785,59 @@
       "hasStructuralAnalysis": true,
       "contentHash": "941a6522b65c6b83ad12d164cc852696488a704aa095ffb4df5cb9c708c53a4e",
       "totalLines": 225
+    },
+    "backend/crates/api/src/wave3_repository/receiving_validation.rs": {
+      "filePath": "backend/crates/api/src/wave3_repository/receiving_validation.rs",
+      "contentHash": "253a6f8ed93b32c0b39e65d153b583e7ffbe1808729d04a7d7ab71de4672297a",
+      "functions": [
+        {
+          "name": "validate_receiving_gsp_fields",
+          "params": [
+            "document_type",
+            "lines",
+            "req",
+            "actor_id"
+          ],
+          "returnType": "Result<(), Wave3RepositoryError>",
+          "exported": true,
+          "lineCount": 65
+        },
+        {
+          "name": "validate_sales_return_batches",
+          "params": [
+            "document_type",
+            "lines",
+            "req"
+          ],
+          "returnType": "Result<(), Wave3RepositoryError>",
+          "exported": false,
+          "lineCount": 65
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "",
+          "specifiers": [
+            "*"
+          ]
+        }
+      ],
+      "exports": [
+        "validate_receiving_gsp_fields"
+      ],
+      "totalLines": 265,
+      "hasStructuralAnalysis": true
+    },
+    "apps/web-admin/dev-mocks/web-admin-dev-mock-receiving-model.ts": {
+      "filePath": "apps/web-admin/dev-mocks/web-admin-dev-mock-receiving-model.ts",
+      "contentHash": "47b19af7c3ba83cb7e5fae64d867ddbe9caada315b0af23ec68b0a1d07b1409a",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 55,
+      "hasStructuralAnalysis": true
     }
   }
 }
