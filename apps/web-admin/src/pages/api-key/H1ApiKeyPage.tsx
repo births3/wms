@@ -364,8 +364,12 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
               <option value="master-data:write">master-data:write</option>
               <option value="inbound:push">inbound:push</option>
               <option value="outbound:push">outbound:push</option>
+              <option value="outbound:receipt">outbound:receipt</option>
               <option value="return:push">return:push</option>
+              <option value="inventory:seed">inventory:seed</option>
+              <option value="order:command">order:command</option>
               <option value="tms:callback">tms:callback</option>
+              <option value="h8:worker">h8:worker</option>
             </select></label>
             <label className="grid gap-1 text-sm">过期时间<span className="text-xs text-muted-foreground">留空使用默认 180 天</span><Input type="datetime-local" value={createForm.expiresAt} onChange={(event) => updateCreateForm("expiresAt", event.target.value)} /></label>
             <DialogFooter><DialogClose asChild><Button type="button" variant="outline" disabled={createMutation.isPending}>取消</Button></DialogClose><Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? "创建中..." : "确认创建"}</Button></DialogFooter>

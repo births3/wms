@@ -190,7 +190,7 @@ ERP 连接通过管理端「基础能力 / H8 集成中心 / H8 ERP 连接」独
 | 变更 | 有效连接的端点、路由或 secret alias 变化后回到 `testing`；旧测试结果失效 |
 | 停用 | 暂停在途消息，保留连接、通道阶段和 Idempotency-Key；重新启用后续传 |
 | 删除 | 仅从未启用且无消息/业务引用时允许物理删除；H2 审计独立保留 |
-| 权限 | `h8.erp_connector.read` 供系统管理员/仓库主管只读，`h8.erp_connector.write` 只供系统管理员执行配置动作 |
+| 权限 | `h8.erp_connector.read` 供系统管理员/仓库主管只读，`h8.erp_connector.write` 只供系统管理员执行配置动作；Rust Worker 另用 H1 `h8:worker` scope 映射控制面只读与运行写入，不进入管理员 RBAC 配置权限 |
 | 审计 | 配置、测试、启停、删除、自动主备切换全部写 H2 append-only 审计，禁止记录明文凭据 |
 
 REST 按 ADR-0018 重试和熔断，满足降级条件后把同一消息及原 Idempotency-Key 转入接口表；半开探测恢复后回到 REST。连接测试只做健康、认证、权限和结构探测，不写真实业务单据。完整字段、状态动作、权限和证据标准见 [US-H8-001](../domain/user-stories-h8-erp-integration.md)。

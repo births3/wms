@@ -5,9 +5,10 @@
 - 使用当前登录态的 `owner_id`，校验负责人和仓库范围归属。
 - 创建、查询、轮换、吊销 API Key，写操作要求 `Idempotency-Key`。
 - 数据库只保存 Key 哈希和生命周期元数据；明文只在首次创建或轮换响应中返回。
-- 作用域只允许 `master-data:write`、`inbound:push`、`outbound:push`、
-  `return:push`、`tms:callback`；管理端与后端使用同一受控清单，支持为
-  H8 出库订单和销退申请分别配置最小 scope。
+- 作用域只允许后端 `API_KEY_SCOPES` 受控清单中的业务 scope，以及 H8 Worker 专用
+  `h8:worker`；管理端与后端使用同一受控清单。H8 Worker 还需按入站消息类型叠加
+  `inbound:push`、`master-data:write`、`outbound:push`、`return:push`、
+  `inventory:seed` 或 `order:command`。
 - 失败计数、临时禁用和限流窗口使用 PostgreSQL 行锁事务，并写入 H2 append-only 审计。
 - 已在应用入口统一接入 `X-WMS-API-Key`：按外部路由声明作用域，注入货主上下文；配置仓库范围的 Key 必须携带并匹配 `X-WMS-Warehouse-ID`。
 - 每次统一鉴权后的调用写入 H2 审计，包含 API Key ID、请求路径、HTTP 方法、响应状态、来源 IP 和 User-Agent；不记录明文 secret。

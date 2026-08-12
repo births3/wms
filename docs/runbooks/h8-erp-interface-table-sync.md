@@ -39,7 +39,7 @@ ERP 厂商容器端口 **18092**，厂商标识 `container-erp-vendor-a`；回�
 
 ```bash
 export WMS_API_BASE=http://127.0.0.1:18090
-export WMS_API_TOKEN='...'   # login 需 owner_code
+export WMS_H8_WORKER_API_KEY='...'   # H1 API Key；需含 h8:worker 及当前入站消息最小 scopes
 export WMS_DB_URL='postgres://...'   # 出站读 outbox
 export H8_CONNECTOR_ID='...' # 当前接口库对应的 H8 连接 UUID；一个 Worker 只绑定一个连接
 export WMS_H8_SECRET_ALIASES='{"vault://h8/worker-db":"本机注入的接口库密码"}'
@@ -92,6 +92,22 @@ EXEC sp_addrolemember N'r_wms_probe_readonly', N'wms_probe_test';
 无法解析的旧 probe alias 时，页面会返回“接口表读取失败”；禁止用 Worker 密码补齐 probe
 alias。API 还必须配置当前单货主接口码 `H8_OWNER_CODE=ZBPF7`。
 
+### 2.2 H8 Worker API Key
+
+在管理端「基础能力 / H1 API Key 管理」创建专用 Key，或调用同一 API Key 管理接口创建：
+
+- 调用方：`h8-rust-worker`；用途：接口表同步控制面。
+- 仓库范围必须留空（`warehouse_ids=[]`），由 `H8_CONNECTOR_ID` 和货主上下文限制连接。
+- 必选 `h8:worker`；按该连接的入站消息类型追加最小业务 scope，例如 `inbound:push`、
+  `master-data:write`、`outbound:push`、`return:push`、`inventory:seed`、`order:command`。
+- API Key 明文只在创建/轮换响应中出现一次，保存到 Secret 管理器；宿主机只注入
+  `WMS_H8_WORKER_API_KEY`，不要再注入 `WMS_API_TOKEN`。
+- 使用 API Key 生命周期的轮换接口提前换 Key；旧 Key 的 7 天宽限期用于平滑重启 Worker，
+  确认新 Key 已生效后再吊销旧 Key。
+
+`h8:worker` 只映射 `h8.erp_connector.read` 与 `h8.erp_worker.write`：可以读取冻结连接、
+解析路由、查询/认领/推进消息和上报心跳，不能新增、修改、测试、启停或删除 ERP 连接。
+
 ## 3. 入站类型（通道 B 接口表 → WMS API）
 
 | type | 表 | API |
@@ -140,7 +156,7 @@ alias。API 还必须配置当前单货主接口码 `H8_OWNER_CODE=ZBPF7`。
 ## 5. Worker
 
 Worker 启动后向「H8 ERP 消息 / Worker 状态」上报实例、版本、方向、当前认领数和心跳。
-启动时只从环境读取 WMS 控制面地址、令牌和 `H8_CONNECTOR_ID`，随后先读取当前连接，
+启动时只从环境读取 WMS 控制面地址、`WMS_H8_WORKER_API_KEY` 和 `H8_CONNECTOR_ID`，随后先读取当前连接，
 再读取 `/api/v1/config/erp-connectors/{id}/versions/{config_version}` 不可变快照。
 接口库主机、端口、库名、用户名和密码 alias 全部来自该快照；密码仅通过
 `WMS_H8_SECRET_ALIASES` / `WMS_SECRETS_MAP` 解析。生产 Worker 禁止使用

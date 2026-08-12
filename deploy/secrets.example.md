@@ -17,7 +17,7 @@ Required runtime values:
   `WMS_HFILE_ACCESS_KEY`, `WMS_HFILE_SECRET_KEY` and optional API / MinIO ports.
   It must also contain an independent `WMS_H9_RENDER_TOKEN` shared only by the
   WMS API and H9 Render Worker. The H8 Rust Worker additionally requires
-  `H8_CONNECTOR_ID`, a least-privilege `WMS_H8_WORKER_API_TOKEN`, and
+  `H8_CONNECTOR_ID`, a least-privilege `WMS_H8_WORKER_API_KEY`, and
   `WMS_H8_SECRET_ALIASES`. This map must contain separate keys for the connector
   Worker password alias and the H8-004 SELECT-only probe password alias; the API
   consumes only the probe alias and the Worker consumes only its transport alias.

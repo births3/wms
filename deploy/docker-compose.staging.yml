@@ -151,7 +151,7 @@ services:
         condition: service_healthy
     environment:
       - WMS_API_BASE=http://wms-api-staging:8080
-      - WMS_API_TOKEN=${WMS_H8_WORKER_API_TOKEN}
+      - WMS_H8_WORKER_API_KEY=${WMS_H8_WORKER_API_KEY}
       - WMS_DB_URL=postgres://wms_staging:${WMS_STAGING_DB_PASSWORD}@postgres-staging:5432/wms_staging
       - WMS_H8_SECRET_ALIASES=${WMS_H8_SECRET_ALIASES}
       - H8_CONNECTOR_ID=${H8_CONNECTOR_ID}
