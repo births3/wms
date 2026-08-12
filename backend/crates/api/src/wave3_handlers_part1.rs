@@ -328,6 +328,9 @@ async fn inbound_receive_handler_requires_permission_and_appends_audit() {
         arrival_temperature_celsius: None,
         exception_note: None,
         details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),
@@ -439,6 +442,9 @@ async fn postgres_receive_handler_writes_business_idempotency_and_audit(pool: Pg
         arrival_temperature_celsius: None,
         exception_note: None,
         details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),
@@ -553,6 +559,9 @@ async fn postgres_putaway_handler_commits_inventory_and_audit(pool: PgPool) {
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),

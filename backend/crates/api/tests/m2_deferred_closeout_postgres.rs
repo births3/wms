@@ -248,6 +248,14 @@ async fn inspection_uses_actual_receipt_quantity_and_blocks_early_signature(pool
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![wms_domain::SalesReturnReceivingBatch {
+                        batch_no: "B-QUANTITY-GATE".to_string(),
+                        quantity: 10.into(),
+                        rejected_qty: 0.into(),
+                        reject_reason: None,
+                    }],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),

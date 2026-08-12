@@ -46,6 +46,7 @@ mod query;
 mod recall;
 mod receiving_read;
 mod receiving_update;
+mod receiving_validation;
 mod relocation;
 mod trace;
 

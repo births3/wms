@@ -123,6 +123,9 @@ async fn force_close_shortage_from_receiving_with_shortage_qty(pool: PgPool) {
                 arrival_temperature_celsius: None,
                 exception_note: Some("到货短少 2".to_string()),
                 details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),

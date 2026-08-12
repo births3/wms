@@ -396,53 +396,6 @@ fn map_receipt_insert_error(error: sqlx::Error) -> Wave3RepositoryError {
     map_db_error(error)
 }
 
-fn validate_receiving_gsp_fields(
-    req: &ReceiveReceivingOrderRequest,
-) -> Result<(), Wave3RepositoryError> {
-    let details = req
-        .details
-        .as_ref()
-        .ok_or_else(|| Wave3RepositoryError::MissingRequiredField("details".to_string()))?;
-    let required = [
-        ("vehicle_no", details.vehicle_no.as_deref()),
-        ("origin", details.origin.as_deref()),
-        ("transport_mode", details.transport_mode.as_deref()),
-        ("carrier", details.carrier.as_deref()),
-        ("contact_name", details.contact_name.as_deref()),
-        ("contact_phone", details.contact_phone.as_deref()),
-        ("contact_id_no", details.contact_id_no.as_deref()),
-        ("seal_checked", details.seal_checked.as_deref()),
-        ("filing_checked", details.filing_checked.as_deref()),
-    ];
-    for (field, value) in required {
-        if value
-            .map(str::trim)
-            .filter(|item| !item.is_empty())
-            .is_none()
-        {
-            return Err(Wave3RepositoryError::MissingRequiredField(
-                field.to_string(),
-            ));
-        }
-    }
-    if details.departure_at.is_none() {
-        return Err(Wave3RepositoryError::MissingRequiredField(
-            "departure_at".to_string(),
-        ));
-    }
-    if details.arrival_at.is_none() {
-        return Err(Wave3RepositoryError::MissingRequiredField(
-            "arrival_at".to_string(),
-        ));
-    }
-    if details.storage_at.is_none() {
-        return Err(Wave3RepositoryError::MissingRequiredField(
-            "storage_at".to_string(),
-        ));
-    }
-    Ok(())
-}
-
 async fn order_requires_cold_chain(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,

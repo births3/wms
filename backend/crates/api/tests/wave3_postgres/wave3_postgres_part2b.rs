@@ -31,6 +31,9 @@ async fn inspection_accepts_quarantined_status_from_quality_color_dictionary(poo
             arrival_temperature_celsius: None,
             exception_note: None,
             details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),
@@ -115,6 +118,9 @@ async fn putaway_audit_failure_rolls_back_all_business_writes(pool: PgPool) {
             arrival_temperature_celsius: None,
             exception_note: None,
             details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),

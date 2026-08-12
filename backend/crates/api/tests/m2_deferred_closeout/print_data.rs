@@ -19,32 +19,57 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
         .await
         .expect("prepare released state");
 
+    let receive_request = ReceiveReceivingOrderRequest {
+        actual_qty: 8.into(),
+        shortage_qty: 1.into(),
+        rejected_qty: 1.into(),
+        arrival_temperature_celsius: Some(4.5),
+        exception_note: Some("外包装轻微破损".to_string()),
+        details: Some(ReceivingReceiptDetails {
+            delivery_qty: 10.into(),
+            second_receiver_id: Some(second_signer_id),
+            sales_return_batches: vec![],
+            temperature_control_method: Some("冷藏".to_string()),
+            vehicle_no: Some("沪A-12345".to_string()),
+            origin: Some("上海配送中心".to_string()),
+            departure_at: Some("2026-06-04T08:00:00Z".parse().expect("departure")),
+            arrival_at: Some("2026-06-04T10:00:00Z".parse().expect("arrival")),
+            storage_at: Some("2026-06-04T10:15:00Z".parse().expect("storage")),
+            transport_mode: Some("冷藏车".to_string()),
+            carrier: Some("华东冷链承运商".to_string()),
+            contact_name: Some("张三".to_string()),
+            contact_phone: Some("13800000000".to_string()),
+            contact_id_no: Some("310101199001010000".to_string()),
+            seal_checked: Some("已核对".to_string()),
+            filing_checked: Some("已核对".to_string()),
+        }),
+    };
+    let mut unauthorized_request = receive_request.clone();
+    unauthorized_request
+        .details
+        .as_mut()
+        .expect("receipt details")
+        .second_receiver_id = Some(Uuid::new_v4());
+    let unauthorized = repository
+        .receive_receiving_order_with_audit(
+            &ctx,
+            order.id,
+            unauthorized_request,
+            chrono::Utc::now(),
+            "print-data-receive-unauthorized",
+            None,
+        )
+        .await;
+    assert!(matches!(
+        unauthorized,
+        Err(Wave3RepositoryError::UnauthorizedSigner)
+    ));
+
     let receipt = repository
         .receive_receiving_order_with_audit(
             &ctx,
             order.id,
-            ReceiveReceivingOrderRequest {
-                actual_qty: 8.into(),
-                shortage_qty: 1.into(),
-                rejected_qty: 1.into(),
-                arrival_temperature_celsius: Some(4.5),
-                exception_note: Some("外包装轻微破损".to_string()),
-                details: Some(ReceivingReceiptDetails {
-                    temperature_control_method: Some("冷藏".to_string()),
-                    vehicle_no: Some("沪A-12345".to_string()),
-                    origin: Some("上海配送中心".to_string()),
-                    departure_at: Some("2026-06-04T08:00:00Z".parse().expect("departure")),
-                    arrival_at: Some("2026-06-04T10:00:00Z".parse().expect("arrival")),
-                    storage_at: Some("2026-06-04T10:15:00Z".parse().expect("storage")),
-                    transport_mode: Some("冷藏车".to_string()),
-                    carrier: Some("华东冷链承运商".to_string()),
-                    contact_name: Some("张三".to_string()),
-                    contact_phone: Some("13800000000".to_string()),
-                    contact_id_no: Some("310101199001010000".to_string()),
-                    seal_checked: Some("已核对".to_string()),
-                    filing_checked: Some("已核对".to_string()),
-                }),
-            },
+            receive_request,
             chrono::Utc::now(),
             "print-data-receive",
             None,
@@ -125,6 +150,8 @@ async fn print_data_reads_receipt_inspection_and_dual_signature(pool: PgPool) {
         .details
         .as_ref()
         .expect("receipt details");
+    assert_eq!(details.delivery_qty, 10.into());
+    assert_eq!(details.second_receiver_id, Some(second_signer_id));
     assert_eq!(details.temperature_control_method.as_deref(), Some("冷藏"));
     assert_eq!(details.vehicle_no.as_deref(), Some("沪A-12345"));
     assert_eq!(details.carrier.as_deref(), Some("华东冷链承运商"));

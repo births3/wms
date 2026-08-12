@@ -26,32 +26,61 @@ pub struct ReceiveReceivingOrderRequest {
 /// 收货现场信息。固定字段使用类型化结构，避免打印或审计依赖前端展示字符串。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReceivingReceiptDetails {
+    #[schema(value_type = String, format = "decimal")]
+    pub delivery_qty: Quantity,
     #[serde(default)]
     pub temperature_control_method: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub vehicle_no: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub origin: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub departure_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    #[schema(required = true)]
     pub arrival_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    #[schema(required = true)]
     pub storage_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    #[schema(required = true)]
     pub transport_mode: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub carrier: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub contact_name: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub contact_phone: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub contact_id_no: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub seal_checked: Option<String>,
     #[serde(default)]
+    #[schema(required = true)]
     pub filing_checked: Option<String>,
+    #[serde(default)]
+    pub second_receiver_id: Option<Uuid>,
+    #[serde(default)]
+    pub sales_return_batches: Vec<SalesReturnReceivingBatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct SalesReturnReceivingBatch {
+    pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
+    pub quantity: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub rejected_qty: Quantity,
+    #[serde(default)]
+    pub reject_reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

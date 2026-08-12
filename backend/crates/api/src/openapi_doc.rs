@@ -870,6 +870,7 @@ use wms_domain::{
         ReceivingOrderReceipt,
         ReceivingOrderPrintData,
         ReceivingReceiptDetails,
+        SalesReturnReceivingBatch,
         RejectReceivingOrderRequest,
         ReportQueryRequest,
         ReportQueryResponse,

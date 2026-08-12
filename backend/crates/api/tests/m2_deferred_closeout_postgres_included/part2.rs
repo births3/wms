@@ -1,5 +1,5 @@
 #[sqlx::test(migrations = "../../migrations")]
-async fn sales_return_inspection_updates_each_batch_line(pool: PgPool) {
+async fn sales_return_batch_rejection_keeps_unrejected_quantities_inspectable(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let ctx = context(owner_id);
     let repository = PgWave3Repository::new(pool.clone());
@@ -23,17 +23,33 @@ async fn sales_return_inspection_updates_each_batch_line(pool: PgPool) {
         .execute(&pool)
         .await
         .expect("prepare released state");
-    repository
+    let receipt = repository
         .receive_receiving_order_with_audit(
             &ctx,
             order.id,
             ReceiveReceivingOrderRequest {
-                actual_qty: 10.into(),
+                actual_qty: 8.into(),
                 shortage_qty: 6.into(),
-                rejected_qty: 0.into(),
+                rejected_qty: 2.into(),
                 arrival_temperature_celsius: None,
-                exception_note: None,
+                exception_note: Some("B-002 外包装破损".to_string()),
                 details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![
+                        wms_domain::SalesReturnReceivingBatch {
+                            batch_no: "B-001".to_string(),
+                            quantity: 4.into(),
+                            rejected_qty: 0.into(),
+                            reject_reason: None,
+                        },
+                        wms_domain::SalesReturnReceivingBatch {
+                            batch_no: "B-002".to_string(),
+                            quantity: 6.into(),
+                            rejected_qty: 2.into(),
+                            reject_reason: Some("外包装破损".to_string()),
+                        },
+                    ],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),
@@ -54,11 +70,14 @@ async fn sales_return_inspection_updates_each_batch_line(pool: PgPool) {
             None,
         )
         .await
-        .expect("receive multi-batch sales return");
+        .expect("receive multi-batch sales return")
+        .value;
+    let details = receipt.details.expect("receipt details");
+    assert_eq!(details.sales_return_batches[1].rejected_qty, 2.into());
 
     for (batch_no, qty, key) in [
         ("B-001", 4_i64, "inspect-b-001"),
-        ("B-002", 6_i64, "inspect-b-002"),
+        ("B-002", 4_i64, "inspect-b-002"),
     ] {
         repository
             .inspect_receiving_order_with_audit(
@@ -133,6 +152,9 @@ async fn putaway_is_partial_until_all_accepted_quantity_is_committed(pool: PgPoo
                 arrival_temperature_celsius: None,
                 exception_note: None,
                 details: Some(ReceivingReceiptDetails {
+                    delivery_qty: 10.into(),
+                    second_receiver_id: None,
+                    sales_return_batches: vec![],
                     temperature_control_method: Some("普通".to_string()),
                     vehicle_no: Some("沪A00000".to_string()),
                     origin: Some("发运地".to_string()),

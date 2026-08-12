@@ -171,14 +171,8 @@ impl PgWave3Repository {
                 actual: order.status,
             });
         }
-        let expected_qty: wms_domain::Quantity = sqlx::query_scalar(
-            "SELECT COALESCE(SUM(expected_qty), 0) FROM receiving_order_lines WHERE receiving_order_id = $1 AND owner_id = $2",
-        )
-        .bind(id)
-        .bind(ctx.owner_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(map_db_error)?;
+        let lines = load_receiving_order_lines_in_tx(&mut tx, ctx.owner_id, id).await?;
+        let expected_qty = lines.iter().map(|line| line.expected_qty).sum();
         if req.actual_qty > expected_qty {
             return Err(Wave3RepositoryError::OverReceiptNotAllowed);
         }
@@ -186,7 +180,19 @@ impl PgWave3Repository {
             return Err(Wave3RepositoryError::QuantityClosureMismatch);
         }
 
-        validate_receiving_gsp_fields(&req)?;
+        receiving_validation::validate_receiving_gsp_fields(
+            &order.document_type,
+            &lines,
+            &req,
+            ctx.user_id,
+        )?;
+        if let Some(second_receiver_id) = req
+            .details
+            .as_ref()
+            .and_then(|details| details.second_receiver_id)
+        {
+            ensure_receiving_clerk_signer(&mut tx, ctx.owner_id, second_receiver_id).await?;
+        }
         let cold_chain = order_requires_cold_chain(&mut tx, ctx.owner_id, id).await?;
         if cold_chain {
             if req.arrival_temperature_celsius.is_none() {
