@@ -28,7 +28,7 @@ use super::lifecycle::{
 };
 use super::repository::H8ErpMessageCursor;
 use super::scope::{authorized_warehouse_ids, message_stats, require_message_warehouse_scope};
-use super::state::{H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE};
+use super::state::{require_worker_write, H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE};
 
 const DEFAULT_LIST_LIMIT: u32 = 50;
 const MAX_LIST_LIMIT: u32 = 200;
@@ -427,7 +427,7 @@ async fn record_worker_heartbeat(
     State(state): State<H8ErpMessageAppState>,
     Json(body): Json<H8WorkerHeartbeatRequest>,
 ) -> Result<Json<H8WorkerStatus>, H8ErpMessageHandlerError> {
-    ctx.require_permission(H8_MSG_WRITE)?;
+    require_worker_write(&ctx)?;
     let status = state
         .runtime_repository
         .record_heartbeat(ctx.owner_id, &body, Utc::now())
@@ -488,7 +488,7 @@ async fn worker_claim_decision(
     State(state): State<H8ErpMessageAppState>,
     Query(query): Query<ClaimDecisionQuery>,
 ) -> Result<Json<H8WorkerClaimDecision>, H8ErpMessageHandlerError> {
-    ctx.require_permission(H8_MSG_WRITE)?;
+    require_worker_write(&ctx)?;
     Ok(Json(
         state
             .runtime_repository
@@ -534,7 +534,7 @@ async fn claim_message(
     Path(id): Path<Uuid>,
     Json(body): Json<ClaimH8ErpMessageRequest>,
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
-    ctx.require_permission(H8_MSG_WRITE)?;
+    require_worker_write(&ctx)?;
     let existing = state.repository.get(ctx.owner_id, id).await?;
     require_message_warehouse_scope(&state, &ctx, &existing).await?;
     if let Some(connector_id) = existing.connector_id {
@@ -605,7 +605,7 @@ async fn record_lifecycle_upsert(
     State(state): State<H8ErpMessageAppState>,
     Json(body): Json<UpsertH8ErpMessageLifecycleRequest>,
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
-    ctx.require_permission(H8_MSG_WRITE)?;
+    require_worker_write(&ctx)?;
     if !wms_domain::is_exchange_audit_stage(body.stage.trim()) {
         return Err(H8ErpMessageHandlerError::BadRequest(
             "invalid exchange audit stage",

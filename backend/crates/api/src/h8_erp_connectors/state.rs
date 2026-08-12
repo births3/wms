@@ -11,6 +11,7 @@ use super::repository::{
 
 pub const H8_CONFIG_READ: &str = "h8.erp_connector.read";
 pub const H8_CONFIG_WRITE: &str = "h8.erp_connector.write";
+pub(crate) const H8_WORKER_WRITE: &str = "h8.erp_worker.write";
 
 type IdempotencyRecord = (String, u16, Value);
 type IdempotencyCache = Arc<Mutex<HashMap<String, IdempotencyRecord>>>;

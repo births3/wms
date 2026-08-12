@@ -29,7 +29,7 @@ use super::idempotency::{
 };
 use super::probe::run_connection_probe;
 use super::repository::H8ConnectorStatusTransition;
-use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE};
+use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE, H8_WORKER_WRITE};
 
 pub fn h8_erp_connector_router(state: H8ErpConnectorAppState) -> Router {
     Router::new()
@@ -140,11 +140,13 @@ async fn resolve_connector_route(
             Some(pool) => load_user_warehouse_scopes(pool, &ctx)
                 .await
                 .map_err(|error| H8ErpConnectorRepoError::Db(error.to_string()))?,
-            None if ctx.has_permission(H8_CONFIG_WRITE) => Vec::new(),
+            None if ctx.has_permission(H8_CONFIG_WRITE) || ctx.has_permission(H8_WORKER_WRITE) => {
+                Vec::new()
+            }
             None => return Err(AuthError::PermissionDenied("warehouse scope".into()).into()),
         };
         if scopes.is_empty() {
-            if !ctx.has_permission(H8_CONFIG_WRITE) {
+            if !ctx.has_permission(H8_CONFIG_WRITE) && !ctx.has_permission(H8_WORKER_WRITE) {
                 return Err(AuthError::PermissionDenied("warehouse scope".into()).into());
             }
         } else if warehouse_id.is_some_and(|id| !scopes.contains(&id)) {

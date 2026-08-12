@@ -332,4 +332,13 @@ mod tests {
             vec!["outbound:push", "outbound:receipt", "return:push"]
         );
     }
+
+    #[test]
+    fn create_accepts_h8_worker_scope() {
+        let now = Utc::now();
+        let mut request = request();
+        request.scopes = vec!["h8:worker".into(), "inbound:push".into()];
+        let (_, scopes) = validate_create(&request, now).expect("H8 Worker scope should validate");
+        assert_eq!(scopes, vec!["h8:worker", "inbound:push"]);
+    }
 }

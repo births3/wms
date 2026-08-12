@@ -8,7 +8,6 @@ use crate::error::WorkerError;
 #[derive(Clone)]
 pub struct BootstrapSettings {
     pub api_base: String,
-    pub api_token: Option<String>,
     pub api_key: Option<String>,
     pub connector_id: Uuid,
     pub poll_interval_seconds: u64,
@@ -65,8 +64,7 @@ impl BootstrapSettings {
                 .unwrap_or_else(|| "http://127.0.0.1:8080".to_owned())
                 .trim_end_matches('/')
                 .to_owned(),
-            api_token: optional(values, "WMS_API_TOKEN"),
-            api_key: optional(values, "WMS_API_KEY"),
+            api_key: optional(values, "WMS_H8_WORKER_API_KEY"),
             connector_id,
             poll_interval_seconds,
             max_retry,

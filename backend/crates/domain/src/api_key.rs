@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 use crate::common::PageMeta;
 
-pub const API_KEY_SCOPES: [&str; 8] = [
+pub const H8_WORKER_API_KEY_SCOPE: &str = "h8:worker";
+
+pub const API_KEY_SCOPES: [&str; 9] = [
     "master-data:write",
     "inbound:push",
     "outbound:push",
@@ -14,6 +16,7 @@ pub const API_KEY_SCOPES: [&str; 8] = [
     "inventory:seed",
     "order:command",
     "tms:callback",
+    H8_WORKER_API_KEY_SCOPE,
 ];
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

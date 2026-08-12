@@ -21,7 +21,7 @@ use super::idempotency::{
     ensure_inbound_api_key_scopes, load_idempotent_response, store_idempotent_response,
 };
 use super::repository::{H8ErpConnectorRepository, PgH8ErpConnectorRepository};
-use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE};
+use super::state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE, H8_WORKER_WRITE};
 use crate::auth::AuthContext;
 
 fn versioned_connector(owner_id: Uuid) -> H8ErpConnector {
@@ -312,7 +312,9 @@ async fn route_resolve_enforces_auth_context_warehouse_scope() {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
     let mut allowed = Request::builder()
-        .uri("/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn")
+        .uri(format!(
+            "/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn&warehouse_id={allowed_warehouse}"
+        ))
         .body(Body::empty())
         .unwrap();
     allowed.extensions_mut().insert(ctx);
@@ -339,7 +341,7 @@ async fn route_resolve_enforces_auth_context_warehouse_scope() {
         jti: "outbound-worker-test".into(),
         warehouse_scope: Some(allowed_warehouse),
     });
-    let response = h8_erp_connector_router(state)
+    let response = h8_erp_connector_router(state.clone())
         .oneshot(outbound)
         .await
         .unwrap();
@@ -347,6 +349,46 @@ async fn route_resolve_enforces_auth_context_warehouse_scope() {
     let body: serde_json::Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
     assert_eq!(body["connector"]["id"], c.id.to_string());
+
+    let mut worker_route = Request::builder()
+        .uri(format!(
+            "/api/v1/config/erp-connectors/route-resolve?direction=inbound&message_type=asn&warehouse_id={allowed_warehouse}"
+        ))
+        .body(Body::empty())
+        .unwrap();
+    worker_route.extensions_mut().insert(AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: owner,
+        actor_name: "h8-worker".into(),
+        permissions: vec![H8_CONFIG_READ.into(), H8_WORKER_WRITE.into()],
+        jti: "api-key:h8-worker".into(),
+        warehouse_scope: None,
+    });
+    let response = h8_erp_connector_router(state.clone())
+        .oneshot(worker_route)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let mut worker_write = Request::builder()
+        .method("POST")
+        .uri(format!("/api/v1/config/erp-connectors/{}/disable", c.id))
+        .header("Idempotency-Key", "worker-must-not-disable")
+        .body(Body::empty())
+        .unwrap();
+    worker_write.extensions_mut().insert(AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: owner,
+        actor_name: "h8-worker".into(),
+        permissions: vec![H8_CONFIG_READ.into(), H8_WORKER_WRITE.into()],
+        jti: "api-key:h8-worker".into(),
+        warehouse_scope: None,
+    });
+    let response = h8_erp_connector_router(state.clone())
+        .oneshot(worker_write)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]

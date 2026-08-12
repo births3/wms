@@ -74,7 +74,10 @@ async fn bootstrap_snapshot_and_heartbeat_follow_control_plane_contract() {
             "334c3ff7-1018-40c6-b1f4-c19b2d2c88e5".to_owned(),
         ),
         ("WMS_API_BASE".to_owned(), api_base),
-        ("WMS_API_TOKEN".to_owned(), "test-token".to_owned()),
+        (
+            "WMS_H8_WORKER_API_KEY".to_owned(),
+            "worker-api-key".to_owned(),
+        ),
         ("H8_WORKER_ID".to_owned(), "rust-worker-1".to_owned()),
         ("H8_WORKER_VERSION".to_owned(), "rust-1".to_owned()),
     ]);
@@ -100,7 +103,10 @@ async fn bootstrap_snapshot_and_heartbeat_follow_control_plane_contract() {
     server.join().expect("测试控制面应正常退出");
     assert!(captured.iter().all(|request| request
         .to_ascii_lowercase()
-        .contains("authorization: bearer test-token")));
+        .contains("x-wms-api-key: worker-api-key")));
+    assert!(captured.iter().all(|request| !request
+        .to_ascii_lowercase()
+        .contains("authorization: bearer")));
     let heartbeat = captured
         .iter()
         .find(|request| request.contains("worker-runtime/heartbeat"))

@@ -12,14 +12,16 @@ use crate::{
 pub struct ControlPlaneClient {
     client: Client,
     api_base: String,
-    api_token: String,
-    api_key: Option<String>,
+    api_key: String,
 }
 
 impl ControlPlaneClient {
     pub fn new(settings: &BootstrapSettings) -> Result<Self, WorkerError> {
-        let api_token = settings.api_token.clone().ok_or_else(|| {
-            WorkerError::new("H8_WORKER_CONTROL_TOKEN_REQUIRED", "WMS_API_TOKEN required")
+        let api_key = settings.api_key.clone().ok_or_else(|| {
+            WorkerError::new(
+                "H8_WORKER_CONTROL_KEY_REQUIRED",
+                "WMS_H8_WORKER_API_KEY required",
+            )
         })?;
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(60))
@@ -28,8 +30,7 @@ impl ControlPlaneClient {
         Ok(Self {
             client,
             api_base: settings.api_base.clone(),
-            api_token,
-            api_key: settings.api_key.clone(),
+            api_key,
         })
     }
 
@@ -139,22 +140,11 @@ impl ControlPlaneClient {
         body: Option<&Value>,
         idempotency_key: Option<&str>,
     ) -> Result<Value, WorkerError> {
-        let inbound = url
-            .path()
-            .starts_with("/api/v1/integration/erp-messages/inbound/");
         let mut request = self
             .client
             .request(method, url)
             .header("Accept", "application/json");
-        if inbound {
-            if let Some(api_key) = &self.api_key {
-                request = request.header("x-wms-api-key", api_key);
-            } else {
-                request = request.bearer_auth(&self.api_token);
-            }
-        } else {
-            request = request.bearer_auth(&self.api_token);
-        }
+        request = request.header("x-wms-api-key", &self.api_key);
         if let Some(idempotency_key) = idempotency_key {
             request = request.header("Idempotency-Key", idempotency_key);
         }

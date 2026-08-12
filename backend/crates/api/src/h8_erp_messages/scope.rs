@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     error::H8ErpMessageHandlerError,
-    state::{H8ErpMessageAppState, H8_MSG_READ, H8_MSG_WRITE},
+    state::{has_message_write, H8ErpMessageAppState, H8_MSG_READ},
 };
 
 #[derive(Debug, Deserialize)]
@@ -41,12 +41,12 @@ pub(super) async fn authorized_warehouse_ids(
         Ok(pool) => load_user_warehouse_scopes(pool, ctx)
             .await
             .map_err(|error| super::error::H8ErpMessageRepoError::Db(error.to_string()))?,
-        Err(_) if ctx.has_permission(H8_MSG_WRITE) => {
+        Err(_) if has_message_write(ctx) => {
             return Ok(requested.map(|warehouse_id| vec![warehouse_id]));
         }
         Err(error) => return Err(error.into()),
     };
-    if scopes.is_empty() && ctx.has_permission(H8_MSG_WRITE) {
+    if scopes.is_empty() && has_message_write(ctx) {
         return Ok(requested.map(|warehouse_id| vec![warehouse_id]));
     }
     if scopes.is_empty() || requested.is_some_and(|warehouse_id| !scopes.contains(&warehouse_id)) {

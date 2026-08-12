@@ -9,7 +9,10 @@ fn base_env() -> HashMap<String, String> {
             "H8_CONNECTOR_ID".to_owned(),
             "334c3ff7-1018-40c6-b1f4-c19b2d2c88e5".to_owned(),
         ),
-        ("WMS_API_TOKEN".to_owned(), "test-token".to_owned()),
+        (
+            "WMS_H8_WORKER_API_KEY".to_owned(),
+            "worker-api-key".to_owned(),
+        ),
     ])
 }
 
@@ -23,6 +26,7 @@ fn bootstrap_uses_frozen_worker_defaults() {
     assert_eq!(settings.lease_minutes, 5);
     assert_eq!(settings.heartbeat_ttl_seconds, 15);
     assert_eq!(settings.owner_code, "ZBPF7");
+    assert_eq!(settings.api_key.as_deref(), Some("worker-api-key"));
 }
 
 #[test]

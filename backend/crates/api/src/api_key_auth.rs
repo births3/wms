@@ -13,6 +13,7 @@ use wms_domain::{inbound_scope_for_catalog_type, ErrorResponse};
 use crate::{
     api_key_service::{ApiKeyAuthError, ApiKeyService},
     auth::AuthContext,
+    h8_erp_connectors::{H8_CONFIG_READ, H8_WORKER_WRITE},
     h8_erp_messages::H8_RECEIPT_WRITE,
 };
 
@@ -113,6 +114,12 @@ pub fn required_scope(path: &str) -> Option<&'static str> {
         inbound_scope_for_catalog_type(message_type)
     } else if path.starts_with("/api/v1/integration/erp-messages/") && path.ends_with("/receipt") {
         Some("outbound:receipt")
+    } else if path == "/api/v1/config/erp-connectors"
+        || path.starts_with("/api/v1/config/erp-connectors/")
+        || path == "/api/v1/integration/erp-messages"
+        || path.starts_with("/api/v1/integration/erp-messages/")
+    {
+        Some(wms_domain::H8_WORKER_API_KEY_SCOPE)
     } else if path.starts_with("/api/v1/tms/") || path.starts_with("/api/v1/traceability/") {
         Some("tms:callback")
     } else {
@@ -175,6 +182,7 @@ fn permissions_for_scope(scope: &str) -> Vec<String> {
         "inventory:seed" => ["m3.write"].as_slice(),
         "order:command" => ["m2.write", "m4.write"].as_slice(),
         "tms:callback" => ["m10.write", "m5.write", "m-tc.write"].as_slice(),
+        wms_domain::H8_WORKER_API_KEY_SCOPE => [H8_CONFIG_READ, H8_WORKER_WRITE].as_slice(),
         _ => &[],
     };
     permissions
@@ -311,6 +319,22 @@ mod tests {
             None
         );
         assert_eq!(required_scope("/api/v1/auth/api-keys"), None);
+        assert_eq!(
+            required_scope("/api/v1/config/erp-connectors"),
+            Some("h8:worker")
+        );
+        assert_eq!(
+            required_scope("/api/v1/config/erp-connectors/route-resolve"),
+            Some("h8:worker")
+        );
+        assert_eq!(
+            required_scope("/api/v1/integration/erp-messages"),
+            Some("h8:worker")
+        );
+        assert_eq!(
+            required_scope("/api/v1/integration/erp-messages/worker-runtime/heartbeat"),
+            Some("h8:worker")
+        );
     }
 
     #[test]
@@ -347,6 +371,13 @@ mod tests {
         assert_eq!(
             permissions_for_scope("order:command"),
             vec!["m2.write".to_string(), "m4.write".to_string()]
+        );
+        assert_eq!(
+            permissions_for_scope("h8:worker"),
+            vec![
+                "h8.erp_connector.read".to_string(),
+                "h8.erp_worker.write".to_string(),
+            ]
         );
     }
 

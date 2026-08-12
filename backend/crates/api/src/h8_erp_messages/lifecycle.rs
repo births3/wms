@@ -18,7 +18,7 @@ use super::{
     },
     error::{H8ErpMessageHandlerError, H8ErpMessageRepoError},
     scope::require_message_warehouse_scope,
-    state::{H8ErpMessageAppState, H8_MSG_WRITE, H8_RECEIPT_WRITE},
+    state::{require_worker_write, H8ErpMessageAppState, H8_RECEIPT_WRITE},
 };
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +33,7 @@ pub(super) async fn record_lifecycle(
     Path(id): Path<Uuid>,
     Json(body): Json<LifecycleRequest>,
 ) -> Result<Json<H8ErpMessage>, H8ErpMessageHandlerError> {
-    ctx.require_permission(H8_MSG_WRITE)?;
+    require_worker_write(&ctx)?;
     let message = state.repository.get(ctx.owner_id, id).await?;
     require_message_warehouse_scope(&state, &ctx, &message).await?;
     let result = safe_lifecycle_result(body.stage.trim(), body.result.trim())?;

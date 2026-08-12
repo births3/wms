@@ -16,12 +16,13 @@ use wms_domain::{
 
 use crate::auth::AuthContext;
 
+use super::state::H8ErpMessageAppState;
+
 use super::audit::{
     snapshot_audit_actions, write_dead_entry_audit, write_exchange_lifecycle_audit,
     write_message_audit, write_owner_audit,
 };
 use super::repository::MemoryH8ErpMessageRepository;
-use super::state::H8ErpMessageAppState;
 
 pub(super) fn sample_message(owner: Uuid, status: &str) -> H8ErpMessage {
     let now = Utc::now();
@@ -66,6 +67,21 @@ pub(super) fn test_ctx(owner: Uuid) -> AuthContext {
         jti: "jti-test".into(),
         warehouse_scope: None,
     }
+}
+
+#[test]
+fn worker_permission_writes_messages_without_connector_configuration_write() {
+    let ctx = AuthContext {
+        user_id: Uuid::nil(),
+        owner_id: Uuid::nil(),
+        actor_name: "h8-worker".into(),
+        permissions: vec!["h8.erp_connector.read".into(), "h8.erp_worker.write".into()],
+        jti: "api-key:h8-worker".into(),
+        warehouse_scope: None,
+    };
+    assert!(super::state::require_worker_write(&ctx).is_ok());
+    assert!(ctx.require_permission("h8.erp_connector.write").is_err());
+    assert!(!ctx.has_permission("h8.erp_connector.write"));
 }
 
 #[tokio::test]

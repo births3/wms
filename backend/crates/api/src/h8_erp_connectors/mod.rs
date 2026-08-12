@@ -20,4 +20,5 @@ pub use handlers::h8_erp_connector_router;
 #[doc(hidden)]
 pub use idempotency::H8IdempotencyWrite;
 pub use repository::{H8ConnectorStatusTransition, H8ErpConnectorRepository};
+pub(crate) use state::H8_WORKER_WRITE;
 pub use state::{H8ErpConnectorAppState, H8_CONFIG_READ, H8_CONFIG_WRITE};

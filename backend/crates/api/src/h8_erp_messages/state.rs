@@ -5,7 +5,8 @@ use std::sync::{Arc, Mutex};
 use sqlx::PgPool;
 
 use crate::audit::AuditLog;
-use crate::h8_erp_connectors::{H8ErpConnectorAppState, H8ErpConnectorRepository};
+use crate::auth::{AuthContext, AuthError};
+use crate::h8_erp_connectors::{H8ErpConnectorAppState, H8ErpConnectorRepository, H8_WORKER_WRITE};
 
 use super::payload_repository::{
     H8PayloadRepository, MemoryH8PayloadRepository, PgH8PayloadRepository,
@@ -19,6 +20,18 @@ use super::runtime_repository::{
 pub const H8_MSG_READ: &str = "h8.erp_connector.read";
 pub const H8_MSG_WRITE: &str = "h8.erp_connector.write";
 pub const H8_RECEIPT_WRITE: &str = "h8.erp_receipt.write";
+
+pub(crate) fn has_message_write(ctx: &AuthContext) -> bool {
+    ctx.has_permission(H8_MSG_WRITE) || ctx.has_permission(H8_WORKER_WRITE)
+}
+
+pub(crate) fn require_worker_write(ctx: &AuthContext) -> Result<(), AuthError> {
+    if has_message_write(ctx) {
+        Ok(())
+    } else {
+        Err(AuthError::PermissionDenied(H8_MSG_WRITE.to_string()))
+    }
+}
 
 #[derive(Clone)]
 pub struct H8ErpMessageAppState {

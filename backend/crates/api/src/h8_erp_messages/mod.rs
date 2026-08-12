@@ -29,6 +29,8 @@ mod pg_repository_tests;
 mod replay_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod worker_auth_tests;
 
 pub use handlers::h8_erp_message_router;
 pub(crate) use lifecycle::{apply_lifecycle_failure, apply_lifecycle_status};
