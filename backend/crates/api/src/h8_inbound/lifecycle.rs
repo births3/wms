@@ -77,7 +77,7 @@ pub(super) async fn prepare_message(
     )
     .map_err(|error| H8InboundError::Unprocessable(format!("{error:?}")))?
     .clone();
-    if connector.api_key_id != Some(ctx.user_id) {
+    if !inbound_api_key_matches(ctx, connector.api_key_id) {
         return Err(AuthError::PermissionDenied("connector API Key binding".to_string()).into());
     }
     let now = Utc::now();
@@ -161,7 +161,7 @@ async fn prepare_existing(
         .get_version(ctx.owner_id, connector_id, config_version)
         .await
         .map_err(|error| H8InboundError::Internal(format!("{error:?}")))?;
-    if binding.api_key_id != Some(ctx.user_id) {
+    if !inbound_api_key_matches(ctx, binding.api_key_id) {
         return Err(AuthError::PermissionDenied("connector API Key binding".to_string()).into());
     }
     if existing.payload_digest != metadata.payload_digest {
@@ -187,6 +187,11 @@ async fn prepare_existing(
         connector_code: binding.connector_code,
         replayed: true,
     })
+}
+
+fn inbound_api_key_matches(ctx: &AuthContext, bound_api_key_id: Option<Uuid>) -> bool {
+    bound_api_key_id == Some(ctx.user_id)
+        || ctx.has_permission(crate::h8_erp_connectors::H8_WORKER_WRITE)
 }
 
 async fn apply_stage(
@@ -253,7 +258,10 @@ pub(super) async fn succeed_message(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_payload_digest;
+    use crate::auth::AuthContext;
+    use uuid::Uuid;
+
+    use super::{inbound_api_key_matches, validate_payload_digest};
 
     #[test]
     fn payload_digest_uses_publisher_canonical_digest() {
@@ -261,5 +269,25 @@ mod tests {
         assert_eq!(validate_payload_digest(&digest).unwrap(), digest);
         assert!(validate_payload_digest(&"A".repeat(64)).is_err());
         assert!(validate_payload_digest("abc").is_err());
+    }
+
+    #[test]
+    fn worker_key_can_use_inbound_route_without_replacing_erp_binding() {
+        let worker = AuthContext {
+            user_id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            actor_name: "H8 Worker".to_string(),
+            permissions: vec!["h8.erp_worker.write".to_string()],
+            jti: "api-key:h8-worker".to_string(),
+            warehouse_scope: None,
+        };
+
+        assert!(inbound_api_key_matches(&worker, Some(Uuid::new_v4())));
+
+        let external = AuthContext {
+            permissions: vec!["m1.master_data.write".to_string()],
+            ..worker
+        };
+        assert!(!inbound_api_key_matches(&external, Some(Uuid::new_v4())));
     }
 }

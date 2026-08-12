@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::common::PageMeta;
 
+/// H1 API Key scope used by the Rust H8 Worker control plane.
 pub const H8_WORKER_API_KEY_SCOPE: &str = "h8:worker";
 
 pub const API_KEY_SCOPES: [&str; 9] = [

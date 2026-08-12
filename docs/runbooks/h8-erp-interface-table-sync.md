@@ -108,6 +108,25 @@ alias。API 还必须配置当前单货主接口码 `H8_OWNER_CODE=ZBPF7`。
 `h8:worker` 只映射 `h8.erp_connector.read` 与 `h8.erp_worker.write`：可以读取冻结连接、
 解析路由、查询/认领/推进消息和上报心跳，不能新增、修改、测试、启停或删除 ERP 连接。
 
+### 2.3 API Key 创建失败排查
+
+API Key 创建、轮换和吊销属于高风险写入。API 进程即使 `/healthz` 返回 200，Redis
+撤销存储不可用时仍会按 ADR-0046 返回 `503 AUTH-010`（“权限失效检查暂不可用”），
+不得绕过 H1 接口直接写 API Key 表。
+
+```bash
+# 必须在启动 WMS API 的同一进程环境中配置；不要把密码写入仓库或日志
+export WMS_REDIS_URL='redis://:replace-with-redis-password@127.0.0.1:6379/0'
+redis-cli -u "$WMS_REDIS_URL" ping
+```
+
+修改 API 进程的环境变量后必须重启 API，再用新的 `Idempotency-Key` 重试官方 H1
+API Key 接口。创建成功后用新 Key 请求一个只读控制面接口，并检查 Key 的
+`last_used_at` 或审计记录；仅看 `/healthz` 不足以证明鉴权链路已恢复。
+
+2026-08-12 的实际处置记录见
+[H8 Worker Key 审查与运行记录](../reviews/h8-worker-key-review-and-runtime-record-2026-08-12.md)。
+
 ## 3. 入站类型（通道 B 接口表 → WMS API）
 
 | type | 表 | API |
@@ -144,7 +163,7 @@ alias。API 还必须配置当前单货主接口码 `H8_OWNER_CODE=ZBPF7`。
 
 通道 A 的 ERP 业务回执调用
 `POST /api/v1/integration/erp-messages/{message_id}/receipt`，使用具备
-`inbound:push` scope 的 `X-WMS-API-Key`，并携带与原出站消息一致的
+`outbound:receipt` scope 的 `X-WMS-API-Key`，并携带与原出站消息一致的
 `Idempotency-Key`、`schema_version` 和 `correlation_id`。`result=ok` 进入
 `acked` 且不得携带 `error_summary`；`result=rejected` 必须带 `error_summary`
 并进入 `dead`。生成的 curl 示例必须保留 API Key 与幂等头，禁止误写为 JWT Bearer。

@@ -233,6 +233,7 @@ nav:
     - 用户故事矩阵审计: reviews/user-stories-matrix-audit-2026-05-18.md
     - 波次参数对标 - Manhattan: reviews/wave-parameters-comparison-manhattan.md
     - Wave 6 任务完成审计: reviews/wave-6-task-completion-audit-2026-06-04.md
+    - H8 Worker Key 审查与运行记录 (2026-08-12): reviews/h8-worker-key-review-and-runtime-record-2026-08-12.md
     - 用户故事审查规范: review-guidelines-user-stories.md
     - Wave 复盘:
       - 复盘索引: retros/README.md

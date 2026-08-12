@@ -76,7 +76,7 @@ pub async fn api_key_auth_middleware(
         user_id: context.key_id,
         owner_id: context.owner_id,
         actor_name: format!("API Key / {}", context.caller_name),
-        permissions: permissions_for_scope(scope),
+        permissions: permissions_for_request(scope, &context.scopes),
         jti: format!("api-key:{}", context.key_id),
         warehouse_scope,
     };
@@ -191,6 +191,18 @@ fn permissions_for_scope(scope: &str) -> Vec<String> {
         .collect()
 }
 
+fn permissions_for_request(scope: &str, granted_scopes: &[String]) -> Vec<String> {
+    let mut permissions = permissions_for_scope(scope);
+    if granted_scopes
+        .iter()
+        .any(|granted| granted == wms_domain::H8_WORKER_API_KEY_SCOPE)
+        && !permissions.iter().any(|value| value == H8_WORKER_WRITE)
+    {
+        permissions.push(H8_WORKER_WRITE.to_string());
+    }
+    permissions
+}
+
 fn client_ip(headers: &axum::http::HeaderMap) -> Option<String> {
     ["x-forwarded-for", "x-real-ip"].iter().find_map(|name| {
         headers
@@ -269,7 +281,7 @@ mod tests {
     use axum::http::{HeaderMap, HeaderValue};
     use uuid::Uuid;
 
-    use super::{permissions_for_scope, required_scope};
+    use super::{permissions_for_request, permissions_for_scope, required_scope};
 
     #[test]
     fn maps_external_paths_to_declared_scopes() {
@@ -379,6 +391,21 @@ mod tests {
                 "h8.erp_worker.write".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn worker_scope_is_retained_when_business_scope_is_required() {
+        let worker_scopes = vec!["master-data:write".to_string(), "h8:worker".to_string()];
+        let worker_permissions = permissions_for_request("master-data:write", &worker_scopes);
+        assert!(worker_permissions
+            .iter()
+            .any(|value| value == "h8.erp_worker.write"));
+
+        let business_permissions =
+            permissions_for_request("master-data:write", &["master-data:write".to_string()]);
+        assert!(!business_permissions
+            .iter()
+            .any(|value| value == "h8.erp_worker.write"));
     }
 
     #[test]
