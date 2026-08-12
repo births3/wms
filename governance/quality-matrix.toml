@@ -2431,11 +2431,23 @@ e2e_screenshots = [
 api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/receive",
 ]
-reason = "PC 数量闭环、GSP 现场字段、cool/冷冻/冷藏温区按储存条件校验与超温备注已有；但稳定性报告附件未强制、收货节点 M-VR 双人策略、追溯码/LPN、PDA 扫码离线重放及真机证据未闭环。"
+test_checks = [
+  "CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path backend/Cargo.toml -p wms-api sales_return_batch_rejections_must_close_to_receipt_rejected_quantity --lib",
+  "set -a; source .env; set +a; CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres print_data_reads_receipt_inspection_and_dual_signature -- --test-threads=1",
+  "set -a; source .env; set +a; CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres sales_return_batch_rejection_keeps_unrejected_quantities_inspectable -- --test-threads=1",
+  "node apps/web-admin/self-checks/m2-inbound-detail-view-model-self-check.mjs",
+  "pnpm --dir apps/web-admin exec tsc --noEmit",
+]
+reason = "PC 数量闭环、GSP 现场字段录入与详情回读、第二收货员同人/资格校验、销售退货原批号数量和批号级拒收合计约束、cool/冷冻/冷藏温区校验与超温备注已有；但稳定性报告附件未强制、收货节点 M-VR 双人策略、追溯码/LPN、PDA 扫码离线重放及真机证据未闭环。"
 owner = "M2 入库模块负责人"
 resume_when = "强制超温稳定性报告附件（H-FILE），完成收货节点双人策略、追溯码/LPN、PDA 离线冲突链及真机验收后重新执行完整故事验收。"
 evidence_refs = [
   "docs/reviews/m2-overall-review-2026-07-18.md",
+  "backend/crates/domain/src/operations.rs",
+  "backend/crates/api/src/wave3_repository/receiving_validation.rs",
+  "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
+  "apps/web-admin/src/pages/inbound/M2InboundDetailDialog.tsx",
+  "apps/web-admin/self-checks/m2-inbound-detail-view-model-self-check.mjs",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
 ]
@@ -2677,6 +2689,7 @@ database_objects = ["receiving_orders", "receiving_order_receipts", "idempotency
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave3_postgres receiving_order_reject_closes_order_and_replays_idempotently -- --test-threads=1",
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres force_close_shortage_from_receiving_with_shortage_qty -- --test-threads=1",
+  "set -a; source .env; set +a; CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path backend/Cargo.toml -p wms-api --test m2_deferred_closeout_postgres sales_return_batch_rejection_keeps_unrejected_quantities_inspectable -- --test-threads=1",
   "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
 ]
@@ -2690,9 +2703,9 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-reject-dialog-current.png",
   "docs/reviews/m2-overall-review-2026-07-18.md",
 ]
-reason = "整单拒收、数量闭环、短少强制关闭以及条件式 M-QL/H4 记录已有实现与测试；但联络类型未配置时会静默跳过，且 M2 repository 直接写跨上下文表，销售退货批号级部分拒收、结构化异常、稳定性报告、真实企业微信通知和按供应商/商品/类型/批号统计仍未闭环。"
+reason = "整单拒收、数量闭环、短少强制关闭、销售退货批号级部分拒收及条件式 M-QL/H4 记录已有实现与测试；但联络类型未配置时会静默跳过，且 M2 repository 直接写跨上下文表，结构化异常分类、稳定性报告、真实企业微信通知和按供应商/商品/类型/批号统计仍未闭环。"
 owner = "M2 入库模块负责人"
-resume_when = "补齐批号级异常数据模型与数量约束，通过既有服务边界可靠接通附件、M-QL/H4 和异常统计查询，并取得企业微信 dev/staging 回执证据后重新验收。"
+resume_when = "通过既有服务边界可靠接通附件、M-QL/H4 和异常统计查询，并取得企业微信 dev/staging 回执证据后重新验收。"
 
 [[deferred_stories]]
 id = "US-M2-007"

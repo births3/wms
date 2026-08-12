@@ -1,4 +1,5 @@
-
+import type { DevReceivingPrintData } from "./web-admin-dev-mock-receiving-model";
+export type { DevReceivingPrintData } from "./web-admin-dev-mock-receiving-model";
 
 export const devMockEnabled = process.env.WMS_WEB_ADMIN_DEV_MOCK === "1";
 export const devOwnerId = "00000000-0000-0000-0000-000000000001";
@@ -47,53 +48,6 @@ export interface DevOrder {
   created_at: string;
   updated_at: string;
   lines: DevOrderLine[];
-}
-
-export interface DevReceivingPrintData {
-  receipts: Array<{
-    id: string;
-    receiving_order_id: string;
-    owner_id: string;
-    actual_qty: number;
-    shortage_qty: number;
-    rejected_qty: number;
-    arrival_temperature_celsius: number | null;
-    exception_note: string | null;
-    details: {
-      temperature_control_method: string | null;
-      vehicle_no: string | null;
-      origin: string | null;
-      departure_at: string | null;
-      arrival_at: string | null;
-      storage_at: string | null;
-      transport_mode: string | null;
-      carrier: string | null;
-      contact_name: string | null;
-      contact_phone: string | null;
-      contact_id_no: string | null;
-      seal_checked: string | null;
-      filing_checked: string | null;
-    } | null;
-    occurred_at: string;
-  }>;
-  inspections: Array<{
-    id: string;
-    receiving_order_id: string;
-    owner_id: string;
-    batch_no: string;
-    accepted_qty: number;
-    rejected_qty: number;
-    quality_status: string;
-    occurred_at: string;
-  }>;
-  signatures: Array<{
-    id: string;
-    receiving_order_id: string;
-    owner_id: string;
-    first_signer_id: string;
-    second_signer_id: string | null;
-    signed_at: string;
-  }>;
 }
 
 export interface DevProduct {

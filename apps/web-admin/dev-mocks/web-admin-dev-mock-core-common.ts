@@ -414,7 +414,19 @@ export function getDevOrderPrintData(orderId: string) {
 
 function receivingDetails(value: unknown) {
   const details = asRecord(value);
+  const salesReturnBatches = Array.isArray(details.sales_return_batches)
+    ? details.sales_return_batches.map((item) => {
+        const batch = asRecord(item);
+        return {
+          batch_no: asString(batch.batch_no, ""),
+          quantity: asNumber(batch.quantity, 0),
+          rejected_qty: asNumber(batch.rejected_qty, 0),
+          reject_reason: asNullableString(batch.reject_reason),
+        };
+      })
+    : [];
   return {
+    delivery_qty: asNumber(details.delivery_qty, 0),
     temperature_control_method: asNullableString(details.temperature_control_method),
     vehicle_no: asNullableString(details.vehicle_no),
     origin: asNullableString(details.origin),
@@ -428,6 +440,8 @@ function receivingDetails(value: unknown) {
     contact_id_no: asNullableString(details.contact_id_no),
     seal_checked: asNullableString(details.seal_checked),
     filing_checked: asNullableString(details.filing_checked),
+    second_receiver_id: asNullableString(details.second_receiver_id),
+    sales_return_batches: salesReturnBatches,
   };
 }
 

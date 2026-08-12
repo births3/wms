@@ -20,7 +20,10 @@ import {
   StatusBadge,
 } from "@wms/ui";
 
-import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
+import {
+  useReceivingOrderPrintDataQuery,
+  type ReceivingOrder,
+} from "@/features/inbound/inbound-queries";
 import {
   COLUMN_DOCUMENT_TYPE,
   COLUMN_OWNER,
@@ -60,6 +63,7 @@ interface M2InboundDetailDialogProps {
 
 export function M2InboundDetailDialog({ order, currentOwner, defaultStage, open, onOpenChange }: M2InboundDetailDialogProps) {
   const [selectedStage, setSelectedStage] = React.useState<InboundDetailStage>(defaultStage);
+  const printDataQuery = useReceivingOrderPrintDataQuery(open && order ? order.id : null);
 
   React.useEffect(() => {
     if (open) setSelectedStage(defaultStage);
@@ -73,7 +77,8 @@ export function M2InboundDetailDialog({ order, currentOwner, defaultStage, open,
   const expectedQty = totalExpectedQty(order);
   const documentType = inboundDocumentTypeOf(order);
   const currentStage = inboundDetailStageIndex(order.status ?? "");
-  const selectedProcess = processDetail(selectedStage, expectedQty, currentStage);
+  const receipt = printDataQuery.data?.receipts.at(-1) ?? null;
+  const selectedProcess = processDetail(selectedStage, expectedQty, currentStage, receipt);
   const orderRows: Array<[string, string]> = [
     ["单据状态", statusLabel(order.status)],
     [COLUMN_DOCUMENT_TYPE, inboundDocumentTypeLabel(documentType)],

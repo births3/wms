@@ -1,4 +1,7 @@
-import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
+import type {
+  ReceivingOrder,
+  ReceivingOrderReceipt,
+} from "../../features/inbound/inbound-queries.ts";
 import {
   COLUMN_BATCH_NO,
   COLUMN_PRODUCT_CODE,
@@ -7,7 +10,7 @@ import {
   STATUS_COMPLETED,
   STATUS_PENDING,
   STATUS_PENDING_INPUT,
-} from "@/lib/ui-strings";
+} from "../../lib/ui-strings.ts";
 
 export type InboundDetailStage = "receiving" | "inspection" | "putaway" | "completed";
 export type InboundDetailFieldSection = "product" | "order" | "batch" | "process";
@@ -87,25 +90,17 @@ export function inboundDetailStageIndex(status: string | null | undefined) {
   return 0;
 }
 
-export function processDetail(stage: InboundDetailStage, expectedQty: number, currentStage: number) {
+export function processDetail(
+  stage: InboundDetailStage,
+  expectedQty: number,
+  currentStage: number,
+  receipt?: ReceivingOrderReceipt | null,
+) {
   const map = {
-    // ponytail: 列表/详情接口尚未返回收货、验收、上架回执，缺数据一律「待录入 / -」，不虚构现场记录。
     receiving: {
       title: "收货信息",
       state: processState(0, currentStage),
-      rows: [
-        ["承运商 / 车牌", STATUS_PENDING_INPUT],
-        ["发运地点", STATUS_PENDING_INPUT],
-        ["启运 / 到货", STATUS_PENDING_INPUT],
-        ["入库时间", STATUS_PENDING_INPUT],
-        ["运输 / 温控 / 温度", STATUS_PENDING_INPUT],
-        ["联系人", STATUS_PENDING_INPUT],
-        ["随货核对", STATUS_PENDING_INPUT],
-        ["数量闭合", `预报 ${expectedQty} 件 / 实收待录入`],
-        ["第一收货员", STATUS_PENDING_INPUT],
-        ["第二收货员", STATUS_PENDING_INPUT],
-        ["异常备注", "-"],
-      ],
+      rows: receivingRows(expectedQty, receipt),
     },
     inspection: {
       title: "验收信息",
@@ -138,6 +133,84 @@ export function processDetail(stage: InboundDetailStage, expectedQty: number, cu
     },
   } satisfies Record<InboundDetailStage, { title: string; state: ProcessState; rows: Array<[string, string]> }>;
   return map[stage];
+}
+
+function receivingRows(expectedQty: number, receipt?: ReceivingOrderReceipt | null): Array<[string, string]> {
+  const details = receipt?.details;
+  const batches = details?.sales_return_batches ?? [];
+  const rejectedBatches = batches.filter((batch) => Number(batch.rejected_qty) > 0);
+  return [
+    ["发运地点", fieldValue(details?.origin)],
+    ["车牌号", fieldValue(details?.vehicle_no)],
+    ["启运时间", dateTimeValue(details?.departure_at)],
+    ["到货时间", dateTimeValue(details?.arrival_at)],
+    ["收货入库时间", dateTimeValue(details?.storage_at)],
+    ["运输方式", fieldValue(details?.transport_mode)],
+    ["承运商", fieldValue(details?.carrier)],
+    ["联系人（送货人）", fieldValue(details?.contact_name)],
+    ["电话", maskedValue(details?.contact_phone)],
+    ["身份证", maskedValue(details?.contact_id_no)],
+    ["印章样式核对", fieldValue(details?.seal_checked)],
+    ["备案件样式核对", fieldValue(details?.filing_checked)],
+    ["预报数量", `${expectedQty} 件`],
+    ["送货数量", quantityValue(details?.delivery_qty)],
+    ["实际到货数量", quantityValue(receipt?.actual_qty)],
+    ["缺货数量", quantityValue(receipt?.shortage_qty)],
+    ["拒收数量", quantityValue(receipt?.rejected_qty)],
+    ["拒收备注", fieldValue(receipt?.exception_note, "-")],
+    [
+      "销售退货批号 + 数量",
+      batches.length > 0
+        ? batches.map((batch) => `${batch.batch_no} × ${batch.quantity} 件`).join("；")
+        : "-",
+    ],
+    [
+      "销售退货批号级拒收明细",
+      rejectedBatches.length > 0
+        ? rejectedBatches
+            .map((batch) => `${batch.batch_no}：拒收 ${batch.rejected_qty} 件（${batch.reject_reason || "未填写原因"}）`)
+            .join("；")
+        : "-",
+    ],
+    ["第二收货员验证", fieldValue(details?.second_receiver_id)],
+    [
+      "到货温度",
+      receipt?.arrival_temperature_celsius == null
+        ? "-"
+        : `${receipt.arrival_temperature_celsius} °C`,
+    ],
+    ["温控方式", fieldValue(details?.temperature_control_method)],
+  ];
+}
+
+function fieldValue(value: string | null | undefined, fallback = STATUS_PENDING_INPUT) {
+  return value?.trim() || fallback;
+}
+
+function maskedValue(value: string | null | undefined) {
+  const characters = [...(value?.trim() ?? "")];
+  if (characters.length === 0) return STATUS_PENDING_INPUT;
+  if (characters.length <= 7) return "*".repeat(characters.length);
+  return `${characters.slice(0, 3).join("")}${"*".repeat(characters.length - 7)}${characters.slice(-4).join("")}`;
+}
+
+function quantityValue(value: string | null | undefined) {
+  return value == null ? STATUS_PENDING_INPUT : `${value} 件`;
+}
+
+function dateTimeValue(value: string | null | undefined) {
+  if (!value) return STATUS_PENDING_INPUT;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai",
+  }).format(date);
 }
 
 export function productInfoRows(order: Pick<ReceivingOrder, "lines">) {

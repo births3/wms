@@ -24,7 +24,6 @@ import {
 } from "@/features/inbound/inbound-queries";
 import {
   M2InboundDialogs,
-  isColdChainTemperatureControl,
   type CreateFormState,
   type InboundDialog,
   type InspectFormExamples,
@@ -36,7 +35,7 @@ import {
 } from "./M2InboundDialogs";
 import { M2InboundDetailDialog } from "./M2InboundDetailDialog";
 import { M2InboundPrintDialog } from "./M2InboundPrintDialog";
-import { createAsnBatchNo } from "./m2-inbound-document-type";
+import { createAsnBatchNo, inboundDocumentTypeOf } from "./m2-inbound-document-type";
 import {
   dateToIso,
   dateTimeToIso,
@@ -132,10 +131,10 @@ const emptyReceiveForm: ReceiveFormState = {
   contactName: "",
   contactPhone: "",
   contactIdNo: "",
-  sealChecked: "已核对",
-  filingChecked: "已核对",
+  sealChecked: "",
+  filingChecked: "",
   deliveryQty: "",
-  batchQty: "",
+  salesReturnBatches: [],
   secondReceiverId: "",
   note: "",
 };
@@ -149,10 +148,13 @@ const initialReceiveForm: ReceiveFormState = __WMS_WEB_ADMIN_DEV_PREFILL__
       departureTime: "2026-06-27T08:00",
       arrivalTime: "2026-06-27T10:00",
       storageTime: "2026-06-27T10:15",
+      transportMode: "冷藏车",
       carrier: "华东冷链承运商",
       contactName: "张三",
       contactPhone: "13800000000",
       contactIdNo: "310101199001010000",
+      sealChecked: "已核对",
+      filingChecked: "已核对",
       secondReceiverId: secondSignerExample,
     }
   : emptyReceiveForm;
@@ -365,8 +367,14 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       // 送货数量 / 实到数量默认带出订单预报数量，避免误导性 0
       actualQty: qty,
       deliveryQty: qty,
-      // 批号字段默认用批号+预报数量，无批号时留空由用户录入（不要默认 0）
-      batchQty: batchNo ? `${batchNo} × ${qty}` : "",
+      salesReturnBatches: inboundDocumentTypeOf(order) === "sales_return"
+        ? (order.lines ?? []).map((line) => ({
+            batchNo: line.batch_no?.trim() ?? "",
+            quantity: String(line.expected_qty),
+            rejectedQty: "0",
+            rejectReason: "",
+          }))
+        : [],
       shortageQty: "0",
       rejectedQty: "0",
       temperature: "",
@@ -496,21 +504,21 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
   async function submitReceive(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!order) return;
-    const coldChain = isColdChainTemperatureControl(currentTemperatureControl);
     await receiveMutation.mutateAsync({
       id: order.id,
       request: {
         actual_qty: String(toInteger(receiveForm.actualQty)),
         shortage_qty: String(toInteger(receiveForm.shortageQty)),
         rejected_qty: String(toInteger(receiveForm.rejectedQty)),
-        arrival_temperature_celsius: coldChain && receiveForm.temperature !== "" ? Number(receiveForm.temperature) : null,
+        arrival_temperature_celsius: receiveForm.temperature !== "" ? Number(receiveForm.temperature) : null,
         exception_note: receiveForm.note.trim() || null,
         details: {
-          temperature_control_method: coldChain ? receiveForm.temperatureControl.trim() || currentTemperatureControl : null,
+          delivery_qty: String(toInteger(receiveForm.deliveryQty)),
+          temperature_control_method: receiveForm.temperatureControl.trim() || currentTemperatureControl,
           vehicle_no: receiveForm.vehicleNo.trim() || null,
           origin: receiveForm.origin.trim() || null,
-          departure_at: coldChain ? dateTimeToIso(receiveForm.departureTime) : null,
-          arrival_at: coldChain ? dateTimeToIso(receiveForm.arrivalTime) : null,
+          departure_at: dateTimeToIso(receiveForm.departureTime),
+          arrival_at: dateTimeToIso(receiveForm.arrivalTime),
           storage_at: dateTimeToIso(receiveForm.storageTime),
           transport_mode: receiveForm.transportMode.trim() || null,
           carrier: receiveForm.carrier.trim() || null,
@@ -519,6 +527,13 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           contact_id_no: receiveForm.contactIdNo.trim() || null,
           seal_checked: receiveForm.sealChecked.trim() || null,
           filing_checked: receiveForm.filingChecked.trim() || null,
+          second_receiver_id: receiveForm.secondReceiverId.trim() || null,
+          sales_return_batches: receiveForm.salesReturnBatches.map((batch) => ({
+            batch_no: batch.batchNo.trim(),
+            quantity: String(toInteger(batch.quantity)),
+            rejected_qty: String(toInteger(batch.rejectedQty)),
+            reject_reason: batch.rejectReason.trim() || null,
+          })),
         },
       },
     });
@@ -716,6 +731,8 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
           activeDialog={activeDialog}
           orderId={order?.id ?? null}
           orderReceiptNo={order?.receipt_no ?? null}
+          orderExpectedQty={order ? String(totalExpectedQty(order)) : ""}
+          salesReturn={order ? inboundDocumentTypeOf(order) === "sales_return" : false}
           hasOrder={Boolean(order)}
           pending={pending}
           errorMessage={errorMessage}

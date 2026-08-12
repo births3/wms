@@ -91,7 +91,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   await page.getByLabel("拒收数量", { exact: true }).fill("0");
   await expect(page.getByLabel("商品温度属性")).toHaveValue("冷藏");
   await page.getByLabel("到货温度 (°C)").fill("5");
-  await page.getByLabel("冷链运输方式").fill("冷藏车");
+  await page.getByLabel("运输方式").fill("冷藏车");
   await page.getByRole("button", { name: "确认收货" }).click();
   await expect(page.getByText(`${receiptNo} 收货已提交`)).toBeVisible();
   const printDataResponse = await page.evaluate(async (id) => {
@@ -107,6 +107,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
     receipts: [{ actual_qty: "10.0000", shortage_qty: "0", rejected_qty: "0" }],
   });
   expect(printDataResponse.body.receipts[0].details).toMatchObject({
+    delivery_qty: "10",
     vehicle_no: "沪A-12345",
     carrier: "华东冷链承运商",
     origin: "上海配送中心",

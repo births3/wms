@@ -10145,21 +10145,26 @@ export interface components {
         /** @description 收货现场信息。固定字段使用类型化结构，避免打印或审计依赖前端展示字符串。 */
         ReceivingReceiptDetails: {
             /** Format: date-time */
-            arrival_at?: string | null;
-            carrier?: string | null;
-            contact_id_no?: string | null;
-            contact_name?: string | null;
-            contact_phone?: string | null;
+            arrival_at: string | null;
+            carrier: string | null;
+            contact_id_no: string | null;
+            contact_name: string | null;
+            contact_phone: string | null;
+            /** Format: decimal */
+            delivery_qty: string;
             /** Format: date-time */
-            departure_at?: string | null;
-            filing_checked?: string | null;
-            origin?: string | null;
-            seal_checked?: string | null;
+            departure_at: string | null;
+            filing_checked: string | null;
+            origin: string | null;
+            sales_return_batches?: components["schemas"]["SalesReturnReceivingBatch"][];
+            seal_checked: string | null;
+            /** Format: uuid */
+            second_receiver_id?: string | null;
             /** Format: date-time */
-            storage_at?: string | null;
+            storage_at: string | null;
             temperature_control_method?: string | null;
-            transport_mode?: string | null;
-            vehicle_no?: string | null;
+            transport_mode: string | null;
+            vehicle_no: string | null;
         };
         RecomputeInventoryAbcRequest: {
             /** Format: int64 */
@@ -10502,6 +10507,14 @@ export interface components {
         RouteBindingListResponse: {
             data: components["schemas"]["RouteBinding"][];
             page: components["schemas"]["PageMeta"];
+        };
+        SalesReturnReceivingBatch: {
+            batch_no: string;
+            /** Format: decimal */
+            quantity: string;
+            reject_reason?: string | null;
+            /** Format: decimal */
+            rejected_qty: string;
         };
         SavePrintTemplateRequest: {
             designer_version: string;

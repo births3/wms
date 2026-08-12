@@ -7,6 +7,7 @@ import { ERROR_INBOUND_ORDER_NOT_FOUND } from "@/lib/ui-strings";
 
 export type ReceivingOrder = components["schemas"]["ReceivingOrder"];
 export type ReceivingOrderPrintData = components["schemas"]["ReceivingOrderPrintData"];
+export type ReceivingOrderReceipt = components["schemas"]["ReceivingOrderReceipt"];
 export type CreateReceivingOrderRequest = components["schemas"]["CreateReceivingOrderRequest"];
 export type ReceiveReceivingOrderRequest = components["schemas"]["ReceiveReceivingOrderRequest"];
 export type RejectReceivingOrderRequest = components["schemas"]["RejectReceivingOrderRequest"];

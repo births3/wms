@@ -75,9 +75,16 @@ export interface ReceiveFormState {
   sealChecked: string;
   filingChecked: string;
   deliveryQty: string;
-  batchQty: string;
+  salesReturnBatches: SalesReturnBatchFormState[];
   secondReceiverId: string;
   note: string;
+}
+
+export interface SalesReturnBatchFormState {
+  batchNo: string;
+  quantity: string;
+  rejectedQty: string;
+  rejectReason: string;
 }
 
 export interface RejectFormState {
@@ -140,6 +147,8 @@ interface M2InboundDialogsProps {
   activeDialog: InboundDialog | null;
   orderId: string | null;
   orderReceiptNo: string | null;
+  orderExpectedQty: string;
+  salesReturn: boolean;
   hasOrder: boolean;
   pending: boolean;
   errorMessage?: string;
@@ -174,6 +183,8 @@ export function M2InboundDialogs({
   activeDialog,
   orderId,
   orderReceiptNo,
+  orderExpectedQty,
+  salesReturn,
   hasOrder,
   pending,
   errorMessage,
@@ -224,6 +235,14 @@ export function M2InboundDialogs({
 
   if (!activeDialog) return null;
   const coldChainReceiving = isColdChainTemperatureControl(derivedTemperatureControl);
+  function updateSalesReturnBatch(index: number, patch: Partial<SalesReturnBatchFormState>) {
+    setReceiveForm((value) => ({
+      ...value,
+      salesReturnBatches: value.salesReturnBatches.map((batch, batchIndex) =>
+        batchIndex === index ? { ...batch, ...patch } : batch,
+      ),
+    }));
+  }
   const productRows = productsQuery.data ?? [];
 
   function selectCreateProduct(product: MasterDataRow) {
@@ -318,33 +337,64 @@ export function M2InboundDialogs({
               <DialogTitle>收货</DialogTitle>
               <DialogDescription>{orderReceiptNo ?? NO_INBOUND_ORDER_SELECTED}</DialogDescription>
             </DialogHeader>
-            <TextField label="送货数量" type="number" placeholder="默认订单预报数量" value={receiveForm.deliveryQty} onChange={(deliveryQty) => setReceiveForm((value) => ({ ...value, deliveryQty }))} />
-            <TextField label="实际到货数量" type="number" value={receiveForm.actualQty} onChange={(actualQty) => setReceiveForm((value) => ({ ...value, actualQty }))} />
-            <TextField label="缺货数量" type="number" value={receiveForm.shortageQty} onChange={(shortageQty) => setReceiveForm((value) => ({ ...value, shortageQty }))} />
-            <TextField label="拒收数量" type="number" value={receiveForm.rejectedQty} onChange={(rejectedQty) => setReceiveForm((value) => ({ ...value, rejectedQty }))} />
-            <TextField label="批号 + 数量" placeholder="例如 BATCH-202606 × 60" value={receiveForm.batchQty} onChange={(batchQty) => setReceiveForm((value) => ({ ...value, batchQty }))} />
+            <ReadOnlyField label="预报数量" value={orderExpectedQty ? `${orderExpectedQty} 件` : "-"} />
+            <TextField label="送货数量" type="number" required placeholder="默认订单预报数量" value={receiveForm.deliveryQty} onChange={(deliveryQty) => setReceiveForm((value) => ({ ...value, deliveryQty }))} />
+            <TextField label="实际到货数量" type="number" required value={receiveForm.actualQty} onChange={(actualQty) => setReceiveForm((value) => ({ ...value, actualQty }))} />
+            <TextField label="缺货数量" type="number" required value={receiveForm.shortageQty} onChange={(shortageQty) => setReceiveForm((value) => ({ ...value, shortageQty }))} />
+            <TextField label="拒收数量" type="number" required value={receiveForm.rejectedQty} onChange={(rejectedQty) => setReceiveForm((value) => ({ ...value, rejectedQty }))} />
             <ReadOnlyField label="商品温度属性" value={productTemperatureAttribute} />
             <ReadOnlyField label="温控方式" value={derivedTemperatureControl} />
-            {coldChainReceiving && (
-              <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-3 md:grid-cols-4">
-                <div className="text-xs font-medium text-muted-foreground md:col-span-4">冷链字段</div>
-                <TextField label="到货温度 (°C)" type="number" required placeholder="例如 5（单位 °C）" value={receiveForm.temperature} onChange={(temperature) => setReceiveForm((value) => ({ ...value, temperature }))} />
-                <TextField label="启运时间" type="datetime-local" required value={receiveForm.departureTime} onChange={(departureTime) => setReceiveForm((value) => ({ ...value, departureTime }))} />
-                <TextField label="到货时间" type="datetime-local" required value={receiveForm.arrivalTime} onChange={(arrivalTime) => setReceiveForm((value) => ({ ...value, arrivalTime }))} />
-                <TextField label="冷链运输方式" required placeholder="例如 冷藏车" value={receiveForm.transportMode} onChange={(transportMode) => setReceiveForm((value) => ({ ...value, transportMode }))} />
+            <TextField label="到货温度 (°C)" type="number" required={coldChainReceiving} placeholder={coldChainReceiving ? "冷链商品必填，例如 5" : "非冷链商品选填"} value={receiveForm.temperature} onChange={(temperature) => setReceiveForm((value) => ({ ...value, temperature }))} />
+            <TextField label={FIELD_PLATE_NO} required value={receiveForm.vehicleNo} onChange={(vehicleNo) => setReceiveForm((value) => ({ ...value, vehicleNo }))} />
+            <TextField label="发运地点" required value={receiveForm.origin} onChange={(origin) => setReceiveForm((value) => ({ ...value, origin }))} />
+            <TextField label="启运时间" type="datetime-local" required value={receiveForm.departureTime} onChange={(departureTime) => setReceiveForm((value) => ({ ...value, departureTime }))} />
+            <TextField label="到货时间" type="datetime-local" required value={receiveForm.arrivalTime} onChange={(arrivalTime) => setReceiveForm((value) => ({ ...value, arrivalTime }))} />
+            <TextField label="收货入库时间" type="datetime-local" required value={receiveForm.storageTime} onChange={(storageTime) => setReceiveForm((value) => ({ ...value, storageTime }))} />
+            <TextField label="运输方式" required placeholder="例如 普通车 / 冷藏车 / 快递" value={receiveForm.transportMode} onChange={(transportMode) => setReceiveForm((value) => ({ ...value, transportMode }))} />
+            <TextField label="承运商" required value={receiveForm.carrier} onChange={(carrier) => setReceiveForm((value) => ({ ...value, carrier }))} />
+            <TextField label="联系人（送货人）" required value={receiveForm.contactName} onChange={(contactName) => setReceiveForm((value) => ({ ...value, contactName }))} />
+            <TextField label="电话" required value={receiveForm.contactPhone} onChange={(contactPhone) => setReceiveForm((value) => ({ ...value, contactPhone }))} />
+            <TextField label="身份证" required value={receiveForm.contactIdNo} onChange={(contactIdNo) => setReceiveForm((value) => ({ ...value, contactIdNo }))} />
+            <TextField label="印章样式核对" required value={receiveForm.sealChecked} onChange={(sealChecked) => setReceiveForm((value) => ({ ...value, sealChecked }))} />
+            <TextField label="备案件样式核对" required value={receiveForm.filingChecked} onChange={(filingChecked) => setReceiveForm((value) => ({ ...value, filingChecked }))} />
+            <TextField label="第二收货员验证" value={receiveForm.secondReceiverId} onChange={(secondReceiverId) => setReceiveForm((value) => ({ ...value, secondReceiverId }))} />
+            <TextField className="md:col-span-3" label="拒收备注 / 异常处置" required={Number(receiveForm.rejectedQty) > 0} value={receiveForm.note} onChange={(note) => setReceiveForm((value) => ({ ...value, note }))} />
+            {salesReturn && (
+              <section className="grid gap-3 rounded-md border bg-muted/20 p-3 md:col-span-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-medium text-muted-foreground">销售退货批号 + 数量 / 批号级拒收明细</div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReceiveForm((value) => ({
+                      ...value,
+                      salesReturnBatches: [...value.salesReturnBatches, { batchNo: "", quantity: "", rejectedQty: "0", rejectReason: "" }],
+                    }))}
+                  >
+                    新增批号
+                  </Button>
+                </div>
+                {receiveForm.salesReturnBatches.map((batch, index) => (
+                  <div key={index} className="grid gap-3 md:grid-cols-5">
+                    <TextField label="销售退货批号" required value={batch.batchNo} onChange={(batchNo) => updateSalesReturnBatch(index, { batchNo })} />
+                    <TextField label="批号数量" type="number" required value={batch.quantity} onChange={(quantity) => updateSalesReturnBatch(index, { quantity })} />
+                    <TextField label="批号拒收数量" type="number" required value={batch.rejectedQty} onChange={(rejectedQty) => updateSalesReturnBatch(index, { rejectedQty })} />
+                    <TextField label="批号拒收原因" required={Number(batch.rejectedQty) > 0} value={batch.rejectReason} onChange={(rejectReason) => updateSalesReturnBatch(index, { rejectReason })} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={receiveForm.salesReturnBatches.length === 1}
+                      onClick={() => setReceiveForm((value) => ({
+                        ...value,
+                        salesReturnBatches: value.salesReturnBatches.filter((_, batchIndex) => batchIndex !== index),
+                      }))}
+                    >
+                      删除
+                    </Button>
+                  </div>
+                ))}
               </section>
             )}
-            <TextField label={FIELD_PLATE_NO} value={receiveForm.vehicleNo} onChange={(vehicleNo) => setReceiveForm((value) => ({ ...value, vehicleNo }))} />
-            <TextField label="发运地点" value={receiveForm.origin} onChange={(origin) => setReceiveForm((value) => ({ ...value, origin }))} />
-            <TextField label="收货入库时间" type="datetime-local" value={receiveForm.storageTime} onChange={(storageTime) => setReceiveForm((value) => ({ ...value, storageTime }))} />
-            <TextField label="承运商" value={receiveForm.carrier} onChange={(carrier) => setReceiveForm((value) => ({ ...value, carrier }))} />
-            <TextField label="联系人" value={receiveForm.contactName} onChange={(contactName) => setReceiveForm((value) => ({ ...value, contactName }))} />
-            <TextField label="电话" value={receiveForm.contactPhone} onChange={(contactPhone) => setReceiveForm((value) => ({ ...value, contactPhone }))} />
-            <TextField label="身份证" value={receiveForm.contactIdNo} onChange={(contactIdNo) => setReceiveForm((value) => ({ ...value, contactIdNo }))} />
-            <TextField label="印章样式核对" value={receiveForm.sealChecked} onChange={(sealChecked) => setReceiveForm((value) => ({ ...value, sealChecked }))} />
-            <TextField label="备案件样式核对" value={receiveForm.filingChecked} onChange={(filingChecked) => setReceiveForm((value) => ({ ...value, filingChecked }))} />
-            <TextField label="第二收货员验证" value={receiveForm.secondReceiverId} onChange={(secondReceiverId) => setReceiveForm((value) => ({ ...value, secondReceiverId }))} />
-            <TextField className="md:col-span-3" label="异常备注" value={receiveForm.note} onChange={(note) => setReceiveForm((value) => ({ ...value, note }))} />
             <section className="grid gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 md:col-span-3">
               <div>
                 <div className="text-sm font-medium text-destructive">整单拒收</div>
