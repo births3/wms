@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "d0b9767c4d8deee475c48eba70105a1adb040904",
-  "generatedAt": "2026-08-07T03:14:53.690Z",
+  "gitCommitHash": "70f1ade3786e1dc722ba0419779f1dc36a16c975",
+  "generatedAt": "2026-08-12T12:42:37.481Z",
   "files": {
     ".agents/skills/wms-execution-retrospective/SKILL.md": {
       "filePath": ".agents/skills/wms-execution-retrospective/SKILL.md",
@@ -29419,7 +29419,7 @@
     },
     "backend/crates/api/src/api_key_auth.rs": {
       "filePath": "backend/crates/api/src/api_key_auth.rs",
-      "contentHash": "df764f1408e0afb370ce4e1e6c41b72be4e6aa04a3971fe670677d112a2622a7",
+      "contentHash": "691f198e6075c484e5c51ad8795e787737d2dc0c7f515e8452c009147f453d80",
       "functions": [
         {
           "name": "new",
@@ -29555,7 +29555,7 @@
         "api_key_auth_middleware",
         "required_scope"
       ],
-      "totalLines": 369,
+      "totalLines": 449,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/api_key_expiry.rs": {
@@ -52594,7 +52594,7 @@
     },
     "backend/crates/api/src/h8_inbound/lifecycle.rs": {
       "filePath": "backend/crates/api/src/h8_inbound/lifecycle.rs",
-      "contentHash": "f169db26684f8be6d1c208b530755c7631a947e0784a542e5e805edd4a3beac2",
+      "contentHash": "d692b13ce47dcee7cfe05ab52128b9b489b77610c349bb461ba96fcb6d75d297",
       "functions": [
         {
           "name": "idempotency_key",
@@ -52734,7 +52734,7 @@
         "record_convert_message",
         "succeed_message"
       ],
-      "totalLines": 237,
+      "totalLines": 293,
       "hasStructuralAnalysis": true
     },
     "backend/crates/api/src/h8_inbound/product_change.rs": {
@@ -102647,7 +102647,7 @@
     },
     "backend/crates/domain/src/api_key.rs": {
       "filePath": "backend/crates/domain/src/api_key.rs",
-      "contentHash": "55a9efae6b1a39f0e9186038c3d3bb35f19f42348acfaef42feeb7981631c90f",
+      "contentHash": "1e57de46241aadf8b701151bf405c6fff5ddb046b72832da62d2bc325268fcf4",
       "functions": [],
       "classes": [
         {
@@ -102761,7 +102761,7 @@
         "RotateApiKeyRequest",
         "ApiKeyRotationResponse"
       ],
-      "totalLines": 65,
+      "totalLines": 70,
       "hasStructuralAnalysis": true
     },
     "backend/crates/domain/src/audit.rs": {
@@ -117555,12 +117555,12 @@
     },
     "docs/runbooks/h8-erp-interface-table-sync.md": {
       "filePath": "docs/runbooks/h8-erp-interface-table-sync.md",
-      "contentHash": "96c4ff264c35f87a1b9e13ada412314e16cf04bdc308bf46c4ede1ca5d2776c8",
+      "contentHash": "062a120135e70854a2054f4048310c46199208d5998b3c3cd6304d051347b9de",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 276,
+      "totalLines": 301,
       "hasStructuralAnalysis": true
     },
     "docs/runbooks/h8-erp-message-performance.md": {
@@ -117995,12 +117995,12 @@
     },
     "mkdocs.yml": {
       "filePath": "mkdocs.yml",
-      "contentHash": "d19843db19d6dfa0a6933abeef28bd378e1b0e1dc8a0c0433d4fd87a58b42be4",
+      "contentHash": "a7649f878f24b72b62ecec1a9f116a32149383d034ea57294c4fea1b07e16ec3",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 310,
+      "totalLines": 312,
       "hasStructuralAnalysis": true
     },
     "packages/.gitkeep": {
@@ -171619,6 +171619,16 @@
       "exports": [],
       "totalLines": 93,
       "hasStructuralAnalysis": true
+    },
+    "docs/reviews/h8-worker-key-review-and-runtime-record-2026-08-12.md": {
+      "filePath": "docs/reviews/h8-worker-key-review-and-runtime-record-2026-08-12.md",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "hasStructuralAnalysis": true,
+      "contentHash": "941a6522b65c6b83ad12d164cc852696488a704aa095ffb4df5cb9c708c53a4e",
+      "totalLines": 225
     }
   }
 }
