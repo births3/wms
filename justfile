@@ -541,7 +541,10 @@ dev-web-restart:
     fi
     tmux new-session -d -s "{{DEV_WEB_SESSION}}" -c "{{MAIN_ROOT}}" \
       "$dev_env pnpm -C apps/web-admin dev 2>&1 | tee {{DEV_WEB_LOG}}"
-    sleep 2
+    for _ in {1..30}; do
+      ss -ltn "sport = :{{DEV_WEB_PORT}}" 2>/dev/null | grep -q LISTEN && break
+      sleep 1
+    done
     just dev-web-verify
 
 # 校验 9002 来自主工作区，不是 agent worktree
