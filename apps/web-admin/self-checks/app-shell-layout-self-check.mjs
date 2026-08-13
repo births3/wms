@@ -33,6 +33,7 @@ assert.match(appShell, /hidden=\{tab\.view !== (?:view|safeView)\}/, "非激活�
 assert.match(appShell, /lg:grid-rows-\[3\.5rem_1fr\]/, "桌面端应有顶部导航栏和下方工作区两行布局");
 assert.match(appShell, /lg:col-span-2/, "顶部导航栏应横跨左侧菜单和主内容区");
 assert.match(appShell, /<WorkspaceTabs\b[\s\S]*tabs=\{openTabs\.map/, "WorkspaceTabs 应融入顶部导航栏并消费 openTabs");
+assert.match(appShell, /<h1 className="sr-only">[\s\S]*openTabs\.find/, "AppShell 必须为当前页提供唯一语义标题");
 assert.match(appShell, /<Warehouse className="size-5"/, "顶部导航栏左侧应显示系统 Logo");
 assert.match(appShell, /currentUser\.display_name/, "顶部导航栏右侧应显示用户信息");
 assert.match(appShell, /menuKeysForActiveView/, "菜单切换页面时应自动展开当前路径");

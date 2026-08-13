@@ -379,7 +379,7 @@ export function MCGDocumentNumberingPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="M-CG 单据号规则" />
+      <PageHeader />
       <NoticePanel
         notice={notice ?? (documentTypeOptionsQuery.isError
           ? { type: "error", text: errorText(documentTypeOptionsQuery.error, "读取 M1 单据类型字典失败") }

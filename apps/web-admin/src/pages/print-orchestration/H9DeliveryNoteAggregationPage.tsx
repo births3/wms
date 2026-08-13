@@ -309,7 +309,6 @@ export function H9DeliveryNoteAggregationPage({ currentUser }: { currentUser: Cu
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="作业·随货同行单归集"
         actions={notice ? <span className="self-center text-sm text-muted-foreground" role="status">{notice}</span> : undefined}
       />
       <QueryPanel

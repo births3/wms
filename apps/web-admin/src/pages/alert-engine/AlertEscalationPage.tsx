@@ -86,7 +86,7 @@ export function AlertEscalationPage() {
   const editAction: DataGridEditAction = { label: "编辑", description: "编辑选中升级规则", disabled: (context) => context.selectedRowKeys.length !== 1 || upsert.isPending, onClick: () => selectedRow && openForm(selectedRow) };
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-    <PageHeader title="H-AL 告警升级规则" />
+    <PageHeader />
     {notice && <div role="status" className="rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success">{notice}</div>}
     <QueryPanel fields={alertEscalationQueryFields} defaultVisibleFieldKeys={alertEscalationCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />
     <Card><CardContent className="p-5"><DataGrid storageKey="hal.alert-escalation-rules" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={query.isPending ? "加载升级规则..." : undefined} emptyTitle={query.isError ? "读取升级规则失败" : "暂无升级规则"} emptyDescription={query.isError ? errorText(query.error, "请检查权限和 API 服务") : "新增规则后可在告警定义中引用"} tableClassName="min-w-[1770px]" exportFileBaseName="H-AL 告警升级规则" refreshAction={refreshAction} createAction={createAction} editAction={editAction} queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(alertEscalationQueryFields, appliedQuery)} onApplyQueryState={applyGridQueryState} onClearQueryState={clearGridQueryState} /></CardContent></Card>

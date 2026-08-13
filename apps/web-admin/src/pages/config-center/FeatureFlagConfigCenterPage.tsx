@@ -201,7 +201,6 @@ export function FeatureFlagConfigCenterPage({ onBack }: FeatureFlagConfigCenterP
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="配置中心"
         actions={
           <Button variant="outline" onClick={onBack}>
             返回

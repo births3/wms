@@ -325,9 +325,7 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title="M-RC 库存对账"
-      />
+      <PageHeader />
       {ruleQuery.isError && (
         <div
           className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"

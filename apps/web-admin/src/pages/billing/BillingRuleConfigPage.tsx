@@ -107,7 +107,7 @@ export function BillingRuleConfigPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="M9 计费规则配置" />
+      <PageHeader />
       {notice && (
         <div
           className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"}

@@ -416,9 +416,7 @@ export function DrugInspectionStampPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title="药检图章配置"
-      />
+      <PageHeader />
       {notice && (
         <div
           role={notice.kind === "error" ? "alert" : "status"}

@@ -610,9 +610,7 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title={meta.title}
-      />
+      <PageHeader />
       {lastEvent && (
         <div
           className="fixed right-6 top-5 z-50 rounded-md border bg-background/95 px-3 py-2 text-sm text-muted-foreground shadow-sm"

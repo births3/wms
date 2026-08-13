@@ -353,7 +353,6 @@ export function DockManagementPage() {
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="M1 月台管理"
         actions={notice ? <span className="self-center text-sm text-muted-foreground" role="status">{notice}</span> : undefined}
       />
       <input ref={importInputRef} className="hidden" type="file" accept=".xlsx,.csv" onChange={(event) => void handleImport(event)} />

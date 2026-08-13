@@ -168,7 +168,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   if (mode === "settings") {
     return (
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-        <PageHeader title="H4 参数设置" />
+        <PageHeader />
         <NoticePanel notice={settingsDialog.open ? null : notice} />
         <QueryPanel
           fields={h4WechatSettingsQueryFields}
@@ -232,7 +232,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
   if (mode === "records") {
     return (
       <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-        <PageHeader title="H4 发送记录" />
+        <PageHeader />
         <NoticePanel notice={notice} />
         <QueryPanel
           fields={h4NotificationRecordQueryFields}
@@ -288,7 +288,7 @@ export function H4WechatNotifyPage({ mode }: H4WechatNotifyPageProps) {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="H4 通知配置" />
+      <PageHeader />
       <NoticePanel notice={configDialog.open || sendDialog.open ? null : notice} />
       <QueryPanel
         fields={h4NotificationConfigQueryFields}

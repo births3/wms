@@ -394,7 +394,6 @@ export function M3BatchManagementPage({ onOpenLocationHistory }: M3BatchManageme
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="M3 批号管理"
         actions={
           <div className="flex flex-wrap gap-2">
             {lastEvent && (

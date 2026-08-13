@@ -16,7 +16,6 @@ export type SignInspectionRequest = components["schemas"]["SignInspectionRequest
 export type PutawayRequest = components["schemas"]["PutawayRequest"];
 export type PutawayRecommendation = components["schemas"]["PutawayLocationRecommendation"];
 export type PutawayRecommendationResponse = components["schemas"]["PutawayRecommendationResponse"];
-export type ReceivingDashboard = components["schemas"]["ReceivingDashboardResponse"];
 
 export const receivingOrdersQueryKey = ["inbound", "receiving-orders"] as const;
 
@@ -54,28 +53,6 @@ async function listReceivingOrders(): Promise<ReceivingOrder[]> {
     throw new ApiError(result.error, "读取入库单失败", result.response.status);
   }
   return result.data.data;
-}
-
-async function getReceivingDashboard(input: {
-  supplierId: string;
-  productCode: string;
-  from: string;
-  to: string;
-}): Promise<ReceivingDashboard> {
-  const result = await api.GET("/api/v1/inbound/receiving-dashboard", {
-    params: {
-      query: {
-        supplier_id: input.supplierId || undefined,
-        product_code: input.productCode || undefined,
-        from: input.from || undefined,
-        to: input.to || undefined,
-      },
-    },
-  });
-  if (!result.data) {
-    throw new ApiError(result.error, "读取入库进度看板失败", result.response.status);
-  }
-  return result.data;
 }
 
 async function getReceivingOrder(id: string): Promise<ReceivingOrder> {
@@ -225,19 +202,6 @@ export function useReceivingOrdersQuery() {
   return useQuery<ReceivingOrder[], ApiError>({
     queryKey: receivingOrdersQueryKey,
     queryFn: listReceivingOrders,
-  });
-}
-
-export function useReceivingDashboardQuery(input: {
-  supplierId: string;
-  productCode: string;
-  from: string;
-  to: string;
-}, refreshIntervalMs: number | false = 30_000) {
-  return useQuery<ReceivingDashboard, ApiError>({
-    queryKey: ["inbound", "receiving-dashboard", input],
-    queryFn: () => getReceivingDashboard(input),
-    refetchInterval: refreshIntervalMs,
   });
 }
 

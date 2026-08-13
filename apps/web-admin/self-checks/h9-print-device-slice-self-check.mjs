@@ -13,9 +13,10 @@ const view = source("src/app-shell/admin-view.ts");
 const menu = source("dev-mocks/admin-menu-dev-mock.ts");
 const queryConfig = JSON.parse(source("src/pages/page-query-core-fields.json"));
 
-for (const token of ["QueryPanel", "DataGrid", "Dialog", "设备·Print Agent 管理"]) {
+for (const token of ["QueryPanel", "DataGrid", "Dialog"]) {
   if (!page.includes(token)) throw new Error(`H9 打印设备页面缺少 ${token}`);
 }
+if (!app.includes("设备·Print Agent 管理")) throw new Error("H9 打印设备菜单缺少页面名称");
 
 // US-H9-011：站点/映射/打印机/纸盒/测试打印/租约端点全部接入
 for (const path of [

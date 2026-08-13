@@ -18,7 +18,6 @@ try {
     canReceiveOrReject,
     filterOrders,
     dualSignRequiredForPolicy,
-    localDayRange,
     nextM2InboundSelectedId,
     ownerLabel,
     productTemperatureAttribute,
@@ -76,9 +75,6 @@ try {
   assert.equal(productTemperatureAttribute("frozen", "P-001"), "冷冻");
   assert.equal(productTemperatureAttribute("normal", "P-COLD"), "常温");
   assert.equal(productTemperatureAttribute(null, "P-COLD"), "冷藏");
-  const localRange = localDayRange(new Date(2026, 6, 12, 12, 0, 0));
-  assert.ok(localRange.from < localRange.to, "看板本地日期范围必须有明确起止边界");
-
   assert.equal(canReceiveOrReject("released"), true);
   assert.equal(canReceiveOrReject("receiving"), true);
   assert.equal(canReceiveOrReject("completed"), false);
@@ -99,7 +95,6 @@ try {
   assert.equal(dualSignRequiredForPolicy("dual_scan_with_approval"), true);
 
   const pageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPage.tsx", import.meta.url)), "utf8");
-  const dashboardPageSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundDashboardPage.tsx", import.meta.url)), "utf8");
   const orderTableSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundOrderTable.tsx", import.meta.url)), "utf8");
   const printDialogSource = readFileSync(fileURLToPath(new URL("../src/pages/inbound/M2InboundPrintDialog.tsx", import.meta.url)), "utf8");
   const businessPrintDialogSource = readFileSync(fileURLToPath(new URL("../src/pages/print-template/H9BusinessPrintDialog.tsx", import.meta.url)), "utf8");
@@ -197,17 +192,11 @@ try {
   assert.match(devMockCommon, /devSeedOrderStatusOverrides\.get\(id\)/, "种子入库单查询必须读取动作后的状态覆盖");
   assert.match(devMockCommon, /devSeedOrderStatusOverrides\.set\(id, status\)/, "种子入库单动作必须持久化状态覆盖");
   assert.match(devMockCore, /page: \{ count: data\.length, next_cursor: null \}/, "M2 dev mock 列表必须返回分页元数据");
-  assert.match(pageSource, /M2InboundDashboardPage/, "M2 入库页必须提供进度看板入口");
-  assert.match(pageSource, /currentOwner=\{currentOwner\}/, "M2 进度看板必须继承当前货主上下文");
-  assert.match(dashboardPageSource, /<QueryPanel/, "M2 入库看板必须复用 QueryPanel");
-  assert.match(dashboardPageSource, /<DataGrid/, "M2 入库看板必须复用 DataGrid");
-  assert.match(dashboardPageSource, /useReceivingOrdersQuery/, "M2 入库看板点击状态行必须读取对应单据");
-  assert.match(dashboardPageSource, /M2InboundDetailDialog/, "M2 入库看板必须支持打开单据详情弹窗");
-  assert.match(dashboardPageSource, /setInterval|刷新间隔/, "M2 入库看板必须提供可配置的自动刷新");
-  assert.match(dashboardPageSource, /statusLabel\(row\.status\)/, "M2 入库看板必须显示中文状态标签");
-  assert.match(devMockCore, /receiving-dashboard/, "M2 dev mock 必须提供看板真实 API 形状");
-  const dashboardSource = dashboardPageSource;
-  assert.match(dashboardSource, /localDayRange/, "看板默认今天必须按本地日转换为 UTC 范围");
+  assert.doesNotMatch(pageSource, /M2InboundDashboardPage/, "M2 入库页不得再引用进度看板组件");
+  assert.doesNotMatch(pageSource, /showDashboard|setShowDashboard/, "M2 入库页不得保留看板开关状态");
+  assert.doesNotMatch(pageSource, /进度看板/, "M2 入库页不得提供进度看板入口按钮");
+  assert.doesNotMatch(pageSource, /<PageHeader/, "M2 入库页不得渲染空 PageHeader 头部留白");
+  assert.match(pageSource, /role="status"/, "M2 入库页必须保留 lastEvent 的可访问 status 反馈");
   assert.match(helperSource, /new Date\(`\$\{value\}T10:00:00`\)/, "日期输入必须按本地日期转换，不能硬编码 UTC 日期");
 } finally {
   await server.close();

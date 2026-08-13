@@ -2452,44 +2452,16 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m2-inbound/receiving.png",
 ]
 
-[[stories]]
+[[deferred_stories]]
 id = "US-M2-008"
 title = "收货进度看板"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
 types = ["read_only", "frontend_interaction"]
-frontend_pages = ["m2-receiving"]
-navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
-e2e_screenshots = [
-  { page = "m2-receiving", spec = "prototypes/e2e/web-admin-m2-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m2-inbound/receiving-dashboard-detail.png" },
-]
 api_paths = ["GET /api/v1/inbound/receiving-dashboard"]
-evidence_refs = [
-  "prototypes/e2e/web-admin-m2-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m2-inbound/receiving-dashboard-detail.png",
-]
-
-[stories.dimensions]
-requirement = "verified"
-fields = "verified"
-frontend = "verified"
-api = "verified"
-backend = "verified"
-database = "verified"
-security = "verified"
-audit = "not_applicable"
-tests = "verified"
-evidence = "verified"
-docs = "verified"
-governance = "verified"
-
-[stories.not_applicable_reasons]
-audit = "看板只读聚合，不产生写操作；来源单据的创建、收货、验收、上架审计由对应故事负责。"
-
-[stories.tests]
-required_layers = ["L1", "L2", "L3", "L7", "L8"]
-covered_layers = ["L1", "L2", "L3", "L7", "L8"]
+reason = "按用户明确决定，M2 收货管理当前不再提供常驻进度看板入口；现有接口和历史故事文档保留为待复用能力，当前页面与真实 E2E 证据不再作为已完成依据。"
+owner = "M2 模块负责人"
+resume_when = "用户重新确认恢复进度看板，并补齐页面入口、真实 E2E、截图和质量矩阵证据后恢复。"
 
 [[deferred_stories]]
 id = "US-M2-001"

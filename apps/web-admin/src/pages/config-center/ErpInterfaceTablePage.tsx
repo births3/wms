@@ -401,11 +401,8 @@ export function ErpInterfaceTablePage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold">H8 接口表探查</h1>
-          <p className="text-sm text-muted-foreground">MSSQL 只读查询 · 最近 7 天 · 最大跨度 31 天 · 无写操作</p>
-        </div>
+      <header className="flex flex-wrap items-end justify-between gap-2 text-sm text-muted-foreground">
+        <span>MSSQL 只读查询 · 最近 7 天 · 最大跨度 31 天 · 无写操作</span>
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><Database className="size-4" aria-hidden />合计 {listQuery.data?.total ?? 0}</div>
       </header>
       <QueryPanel

@@ -317,9 +317,7 @@ export function M2PutawayStrategyPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8" data-testid="m2-putaway-strategy-page">
-      <PageHeader
-        title="M2 上架策略"
-      />
+      <PageHeader />
       {notice && (
         <div
           className={

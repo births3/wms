@@ -355,7 +355,6 @@ export function H9PrintDevicePage({ currentUser }: { currentUser: CurrentUser })
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="设备·Print Agent 管理"
         actions={notice ? <span className="self-center text-sm text-muted-foreground" role="status">{notice}</span> : undefined}
       />
       <QueryPanel

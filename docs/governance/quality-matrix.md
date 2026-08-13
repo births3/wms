@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 189 |
-| 已完成（已验证） | 52 |
-| 未完成 / 延期 | 137 |
-| 完成率 | 27.5% |
+| 已完成（已验证） | 51 |
+| 未完成 / 延期 | 138 |
+| 完成率 | 27.0% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -40,7 +40,7 @@
 | H9 | 9 | 6 | 15 |
 | M1 | 2 | 9 | 11 |
 | M10 | 0 | 4 | 4 |
-| M2 | 1 | 8 | 9 |
+| M2 | 0 | 9 | 9 |
 | M3 | 9 | 0 | 9 |
 | M4 | 0 | 11 | 11 |
 | M5 | 0 | 3 | 3 |
@@ -98,7 +98,6 @@
 | US-H9-007 归集维度规则配置 | H9 | S3 |
 | US-H9-008 打印组套配置与就绪策略 | H9 | S3 |
 | US-H9-009 分类 PDF 渲染与留存 | H9 | S3 |
-| US-M2-008 收货进度看板 | M2 | S1 |
 | US-AL-001 告警定义注册 | AL | S3 |
 | US-AL-003 告警升级机制 | AL | S3 |
 | US-AL-004 告警看板与统计 | AL | S3 |
@@ -138,6 +137,7 @@
 | US-H9-014 Agent 断网对账与本地空间 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 断网、重启、对账、本地缓存和空间阈值已确认；客户端日志、清理、冲突处置、页面和 S4 证据未实现。 |
 | US-H9-015 Print Agent 客户端与启动更新 | H9 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | Windows、Tauri 2、React/Rust、Velopack、不可变发布、SHA-256、无发布者验真残余风险、pilot 短期授权、全局版本专用权限和机器下载协议均已由 ADR-0040 确认；客户端、发布链路和运行证据尚未创建。 |
 | US-M2-002 PDA/PC Web 收货 | M2 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | PC 数量闭环、GSP 现场字段录入与详情回读、第二收货员同人/资格校验、销售退货原批号数量和批号级拒收合计约束、cool/冷冻/冷藏温区校验与超温备注已有；但稳定性报告附件未强制、收货节点 M-VR 双人策略、追溯码/LPN、PDA 扫码离线重放及真机证据未闭环。 |
+| US-M2-008 收货进度看板 | M2 | S1 | L1、L2、L3、L7、L8 | 按用户明确决定，M2 收货管理当前不再提供常驻进度看板入口；现有接口和历史故事文档保留为待复用能力，当前页面与真实 E2E 证据不再作为已完成依据。 |
 | US-M2-001 创建 ASN（采购入库通知） | M2 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | ASN 自动编号、引用校验、审计和作废入口已有；inbound:push 已收敛到 ASN 创建路径，仓库范围进入认证上下文，api_key_postgres 7/7 覆盖同仓成功/跨仓拒绝/作业路径拒绝；创建后 M-VR 自动校验/状态流转及真实 ERP 推送回执仍未完成。 |
 | US-M2-003 PDA/PC Web 验收 | M2 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 批号、数量、日期、质量状态、追溯码、外观等四项核对、抽验数量必填与批准文号主数据比对已贯通；不合格 M-QL/H4 仍仅在预配置类型存在时创建，近效期/过期判定、档案补录审批/ERP 恢复、PDA 离线及真机证据未闭环。 |
 | US-M2-004 双人验收签字 | M2 | S4 | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | 第一签名绑定当前用户、待第二人状态、第二步 append-only 追加完整双签记录与前端第二签契约已修复；附件、审批链路及真实双人/PDA 设备证据仍缺失。 |
@@ -297,7 +297,6 @@
 | US-H9-007 归集维度规则配置 | H9 | S3 | write、config_rule、api_change、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | h9-delivery-note-aggregation | GET /api/v1/print-orchestration/aggregation-fields<br>GET /api/v1/print-orchestration/aggregation-rules/versions<br>POST /api/v1/print-orchestration/aggregation-rules/versions<br>POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test<br>POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish<br>POST /api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-008 打印组套配置与就绪策略 | H9 | S3 | write、config_rule、api_change、frontend_interaction、critical_path、audit_compliance | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | h9-delivery-note-aggregation | GET /api/v1/print-orchestration/print-document-categories<br>GET /api/v1/print-orchestration/print-suites/versions<br>POST /api/v1/print-orchestration/print-suites/versions<br>POST /api/v1/print-orchestration/print-suites/versions/{version_id}/test<br>POST /api/v1/print-orchestration/print-suites/versions/{version_id}/publish<br>POST /api/v1/print-orchestration/print-suites/versions/{version_id}/disable<br>GET /api/v1/print-orchestration/suite-instances | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H9-009 分类 PDF 渲染与留存 | H9 | S3 | write、integration、api_change、frontend_interaction、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | h9-delivery-note-aggregation | GET /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs<br>POST /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare<br>POST /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download<br>POST /api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
-| US-M2-008 收货进度看板 | M2 | S1 | read_only、frontend_interaction | L1、L2、L3、L7、L8 | m2-receiving | GET /api/v1/inbound/receiving-dashboard | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:not_applicable<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-001 告警定义注册 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-definitions | GET /api/v1/alert-definitions<br>GET /api/v1/alert-definitions/{id}<br>POST /api/v1/alert-definitions/change-requests<br>PUT /api/v1/quality-liaisons/types/{type_code}<br>POST /api/v1/quality-liaisons/{id}/approval-callback | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-003 告警升级机制 | AL | S3 | read_only、write、api_change、frontend_interaction、config_rule、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-escalations | GET /api/v1/alert-escalation-rules<br>PUT /api/v1/alert-escalation-rules/{rule_code} | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-AL-004 告警看板与统计 | AL | S3 | read_only、write、api_change、frontend_interaction、integration、audit_compliance | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | hal-alert-dashboard | GET /api/v1/alerts/active<br>GET /api/v1/alerts/statistics<br>GET /api/v1/alerts/gsp-report<br>GET /api/v1/alerts/changes<br>POST /api/v1/alerts/exports<br>GET /api/v1/alerts/exports/{id}<br>GET /api/v1/alerts/exports/{token}/download | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |

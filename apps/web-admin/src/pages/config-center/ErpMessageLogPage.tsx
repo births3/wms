@@ -314,13 +314,7 @@ export function ErpMessageLogPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold">H8 ERP 消息</h1>
-          <p className="text-sm text-muted-foreground">
-            运行日志与死信重放 · {canWrite ? "可重放" : "只读"}
-          </p>
-        </div>
+      <header className="flex flex-wrap items-end justify-end gap-2">
         {statsQuery.data ? (
           <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
             <span>合计 {statsQuery.data.total}</span>

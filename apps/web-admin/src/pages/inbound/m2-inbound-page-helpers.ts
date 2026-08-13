@@ -303,14 +303,6 @@ export function dateTimeToIso(value: string) {
   return Number.isNaN(localDate.getTime()) ? null : localDate.toISOString();
 }
 
-export function localDayRange(value = new Date()) {
-  const from = new Date(value);
-  from.setHours(0, 0, 0, 0);
-  const to = new Date(value);
-  to.setHours(23, 59, 59, 999);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
-
 export function dateInputValue(value: Date) {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, "0");

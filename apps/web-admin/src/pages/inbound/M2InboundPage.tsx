@@ -1,7 +1,5 @@
 import * as React from "react";
 import {
-  Button,
-  PageHeader,
   QueryPanel,
   buildQueryPanelSummaryItems,
   type QueryPanelField,
@@ -58,7 +56,6 @@ import {
   type OwnerContext,
 } from "./m2-inbound-page-helpers";
 import { M2InboundOrderTable } from "./M2InboundOrderTable";
-import { M2InboundDashboardPage } from "./M2InboundDashboardPage";
 import {
   BUTTON_ADD,
   BUTTON_REFRESH,
@@ -216,7 +213,6 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
       (value) => normalizeM2InboundQueryValue(value, defaultQuery, mode),
     );
   const [activeDialog, setActiveDialog] = React.useState<InboundDialog | null>(null);
-  const [showDashboard, setShowDashboard] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [printOpen, setPrintOpen] = React.useState(false);
   const [lastEvent, setLastEvent] = React.useState<string | null>(null);
@@ -664,27 +660,13 @@ export function M2InboundPage({ mode, currentOwner }: M2InboundPageProps) {
         }
       : undefined;
 
-  if (showDashboard && mode === "receiving") {
-    return <M2InboundDashboardPage currentOwner={currentOwner} onBack={() => setShowDashboard(false)} />;
-  }
-
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-        <PageHeader
-          title={pageMeta.title}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              {lastEvent && (
-                <span className="self-center text-sm text-muted-foreground" role="status">
-                  {lastEvent}
-                </span>
-              )}
-              {mode === "receiving" && (
-                <Button variant="outline" onClick={() => setShowDashboard(true)}>进度看板</Button>
-              )}
-            </div>
-          }
-        />
+        {lastEvent && (
+          <div role="status" className="text-sm text-muted-foreground">
+            {lastEvent}
+          </div>
+        )}
 
         <QueryPanel
           fields={m2InboundQueryFields}

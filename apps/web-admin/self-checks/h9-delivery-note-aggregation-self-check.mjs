@@ -12,9 +12,10 @@ const view = source("src/app-shell/admin-view.ts");
 const menu = source("dev-mocks/admin-menu-dev-mock.ts");
 const queryConfig = JSON.parse(source("src/pages/page-query-core-fields.json"));
 
-for (const token of ["QueryPanel", "DataGrid", "Dialog", "作业·随货同行单归集"]) {
+for (const token of ["QueryPanel", "DataGrid", "Dialog"]) {
   if (!page.includes(token)) throw new Error(`H9 归集页面缺少 ${token}`);
 }
+if (!app.includes("作业·随货同行单归集")) throw new Error("H9 归集菜单缺少页面名称");
 for (const path of [
   "/api/v1/print-orchestration/delivery-note-candidates",
   "/api/v1/print-orchestration/delivery-note-groups",

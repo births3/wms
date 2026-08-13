@@ -127,7 +127,7 @@ export function M3MaintenancePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="M3 在库养护" />
+      <PageHeader />
       <QueryPanel
         fields={m3MaintenanceQueryFields}
         defaultVisibleFieldKeys={m3MaintenanceCoreQueryFieldKeys}

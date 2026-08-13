@@ -164,9 +164,7 @@ export function DrugInspectionReviewPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title="药检单审核"
-      />
+      <PageHeader />
       {notice && <NoticeBox notice={notice} />}
       <QueryPanel
         fields={drugInspectionReviewQueryFields}

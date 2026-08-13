@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Button, Card, CardContent, Input, PageHeader, WorkspaceTabs, cn } from "@wms/ui";
+import { Button, Card, CardContent, Input, WorkspaceTabs, cn } from "@wms/ui";
 import {
   Activity,
   ArrowUpCircle,
@@ -696,6 +696,9 @@ function AppShell({
             退出
           </Button>
         </header>
+        <h1 className="sr-only">
+          {openTabs.find((tab) => tab.view === activeView)?.label ?? "WMS Admin"}
+        </h1>
         {children}
       </div>
     </div>
@@ -751,7 +754,6 @@ function MenuUnavailablePanel({
 }) {
   return (
     <section className="flex w-full flex-col gap-6 px-4 py-8 lg:px-8">
-      <PageHeader title="运营总览" />
       <Card className="rounded-lg shadow-sm">
         <CardContent className="flex max-w-2xl flex-col gap-4 p-6" role={loading ? "status" : "alert"}>
           <div>

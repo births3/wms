@@ -215,9 +215,7 @@ export function H2AuditTrailPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title="H2 审计追踪"
-      />
+      <PageHeader />
 
       <QueryPanel
         fields={h2AuditQueryFields}
@@ -276,9 +274,7 @@ export function H3ApiContractPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title="H3 OpenAPI 契约"
-      />
+      <PageHeader />
 
       <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
         <Card className="rounded-lg shadow-sm">

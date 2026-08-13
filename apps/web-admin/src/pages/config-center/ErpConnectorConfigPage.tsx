@@ -384,7 +384,6 @@ export function ErpConnectorConfigPage({
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title="H8 ERP 连接"
         actions={
           onBack ? (
             <Button variant="outline" onClick={onBack}>

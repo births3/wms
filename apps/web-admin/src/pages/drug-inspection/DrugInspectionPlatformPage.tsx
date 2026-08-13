@@ -97,7 +97,7 @@ export function DrugInspectionPlatformPage() {
   }
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-    <PageHeader title="M-DI 药检平台对接配置" />
+    <PageHeader />
     {notice && <div className={cn("rounded-md border px-3 py-2 text-sm", notice.type === "success" ? "border-wms-success/30 bg-wms-success/10 text-wms-success" : "border-destructive/30 bg-destructive/10 text-destructive")} role={notice.type === "success" ? "status" : "alert"}>{notice.text}</div>}
     <QueryPanel fields={queryFields} defaultVisibleFieldKeys={mDiPlatformCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => setAppliedQuery(draftQuery)} onReset={() => { setDraftQuery({ status: "" }); setAppliedQuery({ status: "" }); }} />
     <Card className="rounded-lg shadow-sm"><CardContent className="p-5"><DataGrid storageKey="m-di.drug-inspection-platforms" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selectedRowKeys} onSelectedRowKeysChange={setSelectedRowKeys} caption={platformsQuery.isPending ? "加载药检平台..." : undefined} emptyTitle={platformsQuery.isError ? "读取药检平台失败" : "暂无药检平台配置"} emptyDescription={platformsQuery.isError ? errorMessage(platformsQuery.error, "请检查鉴权和数据库连接") : "请新增药检平台对接配置"} refreshAction={refreshAction} createAction={createAction} editAction={editAction} toolbarActions={toolbarActions} queryState={appliedQuery} querySummaryItems={querySummaryItems} onApplyQueryState={(value) => { const next = { status: queryString((value as QueryPanelValue).status) }; setDraftQuery(next); setAppliedQuery(next); }} onClearQueryState={() => { setDraftQuery({ status: "" }); setAppliedQuery({ status: "" }); }} /></CardContent></Card>

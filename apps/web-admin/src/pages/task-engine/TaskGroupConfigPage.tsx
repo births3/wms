@@ -85,7 +85,7 @@ export function TaskGroupConfigPage() {
   const editAction: DataGridEditAction = { label: "编辑资格", description: "维护选中任务组的适用范围与成员", disabled: (context) => context.selectedRowKeys.length !== 1 || save.isPending, onClick: () => selectedRow && openDialog(selectedRow) };
 
   return <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-    <PageHeader title="M-TE 任务组与人员资格" />
+    <PageHeader />
     {notice && <div className={notice.kind === "error" ? "rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" : "rounded-md border border-wms-success/30 bg-wms-success/10 px-3 py-2 text-sm text-wms-success"} role={notice.kind === "error" ? "alert" : "status"}>{notice.text}</div>}
     <QueryPanel fields={mteTaskGroupQueryFields} defaultVisibleFieldKeys={mteTaskGroupCoreQueryFieldKeys} value={draftQuery} onValueChange={setDraftQuery} onQuery={() => applyQuery(draftQuery)} onReset={resetQuery} />
     <Card><CardContent className="p-5"><DataGrid storageKey="mte.task-groups" columns={columns} data={rows} rowKey={(row) => row.id} selectable selectedRowKeys={selected} onSelectedRowKeysChange={setSelected} caption={groupsQuery.isPending ? "加载任务组..." : undefined} emptyTitle={groupsQuery.isError ? "读取任务组失败" : "暂无任务组"} emptyDescription={groupsQuery.isError ? errorText(groupsQuery.error, "请检查鉴权和 API 服务") : "业务创建首个任务时会生成仓库默认任务组，也可手工新增"} refreshAction={refreshAction} createAction={createAction} editAction={editAction} exportFileBaseName="M-TE-task-groups" queryState={appliedQuery} querySummaryItems={buildQueryPanelSummaryItems(mteTaskGroupQueryFields, appliedQuery)} onApplyQueryState={applyGridQueryState} onClearQueryState={clearGridQueryState} /></CardContent></Card>

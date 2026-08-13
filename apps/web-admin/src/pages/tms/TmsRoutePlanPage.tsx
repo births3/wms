@@ -72,7 +72,7 @@ export function TmsRoutePlanPage() {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader title="接收 TMS 路径规划结果" />
+      <PageHeader />
       {(validationError || mutation.error) && (
         <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

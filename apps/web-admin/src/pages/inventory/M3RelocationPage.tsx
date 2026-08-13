@@ -89,7 +89,7 @@ export function M3RelocationPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="M3 库内移库" />
+      <PageHeader />
       <QueryPanel
         fields={m3RelocationQueryFields}
         defaultVisibleFieldKeys={m3RelocationCoreQueryFieldKeys}

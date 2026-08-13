@@ -299,9 +299,7 @@ export function H1ApiKeyPage({ currentUser }: { currentUser: CurrentUser }) {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title="H1 API Key 生命周期"
-      />
+      <PageHeader />
       <NoticePanel notice={notice} />
       <QueryPanel
         fields={apiKeyQueryFields}

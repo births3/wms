@@ -217,9 +217,7 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="M3 库位历史追踪"
-      />
+      <PageHeader />
       <QueryPanel
         fields={m3LocationHistoryQueryFields}
         defaultVisibleFieldKeys={m3LocationHistoryCoreQueryFieldKeys}

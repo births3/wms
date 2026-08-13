@@ -107,9 +107,7 @@ export function H1SessionPage({ currentUser }: H1SessionPageProps) {
 
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
-      <PageHeader
-        title="H1 登录会话"
-      />
+      <PageHeader />
 
       <Card className="rounded-lg border-primary/20 bg-primary/5 shadow-sm">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
