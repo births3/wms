@@ -108,6 +108,9 @@ site/
 # codex-cli 用，不是项目资产。每个开发机各自维护本地 .codex/。
 .codex/
 
+# ---- Claude CLI 本地 worktree ----
+.claude/worktrees/
+
 # ---- Understand-Anything 项目图谱本地临时文件 ----
 .ua/intermediate/
 .ua/diff-overlay.json

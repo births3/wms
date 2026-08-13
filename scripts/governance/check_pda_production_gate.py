@@ -100,7 +100,7 @@ PDA_STACK_SCRIPT_PATTERNS = (
     ("react-native", re.compile(rf"(?:^|[^\w/.-]){EXPO_CLI_CMD_RE}\s+run:android\b")),
     ("react-native", re.compile(rf"(?:^|[^\w/.-]){EAS_CLI_CMD_RE}\s+build\b")),
 )
-IGNORED_PACKAGE_ROOTS = ("spikes/", "node_modules/")
+IGNORED_PACKAGE_ROOTS = ("spikes/", "node_modules/", ".claude/worktrees/")
 ACCEPTED_SPIKE_RESULT_COMMON_TOKENS = (
     "## 实测结果",
     "真 PDA",

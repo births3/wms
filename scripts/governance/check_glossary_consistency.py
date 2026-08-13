@@ -146,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     md_files: list[Path] = []
     for p in REPO_ROOT.rglob("*.md"):
         rel = p.relative_to(REPO_ROOT).as_posix()
-        if any(skip in rel for skip in ("node_modules/", "target/", ".git/")):
+        if any(skip in rel for skip in ("node_modules/", "target/", ".git/", ".claude/worktrees/")):
             continue
         if p == GLOSSARY_PATH:
             continue

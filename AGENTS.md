@@ -8,7 +8,7 @@
 |---|---|---|
 | `AGENTS.md` | 项目原则、常用命令、验证要求、协作约定、禁止事项 | 本文件 |
 | `*/AGENTS.override.md` | 模块独有规则，例如后端、前端应用、原型、部署、治理脚本 | 见下方模块规则 |
-| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、页面查询治理、质量矩阵治理、审计流程、PlantUML 图文沉淀、worktree 子代理流程、Gitea issue 执行闭环、会话停止前收口复盘 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md`、`.agents/skills/wms-page-query-governance/SKILL.md`、`.agents/skills/wms-quality-matrix-governance/SKILL.md`、`.agents/skills/wms-review-fix-commit/SKILL.md`、`.agents/skills/wms-plantuml-docs/SKILL.md`、`.agents/skills/wms-worktree-subagent/SKILL.md`、`.agents/skills/wms-issue-codex-exec/SKILL.md` 与 `.agents/skills/wms-session-closeout/SKILL.md` |
+| `.agents/skills/<skill>/SKILL.md` | 复杂流程，例如需求确认、治理修复、页面查询治理、质量矩阵治理、审计流程、PlantUML 图文沉淀、Herdr 标签子任务、worktree 子代理流程、Gitea issue 执行闭环、会话停止前收口复盘 | 见 `.agents/skills/wms-governance-workflow/SKILL.md`、`.agents/skills/wms-loop-engineering/SKILL.md`、`.agents/skills/wms-page-query-governance/SKILL.md`、`.agents/skills/wms-quality-matrix-governance/SKILL.md`、`.agents/skills/wms-review-fix-commit/SKILL.md`、`.agents/skills/wms-plantuml-docs/SKILL.md`、`.agents/skills/wms-herdr-subtask/SKILL.md`、`.agents/skills/wms-worktree-subagent/SKILL.md`、`.agents/skills/wms-issue-codex-exec/SKILL.md` 与 `.agents/skills/wms-session-closeout/SKILL.md` |
 | `.codex/config.toml` | 模型、沙箱、MCP、钩子、审批默认值 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `.codex/rules/*.rules` | 命令允许 / 提示 / 禁止规则 | 本仓库不跟踪；`.gitignore` 标记为本机配置 |
 | `docs/*.md` | 详细说明、经验手册、长规范、背景材料 | 见 [docs/agent-collaboration.md](docs/agent-collaboration.md) 与 [docs/agent-document-index.md](docs/agent-document-index.md) |
@@ -55,8 +55,9 @@
 
 - 图谱数据统一放在 `.ua/`：架构图 `.ua/knowledge-graph.json`，业务域图 `.ua/domain-graph.json`，新鲜度元数据 `.ua/meta.json`。
 - 建图或更新调用 `understand-anything:understand`，业务流程视角调用 `understand-anything:understand-domain`，变更影响调用 `understand-anything:understand-diff`，可视化调用 `understand-anything:understand-dashboard`。
-- 使用图谱回答前运行 `python3 scripts/governance/check_knowledge_graph_freshness.py --json`：`sourceCommitHash` 可为当前 `HEAD` 或其祖先，但其后不得有 `.ua/` 之外的输入变化，且 `inputFingerprint` 必须匹配；旧 `gitCommitHash` 不兼容读取。存在未提交业务改动时，图谱只代表已分析基线，先做 diff 分析或更新图谱。
-- 项目主人已持续批准当前 `.ua/.understandignore`；该文件和额外 exclude 范围不变时，代理按运行手册自动选择元数据更新、部分更新、架构更新或全量更新，不再重复确认。范围改变时必须重新确认。
+- 使用图谱回答前运行 `python3 scripts/governance/check_knowledge_graph_freshness.py --json`：`sourceCommitHash` 可为当前 `HEAD` 或其祖先，但其后不得有 `.ua/` 之外的输入变化，且 `inputFingerprint` 必须匹配；旧 `gitCommitHash` 不兼容读取。检查失败时只说明图谱代表的历史基线，不得自动更新。
+- 图谱默认关闭自动更新；只有用户明确要求“更新图谱”“重建图谱”或明确调用 Understand-Anything 图谱技能时才执行。普通代码提交、review、修复、分组提交、merge、rebase 或新鲜度失败都不得触发图谱更新。
+- 用户明确要求更新后，项目主人已持续批准当前 `.ua/.understandignore`；该文件和额外 exclude 范围不变时，代理按运行手册选择元数据更新、部分更新、架构更新或全量更新，不再重复确认。范围改变时必须重新确认。
 - 详细的视角、更新触发器、Git 规则和使用边界见 [docs/agent-knowledge-graph.md](docs/agent-knowledge-graph.md)。
 
 ## 验证要求
@@ -72,12 +73,16 @@
 
 - 每次会话开始先看 `git status --short`，区分已有改动和本轮改动。
 - 脏工作区中只改任务相关文件；目标文件已有修改时先看差异。
+- Herdr 快捷寻址统一解释为 `herdr <workspace 标签> <tab 编号>`；例如 `herdr wms 2` 表示 workspace 标签为 `wms`、tab number 为 `2`，不得误解为进程、端口、tmux 会话或 agent 序号。
+- 用户提到上述 Herdr 地址时，先验证 `HERDR_ENV=1`，再用 `herdr workspace list` 按标签取得 workspace ID、用 `herdr tab list --workspace <workspace-id>` 按 number 取得 tab ID，并结合 `herdr agent list` 或 `herdr api snapshot` 返回该 tab 当前 pane、agent、状态和目录；agent occupant 与状态必须实时查询，不得沿用历史结论。
+- Herdr 地址默认只授权识别和读取状态；只有用户明确要求切换、发消息、启动、停止或关闭时，才执行相应控制操作。若不在 Herdr 管理环境中，明确说明无法读取实时状态，不猜测映射。
+- Herdr 标签寻址、创建 Tab、启动 Claude/Codex、选择 worktree、注入 Rust 共享构建目录和任务收口统一使用 `wms-herdr-subtask`。
 - 向用户提确认问题时使用编号表格，问题不超过 10 个，详见 [docs/agent-collaboration.md](docs/agent-collaboration.md)。
 - 有风险决策给 2-3 个候选方案、影响和建议，等待用户确认；无风险治理修复可直接做。
 - 业务/法规/安全最终结论不由 AI 拍板；AI 只给可验证参考意见。
 - DO NOT send optional commentary。
 - 默认本地提交按 [docs/agent-commit-rules.md](docs/agent-commit-rules.md)；满足条件时不再额外询问是否提交。
-- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，页面查询治理用 `wms-page-query-governance`，质量矩阵治理用 `wms-quality-matrix-governance`，PlantUML 图文沉淀用 `wms-plantuml-docs`，审查修复后分组提交用 `wms-review-fix-commit`，worktree 子代理执行用 `wms-worktree-subagent`，Gitea issue 自动处理用 `wms-issue-codex-exec`，执行漏项复盘迭代用 `wms-execution-retrospective`，会话停止前收口复盘用 `wms-session-closeout`。
+- 复杂流程按对应 `.agents/skills/*/SKILL.md` 执行；治理修复用 `wms-governance-workflow`，闭环执行用 `wms-loop-engineering`，页面查询治理用 `wms-page-query-governance`，质量矩阵治理用 `wms-quality-matrix-governance`，PlantUML 图文沉淀用 `wms-plantuml-docs`，审查修复后分组提交用 `wms-review-fix-commit`，Herdr 标签子任务用 `wms-herdr-subtask`，非交互 worktree 子代理执行用 `wms-worktree-subagent`，Gitea issue 自动处理用 `wms-issue-codex-exec`，执行漏项复盘迭代用 `wms-execution-retrospective`，会话停止前收口复盘用 `wms-session-closeout`。
 
 ## 禁止事项
 
@@ -104,13 +109,6 @@
 - 前端：Vite + React + TypeScript + shadcn/ui + Zustand + TanStack Query。
 - PDA：React Native + TypeScript；生产应用启动受 ADR-0027 和 PDA 门禁约束。
 - 提交规范：`<类型>(<范围>)：<描述>`，中文 Conventional Commits，详见 [docs/governance.md](docs/governance.md#32-conventional-commits)。
-
-## Rust 编译资源共享
-
-- 所有 worktree（EnterWorktree 原生 worktree、`wms-worktree-subagent` / herdr 子代理 worktree）执行 Rust 编译时复用主工作区 `backend/target`（`CARGO_TARGET_DIR=/home/test1/workspace/wms/backend/target`），禁止在各 worktree 生成独立 `backend/target`。
-- `justfile` 已统一注入 `CARGO_TARGET_DIR`，无条件指向主工作区 `backend/target`（不自动回退；CI / 其他机器不使用 justfile，其 cargo 行为不受影响）。
-- 共享 target 按 rustc 指纹复用产物，跨 checkout 首次编译仍会全量重编（主要省磁盘）；经 just 的编译统一关闭增量（`CARGO_INCREMENTAL=0`，与 herdr 规则一致；herdr 长期开发 Tab 不经 just 的编译可保留增量），不经 just 的手动编译不受影响。
-- 并行 Cargo 会等待构建锁，需错峰执行；禁止 `cargo clean`、删除共享 target、安装 sccache；构建前后 `df -h . /tmp` 检查（< 5GiB 不启动重型验证，< 2GiB 停止）。
 
 ## 必读文档（按优先级）
 

@@ -66,6 +66,7 @@ scripts/governance/.cache/
 site/
 .kiro/
 .codex/
+.claude/worktrees/
 .gitleaks.toml
 
 # --- Detected directories (uncomment to exclude) ---

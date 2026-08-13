@@ -85,6 +85,7 @@ HARDCODED_SECRET_PATTERNS = [
 SCAN_DIRS = ["backend/", "apps/", "packages/", "scripts/", "shared/"]
 EXCLUDE_PATTERNS = [
     r"\.git/",
+    r"\.claude/worktrees/",
     r"target/",
     r"node_modules/",
     r"site/",

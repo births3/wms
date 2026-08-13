@@ -44,7 +44,7 @@
 
 ```text
 understand-anything:understand
-/understand --full --language zh --auto-update
+/understand --full --language zh --no-auto-update
 ```
 
 运行前先确认 `.ua/.understandignore`，完成 skill 的确认门禁；运行后必须单独提交生成的
@@ -65,15 +65,15 @@ python3 scripts/governance/check_knowledge_graph_freshness.py --json
 - 全仓扫描；
 - 中文输出；
 - LLM 复审；
-- `autoUpdate: true`；
+- `autoUpdate: false`；
 - 保留代码、文档、SQL、迁移、配置、测试、治理和部署文件；
 - 排除密钥、构建产物、截图/运行证据、本地数据库和缓存。
 
-结构图通过插件 hook 动态更新：
+结构图只按用户明确指令更新：
 
-1. commit、merge、rebase 或 cherry-pick 后检测 Git 基线变化；
-2. 对代码、Markdown、SQL、TOML、YAML、迁移、部署和治理文件做忽略规则与结构指纹判断；
-3. 语义不变时只更新元数据，局部结构变化时增量更新，跨模块或大范围变化时全量更新；
+1. 普通 commit、merge、rebase、cherry-pick、review、修复和分组提交不触发图谱更新；
+2. 新鲜度检查失败时只报告图谱代表的历史基线，不自动修复或刷新；
+3. 用户明确要求“更新图谱”“重建图谱”或明确调用图谱技能后，才按结构指纹选择最小充分动作；
 4. 不允许把 `.ua/meta.json` 推进到尚未分析的相关文件之后；图谱输出可在输入提交之后单独提交。
 
 业务域图从结构图派生，成本较低，但不由结构图 hook 自动重建。用户故事、术语、状态机、审批、合规规则或跨模块流程改变后，必须再调用 `understand-anything:understand-domain`。
@@ -86,7 +86,7 @@ python3 scripts/governance/check_knowledge_graph_freshness.py --json
 2. 运行 `python3 scripts/governance/check_knowledge_graph_freshness.py --json`；
 3. `sourceCommitHash` 必须是当前 `HEAD` 或其祖先，且其后没有 `.ua/` 之外的已提交、暂存、未暂存或未跟踪输入变化；
 4. `inputFingerprint` 必须与当前指纹输入一致；旧字段 `gitCommitHash` 不兼容读取；
-5. 有未提交业务变更或检查结果为 stale 时，图谱只能说明已分析基线；使用 `understand-diff` 叠加影响，或先更新图谱；
+5. 有未提交业务变更或检查结果为 stale 时，图谱只能说明已分析基线；不得自动更新，只有用户明确要求后才运行 `understand-diff` 或更新图谱；
 6. Dashboard 已打开时，图谱更新后刷新浏览器页面。
 
 `inputFingerprint` 是对 `fingerprints.json.files` 中按路径排序的
@@ -97,12 +97,12 @@ python3 scripts/governance/check_knowledge_graph_freshness.py --json
 
 ## 按变更选择动作
 
-项目主人于 2026-08-03 持续批准当前版本 `.ua/.understandignore`。该文件和命令行额外
-`--exclude` 范围不变时，代理必须按下表自行选择最小充分动作，不再就全量或部分更新重复
-确认；边界模糊时自动选择较重一级。只有修改 ignore、额外 exclude 或分析目录范围时，才需要
-重新确认建图范围。
+以下选择规则只在用户明确要求更新图谱后生效。项目主人于 2026-08-03 持续批准当前版本
+`.ua/.understandignore`；该文件和命令行额外 `--exclude` 范围不变时，代理按下表选择最小充分
+动作，不再就全量或部分更新重复确认；边界模糊时选择较重一级。只有修改 ignore、额外 exclude
+或分析目录范围时，才需要重新确认建图范围。
 
-| 变更 | 自动动作 |
+| 变更 | 明确要求更新后的动作 |
 |---|---|
 | 内容哈希变化，但受支持代码的函数、类型、import/export 结构均未变化 | 只更新元数据和指纹 |
 | 同一目录或同一限界上下文内 `<= 10` 个结构/语义变化文件 | 部分更新相关节点、边和指纹 |

@@ -84,6 +84,10 @@
 ## 协作约定
 
 - 会话开始先 `git status --short`，区分已有改动与本轮改动；目标文件已有修改先看差异。
+- Herdr 快捷寻址统一解释为 `herdr <workspace 标签> <tab 编号>`；例如 `herdr wms 2` 表示 workspace 标签为 `wms`、tab number 为 `2`，不得误解为进程、端口、tmux 会话或 agent 序号。
+- 用户提到上述 Herdr 地址时，先验证 `HERDR_ENV=1`，再用 `herdr workspace list` 按标签取得 workspace ID、用 `herdr tab list --workspace <workspace-id>` 按 number 取得 tab ID，并结合 `herdr agent list` 或 `herdr api snapshot` 返回该 tab 当前 pane、agent、状态和目录；agent occupant 与状态必须实时查询，不得沿用历史结论。
+- Herdr 地址默认只授权识别和读取状态；只有用户明确要求切换、发消息、启动、停止或关闭时，才执行相应控制操作。若不在 Herdr 管理环境中，明确说明无法读取实时状态，不猜测映射。
+- Herdr 标签寻址、创建 Tab、启动 Claude/Codex、选择 worktree、注入 Rust 共享构建目录和任务收口统一使用 `wms-herdr-subtask`。
 - 确认问题用编号表格，一次 ≤ 10 个（[docs/agent-collaboration.md](docs/agent-collaboration.md)）。
 - 风险决策给 2-3 个候选方案+影响+建议，等用户确认；无风险治理修复可直接做。
 - 业务/法规/安全最终结论不由 AI 拍板，只给可验证参考意见。
@@ -116,13 +120,6 @@
 - PDA：React Native + TypeScript；生产应用启动受 ADR-0027 和 PDA 门禁约束。
 - 提交规范：中文 Conventional Commits（见上）。
 
-## Rust 编译资源共享
-
-- 所有 worktree（EnterWorktree 原生 worktree、`wms-worktree-subagent` / herdr 子代理 worktree）执行 Rust 编译时复用主工作区 `backend/target`（`CARGO_TARGET_DIR=/home/test1/workspace/wms/backend/target`），禁止在各 worktree 生成独立 `backend/target`。
-- `justfile` 已统一注入 `CARGO_TARGET_DIR`，无条件指向主工作区 `backend/target`（不自动回退；CI / 其他机器不使用 justfile，其 cargo 行为不受影响）。
-- 共享 target 按 rustc 指纹复用产物，跨 checkout 首次编译仍会全量重编（主要省磁盘）；经 just 的编译统一关闭增量（`CARGO_INCREMENTAL=0`，与 herdr 规则一致；herdr 长期开发 Tab 不经 just 的编译可保留增量），不经 just 的手动编译不受影响。
-- 并行 Cargo 会等待构建锁，需错峰执行；禁止 `cargo clean`、删除共享 target、安装 sccache；构建前后 `df -h . /tmp` 检查（< 5GiB 不启动重型验证，< 2GiB 停止）。
-
 ## 复杂流程（按 skill 执行）
 
 - 治理修复：`wms-governance-workflow`
@@ -131,6 +128,7 @@
 - 质量矩阵治理：`wms-quality-matrix-governance`
 - PlantUML 图文沉淀：`wms-plantuml-docs`
 - **审查→修复→复审→分组提交**：`wms-review-fix-commit`
+- Herdr 标签交互式子任务：`wms-herdr-subtask`
 - worktree 子代理：`wms-worktree-subagent`
 - Gitea issue 执行闭环：`wms-issue-codex-exec`
 - 执行漏项复盘：`wms-execution-retrospective`

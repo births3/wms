@@ -62,9 +62,9 @@ def _find_md_files() -> list[Path]:
     files: list[Path] = []
     for p in REPO_ROOT.rglob("*.md"):
         rel = p.relative_to(REPO_ROOT).as_posix()
-        # exclude 任意层级下的 node_modules / target / .git / dist / build
+        # exclude 任意层级下的依赖、构建产物和本地 Agent worktree
         parts = rel.split("/")
-        if any(part in ("node_modules", "target", ".git", "dist", "build", "site") for part in parts):
+        if any(part in ("node_modules", "target", ".git", ".claude", "dist", "build", "site") for part in parts):
             continue
         files.append(p)
     return sorted(files)
