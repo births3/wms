@@ -153,6 +153,10 @@ export interface DataGridServerPagination {
   onPageChange: (pageIndex: number) => void;
   /** 每页条数变更回调（可选；未提供时回退内部 onPageSizeChange） */
   onPageSizeChange?: (pageSize: number) => void;
+  /** 后台预加载当前页之后的指定页数；未提供时不预加载 */
+  prefetchPageCount?: number;
+  /** 预加载目标页（0 基）；失败由调用方按最佳努力处理 */
+  onPrefetchPage?: (pageIndex: number, pageSize: number) => void | Promise<void>;
 }
 
 export interface DataGridProps<T>

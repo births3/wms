@@ -69,6 +69,7 @@ export type {
   DataGridQuerySummaryItem,
   DataGridRefreshAction,
   DataGridSelectedArea,
+  DataGridServerPagination,
   DataGridSummaryGroupResult,
   DataGridSummaryResult,
   DataGridSummarySelection,

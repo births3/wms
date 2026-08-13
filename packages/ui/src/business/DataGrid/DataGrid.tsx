@@ -5,7 +5,15 @@ import { DataGridContent } from "./DataGridContent";
 import { DataGridDetailDialog } from "./DataGridDetailDialog";
 import type { DataGridActionSettingItem } from "./DataGridActionSettingsPanel";
 import { DataGridFilterChips } from "./DataGridFilterChips";
+import { DataGridFilterHistory } from "./DataGridFilterHistory";
 import { DataGridToolbar } from "./DataGridToolbar";
+import {
+  getDataGridFilterHistoryStorage,
+  loadDataGridFilterHistoryFromStorage,
+  recordDataGridFilterHistory,
+  saveDataGridFilterHistoryToStorage,
+  type DataGridFilterHistoryEntry,
+} from "./data-grid-filter-history";
 import { clearDataGridFilterKey } from "./data-grid-filter-summary";
 import {
   buildDataGridActionDescriptors,
@@ -20,6 +28,7 @@ import {
   dataGridFloatingPanelPosition,
   dataGridFrozenColumnOffsets,
   dataGridTableWidth,
+  dataGridFilterActive,
   dataGridFilterConfigForData,
   getDataGridCopyText,
   getDataGridPage,
@@ -28,10 +37,12 @@ import {
   sanitizeGridState,
   sanitizeDataGridColumnFiltersForData,
   toggleHiddenAction,
+  type DataGridColumnFilters,
   type DataGridFloatingPanelPosition,
   type DataGridLogicState,
   type DataGridPageResult,
 } from "./data-grid-logic";
+import { getDataGridPrefetchPageIndexes } from "./data-grid-pagination-prefetch";
 import { loadGridSettings, saveGridSettings } from "./data-grid-storage";
 import {
   defaultColumnWidth,
@@ -132,10 +143,17 @@ function DataGridInner<T>(
       if (row) setBuiltinDetailRow(row);
     },
   } : undefined);
-  // 行双击：页面未传 onRowDoubleClick 时回退打开内置详情对话框
+  // 行双击：页面未传 onRowDoubleClick 时复用当前“查看”动作
   const handleRowDoubleClick: (row: T, idx: number) => void = onRowDoubleClick
     ? onRowDoubleClick
-    : (row: T) => setBuiltinDetailRow(row);
+    : (row: T) => {
+        // 双击与"查看"按钮走同一 detailAction（自定义或内置），展示内容一致
+        if (effectiveDetailAction) {
+          effectiveDetailAction.onClick({ selectedRowKeys: [rowKey(row)] });
+        } else {
+          setBuiltinDetailRow(row);
+        }
+      };
   const actionDescriptors = React.useMemo(
     () =>
       buildDataGridActionDescriptors({
@@ -186,9 +204,39 @@ function DataGridInner<T>(
   const [summaryOpen, setSummaryOpen] = React.useState(false);
   const [summaryConfig, setSummaryConfig] = React.useState<DataGridSummaryConfig | null>(null);
   const [openFilterKey, setOpenFilterKey] = React.useState<string | null>(null);
+  // 最近筛选历史：自动记录激活筛选组合，最多 5 条，随 settings 保存/恢复
+  const [filterHistory, setFilterHistory] = React.useState<DataGridFilterHistoryEntry[]>(() =>
+    loadDataGridFilterHistoryFromStorage(getDataGridFilterHistoryStorage(), storageKey),
+  );
   const [internalSelectedRowKeys, setInternalSelectedRowKeys] = React.useState<string[]>([]);
   const [draggingColumnKey, setDraggingColumnKey] = React.useState<string | null>(null);
   const [copyNotice, setCopyNotice] = React.useState<{ cellKey: string; text: string } | null>(null);
+
+  const serverPageIndex = serverPagination?.pageIndex;
+  const serverPageSize = serverPagination?.pageSize;
+  const serverTotal = serverPagination?.total;
+  const serverPrefetchPageCount = serverPagination?.prefetchPageCount;
+  const onPrefetchPage = serverPagination?.onPrefetchPage;
+
+  React.useEffect(() => {
+    if (!onPrefetchPage || serverPageIndex === undefined || serverPageSize === undefined || serverTotal === undefined) {
+      return;
+    }
+
+    const pageIndexes = getDataGridPrefetchPageIndexes({
+      pageIndex: serverPageIndex,
+      pageSize: serverPageSize,
+      total: serverTotal,
+      prefetchCount: serverPrefetchPageCount ?? 0,
+    });
+    for (const pageIndex of pageIndexes) {
+      try {
+        void Promise.resolve(onPrefetchPage(pageIndex, serverPageSize)).catch(() => undefined);
+      } catch {
+        // 预加载是最佳努力，不阻断当前页展示。
+      }
+    }
+  }, [data, onPrefetchPage, serverPageIndex, serverPageSize, serverTotal, serverPrefetchPageCount]);
 
   React.useImperativeHandle(ref, () => rootRef.current as HTMLDivElement);
 
@@ -199,6 +247,26 @@ function DataGridInner<T>(
   React.useEffect(() => {
     saveGridSettings(storageKey, settings);
   }, [settings, storageKey]);
+
+  // 最近筛选自动记录：筛选组合变化且存在激活筛选时防抖 500ms 记录；
+  // 初始加载/清空筛选（空组合）不记录，记录是筛选流程的旁路。
+  React.useEffect(() => {
+    const hasActiveFilters = Object.keys(settings.columnFilters).some((key) =>
+      dataGridFilterActive(settings.columnFilters[key]),
+    );
+    if (!hasActiveFilters) return;
+
+    const timer = window.setTimeout(() => {
+      setFilterHistory((current) =>
+        recordDataGridFilterHistory(current, settings.columnFilters, new Date().toISOString()),
+      );
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [settings.columnFilters]);
+
+  React.useEffect(() => {
+    saveDataGridFilterHistoryToStorage(getDataGridFilterHistoryStorage(), storageKey, filterHistory);
+  }, [filterHistory, storageKey]);
 
   React.useEffect(() => {
     setPageIndex(0);
@@ -348,6 +416,18 @@ function DataGridInner<T>(
     label: columnLabel(column),
     filter: dataGridFilterConfigForData(column, data),
   }));
+  // 最近筛选摘要覆盖全部可筛选列（含当前隐藏列），保证历史条目始终可读
+  const filterHistoryFields = React.useMemo(
+    () =>
+      columns
+        .filter((column) => column.filter !== false)
+        .map((column) => ({
+          key: column.key,
+          label: columnLabel(column),
+          filter: dataGridFilterConfigForData(column, data),
+        })),
+    [columns, data],
+  );
   const visibleAction = React.useCallback((key: string) => !hiddenActionKeys.has(key), [settings.hiddenActions]);
   const hasHiddenToolbarActions = actionDescriptors.some((action) => hiddenActionKeys.has(action.key));
   const actionSettingItems: DataGridActionSettingItem[] = actionDescriptors.map((action) => ({
@@ -391,6 +471,16 @@ function DataGridInner<T>(
 
   function clearColumnFilters() {
     setSettings((current) => ({ ...current, columnFilters: {} }));
+  }
+
+  // 一键复用最近筛选：恢复筛选组合并回到第一页
+  function applyFilterHistory(filters: DataGridColumnFilters) {
+    setSettings((current) => ({ ...current, columnFilters: filters }));
+    setPageIndex(0);
+  }
+
+  function clearFilterHistory() {
+    setFilterHistory([]);
   }
 
   function setSelectedKeys(keys: string[]) {
@@ -474,16 +564,30 @@ function DataGridInner<T>(
   const tableStyle = { width: finalTableWidth, minWidth: finalTableWidth };
   const summaryTableStyle = { width: summaryTableWidth, minWidth: summaryTableWidth };
 
+  const hasActiveFilters = Object.keys(columnFilters).some((key) => dataGridFilterActive(columnFilters[key]));
+
   return (
     // flex 撑满父容器：工具栏固定、表格区占剩余空间，页面级不滚动
     <div ref={rootRef} className={cn("flex h-full min-h-0 flex-col gap-3", className)} {...rest}>
-      <DataGridFilterChips
-        className="border-primary/30 bg-primary/5 text-primary"
-        filters={columnFilters}
-        fields={filterSummaryFields}
-        onClearFilter={clearColumnFilter}
-        onClearAll={clearColumnFilters}
-      />
+      {hasActiveFilters || filterHistory.length > 0 ? (
+        <div className="flex flex-wrap items-start gap-2">
+          <DataGridFilterChips
+            className="min-w-0 flex-1 border-primary/30 bg-primary/5 text-primary"
+            filters={columnFilters}
+            fields={filterSummaryFields}
+            onClearFilter={clearColumnFilter}
+            onClearAll={clearColumnFilters}
+          />
+          {filterHistory.length > 0 ? (
+            <DataGridFilterHistory
+              entries={filterHistory}
+              fields={filterHistoryFields}
+              onApply={applyFilterHistory}
+              onClear={clearFilterHistory}
+            />
+          ) : null}
+        </div>
+      ) : null}
       <DataGridToolbar
         refreshAction={refreshAction}
         queryAction={queryAction}

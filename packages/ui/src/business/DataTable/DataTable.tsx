@@ -86,17 +86,9 @@ export function DataTable<T>({
   // state 承载滚动容器节点：ref 突变不触发重渲染，ScrollBar 的 container prop 依赖节点就绪
   const [scrollAreaNode, setScrollAreaNode] = React.useState<HTMLDivElement | null>(null);
   const [hScrollable, setHScrollable] = React.useState(false);
-  const { maxHeight: measuredMaxHeight, minHeight: measuredMinHeight } = useScrollAreaMaxHeight(
-    maxHeight,
-    scrollAreaRef,
-    bottomBarRef,
-    rootRef,
-  );
+  const measuredMaxHeight = useScrollAreaMaxHeight(maxHeight, scrollAreaRef, bottomBarRef, rootRef);
   // 动态：显式 maxHeight 优先，否则用视口测量兜底
   const effectiveMaxHeight = maxHeight !== undefined ? maxHeight : measuredMaxHeight;
-  // 内容少时按视口剩余空间撑满：minHeight 随稳定态（首帧/resize/RO）重锚定，页面滚动时不更新，
-  // 避免滚动时表格高度随视口相对位置伸缩；显式 maxHeight 时保持纯上限语义
-  const effectiveMinHeight = maxHeight === undefined ? measuredMinHeight : undefined;
 
   return (
     <div
@@ -118,11 +110,7 @@ export function DataTable<T>({
           setScrollAreaNode(node);
         }}
         className="min-h-0 flex-1 overflow-auto overscroll-contain [&::-webkit-scrollbar:horizontal]:hidden [scrollbar-width:none]"
-        style={
-          effectiveMaxHeight !== undefined
-            ? { minHeight: effectiveMinHeight, maxHeight: effectiveMaxHeight }
-            : undefined
-        }
+        style={effectiveMaxHeight !== undefined ? { maxHeight: effectiveMaxHeight } : undefined}
       >
         <table ref={tableRef} className={cn("w-full caption-bottom text-sm", tableClassName)} style={tableStyle}>
           <colgroup>

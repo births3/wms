@@ -46,10 +46,6 @@ assert.match(dataTableSource, /contentRef=\{tableRef\}/);
 assert.match(dataTableSource, /maxHeight\?: string \| number/);
 assert.match(dataTableSource, /useScrollAreaMaxHeight/);
 
-// DataTable：内容少时滚动区按视口剩余撑满（minHeight 与 maxHeight 同源测量，防回退为纯上限）
-assert.match(dataTableSource, /minHeight: effectiveMinHeight/);
-assert.match(dataTableSource, /maxHeight: effectiveMaxHeight/);
-
 // DataGridContent：外层滚动 div 与魔法数移除，DataTable 改为 flex 子项
 assert.doesNotMatch(dataGridContentSource, /23rem/);
 assert.doesNotMatch(dataGridContentSource, /overflow-visible/);

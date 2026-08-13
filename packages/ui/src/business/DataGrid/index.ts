@@ -19,11 +19,30 @@ export type {
   DataGridQuerySummaryItem,
   DataGridRefreshAction,
   DataGridSelectedArea,
+  DataGridServerPagination,
   DataGridToolbarAction,
   DataGridToolbarActionContext,
 } from "./data-grid-types";
+export { getDataGridPrefetchPageIndexes } from "./data-grid-pagination-prefetch";
+export type { DataGridPrefetchPageIndexesInput } from "./data-grid-pagination-prefetch";
 export { DataGridFilterChips } from "./DataGridFilterChips";
 export type { DataGridFilterChipsProps } from "./DataGridFilterChips";
+export { DataGridFilterHistory } from "./DataGridFilterHistory";
+export type { DataGridFilterHistoryProps } from "./DataGridFilterHistory";
+export {
+  DATA_GRID_FILTER_HISTORY_MAX,
+  dataGridColumnFiltersEqual,
+  dataGridFilterHistoryStorageKey,
+  getDataGridFilterHistoryStorage,
+  loadDataGridFilterHistoryFromStorage,
+  recordDataGridFilterHistory,
+  sanitizeDataGridFilterHistory,
+  saveDataGridFilterHistoryToStorage,
+} from "./data-grid-filter-history";
+export type {
+  DataGridFilterHistoryEntry,
+  DataGridFilterHistoryStorage,
+} from "./data-grid-filter-history";
 export { buildDataGridCsv, downloadDataGridCsv } from "./data-grid-export";
 export type {
   DataGridCsvColumn,
