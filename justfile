@@ -26,12 +26,6 @@ export CARGO_PROFILE_TEST_INCREMENTAL := "false"
 # 仓库根目录的绝对路径（所有 worktree 内行为一致）
 ROOT := justfile_directory()
 MAIN_ROOT := "/home/test1/workspace/wms"
-
-# Rust 编译缓存共享（规则唯一事实源：仓库根 CLAUDE.md「Rust 编译资源共享」；herdr 外部工具规则见其自身 skill）
-# 所有 worktree 复用主工作区 backend/target 省磁盘；CI/其他机器不使用 justfile（MAIN_ROOT 已是本机硬编码）
-# 经 just 的编译统一关闭增量（CARGO_INCREMENTAL=0，与 herdr 规则一致）；不经 just 的手动编译不受影响
-export CARGO_TARGET_DIR := MAIN_ROOT / "backend/target"
-export CARGO_INCREMENTAL := "0"
 DEV_WEB_SESSION := "wms-web-admin-9002"
 DEV_WEB_PORT := "9002"
 DEV_WEB_CWD := MAIN_ROOT / "apps/web-admin"
@@ -95,6 +89,8 @@ _t2-unit-tests:
     @cargo test --manifest-path backend/Cargo.toml --workspace --lib
     @pnpm --dir apps/web-admin run test:self-checks
     @node packages/ui/tests/dialog-dismiss.test.ts
+    @node packages/ui/tests/data-grid-filter-history.test.ts
+    @node packages/ui/tests/data-grid-pagination-prefetch.test.ts
     @node packages/ui/tests/data-grid-views.test.ts
     @node packages/ui/tests/query-panel-quick-filters.test.ts
     @node packages/ui/tests/scroll-bar-math.test.ts
@@ -451,16 +447,18 @@ customer-portal-real-e2e:
       pnpm --dir apps/customer-portal run test:e2e:real
 
 # 开发应用服务依赖：PostgreSQL、Redis、MinIO；不会构建应用镜像
-dev-infra:
+dev-infra env_file="":
     #!/usr/bin/env bash
     set -euo pipefail
-    env_file="{{DEV_ENV_FILE}}"
-    compose_file="{{DEV_COMPOSE_FILE}}"
+    env_file="{{env_file}}"
+    if [[ -z "$env_file" ]]; then env_file="{{DEV_ENV_FILE}}"; fi
     test -f "$env_file" || { echo "缺少 $env_file，请先复制 dev-h2.env.example" >&2; exit 2; }
-    secret_file="{{ROOT}}/deploy/secrets/wms_dev_h2_db_password.txt"
     set -a
     source "$env_file"
     set +a
+    compose_file="${WMS_DEV_COMPOSE_FILE:-{{DEV_COMPOSE_FILE}}}"
+    if [[ "$compose_file" != /* ]]; then compose_file="{{ROOT}}/$compose_file"; fi
+    secret_file="{{ROOT}}/deploy/secrets/wms_dev_h2_db_password.txt"
     : "${WMS_DEV_H2_DB_PASSWORD:?WMS_DEV_H2_DB_PASSWORD is required}"
     test -s "$secret_file" || {
       echo "缺少 $secret_file" >&2
@@ -479,17 +477,20 @@ dev-infra:
       run --rm minio-init-dev-h2
 
 # 开发数据库迁移：只迁移，不启动应用服务
-dev-migrate:
+dev-migrate env_file="":
     #!/usr/bin/env bash
     set -euo pipefail
-    env_file="{{DEV_ENV_FILE}}"
+    env_file="{{env_file}}"
+    if [[ -z "$env_file" ]]; then env_file="{{DEV_ENV_FILE}}"; fi
     test -f "$env_file" || { echo "缺少 $env_file" >&2; exit 2; }
     set -a
     source "$env_file"
     set +a
-    : "${WMS_DEV_H2_DB_PASSWORD:?WMS_DEV_H2_DB_PASSWORD is required}"
-    db_password_url="$(python3 -c 'import os; from urllib.parse import quote; print(quote(os.environ["WMS_DEV_H2_DB_PASSWORD"], safe=""))')"
-    export WMS_DB_URL="${WMS_DB_URL:-postgres://wms_dev_h2:${db_password_url}@127.0.0.1:${WMS_DEV_H2_DB_PORT:-15432}/wms_dev_h2}"
+    if [[ -z "${WMS_DB_URL:-}" ]]; then
+      : "${WMS_DEV_H2_DB_PASSWORD:?WMS_DEV_H2_DB_PASSWORD is required when WMS_DB_URL is unset}"
+      db_password_url="$(python3 -c 'import os; from urllib.parse import quote; print(quote(os.environ["WMS_DEV_H2_DB_PASSWORD"], safe=""))')"
+      export WMS_DB_URL="postgres://wms_dev_h2:${db_password_url}@127.0.0.1:${WMS_DEV_H2_DB_PORT:-15432}/wms_dev_h2"
+    fi
     cargo run --manifest-path backend/Cargo.toml -p wms-api --bin wms-db-migrate
 
 # 开发应用服务：宿主机 cargo/node 运行，源码变化后只重启对应服务
@@ -516,6 +517,101 @@ dev-services-describe services="api,render":
       --root "{{ROOT}}" \
       --services "{{services}}"
 
+# 统一启动一个 runtime：基础设施、API/Worker 和管理端 9002 使用同一份环境配置
+dev-up *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    runtime="dev-h2"
+    services="api,render"
+    runtime_set=0
+    services_set=0
+    for arg in {{args}}; do
+      case "$arg" in
+        runtime=*) runtime="${arg#runtime=}"; runtime_set=1 ;;
+        services=*) services="${arg#services=}"; services_set=1 ;;
+        *)
+          if [[ "$runtime_set" == 0 ]]; then
+            runtime="$arg"
+            runtime_set=1
+          elif [[ "$services_set" == 0 ]]; then
+            services="$arg"
+            services_set=1
+          else
+            echo "用法：just dev-up [runtime=<名称>] [services=<列表>]" >&2
+            exit 2
+          fi
+          ;;
+      esac
+    done
+    if [[ ! "$runtime" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+      echo "runtime 只能包含字母、数字、点、下划线和短横线" >&2
+      exit 2
+    fi
+    if [[ ! "$services" =~ ^(none|(api|render|h8)(,(api|render|h8))*)$ ]]; then
+      echo "services 必须是 none 或逗号分隔的 api/render/h8" >&2
+      exit 2
+    fi
+    env_file="{{ROOT}}/deploy/env/${runtime}.env"
+    test -f "$env_file" || {
+      echo "缺少 $env_file；请从对应的 .env.example 复制并填写本机配置" >&2
+      exit 2
+    }
+    set -a
+    source "$env_file"
+    set +a
+    infra_mode="${WMS_DEV_INFRA_MODE:-compose}"
+    migrate="${WMS_DEV_MIGRATE:-1}"
+    case "$infra_mode" in
+      compose|none) ;;
+      *) echo "WMS_DEV_INFRA_MODE 只能是 compose 或 none" >&2; exit 2 ;;
+    esac
+    case "$migrate" in
+      1|0) ;;
+      *) echo "WMS_DEV_MIGRATE 只能是 0 或 1" >&2; exit 2 ;;
+    esac
+    bind_addr="${WMS_BIND_ADDR:-0.0.0.0:18080}"
+    bind_port="${bind_addr##*:}"
+    configured_web_api="${WMS_WEB_ADMIN_E2E_API_URL:-}"
+    api_base="${WMS_API_BASE:-${configured_web_api:-http://127.0.0.1:$bind_port}}"
+    if [[ -n "$configured_web_api" && "$configured_web_api" != "$api_base" ]]; then
+      echo "WMS_API_BASE 与 WMS_WEB_ADMIN_E2E_API_URL 必须指向同一个 API" >&2
+      exit 2
+    fi
+    export WMS_API_BASE="$api_base"
+    if [[ "$infra_mode" == "compose" ]]; then just dev-infra "$env_file"; fi
+    if [[ "$migrate" == "1" ]]; then just dev-migrate "$env_file"; fi
+    app_session="wms-dev-up"
+    app_log="/tmp/wms-dev-up.log"
+    tmux kill-session -t "$app_session" 2>/dev/null || true
+    if [[ ",$services," == *,api,* ]]; then
+      for _ in {1..10}; do
+        ss -ltn "sport = :$bind_port" 2>/dev/null | grep -q LISTEN || break
+        sleep 1
+      done
+      if ss -ltn "sport = :$bind_port" 2>/dev/null | grep -q LISTEN; then
+        echo "旧 API 未退出，端口仍被占用：$bind_port" >&2
+        exit 1
+      fi
+    fi
+    if [[ "$services" != "none" ]]; then
+      tmux new-session -d -s "$app_session" -c "{{ROOT}}" \
+        "set -a; source '$env_file'; set +a; export WMS_API_BASE='$WMS_API_BASE'; exec python3 '{{DEV_SERVICES_SCRIPT}}' run --root '{{ROOT}}' --services '$services' 2>&1 | tee '$app_log'"
+    fi
+    WMS_WEB_ADMIN_DEV_MOCK="${WMS_WEB_ADMIN_DEV_MOCK:-0}" \
+      WMS_WEB_ADMIN_E2E_API_URL="$api_base" \
+      just dev-web-restart
+    for _ in {1..300}; do
+      if curl --noproxy '*' -fsS --max-time 2 "$api_base/healthz" >/dev/null; then
+        echo "runtime=$runtime api=$api_base web=http://127.0.0.1:{{DEV_WEB_PORT}}"
+        [[ "$services" == "none" ]] || echo "backend-session=$app_session log=$app_log"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "API 未在 300 秒内就绪：$api_base/healthz" >&2
+    [[ "$services" == "none" ]] || tmux capture-pane -p -t "$app_session" -S -40 >&2 || true
+    exit 1
+
 # 管理端 9002 当前占用状态
 dev-web-status:
     #!/usr/bin/env bash
@@ -523,9 +619,10 @@ dev-web-status:
     echo "tmux:"
     tmux ls 2>/dev/null | grep -E '^{{DEV_WEB_SESSION}}:' || true
     echo "process:"
-    pgrep -af 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}|pnpm -C apps/web-admin dev .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true
+    ss -ltnp "sport = :{{DEV_WEB_PORT}}" 2>/dev/null || true
     echo "cwd:"
-    for pid in $(pgrep -f 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true); do
+    mapfile -t pids < <(ss -ltnp "sport = :{{DEV_WEB_PORT}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
+    for pid in "${pids[@]}"; do
       printf '%s ' "$pid"
       readlink "/proc/$pid/cwd" || true
     done
@@ -535,7 +632,8 @@ dev-web-restart:
     #!/usr/bin/env bash
     set -euo pipefail
     tmux kill-session -t "{{DEV_WEB_SESSION}}" 2>/dev/null || true
-    for pid in $(pgrep -f 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true); do
+    mapfile -t pids < <(ss -ltnp "sport = :{{DEV_WEB_PORT}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
+    for pid in "${pids[@]}"; do
       cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
       if [[ "$cwd" == "{{DEV_WEB_CWD}}" || "$cwd" == *"/wms-agent-"* ]]; then
         kill "$pid" 2>/dev/null || true
@@ -559,7 +657,8 @@ dev-web-verify:
     #!/usr/bin/env bash
     set -euo pipefail
     ok=0
-    for pid in $(pgrep -f 'vite .*--port[[:space:]]+{{DEV_WEB_PORT}}' || true); do
+    mapfile -t pids < <(ss -ltnp "sport = :{{DEV_WEB_PORT}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)
+    for pid in "${pids[@]}"; do
       cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
       echo "$pid $cwd"
       if [[ "$cwd" == "{{DEV_WEB_CWD}}" ]]; then
@@ -1258,7 +1357,7 @@ wave-1-h2-baseline-dry-run-container *args:
       --workdir /tmp \
       --user "$(id -u):$(id -g)" \
       -v "$PWD/artifacts/dev/wave1/h2:/tmp/artifacts/dev/wave1/h2" \
-      -v "{{MAIN_ROOT}}/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
+      -v "$PWD/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
       --entrypoint /bin/sh \
       wms-api-dev-h2:${WMS_VERSION:-latest} \
       -c 'export WMS_DB_URL="postgres://wms_dev_h2:${WMS_DEV_H2_DB_PASSWORD}@postgres-dev-h2:5432/wms_dev_h2"; exec /tmp/wms-audit-baseline-load {{args}}'
@@ -1272,7 +1371,7 @@ wave-1-h2-baseline-load-container *args:
       --workdir /tmp \
       --user "$(id -u):$(id -g)" \
       -v "$PWD/artifacts/dev/wave1/h2:/tmp/artifacts/dev/wave1/h2" \
-      -v "{{MAIN_ROOT}}/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
+      -v "$PWD/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
       -e WMS_DEV_DB_HOST_ALLOWLIST=postgres-dev-h2 \
       --entrypoint /bin/sh \
       wms-api-dev-h2:${WMS_VERSION:-latest} \
@@ -1313,8 +1412,8 @@ wave-1-h2-seal-run-7d-container:
       --env-file deploy/env/dev-h2.env \
       --workdir /tmp \
       --user "$(id -u):$(id -g)" \
-      -v "{{MAIN_ROOT}}/backend/target/release/audit-maintenance:/tmp/audit-maintenance:ro" \
-      -v "{{MAIN_ROOT}}/deploy/scripts/audit_maintenance.sh:/tmp/audit_maintenance.sh:ro" \
+      -v "$PWD/backend/target/release/audit-maintenance:/tmp/audit-maintenance:ro" \
+      -v "$PWD/deploy/scripts/audit_maintenance.sh:/tmp/audit_maintenance.sh:ro" \
       -e AUDIT_MAINTENANCE_BIN=/tmp/audit-maintenance \
       --entrypoint /bin/sh \
       wms-api-dev-h2:${WMS_VERSION:-latest} \

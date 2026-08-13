@@ -274,6 +274,7 @@ nav:
     - 视觉打磨自查: prototypes/visual-review-batch1.md
   - 运行手册:
     - Gitea Issue Agent: runbooks/gitea-issue-agent.md
+    - 本地开发服务: runbooks/local-dev-services.md
     - Wave 1 H2 开发环境: runbooks/wave-1-h2-dev-environment.md
     - H8 ERP 接口表同步: runbooks/h8-erp-interface-table-sync.md
     - H8 ERP 消息性能验收: runbooks/h8-erp-message-performance.md
