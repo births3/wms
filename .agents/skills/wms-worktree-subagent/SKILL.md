@@ -50,6 +50,7 @@ description: 用户要求在 WMS 仓库使用 subagent、codex exec、worktree�
 ## 子代理原则
 
 - 写任务一个任务一个 worktree；只有 `read-only-current-diff` 可以读取主工作区。
+- Rust 编译共享：所有 worktree（含 EnterWorktree 原生 worktree）复用主工作区 `backend/target`，完整规则见仓库根 `CLAUDE.md`「Rust 编译资源共享」（唯一事实源）。要点：`justfile` 统一注入 `CARGO_TARGET_DIR`（不自动回退）、经 just 编译统一关闭增量、禁止各 worktree 独立 target / `cargo clean` / 删共享 target / 装 sccache、并行等锁错峰、构建前后 `df -h . /tmp` 检查（< 5GiB 不启动重型验证，< 2GiB 停止）。
 - 子代理只改授权范围；不推送、不改 main。
 - 子代理不创建远端 PR；只交付本地 diff、验证结果和清理建议。Gitea issue-agent 当前也走本地分支交付。
 - 写任务默认用 `wms-loop-engineering`，并按 `wms-review-fix-commit` 的 review → fix → review 检查项自审；子代理不 `git add` / `git commit`，由主代理提交。

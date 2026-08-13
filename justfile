@@ -26,6 +26,12 @@ export CARGO_PROFILE_TEST_INCREMENTAL := "false"
 # 仓库根目录的绝对路径（所有 worktree 内行为一致）
 ROOT := justfile_directory()
 MAIN_ROOT := "/home/test1/workspace/wms"
+
+# Rust 编译缓存共享（规则唯一事实源：仓库根 CLAUDE.md「Rust 编译资源共享」；herdr 外部工具规则见其自身 skill）
+# 所有 worktree 复用主工作区 backend/target 省磁盘；CI/其他机器不使用 justfile（MAIN_ROOT 已是本机硬编码）
+# 经 just 的编译统一关闭增量（CARGO_INCREMENTAL=0，与 herdr 规则一致）；不经 just 的手动编译不受影响
+export CARGO_TARGET_DIR := MAIN_ROOT / "backend/target"
+export CARGO_INCREMENTAL := "0"
 DEV_WEB_SESSION := "wms-web-admin-9002"
 DEV_WEB_PORT := "9002"
 DEV_WEB_CWD := MAIN_ROOT / "apps/web-admin"
@@ -94,6 +100,7 @@ _t2-unit-tests:
     @node packages/ui/tests/scroll-bar-math.test.ts
     @node packages/ui/tests/viewport-math.test.ts
     @node packages/ui/tests/scroll-bar-wiring.test.ts
+    @node packages/ui/tests/table-row-background.test.ts
     @node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
 
 _t2-contract-static:
@@ -1251,7 +1258,7 @@ wave-1-h2-baseline-dry-run-container *args:
       --workdir /tmp \
       --user "$(id -u):$(id -g)" \
       -v "$PWD/artifacts/dev/wave1/h2:/tmp/artifacts/dev/wave1/h2" \
-      -v "$PWD/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
+      -v "{{MAIN_ROOT}}/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
       --entrypoint /bin/sh \
       wms-api-dev-h2:${WMS_VERSION:-latest} \
       -c 'export WMS_DB_URL="postgres://wms_dev_h2:${WMS_DEV_H2_DB_PASSWORD}@postgres-dev-h2:5432/wms_dev_h2"; exec /tmp/wms-audit-baseline-load {{args}}'
@@ -1265,7 +1272,7 @@ wave-1-h2-baseline-load-container *args:
       --workdir /tmp \
       --user "$(id -u):$(id -g)" \
       -v "$PWD/artifacts/dev/wave1/h2:/tmp/artifacts/dev/wave1/h2" \
-      -v "$PWD/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
+      -v "{{MAIN_ROOT}}/backend/target/release/wms-audit-baseline-load:/tmp/wms-audit-baseline-load:ro" \
       -e WMS_DEV_DB_HOST_ALLOWLIST=postgres-dev-h2 \
       --entrypoint /bin/sh \
       wms-api-dev-h2:${WMS_VERSION:-latest} \
@@ -1306,8 +1313,8 @@ wave-1-h2-seal-run-7d-container:
       --env-file deploy/env/dev-h2.env \
       --workdir /tmp \
       --user "$(id -u):$(id -g)" \
-      -v "$PWD/backend/target/release/audit-maintenance:/tmp/audit-maintenance:ro" \
-      -v "$PWD/deploy/scripts/audit_maintenance.sh:/tmp/audit_maintenance.sh:ro" \
+      -v "{{MAIN_ROOT}}/backend/target/release/audit-maintenance:/tmp/audit-maintenance:ro" \
+      -v "{{MAIN_ROOT}}/deploy/scripts/audit_maintenance.sh:/tmp/audit_maintenance.sh:ro" \
       -e AUDIT_MAINTENANCE_BIN=/tmp/audit-maintenance \
       --entrypoint /bin/sh \
       wms-api-dev-h2:${WMS_VERSION:-latest} \

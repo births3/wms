@@ -146,7 +146,7 @@ def test_wave1_h2_baseline_container_dry_run_entry_is_documented_and_guarded():
     assert "--entrypoint /bin/sh" in container_recipe
     assert "WMS_DB_URL=" in container_recipe
     assert (
-        "$PWD/backend/target/release/wms-audit-baseline-load:"
+        "{{MAIN_ROOT}}/backend/target/release/wms-audit-baseline-load:"
         "/tmp/wms-audit-baseline-load:ro"
         in container_recipe
     )
@@ -173,7 +173,7 @@ def test_wave1_h2_baseline_container_dry_run_entry_is_documented_and_guarded():
     assert "--entrypoint /bin/sh" in load_recipe
     assert "WMS_DB_URL=" in load_recipe
     assert (
-        "$PWD/backend/target/release/wms-audit-baseline-load:"
+        "{{MAIN_ROOT}}/backend/target/release/wms-audit-baseline-load:"
         "/tmp/wms-audit-baseline-load:ro"
         in load_recipe
     )
@@ -401,7 +401,7 @@ def test_wave1_h2_seal_cron_container_entries_are_guarded_and_documented():
     assert "cargo build --manifest-path backend/Cargo.toml -p wms-api --release --bin audit-maintenance" in run_recipe
     assert "--network wms-dev-h2_default" in run_recipe
     assert "--env-file deploy/env/dev-h2.env" in run_recipe
-    assert "$PWD/backend/target/release/audit-maintenance:/tmp/audit-maintenance:ro" in run_recipe
+    assert "{{MAIN_ROOT}}/backend/target/release/audit-maintenance:/tmp/audit-maintenance:ro" in run_recipe
     assert "AUDIT_MAINTENANCE_BIN=/tmp/audit-maintenance" in run_recipe
     assert "deploy/scripts/audit_maintenance.sh" in run_recipe
     assert "postgres-dev-h2:5432" in run_recipe

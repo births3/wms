@@ -105,6 +105,13 @@
 - PDA：React Native + TypeScript；生产应用启动受 ADR-0027 和 PDA 门禁约束。
 - 提交规范：`<类型>(<范围>)：<描述>`，中文 Conventional Commits，详见 [docs/governance.md](docs/governance.md#32-conventional-commits)。
 
+## Rust 编译资源共享
+
+- 所有 worktree（EnterWorktree 原生 worktree、`wms-worktree-subagent` / herdr 子代理 worktree）执行 Rust 编译时复用主工作区 `backend/target`（`CARGO_TARGET_DIR=/home/test1/workspace/wms/backend/target`），禁止在各 worktree 生成独立 `backend/target`。
+- `justfile` 已统一注入 `CARGO_TARGET_DIR`，无条件指向主工作区 `backend/target`（不自动回退；CI / 其他机器不使用 justfile，其 cargo 行为不受影响）。
+- 共享 target 按 rustc 指纹复用产物，跨 checkout 首次编译仍会全量重编（主要省磁盘）；经 just 的编译统一关闭增量（`CARGO_INCREMENTAL=0`，与 herdr 规则一致；herdr 长期开发 Tab 不经 just 的编译可保留增量），不经 just 的手动编译不受影响。
+- 并行 Cargo 会等待构建锁，需错峰执行；禁止 `cargo clean`、删除共享 target、安装 sccache；构建前后 `df -h . /tmp` 检查（< 5GiB 不启动重型验证，< 2GiB 停止）。
+
 ## 必读文档（按优先级）
 
 1. [docs/agent-collaboration.md](docs/agent-collaboration.md) — AI 协作细则与确认流程
