@@ -107,6 +107,8 @@ const {
   devOwnerId,
   devCustomer,
   devSeedProducts,
+  devSeedSuppliers,
+  devSeedCustomers,
   devSupplier,
   devSystemDictionaryItemsByCode,
   devUser,
@@ -133,10 +135,11 @@ export function webAdminDevMock(): Plugin {
           return;
         }
 
-        const pathname = new URL(req.url, "http://wms.local").pathname;
+        const url = new URL(req.url, "http://wms.local");
+        const pathname = url.pathname;
 
         try {
-          if (await tryHandleDevMockRoute(req, res, pathname)) return;
+          if (await tryHandleDevMockRoute(req, res, pathname, url.searchParams)) return;
           sendError(res, 404, "DEV_MOCK_NOT_FOUND", "Dev mock route not found");
         } catch (error) {
           if (error instanceof SyntaxError) {
@@ -154,6 +157,7 @@ async function tryHandleDevMockRoute(
   req: IncomingMessage,
   res: ServerResponse,
   pathname: string,
+  searchParams: URLSearchParams,
 ): Promise<boolean> {
   if (pathname.startsWith("/api/v1/admin/menus")) {
     await handleAdminMenuDevMock(req, res, pathname);
@@ -295,7 +299,7 @@ async function tryHandleDevMockRoute(
   }
 
   if (req.method === "GET") {
-    const response = devMasterDataResponse(pathname);
+    const response = devMasterDataResponse(pathname, searchParams);
     if (response) {
       sendJson(res, 200, response);
       return true;
@@ -550,13 +554,16 @@ async function tryHandleDevMockRoute(
   return false;
 }
 
-function devMasterDataResponse(pathname: string): Record<string, unknown> | null {
+function devMasterDataResponse(pathname: string, searchParams: URLSearchParams): Record<string, unknown> | null {
   let data: unknown[] | undefined;
   if (pathname === "/api/v1/master-data/products") {
-    data = [...devSeedProducts];
+    const page = Math.max(Number.parseInt(searchParams.get("page") ?? "", 10) || 1, 1);
+    const pageSize = Math.min(Math.max(Number.parseInt(searchParams.get("page_size") ?? "", 10) || 20, 1), 200);
+    const start = (page - 1) * pageSize;
+    data = devSeedProducts.slice(start, start + pageSize);
     return {
       data,
-      page: { count: data.length, next_cursor: null },
+      page: { count: data.length, next_cursor: null, total: devSeedProducts.length },
       inventory_alert_count: 0,
       pending_receipt_orders: 0,
       returns_this_month: 0,
@@ -564,8 +571,8 @@ function devMasterDataResponse(pathname: string): Record<string, unknown> | null
       store_id: null,
     };
   }
-  if (pathname === "/api/v1/master-data/suppliers") data = [...devCreatedSuppliers, devSupplier];
-  if (pathname === "/api/v1/master-data/customers") data = [...devCreatedCustomers, devCustomer];
+  if (pathname === "/api/v1/master-data/suppliers") data = [...devCreatedSuppliers, devSupplier, ...devSeedSuppliers];
+  if (pathname === "/api/v1/master-data/customers") data = [...devCreatedCustomers, devCustomer, ...devSeedCustomers];
   if (pathname === "/api/v1/master-data/warehouses") data = [...devCreatedWarehouses, devWarehouse];
   if (pathname === "/api/v1/master-data/locations") data = [...devCreatedLocations, devLocation];
   const dictionary = pathname.match(/^\/api\/v1\/system-dictionaries\/([^/]+)\/items$/);

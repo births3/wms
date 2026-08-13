@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DataGrid,
   PageHeader,
@@ -24,8 +25,11 @@ import {
   batchCreateLocations,
   createCustomer,
   createSupplier,
+  productsPageQueryOptions,
   useMasterDataRowsQuery,
+  useProductsPageQuery,
   useSystemDictionaryItemOptionsQuery,
+  masterDataQueryKey,
   type CreateCustomerRequest,
   type CreateSupplierRequest,
   type MasterDataRow,
@@ -148,7 +152,15 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const meta = masterDataViewMeta[viewId];
   const canWrite = currentUser.permissions.includes("m1.master_data.write");
   const canPrint = currentUser.permissions.includes("h9.print_template.print");
-  const rowsQuery = useMasterDataRowsQuery(viewId);
+  const queryClient = useQueryClient();
+  const [productPageIndex, setProductPageIndex] = React.useState(0);
+  const [productPageSize, setProductPageSize] = React.useState(20);
+  const rowsQuery = useMasterDataRowsQuery(viewId, viewId !== "m1-products");
+  const productsPageQuery = useProductsPageQuery(productPageIndex, productPageSize, viewId === "m1-products");
+  const prefetchProductPage = React.useCallback(
+    (pageIndex: number, pageSize: number) => queryClient.prefetchQuery(productsPageQueryOptions(pageIndex, pageSize)),
+    [queryClient],
+  );
   const warehouseRowsQuery = useMasterDataRowsQuery("m1-warehouses", viewId === "m1-zones");
   const zoneRowsQuery = useMasterDataRowsQuery("m1-zones", viewId === "m1-locations");
   const locationTypeOptionsQuery = useSystemDictionaryItemOptionsQuery(
@@ -185,11 +197,14 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   const [locationBatchSubmitting, setLocationBatchSubmitting] = React.useState(false);
   const [locationBatchScopeKey, setLocationBatchScopeKey] = React.useState("");
   const normalizedKeyword = queryString(appliedQuery.keyword).trim().toLowerCase();
+  const activeRows = viewId === "m1-products" ? productsPageQuery.data?.rows ?? [] : rowsQuery.data ?? [];
+  const activeRowsError = viewId === "m1-products" ? productsPageQuery.error : rowsQuery.error;
+  const activeRowsPending = viewId === "m1-products" ? productsPageQuery.isPending : rowsQuery.isPending;
   const rows = React.useMemo(() => {
-    const data = rowsQuery.data ?? [];
+    const data = activeRows;
     if (!normalizedKeyword) return data;
     return data.filter((row) => row.searchText.includes(normalizedKeyword));
-  }, [normalizedKeyword, rowsQuery.data]);
+  }, [activeRows, normalizedKeyword]);
   const m1QuerySummaryItems = React.useMemo(
     () => buildQueryPanelSummaryItems(m1QueryFields, appliedQuery),
     [appliedQuery],
@@ -244,6 +259,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   React.useEffect(() => {
     setSelectedRowKeys([]);
     setRowActionError(null);
+    setProductPageIndex(0);
   }, [viewId]);
 
   React.useEffect(() => {
@@ -259,7 +275,14 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   }, [locationBatchType, locationTypeOptions, viewId]);
 
   async function refreshRows() {
-    await rowsQuery.refetch();
+    if (viewId === "m1-products") {
+      await queryClient.invalidateQueries({
+        queryKey: [...masterDataQueryKey, "m1-products-page"],
+      });
+      await productsPageQuery.refetch();
+    } else {
+      await rowsQuery.refetch();
+    }
     setRowActionError(null);
     setLastEvent(`${meta.title} 已刷新`);
   }
@@ -358,11 +381,13 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   function applyGridQueryState(queryState: unknown) {
     applyQuery(queryValueFromUnknown(queryState));
     setSelectedRowKeys([]);
+    setProductPageIndex(0);
   }
 
   function clearGridQueryState() {
     resetQuery();
     setSelectedRowKeys([]);
+    setProductPageIndex(0);
   }
 
   function selectedRowFrom(keys: string[]) {
@@ -505,7 +530,6 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
   return (
     <section className="flex w-full flex-col gap-5 px-4 py-8 lg:px-8">
       <PageHeader
-        title={meta.title}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {lastEvent && (
@@ -543,14 +567,15 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         onQuery={() => {
           applyQuery(draftQuery);
           setSelectedRowKeys([]);
+          setProductPageIndex(0);
         }}
         onReset={clearGridQueryState}
         resetLabel="重置"
       />
 
-      {(rowsQuery.error || rowActionError) && (
+      {(activeRowsError || rowActionError) && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {rowsQuery.error?.message ?? rowActionError}
+          {activeRowsError?.message ?? rowActionError}
         </div>
       )}
 
@@ -560,10 +585,26 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         rowKey={(row) => row.id}
         selectedRowKeys={selectedRowKeys}
         onSelectedRowKeysChange={setSelectedRowKeys}
-        caption={rowsQuery.isPending ? "加载基础档案..." : undefined}
+        serverPagination={viewId === "m1-products" ? {
+          pageIndex: productPageIndex,
+          pageSize: productPageSize,
+          total: productsPageQuery.data?.total ?? 0,
+          prefetchPageCount: 2,
+          onPrefetchPage: prefetchProductPage,
+          onPageChange: (next) => {
+            setProductPageIndex(next);
+            setSelectedRowKeys([]);
+          },
+          onPageSizeChange: (next) => {
+            setProductPageSize(next);
+            setProductPageIndex(0);
+            setSelectedRowKeys([]);
+          },
+        } : undefined}
+        caption={activeRowsPending ? "加载基础档案..." : undefined}
         emptyTitle={meta.emptyTitle}
         emptyDescription={
-          rowsQuery.isPending
+          activeRowsPending
             ? "正在读取基础档案。"
             : normalizedKeyword
               ? meta.emptyDescription

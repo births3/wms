@@ -61,6 +61,19 @@ export async function listProducts(): Promise<MasterDataRow[]> {
   return result.data.data.map(productRow);
 }
 
+export async function listProductsPage(page: number, pageSize: number) {
+  const result = await api.GET("/api/v1/master-data/products", {
+    params: { query: { page, page_size: pageSize } },
+  });
+  if (!result.data) {
+    throw new ApiError(result.error, "读取商品档案失败", result.response.status);
+  }
+  return {
+    rows: result.data.data.map(productRow),
+    total: result.data.page.total ?? result.data.data.length,
+  };
+}
+
 export async function listSuppliers(): Promise<MasterDataRow[]> {
   const result = await api.GET("/api/v1/master-data/suppliers");
   if (!result.data) {

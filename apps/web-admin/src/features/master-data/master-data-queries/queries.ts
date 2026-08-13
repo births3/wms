@@ -43,6 +43,7 @@ import {
   getCustomerProfile,
   listLocations,
   listProducts,
+  listProductsPage,
   listSpecialDrugCategoryOptions,
   listSystemDictionaryGroups,
   listSystemDictionaryItemOptions,
@@ -80,6 +81,22 @@ export function useMasterDataRowsQuery(viewId: MasterDataViewId, enabled = true)
     enabled,
     // 列表接口当前为全量返回，缓存避免切换视图/重挂载重复拉取大表
     staleTime: 30_000,
+  });
+}
+
+export function productsPageQueryOptions(pageIndex: number, pageSize: number) {
+  return {
+    queryKey: [...masterDataQueryKey, "m1-products-page", pageIndex, pageSize],
+    queryFn: () => listProductsPage(pageIndex + 1, pageSize),
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+  };
+}
+
+export function useProductsPageQuery(pageIndex: number, pageSize: number, enabled = true) {
+  return useQuery<{ rows: MasterDataRow[]; total: number }, ApiError>({
+    ...productsPageQueryOptions(pageIndex, pageSize),
+    enabled,
   });
 }
 

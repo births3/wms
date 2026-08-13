@@ -15,6 +15,18 @@ try {
     fileURLToPath(new URL("../src/features/master-data/master-data-queries/api.ts", import.meta.url)),
     "utf8",
   );
+  const pageSource = readFileSync(
+    fileURLToPath(new URL("../src/pages/master-data/M1MasterDataPage.tsx", import.meta.url)),
+    "utf8",
+  );
+  const queriesSource = readFileSync(
+    fileURLToPath(new URL("../src/features/master-data/master-data-queries/queries.ts", import.meta.url)),
+    "utf8",
+  );
+  const devMockSource = readFileSync(
+    fileURLToPath(new URL("../dev-mocks/web-admin-dev-mock-core.ts", import.meta.url)),
+    "utf8",
+  );
   const { productSourceLabel, masterDataActionLabels, productTableClassName, masterDataColumns } =
     await server.ssrLoadModule("/src/pages/master-data/m1-product-page-model.ts");
   const { baseMasterDataColumns } = await server.ssrLoadModule(
@@ -40,6 +52,13 @@ try {
   );
   assert.doesNotMatch(apiSource, /web-m1-product-create/);
   assert.doesNotMatch(apiSource, /web-m1-product-update/);
+  assert.match(apiSource, /listProductsPage/);
+  assert.match(apiSource, /page_size: pageSize/);
+  assert.match(pageSource, /useProductsPageQuery/);
+  assert.match(pageSource, /serverPagination=\{viewId === "m1-products"/);
+  assert.doesNotMatch(queriesSource, /placeholderData/, "商品翻页不得继续展示上一页数据");
+  assert.match(devMockSource, /devSeedProducts\.slice\(start, start \+ pageSize\)/);
+  assert.match(devMockSource, /total: devSeedProducts\.length/);
   assert.match(apiSource, /web-m1-supplier-create/);
   assert.match(apiSource, /web-m1-supplier-update-/);
   assert.match(apiSource, /web-m1-customer-create/);
