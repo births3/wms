@@ -564,20 +564,28 @@ function DataGridInner<T>(
   });
   const finalTableWidth = dataGridTableWidth(finalColumns);
   const summaryTableWidth = summaryColumns.length > 0 ? dataGridTableWidth(summaryColumns) : finalTableWidth;
-  // 动态：表格宽度由当前显示列、用户拖动列宽和字符串列宽共同计算。
-  const tableStyle = { width: finalTableWidth, minWidth: finalTableWidth };
-  const summaryTableStyle = { width: summaryTableWidth, minWidth: summaryTableWidth };
+  // 动态：表格宽度自适应，至少撑满 100% 容器；列宽总和超出时产生横向滚动。
+  const tableStyle: React.CSSProperties = {
+    minWidth: finalTableWidth ? `max(100%, ${finalTableWidth}px)` : "100%",
+    width: finalTableWidth ? `max(100%, ${finalTableWidth}px)` : "100%",
+  };
+  const summaryTableStyle: React.CSSProperties = {
+    minWidth: summaryTableWidth ? `max(100%, ${summaryTableWidth}px)` : "100%",
+    width: summaryTableWidth ? `max(100%, ${summaryTableWidth}px)` : "100%",
+  };
 
+  const hasActiveQuerySummary = Boolean(querySummaryItems && querySummaryItems.length > 0);
   const hasActiveAdvancedFilters = Boolean(
     settings.advancedFilters?.items && settings.advancedFilters.items.length > 0,
   );
   const hasActiveFilters =
     Object.keys(columnFilters).some((key) => dataGridFilterActive(columnFilters[key])) ||
-    hasActiveAdvancedFilters;
+    hasActiveAdvancedFilters ||
+    hasActiveQuerySummary;
 
   return (
-    // flex 撑满父容器：工具栏固定、表格区占剩余空间，数据少时保持最小撑开高度
-    <div ref={rootRef} className={cn("flex h-full min-h-[380px] flex-col gap-3", className)} {...rest}>
+    // flex 撑满父容器：工具栏固定、表格区占剩余空间，自适应撑满到底部，数据少时保持最小撑开高度
+    <div ref={rootRef} data-datagrid-root="true" className={cn("flex flex-1 min-h-0 min-h-[380px] flex-col gap-3", className)} {...rest}>
       {hasActiveFilters || filterHistory.length > 0 ? (
         <div className="flex flex-wrap items-start gap-2">
           <DataGridFilterChips
@@ -585,6 +593,7 @@ function DataGridInner<T>(
             filters={columnFilters}
             advancedFilters={settings.advancedFilters}
             fields={filterSummaryFields}
+            querySummaryItems={querySummaryItems}
             onClearFilter={(key) => {
               if (key.startsWith("adv-")) {
                 const advId = key.replace("adv-", "");
@@ -598,6 +607,10 @@ function DataGridInner<T>(
                 setPageIndex(0);
                 return;
               }
+              if (querySummaryItems?.some((item) => item.key === key)) {
+                onClearQueryState?.(key);
+                return;
+              }
               clearColumnFilter(key);
             }}
             onClearAll={() => {
@@ -606,6 +619,7 @@ function DataGridInner<T>(
                 ...current,
                 advancedFilters: { joinOperator: "and", items: [] },
               }));
+              onClearQueryState?.();
               setPageIndex(0);
             }}
           />

@@ -761,3 +761,70 @@ Matrix E2E 详细规范见 [docs/prototypes/matrix-e2e-screenshot-gate.md](proto
 - 写操作明确 H2 审计事件或豁免理由。
 - 写操作覆盖 ADR-0006 必备维度：L4 错误、L5 数据一致、L8 权限、L11 幂等。
 - 正式接口接入时删除相应页面内开发 Mock 状态和假写入；不得保留双路径兼容层。
+
+---
+
+## 14. 页面查询与筛选交互设计规范 (Query & Filter Standards)
+
+面向大型企业级 WMS 列表型页面（List Page Family），统一遵循以下经典查询与筛选架构规范：
+
+### 14.1 核心组件分层与组合模型
+
+```mermaid
+graph TD
+    Page[ListPageTemplate 页面标准模板] --> Header[Header: 标题 / 货主 / 操作]
+    Page --> Query[QueryPanel: 核心字段外露 + 更多字段折叠]
+    Page --> Card[Card 容器: p-5 统一内边距与边框]
+    Card --> Chips[DataGridFilterChips: 已应用条件标签栏]
+    Card --> Toolbar[Toolbar: 刷新 / 新建 / 详情 / 打印 / 专有动作]
+    Card --> Table[DataGrid: 自适应弹性撑满到底部]
+```
+
+1. **底层模板**：统一使用 `@wms/ui` 中的 `ListPageTemplate` 组织页面框架。
+2. **查询面板**：统一使用 `@wms/ui` 中的 `QueryPanel` 管理表单条件。
+3. **表格与标签**：统一使用 `@wms/ui` 中的 `DataGrid` 与 `DataGridFilterChips` 渲染数据和已生效条件。
+
+### 14.2 渐进式曝光规范 (Progressive Disclosure)
+
+1. **核心字段外露 (Core Fields)**：
+   - 默认首屏可见字段数量严格控制在 **2~3 个以内**（通过 `coreQueryFieldKeys` 声明）。
+   - 典型核心字段：关键字/单据号（`keyword`）、货主（`ownerKeyword`）、业务状态（`statusFilter`）。
+2. **扩展条件折叠 (More Fields)**：
+   - 低频或占用空间的字段（如单据类型、日期区间、批号、库位）默认折叠在“展开”面板内。
+   - 展开与收起必须具备平滑过渡，严禁破坏页面排版。
+
+### 14.3 草稿态与生效态双向解耦 (Draft vs Applied State)
+
+1. **输入与提交分离**：
+   - 输入框输入时仅更新本地表单草稿态（`draftQuery`），不触发高频网络请求。
+   - 只有当用户点击「查询」按钮或在输入框中按下 `Enter` 键时，才将草稿态提交为生效态（`appliedQuery`）并触发数据请求。
+2. **防重复点击与微动效**：
+   - 数据请求中，查询按钮图标自动转为 `<Loader2 className="animate-spin" />` 顺时针微旋转，并置为 `disabled` 防连击状态。
+   - 数据返回后平滑恢复为 `<Search /> 查询`。
+
+### 14.4 已应用条件显式透明感知 (Filter Chips)
+
+1. **结构规范**：
+   - 查询生效后，表格 Card 容器顶部渲染 `DataGridFilterChips`：
+     `已应用条件: [关键字: xxx ✕] [状态: 待收货 ✕] ... [清除全部]`
+2. **精准单项删除联动**：
+   - 点击单个条件芯片右侧的 `✕` 按钮，仅移除该特定筛选条件并立即触发数据刷新。
+   - 点击「清除全部」一键重置所有条件至默认状态。
+
+### 14.5 零布局抖动 (Zero Layout Shift / Silent Feedback)
+
+1. **静默刷新原则**：
+   - 高频查询与刷新严禁在页面 Header 或 Card 顶部插入动态高度文本（如“已查询完成”或“列表已刷新”）。
+   - 加载反馈统一收敛在查询按钮 Loading 动效与表格骨架屏中。
+
+### 14.6 横向弹性自适应撑满 (Full-Width Elastic Adaptation)
+
+1. **弹性宽度规则**：
+   - 表格采用 `minWidth: max(100%, finalTableWidth)` 计算模型。
+   - **列较少或宽屏下**：表格 100% 撑满外层 Card 容器，消除右侧空白留白。
+   - **列较多或窄屏下**：保持安全列宽并平滑开启横向滚动。
+
+### 14.7 侧边栏完全缩进与标签栏高亮展开机制
+
+1. **完全缩进**：侧边栏收起时宽度归零（完全隐藏），主工作区享受 100% 全屏视口。
+2. **标签栏彩色标出**：完全缩进后，展开按钮移动至顶部 `WorkspaceTabs` 最左侧，采用主题色高亮胶囊样式（`<PanelLeftOpen /> 展开菜单`）醒目标出。

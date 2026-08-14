@@ -4,18 +4,18 @@ import { readFileSync } from "node:fs";
 const dataTableSource = readFileSync(new URL("../src/business/DataTable/DataTable.tsx", import.meta.url), "utf8");
 const dataGridSource = readFileSync(new URL("../src/business/DataGrid/DataGrid.tsx", import.meta.url), "utf8");
 
-// 1. DataTable 根容器必须具备 min-h-[380px] 兜底，防止数据少或空数据时表格高度塌陷
+// 1. DataTable 根容器必须具备 flex-1 min-h-0 min-h-[380px] 兜底，支持自适应撑满到底部且防止高度塌陷
 assert.match(
   dataTableSource,
-  /className=\{cn\("flex min-h-\[380px\] flex-col rounded-md border bg-background/,
-  "DataTable root element must include min-h-[380px] to prevent height collapse",
+  /className=\{cn\("flex flex-1 min-h-0 min-h-\[380px\] flex-col rounded-md border bg-background/,
+  "DataTable root element must include flex-1 min-h-0 min-h-[380px]",
 );
 
-// 2. DataGrid 根容器必须具备 min-h-[380px]
+// 2. DataGrid 根容器必须具备 flex-1 min-h-0 min-h-[380px]
 assert.match(
   dataGridSource,
-  /className=\{cn\("flex h-full min-h-\[380px\] flex-col gap-3"/,
-  "DataGrid root element must include min-h-[380px]",
+  /className=\{cn\("flex flex-1 min-h-0 min-h-\[380px\] flex-col gap-3"/,
+  "DataGrid root element must include flex-1 min-h-0 min-h-[380px]",
 );
 
 // 3. 底部翻页控制栏必须包含 mt-auto，确保在任何高度下均稳定贴附在表格容器底部

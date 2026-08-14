@@ -1,7 +1,6 @@
 import * as React from "react";
-import { X } from "lucide-react";
-import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
+import { cn } from "../../lib/utils";
 import { DataTable, type DataTableColumn, type DataTableProps } from "../DataTable";
 import { DataGridActionSettingsPanel, type DataGridActionSettingItem } from "./DataGridActionSettingsPanel";
 import { DataGridContextMenu } from "./DataGridContextMenu";
@@ -62,7 +61,7 @@ export interface DataGridContentProps<T> {
   /** 服务端分页受控模式透传给页脚；未提供时页脚走现有内存分页分支 */
   serverPagination?: DataGridServerPagination;
   querySummaryItems: DataGridQuerySummaryItem[];
-  onClearQueryState?: () => void;
+  onClearQueryState?: (key?: string) => void;
   fieldsOpen: boolean;
   fieldListId: string;
   fieldsPanelPosition: DataGridFloatingPanelPosition | null;
@@ -245,28 +244,6 @@ export function DataGridContent<T>({
           }
         />
       )}
-      {querySummaryItems.length > 0 ? (
-        <div
-          aria-label="业务查询条件"
-          className="flex flex-wrap items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800"
-        >
-          <span className="font-medium">业务查询</span>
-          {querySummaryItems.map((item) => (
-            <span
-              key={item.key}
-              className="inline-flex h-8 max-w-full items-center rounded-md border border-sky-100 bg-background px-2 text-foreground shadow-sm"
-            >
-              <span className="max-w-[18rem] truncate">{item.text}</span>
-            </span>
-          ))}
-          {onClearQueryState ? (
-            <Button type="button" variant="ghost" size="sm" className="h-8 text-sky-800" onClick={onClearQueryState}>
-              <X className="size-3.5" aria-hidden />
-              清除查询
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
       <DataGridFieldSettingsPanel
         open={fieldsOpen}
         panelId={fieldListId}

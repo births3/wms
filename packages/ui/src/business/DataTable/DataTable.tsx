@@ -93,7 +93,8 @@ export function DataTable<T>({
   return (
     <div
       ref={rootRef}
-      className={cn("flex min-h-[380px] flex-col rounded-md border bg-background overflow-hidden font-sans", className)}
+      data-datatable-root="true"
+      className={cn("flex flex-1 min-h-0 min-h-[380px] flex-col rounded-md border bg-background overflow-hidden font-sans", className)}
       {...rest}
     >
       {caption && (
