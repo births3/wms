@@ -1,2 +1,0 @@
-version = 1
-shared_module = "backend/crates/api/src/idempotency.rs"

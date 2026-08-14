@@ -1,3 +1,0 @@
-CREATE TABLE outbound_order (
-    id BIGINT PRIMARY KEY
-);

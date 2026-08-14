@@ -1,5 +1,0 @@
-@media print {
-  .no-print { display: none !important; }
-  .md-header, .md-tabs, .md-sidebar, .md-footer { display: none !important; }
-  .md-content { margin: 0 !important; max-width: 100% !important; }
-}

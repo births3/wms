@@ -1,4 +1,0 @@
-interface:
-  display_name: "WMS Herdr 标签子任务"
-  short_description: "按 Herdr 标签和 Tab 编号安全启动、执行并收口 WMS 子任务"
-  default_prompt: "使用 $wms-herdr-subtask 按 Herdr workspace 标签和 Tab 编号启动并收口当前 WMS 子任务。"
