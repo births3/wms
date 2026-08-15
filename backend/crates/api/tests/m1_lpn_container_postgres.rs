@@ -60,6 +60,12 @@ async fn lpn_container_create_list_and_duplicate(pool: PgPool) {
     )
     .await
     .expect("other owner can also allocate");
+    let own = repo
+        .list(&actor, None, None, None)
+        .await
+        .expect("owner scoped list");
+    assert_eq!(own.len(), 2);
+    assert!(own.iter().all(|row| row.owner_id == owner_id));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

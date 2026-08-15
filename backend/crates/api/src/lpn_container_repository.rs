@@ -401,6 +401,7 @@ impl PgLpnContainerRepository {
                AND batch_no = $3
                AND location_id = $4
                AND quality_status = $5
+             FOR UPDATE
             "#,
         )
         .bind(ctx.owner_id)
