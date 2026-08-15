@@ -58,6 +58,16 @@ export type {
   DataGridFilterSummaryItem,
 } from "./data-grid-filter-summary";
 export {
+  createStatusColumn,
+  createMonoColumn,
+  createDateColumn,
+  createNumericColumn,
+  type CreateStatusColumnOptions,
+  type CreateMonoColumnOptions,
+  type CreateDateColumnOptions,
+  type CreateNumericColumnOptions,
+} from "./data-grid-column-factory";
+export {
   buildDataGridSummaryGroups,
   buildDataGridSummaryResults,
   buildDataGridSummaryTable,
