@@ -70,6 +70,13 @@ interface SalesReturnBatchItem {
   reject_reason?: string;
 }
 
+function maskedValue(value: string | null | undefined) {
+  const characters = [...(value?.trim() ?? "")];
+  if (characters.length === 0) return "-";
+  if (characters.length <= 7) return "*".repeat(characters.length);
+  return `${characters.slice(0, 3).join("")}${"*".repeat(characters.length - 7)}${characters.slice(-4).join("")}`;
+}
+
 function getReceiptDetails(row: ReceivingOrder) {
   const receipt = (row as unknown as { receipt?: ReceivingOrderReceipt })?.receipt;
   const details = receipt?.details;
@@ -280,17 +287,19 @@ export function buildInboundOrderColumns({
         },
         {
           key: "contact_person",
-          header: "联系人 / 电话",
-          width: 160,
-          minWidth: 140,
+          header: "送货人 / 电话 / 身份证",
+          width: 190,
+          minWidth: 160,
           render: (row) => {
             const { details } = getReceiptDetails(row);
             const name = details?.contact_name;
-            const phone = details?.contact_phone ? `${details.contact_phone.slice(0, 3)}****${details.contact_phone.slice(-4)}` : "";
+            const phone = maskedValue(details?.contact_phone);
+            const idNo = maskedValue(details?.contact_id_no);
             return (
-              <div className="text-xs">
-                <div>{name || "-"}</div>
-                {phone && <div className="text-muted-foreground font-mono">{phone}</div>}
+              <div className="text-xs space-y-0.5">
+                <div className="font-medium">{name || "-"}</div>
+                {phone !== "-" && <div className="text-muted-foreground font-mono">📱 {phone}</div>}
+                {idNo !== "-" && <div className="text-muted-foreground font-mono">🪪 {idNo}</div>}
               </div>
             );
           },
