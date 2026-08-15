@@ -16,11 +16,26 @@ function idempotencyKey() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
-export function useLpnContainersQuery() {
+export function useLpnContainersQuery(filters?: {
+  keyword?: string;
+  containerType?: string;
+  status?: string;
+}) {
+  const keyword = filters?.keyword?.trim() || undefined;
+  const containerType = filters?.containerType?.trim() || undefined;
+  const status = filters?.status?.trim() || undefined;
   return useQuery<LpnContainer[], ApiError>({
-    queryKey: listKey,
+    queryKey: [...listKey, keyword ?? "", containerType ?? "", status ?? ""],
     queryFn: async () => {
-      const result = await api.GET("/api/v1/master-data/lpn-containers");
+      const result = await api.GET("/api/v1/master-data/lpn-containers", {
+        params: {
+          query: {
+            keyword,
+            type: containerType,
+            status,
+          },
+        },
+      });
       if (!result.data) throw new ApiError(result.error, "读取容器失败", result.response.status);
       return result.data.data;
     },

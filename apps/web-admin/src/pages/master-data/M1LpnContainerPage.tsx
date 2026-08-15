@@ -69,25 +69,20 @@ export const lpnQueryFields: QueryPanelField[] = [
 export const lpnCoreQueryFieldKeys = ["keyword", "containerType"];
 
 export function M1LpnContainerPage() {
-  const listQuery = useLpnContainersQuery();
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } = usePageQueryState<QueryPanelValue>(
+    () => ({ keyword: "", containerType: "", status: "" }),
+  );
+  const listQuery = useLpnContainersQuery({
+    keyword: queryString(appliedQuery.keyword),
+    containerType: queryString(appliedQuery.containerType),
+    status: queryString(appliedQuery.status),
+  });
   const createMutation = useCreateLpnContainerMutation();
   const policiesQuery = useLpnTypePoliciesQuery();
   const upsertPolicy = useUpsertLpnTypePolicyMutation();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [containerType, setContainerType] = React.useState("pallet");
-  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } = usePageQueryState<QueryPanelValue>(
-    () => ({ keyword: "", containerType: "", status: "" }),
-  );
-
-  const keyword = queryString(appliedQuery.keyword).toLowerCase();
-  const typeFilter = queryString(appliedQuery.containerType);
-  const statusFilter = queryString(appliedQuery.status);
-  const rows = (listQuery.data ?? []).filter((row) => {
-    const matchesKeyword = !keyword || `${row.lpn_code} ${row.container_type}`.toLowerCase().includes(keyword);
-    const matchesType = !typeFilter || row.container_type === typeFilter;
-    const matchesStatus = !statusFilter || row.status === statusFilter;
-    return matchesKeyword && matchesType && matchesStatus;
-  });
+  const rows = listQuery.data ?? [];
 
   const policyRows = TYPE_OPTIONS.map((type) => {
     const policy = policiesQuery.data?.find((item) => item.container_type === type.value);
@@ -103,6 +98,7 @@ export function M1LpnContainerPage() {
     { key: "lpn_code", header: "LPN", mono: true, width: 220, copyValue: (row) => row.lpn_code, render: (row) => row.lpn_code },
     { key: "container_type", header: "类型", width: 140, render: (row) => TYPE_OPTIONS.find((item) => item.value === row.container_type)?.label ?? row.container_type },
     { key: "status", header: "状态", width: 120, render: (row) => STATUS_LABELS[row.status] ?? row.status },
+    { key: "location_id", header: "当前库位", width: 220, mono: true, render: (row) => row.location_id ?? "—" },
     { key: "created_at", header: "创建时间", width: 180, render: (row) => formatDateTime(row.created_at) },
     { key: "capacity_cm3", header: "容量 cm³", width: 120, render: (row) => row.capacity_cm3 ?? "—" },
   ];
@@ -155,7 +151,10 @@ export function M1LpnContainerPage() {
   };
   const createAction: DataGridCreateAction = {
     label: BUTTON_ADD,
-    onClick: () => setCreateOpen(true),
+    onClick: () => {
+      setContainerType("pallet");
+      setCreateOpen(true);
+    },
   };
 
   return (
