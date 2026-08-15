@@ -25,6 +25,33 @@ v1 要做整托作业，PDA 只负责扫码。第一刀已有 `lpn_containers` �
 - 默认一托一品一批，运营要按类型打开混装。
 - 库存 `container_lpn` 成为整托识别来源，与主档必须同事务更新。
 
+## 测试证据
+
+- L11：`create_replays_same_idempotency_key_without_second_row`（同一 `Idempotency-Key` 重放，只 1 行）。
+- L6：`concurrent_same_sku_batch_putaway_adds_qty`（同 LPN/库位/SKU/批号并发加数量，在手合计正确）。
+- 质量矩阵类型含 `concurrent_resource`，由脚本推导覆盖 L6。
+
+## 稀疏仓库接线
+
+下列父文件整份未跟踪，禁止整文件提交。LPN 只抽到专用文件；工作区父文件改完后保持本地：
+
+| 父文件（勿整份提交） | LPN 接线 |
+|---|---|
+| `apps/web-admin/src/App.tsx` | `{ ...lpnContainerMenuItem, icon: PackageCheck }` |
+| `apps/web-admin/src/app-shell/admin-view.ts` | `typeof LPN_CONTAINER_VIEW_ID` |
+| `apps/web-admin/src/app-shell/AdminViewRenderer.tsx` | `view === LPN_CONTAINER_VIEW_ID` |
+| `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` | `m1-lpn-containers` |
+| `backend/crates/domain/src/lib.rs` | `mod lpn_container; pub use lpn_container::*;` |
+| `backend/crates/api/src/lib.rs` | `pub mod lpn_container_handlers;` / `lpn_container_repository` |
+| `backend/crates/api/src/openapi_doc.rs` | 五个 LPN path 操作 |
+| `backend/crates/api/examples/wms_api_e2e.rs` | `lpn_container_router` + `wms_api_e2e_seed_lpn` |
+| `backend/crates/api/examples/support/wms_api_e2e_seed_data.rs` | `seed_lpn_putaway_order` |
+| `docs/error-codes.md` | `M1_LPN_*` / `M2_LPN_*` |
+| `docs/glossary.md` | #53 容器、#54 LPN、#72 整托 |
+| `governance/quality-matrix.toml` | `[[stories]] US-M1-004a`，含 L6 |
+
+已入库的专用文件：`lpn-container-nav.ts`、`wms_api_e2e_seed_lpn.rs`、本 ADR、handler/repository/openapi path、页面、迁移、postgres 测试、Playwright spec。
+
 ## 参考
 
 - `docs/glossary.md` #53 容器、#54 LPN、#72 整托
