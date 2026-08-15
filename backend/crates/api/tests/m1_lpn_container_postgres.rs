@@ -592,3 +592,100 @@ async fn putaway_denies_mixed_sku_when_policy_off(pool: PgPool) {
         .expect_err("default policy denies mix sku");
     assert_eq!(denied, Wave3RepositoryError::LpnMixDenied);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn create_replays_same_idempotency_key_without_second_row(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
+    let owner_id = Uuid::new_v4();
+    seed_lpn_numbering(&pool, at(0), owner_id).await;
+    let repo = PgLpnContainerRepository::new(pool.clone());
+    let actor = ctx(owner_id);
+
+    let first = repo
+        .create(&actor, create_req(), at(9), "lpn-create-replay")
+        .await
+        .expect("first create should persist");
+    let replay = repo
+        .create(&actor, create_req(), at(10), "lpn-create-replay")
+        .await
+        .expect("same idempotency key should replay");
+    assert_eq!(replay.id, first.id);
+    assert_eq!(replay.lpn_code, first.lpn_code);
+
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM lpn_containers WHERE owner_id = $1")
+        .bind(owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("lpn row count");
+    assert_eq!(count, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_same_sku_batch_putaway_adds_qty(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
+    let fixture = seed_putaway(&pool).await;
+    seed_lpn_numbering(&pool, at(0), fixture.owner_id).await;
+    let actor = ctx(fixture.owner_id);
+    let lpn_repo = PgLpnContainerRepository::new(pool.clone());
+    let wave3 = PgWave3Repository::new(pool.clone());
+    let created = lpn_repo
+        .create(&actor, create_req(), at(9), "lpn-concurrent-create")
+        .await
+        .expect("lpn master");
+
+    let left_wave3 = wave3.clone();
+    let right_wave3 = wave3;
+    let left_actor = actor.clone();
+    let right_actor = actor;
+    let left_req = putaway_req(&fixture, &created.lpn_code);
+    let right_req = putaway_req(&fixture, &created.lpn_code);
+    let order_id = fixture.order_id;
+    let (left, right) = tokio::join!(
+        left_wave3.putaway_receiving_order_and_inventory_with_audit(
+            &left_actor,
+            order_id,
+            left_req,
+            Utc::now(),
+            "lpn-concurrent-putaway-1",
+            None,
+        ),
+        right_wave3.putaway_receiving_order_and_inventory_with_audit(
+            &right_actor,
+            order_id,
+            right_req,
+            Utc::now(),
+            "lpn-concurrent-putaway-2",
+            None,
+        ),
+    );
+    left.expect("first concurrent same-sku putaway should succeed");
+    right.expect("second concurrent same-sku putaway should succeed");
+
+    let qty_on_hand: wms_domain::Quantity = sqlx::query_scalar(
+        "SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
+    )
+    .bind(fixture.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("on-hand qty");
+    assert_eq!(qty_on_hand, 4.into());
+
+    let batch_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
+    )
+    .bind(fixture.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("batch row count");
+    assert_eq!(batch_count, 1);
+
+    let putaway_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $2",
+    )
+    .bind(fixture.owner_id)
+    .bind(fixture.order_id)
+    .fetch_one(&pool)
+    .await
+    .expect("putaway row count");
+    assert_eq!(putaway_count, 2);
+}
