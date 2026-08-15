@@ -126,7 +126,7 @@ impl IntoResponse for LpnContainerHandlerError {
                 "M1_LPN_PERSIST_FAILED",
                 "LPN 容器持久化失败".to_string(),
             ),
-            LpnContainerHandlerError::Auth(_) => unreachable!("auth error returned above"),
+            LpnContainerHandlerError::Auth(error) => return error.into_response(),
         };
         (
             status,

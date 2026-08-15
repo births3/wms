@@ -3,9 +3,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    decide_lpn_mix, decide_lpn_putaway_bind, lpn_numbering_document_type,
-    CreateLpnContainerRequest, LpnContainer, LpnContainerTypePolicy, LpnContainerValidationError,
-    LpnMixDenied, LpnPutawayBindDecision, UpdateLpnContainerRequest,
+    decide_lpn_mix, decide_lpn_putaway_bind, lpn_inventory_identity_allows,
+    lpn_numbering_document_type, CreateLpnContainerRequest, LpnContainer, LpnContainerTypePolicy,
+    LpnContainerValidationError, LpnMixDenied, LpnPutawayBindDecision, UpdateLpnContainerRequest,
     UpsertLpnContainerTypePolicyRequest,
 };
 
@@ -381,6 +381,42 @@ impl PgLpnContainerRepository {
                 other => LpnPutawayBindError::Database(format!("{other:?}")),
             })?;
         Ok(updated)
+    }
+
+    pub async fn enforce_inventory_identity(
+        tx: &mut Transaction<'_, Postgres>,
+        ctx: &AuthContext,
+        product_code: &str,
+        batch_no: &str,
+        location_id: Uuid,
+        quality_status: &str,
+        incoming_lpn: Option<&str>,
+    ) -> Result<(), LpnPutawayBindError> {
+        let existing: Option<Option<String>> = sqlx::query_scalar(
+            r#"
+            SELECT container_lpn
+              FROM inventory_batches
+             WHERE owner_id = $1
+               AND product_code = $2
+               AND batch_no = $3
+               AND location_id = $4
+               AND quality_status = $5
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(product_code)
+        .bind(batch_no)
+        .bind(location_id)
+        .bind(quality_status)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(|error| LpnPutawayBindError::Database(error.to_string()))?;
+        if let Some(existing_lpn) = existing {
+            if !lpn_inventory_identity_allows(existing_lpn.as_deref(), incoming_lpn) {
+                return Err(LpnPutawayBindError::NotUsable);
+            }
+        }
+        Ok(())
     }
 
     pub async fn enforce_putaway_mix(

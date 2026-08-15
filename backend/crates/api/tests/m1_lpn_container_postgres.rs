@@ -407,6 +407,7 @@ async fn putaway_rejects_unusable_status_cross_location_and_other_owner(pool: Pg
     for (_code, status, key) in [
         ("LPN-SHIP-01", "shipped", "lpn-putaway-shipped"),
         ("LPN-TRN-01", "in_transit", "lpn-putaway-transit"),
+        ("LPN-REC-01", "recycling", "lpn-putaway-recycling"),
     ] {
         let created = lpn_repo
             .create(&actor, create_req(), at(9), &format!("{key}-c"))
