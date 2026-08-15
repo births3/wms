@@ -37,9 +37,9 @@ v1 要做整托作业，PDA 只负责扫码。第一刀已有 `lpn_containers` �
 
 | 父文件（勿整份提交） | LPN 接线 |
 |---|---|
-| `apps/web-admin/src/App.tsx` | `{ ...lpnContainerMenuItem, icon: PackageCheck }` |
-| `apps/web-admin/src/app-shell/admin-view.ts` | `typeof LPN_CONTAINER_VIEW_ID` |
-| `apps/web-admin/src/app-shell/AdminViewRenderer.tsx` | `view === LPN_CONTAINER_VIEW_ID` |
+| `apps/web-admin/src/App.tsx` | 必须保留字面量 `{ id: "m1-lpn-containers", title: "M1 容器管理", subtitle: "LPN / 类型策略", icon: PackageCheck }`。导航扫描只认 `id`/`title` 字符串，禁止改成展开 `lpnContainerMenuItem`。 |
+| `apps/web-admin/src/app-shell/admin-view.ts` | 联合类型字面量 `"m1-lpn-containers"`，不要写成 `typeof LPN_CONTAINER_VIEW_ID`。 |
+| `apps/web-admin/src/app-shell/AdminViewRenderer.tsx` | `if (view === "m1-lpn-containers") return <M1LpnContainerPage />` |
 | `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` | `m1-lpn-containers` |
 | `backend/crates/domain/src/lib.rs` | `mod lpn_container; pub use lpn_container::*;` |
 | `backend/crates/api/src/lib.rs` | `pub mod lpn_container_handlers;` / `lpn_container_repository` |
