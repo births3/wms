@@ -24,7 +24,7 @@ import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
 import type { ReceivingOrderListRow } from "@/features/inbound/receiving-order-list-row";
 import type { InboundDialog } from "./M2InboundDialogs";
 import { inboundDocumentTypeLabel, inboundDocumentTypeOf } from "./m2-inbound-document-type";
-import { maskedContactLines, quantityLabel, receiptDetailsOf } from "./m2-inbound-receipt-fields";
+import { contactLines, quantityLabel, receiptDetailsOf } from "./m2-inbound-receipt-fields";
 import {
   canInspect,
   canPutaway,
@@ -64,8 +64,6 @@ interface M2InboundOrderTableProps {
   onApplyQueryState?: (queryState: unknown) => void;
   onClearQueryState?: () => void;
 }
-
-
 
 export function buildInboundOrderColumns({
   mode,
@@ -157,11 +155,11 @@ export function buildInboundOrderColumns({
           width: 190,
           minWidth: 160,
           copyValue: (row) => {
-            const contact = maskedContactLines(receiptDetailsOf(row).details);
+            const contact = contactLines(receiptDetailsOf(row).details);
             return [contact.name, contact.phone, contact.idNo].filter(Boolean).join(" / ") || "-";
           },
           render: (row) => {
-            const contact = maskedContactLines(receiptDetailsOf(row).details);
+            const contact = contactLines(receiptDetailsOf(row).details);
             return (
               <div className="text-xs space-y-0.5">
                 <div className="font-medium">{contact.name ?? "-"}</div>

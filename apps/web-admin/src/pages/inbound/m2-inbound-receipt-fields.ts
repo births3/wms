@@ -1,21 +1,20 @@
-import type { ReceivingOrderReceipt, SalesReturnReceivingBatch } from "@/features/inbound/inbound-queries";
+import type { ReceivingOrderReceipt } from "@/features/inbound/inbound-queries";
 import { receiptOf, type ReceivingOrderListRow } from "@/features/inbound/receiving-order-list-row";
-import { maskSensitiveDisplayValue } from "@/lib/mask-sensitive";
 
 export function receiptDetailsOf(row: ReceivingOrderListRow) {
   const receipt = receiptOf(row);
   return {
     receipt,
     details: receipt?.details,
-    batches: (receipt?.details?.sales_return_batches ?? []) as SalesReturnReceivingBatch[],
+    batches: receipt?.details?.sales_return_batches ?? [],
   };
 }
 
-export function maskedContactLines(details: ReceivingOrderReceipt["details"]) {
+export function contactLines(details: ReceivingOrderReceipt["details"]) {
   return {
     name: details?.contact_name?.trim() || undefined,
-    phone: maskSensitiveDisplayValue(details?.contact_phone),
-    idNo: maskSensitiveDisplayValue(details?.contact_id_no),
+    phone: details?.contact_phone?.trim() || undefined,
+    idNo: details?.contact_id_no?.trim() || undefined,
   };
 }
 

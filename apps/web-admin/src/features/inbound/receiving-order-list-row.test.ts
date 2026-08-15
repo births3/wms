@@ -53,3 +53,6 @@ const receipt = {
 const row = toReceivingOrderListRow({ ...order, receipt });
 assert.equal(receiptOf(row)?.actual_qty, "10");
 assert.equal(receiptOf(row)?.details?.contact_name, "张三");
+assert.equal(receiptOf(row)?.details?.contact_phone, "138****0000");
+assert.equal(receiptOf(row)?.details?.contact_id_no, "320***********1234");
+assert.equal(receipt.details?.contact_phone, "13800000000");
