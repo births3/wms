@@ -144,13 +144,14 @@ function DataGridInner<T>(
       if (row) setBuiltinDetailRow(row);
     },
   } : undefined);
-  // 行双击：页面未传 onRowDoubleClick 时复用当前“查看”动作
+  // 行双击：优先自定义 -> 业务详情 -> 业务编辑 -> 内置全字段详情抽屉
   const handleRowDoubleClick: (row: T, idx: number) => void = onRowDoubleClick
     ? onRowDoubleClick
     : (row: T) => {
-        // 双击与"查看"按钮走同一 detailAction（自定义或内置），展示内容一致
         if (effectiveDetailAction) {
           effectiveDetailAction.onClick({ selectedRowKeys: [rowKey(row)] });
+        } else if (editAction) {
+          editAction.onClick({ selectedRowKeys: [rowKey(row)] });
         } else {
           setBuiltinDetailRow(row);
         }
