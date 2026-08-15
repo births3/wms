@@ -387,7 +387,7 @@ async fn putaway_rejects_unusable_status_cross_location_and_other_owner(pool: Pg
     let lpn_repo = PgLpnContainerRepository::new(pool.clone());
     let wave3 = PgWave3Repository::new(pool.clone());
 
-    lpn_repo
+    let foreign = lpn_repo
         .create(&other, create_req(), at(8), "lpn-other-owner")
         .await
         .expect("other owner lpn");
@@ -395,7 +395,7 @@ async fn putaway_rejects_unusable_status_cross_location_and_other_owner(pool: Pg
         .putaway_receiving_order_and_inventory_with_audit(
             &actor,
             fixture.order_id,
-            putaway_req(&fixture, "LPN-OWN-01"),
+            putaway_req(&fixture, &foreign.lpn_code),
             Utc::now(),
             "lpn-putaway-owner",
             None,
@@ -583,7 +583,7 @@ async fn putaway_denies_mixed_sku_when_policy_off(pool: PgPool) {
         .putaway_receiving_order_and_inventory_with_audit(
             &actor,
             fixture.order_id,
-            mixed,
+            mixed.clone(),
             Utc::now(),
             "lpn-mix-second",
             None,
@@ -591,6 +591,29 @@ async fn putaway_denies_mixed_sku_when_policy_off(pool: PgPool) {
         .await
         .expect_err("default policy denies mix sku");
     assert_eq!(denied, Wave3RepositoryError::LpnMixDenied);
+
+    lpn_repo
+        .upsert_type_policy(
+            &actor,
+            wms_domain::UpsertLpnContainerTypePolicyRequest {
+                container_type: LPN_CONTAINER_TYPE_PALLET.to_string(),
+                allow_mix_batch: true,
+                allow_mix_sku: true,
+            },
+        )
+        .await
+        .expect("open mix sku");
+    wave3
+        .putaway_receiving_order_and_inventory_with_audit(
+            &actor,
+            fixture.order_id,
+            mixed,
+            Utc::now(),
+            "lpn-mix-allowed",
+            None,
+        )
+        .await
+        .expect("policy on allows mix sku");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -618,6 +641,15 @@ async fn create_replays_same_idempotency_key_without_second_row(pool: PgPool) {
         .await
         .expect("lpn row count");
     assert_eq!(count, 1);
+
+    let idempotency_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = 'lpn-create-replay'",
+    )
+    .bind(owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("idempotency row count");
+    assert_eq!(idempotency_count, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -658,34 +690,98 @@ async fn concurrent_same_sku_batch_putaway_adds_qty(pool: PgPool) {
             None,
         ),
     );
-    left.expect("first concurrent same-sku putaway should succeed");
-    right.expect("second concurrent same-sku putaway should succeed");
+    let left = left.expect("first concurrent same-sku putaway should succeed");
+    let right = right.expect("second concurrent same-sku putaway should succeed");
+    assert!(!left.replayed, "distinct keys must not replay");
+    assert!(!right.replayed, "distinct keys must not replay");
 
-    let qty_on_hand: wms_domain::Quantity = sqlx::query_scalar(
-        "SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
-    )
-    .bind(fixture.owner_id)
-    .fetch_one(&pool)
-    .await
-    .expect("on-hand qty");
+    let (qty_on_hand, bound, batch_count): (wms_domain::Quantity, Option<String>, i64) =
+        sqlx::query_as(
+            "SELECT qty_on_hand, container_lpn, COUNT(*) OVER () FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
+        )
+        .bind(fixture.owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("batch after concurrent putaway");
     assert_eq!(qty_on_hand, 4.into());
-
-    let batch_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
-    )
-    .bind(fixture.owner_id)
-    .fetch_one(&pool)
-    .await
-    .expect("batch row count");
+    assert_eq!(bound.as_deref(), Some(created.lpn_code.as_str()));
     assert_eq!(batch_count, 1);
-
-    let putaway_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $2",
+    let (status, location_id, putaway_count): (String, Option<Uuid>, i64) = sqlx::query_as(
+        "SELECT lpn.status, lpn.location_id, (SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $3) FROM lpn_containers lpn WHERE lpn.owner_id = $1 AND lpn.lpn_code = $2",
     )
     .bind(fixture.owner_id)
+    .bind(&created.lpn_code)
     .bind(fixture.order_id)
     .fetch_one(&pool)
     .await
-    .expect("putaway row count");
+    .expect("lpn bind state");
+    assert_eq!(status, "in_use");
+    assert_eq!(location_id, Some(fixture.location_id));
     assert_eq!(putaway_count, 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn create_fails_when_numbering_rule_missing(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
+    let actor = ctx(Uuid::new_v4());
+    insert_owner(&pool, actor.owner_id).await;
+    sqlx::query(
+        "UPDATE document_number_rules SET enabled = FALSE WHERE document_type LIKE 'lpn_%'",
+    )
+    .execute(&pool)
+    .await
+    .expect("disable lpn rules");
+    let repo = PgLpnContainerRepository::new(pool.clone());
+    assert!(matches!(
+        repo.create(&actor, create_req(), at(9), "lpn-no-rule")
+            .await,
+        Err(LpnContainerRepositoryError::NumberingUnavailable)
+    ));
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM lpn_containers WHERE owner_id = $1")
+        .bind(actor.owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("no lpn row");
+    assert_eq!(count, 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn putaway_rejects_second_lpn_on_same_sku_batch_location(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
+    let fixture = seed_putaway(&pool).await;
+    seed_lpn_numbering(&pool, at(0), fixture.owner_id).await;
+    let actor = ctx(fixture.owner_id);
+    let lpn_repo = PgLpnContainerRepository::new(pool.clone());
+    let wave3 = PgWave3Repository::new(pool);
+    let first = lpn_repo
+        .create(&actor, create_req(), at(9), "lpn-identity-a")
+        .await
+        .expect("first lpn");
+    let second = lpn_repo
+        .create(&actor, create_req(), at(10), "lpn-identity-b")
+        .await
+        .expect("second lpn");
+    wave3
+        .putaway_receiving_order_and_inventory_with_audit(
+            &actor,
+            fixture.order_id,
+            putaway_req(&fixture, &first.lpn_code),
+            Utc::now(),
+            "lpn-identity-first",
+            None,
+        )
+        .await
+        .expect("first lpn putaway");
+    let denied = wave3
+        .putaway_receiving_order_and_inventory_with_audit(
+            &actor,
+            fixture.order_id,
+            putaway_req(&fixture, &second.lpn_code),
+            Utc::now(),
+            "lpn-identity-second",
+            None,
+        )
+        .await
+        .expect_err("second lpn must not overwrite first");
+    assert_eq!(denied, Wave3RepositoryError::LpnNotUsable);
 }

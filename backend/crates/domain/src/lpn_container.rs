@@ -197,6 +197,13 @@ pub fn decide_lpn_mix(
     Ok(())
 }
 
+pub fn lpn_inventory_identity_allows(
+    existing_container_lpn: Option<&str>,
+    incoming_lpn: Option<&str>,
+) -> bool {
+    existing_container_lpn == incoming_lpn
+}
+
 impl UpdateLpnContainerRequest {
     pub fn validate(&self) -> Result<(), LpnContainerValidationError> {
         if let Some(status) = self.status.as_deref() {
@@ -266,6 +273,15 @@ mod tests {
         );
         assert_eq!(decide_lpn_mix(false, false, &existing, "P1", "B1"), Ok(()));
         assert_eq!(decide_lpn_mix(true, true, &existing, "P2", "B2"), Ok(()));
+    }
+
+    #[test]
+    fn inventory_identity_rejects_other_lpn_or_loose_merge() {
+        assert!(lpn_inventory_identity_allows(Some("A"), Some("A")));
+        assert!(lpn_inventory_identity_allows(None, None));
+        assert!(!lpn_inventory_identity_allows(Some("A"), Some("B")));
+        assert!(!lpn_inventory_identity_allows(Some("A"), None));
+        assert!(!lpn_inventory_identity_allows(None, Some("A")));
     }
 
     #[test]
