@@ -2,6 +2,7 @@ import type {
   ReceivingOrder,
   ReceivingOrderReceipt,
 } from "../../features/inbound/inbound-queries.ts";
+import { maskSensitiveDisplayValue } from "../../lib/mask-sensitive.ts";
 import {
   COLUMN_BATCH_NO,
   COLUMN_PRODUCT_CODE,
@@ -148,8 +149,8 @@ function receivingRows(expectedQty: number, receipt?: ReceivingOrderReceipt | nu
     ["运输方式", fieldValue(details?.transport_mode)],
     ["承运商", fieldValue(details?.carrier)],
     ["联系人（送货人）", fieldValue(details?.contact_name)],
-    ["电话", maskedValue(details?.contact_phone)],
-    ["身份证", maskedValue(details?.contact_id_no)],
+    ["电话", maskSensitiveDisplayValue(details?.contact_phone) ?? STATUS_PENDING_INPUT],
+    ["身份证", maskSensitiveDisplayValue(details?.contact_id_no) ?? STATUS_PENDING_INPUT],
     ["印章样式核对", fieldValue(details?.seal_checked)],
     ["备案件样式核对", fieldValue(details?.filing_checked)],
     ["预报数量", `${expectedQty} 件`],
@@ -185,13 +186,6 @@ function receivingRows(expectedQty: number, receipt?: ReceivingOrderReceipt | nu
 
 function fieldValue(value: string | null | undefined, fallback = STATUS_PENDING_INPUT) {
   return value?.trim() || fallback;
-}
-
-function maskedValue(value: string | null | undefined) {
-  const characters = [...(value?.trim() ?? "")];
-  if (characters.length === 0) return STATUS_PENDING_INPUT;
-  if (characters.length <= 7) return "*".repeat(characters.length);
-  return `${characters.slice(0, 3).join("")}${"*".repeat(characters.length - 7)}${characters.slice(-4).join("")}`;
 }
 
 function quantityValue(value: string | null | undefined) {
