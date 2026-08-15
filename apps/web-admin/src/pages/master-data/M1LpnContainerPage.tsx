@@ -25,6 +25,7 @@ import {
   useUpsertLpnTypePolicyMutation,
   type LpnContainer,
 } from "@/features/master-data/lpn-container-queries";
+import { lpnContainerMenuItem } from "@/features/master-data/lpn-container-nav";
 import { queryString } from "@/lib/query-value";
 import { BUTTON_ADD, BUTTON_REFRESH, BUTTON_SAVE, FIELD_KEYWORD } from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
@@ -159,7 +160,7 @@ export function M1LpnContainerPage() {
 
   return (
     <ListPageTemplate
-      header={{ title: "M1 容器管理", subtitle: "US-M1-004a 容器主档 / 类型策略" }}
+      header={{ title: lpnContainerMenuItem.title, subtitle: "US-M1-004a 容器主档 / 类型策略" }}
       notice={
         listQuery.error
           ? { kind: "error", text: listQuery.error.message }
