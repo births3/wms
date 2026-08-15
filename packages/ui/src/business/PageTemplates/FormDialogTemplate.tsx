@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from "../../ui/dialog";
 
-export interface FormDialogTemplateProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface FormDialogTemplateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title" | "onSubmit"> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: React.ReactNode;

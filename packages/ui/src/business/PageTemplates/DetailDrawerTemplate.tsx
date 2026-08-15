@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "../../ui/dialog";
 
-export interface DetailDrawerTemplateProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface DetailDrawerTemplateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: React.ReactNode;
