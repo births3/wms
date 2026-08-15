@@ -4,7 +4,7 @@ import path from "node:path";
 
 const artifactsDir = path.resolve("../artifacts/screenshot-portal/real-web/m1-lpn-containers");
 
-test("M1 容器管理真实登录后创建托盘并回显 LPN", async ({ page }) => {
+test("M1 容器管理真实登录后完成创建、查询和类型策略", async ({ page }) => {
   fs.mkdirSync(artifactsDir, { recursive: true });
 
   await page.goto("/");
@@ -30,7 +30,7 @@ test("M1 容器管理真实登录后创建托盘并回显 LPN", async ({ page })
   await expect(page.getByRole("heading", { name: "M1 容器管理", level: 2 })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByText("LPN", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("当前库位", { exact: true }).first()).toBeVisible();
   const policyTitle = page.getByText("类型策略（默认禁止混批/混品）");
   await policyTitle.scrollIntoViewIfNeeded();
   await expect(policyTitle).toBeVisible();
@@ -48,7 +48,42 @@ test("M1 容器管理真实登录后创建托盘并回显 LPN", async ({ page })
   expect(created.ok()).toBeTruthy();
   const body = (await created.json()) as { lpn_code?: string };
   expect(body.lpn_code).toMatch(/^LPN-PL-/);
-  await expect(page.getByText(body.lpn_code ?? "", { exact: true })).toBeVisible();
+  const lpnCode = body.lpn_code ?? "";
+  await expect(page.getByText(lpnCode, { exact: true })).toBeVisible();
+
+  const keyword = page.getByRole("textbox", { name: "关键字" });
+  await keyword.fill(lpnCode);
+  const filtered = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/master-data/lpn-containers") &&
+      response.url().includes(`keyword=${encodeURIComponent(lpnCode)}`) &&
+      response.request().method() === "GET",
+  );
+  await page.getByRole("button", { name: "查询", exact: true }).click();
+  expect((await filtered).ok()).toBeTruthy();
+  await expect(page.getByText(lpnCode, { exact: true })).toBeVisible();
+
+  await keyword.fill("LPN-NOT-EXIST");
+  const emptyList = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/master-data/lpn-containers") &&
+      response.url().includes("keyword=LPN-NOT-EXIST") &&
+      response.request().method() === "GET",
+  );
+  await page.getByRole("button", { name: "查询", exact: true }).click();
+  expect((await emptyList).ok()).toBeTruthy();
+  await expect(page.getByText("暂无容器")).toBeVisible();
+
+  const mixBatch = page.getByRole("checkbox", { name: "托盘混批" });
+  await mixBatch.scrollIntoViewIfNeeded();
+  const policySaved = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/master-data/lpn-container-type-policies") &&
+      response.request().method() === "PUT",
+  );
+  await mixBatch.click({ force: true });
+  expect((await policySaved).ok()).toBeTruthy();
+  await expect(mixBatch).toBeChecked();
 
   await page.screenshot({
     path: path.join(artifactsDir, "lpn-containers.png"),
