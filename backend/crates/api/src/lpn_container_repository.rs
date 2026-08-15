@@ -211,7 +211,7 @@ impl PgLpnContainerRepository {
             SELECT id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
               FROM lpn_containers
              WHERE owner_id = $1
-               AND ($2::text IS NULL OR lpn_code ILIKE '%' || $2 || '%')
+               AND ($2::text IS NULL OR lpn_code ILIKE '%' || $2 || '%' OR container_type ILIKE '%' || $2 || '%')
                AND ($3::text IS NULL OR container_type = $3)
                AND ($4::text IS NULL OR status = $4)
              ORDER BY lpn_code

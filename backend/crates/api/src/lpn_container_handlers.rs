@@ -77,7 +77,7 @@ impl IntoResponse for LpnContainerHandlerError {
             ),
             LpnContainerHandlerError::Repository(LpnContainerRepositoryError::NotFound) => (
                 StatusCode::NOT_FOUND,
-                "M1-404",
+                "M1_LPN_NOT_FOUND",
                 "LPN 容器不存在".to_string(),
             ),
             LpnContainerHandlerError::Repository(LpnContainerRepositoryError::DuplicateCode) => (
@@ -123,7 +123,7 @@ impl IntoResponse for LpnContainerHandlerError {
             | LpnContainerHandlerError::Repository(LpnContainerRepositoryError::Database(_))
             | LpnContainerHandlerError::Repository(LpnContainerRepositoryError::Serialize(_)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "M1-500",
+                "M1_LPN_PERSIST_FAILED",
                 "LPN 容器持久化失败".to_string(),
             ),
             LpnContainerHandlerError::Auth(_) => unreachable!("auth error returned above"),

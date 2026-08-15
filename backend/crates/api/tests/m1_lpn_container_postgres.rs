@@ -522,3 +522,73 @@ async fn upsert_type_policy_writes_audit(pool: PgPool) {
     .expect("policy audit");
     assert_eq!(action, "upsert_lpn_type_policy");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn putaway_denies_mixed_sku_when_policy_off(pool: PgPool) {
+    ensure_audit_partition(&pool, at(0)).await;
+    let fixture = seed_putaway(&pool).await;
+    seed_lpn_numbering(&pool, at(0), fixture.owner_id).await;
+    let actor = ctx(fixture.owner_id);
+    let product_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO products (id, owner_id, erp_goods_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 2002, 'LPN-P-002', 'p2', '1', 'normal', 10, 'active')",
+    )
+    .bind(product_id)
+    .bind(fixture.owner_id)
+    .execute(&pool)
+    .await
+    .expect("second product");
+    sqlx::query(
+        "INSERT INTO receiving_order_lines (id, receiving_order_id, owner_id, line_no, product_id, product_code, expected_qty, batch_no, production_date, expiry_date) VALUES ($1, $2, $3, 2, $4, 'LPN-P-002', 10, 'LPN-B-002', '2026-01-01', '2028-01-01')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(fixture.order_id)
+    .bind(fixture.owner_id)
+    .bind(product_id)
+    .execute(&pool)
+    .await
+    .expect("second line");
+    sqlx::query(
+        "INSERT INTO receiving_inspections (id, receiving_order_id, owner_id, batch_no, accepted_qty, rejected_qty, production_date, expiry_date, quality_status, occurred_at) VALUES ($1, $2, $3, 'LPN-B-002', 10, 0, '2026-01-01', '2028-01-01', 'qualified', $4)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(fixture.order_id)
+    .bind(fixture.owner_id)
+    .bind(at(0))
+    .execute(&pool)
+    .await
+    .expect("second inspection");
+
+    let lpn_repo = PgLpnContainerRepository::new(pool.clone());
+    let wave3 = PgWave3Repository::new(pool);
+    let created = lpn_repo
+        .create(&actor, create_req(), at(9), "lpn-mix-create")
+        .await
+        .expect("lpn");
+    wave3
+        .putaway_receiving_order_and_inventory_with_audit(
+            &actor,
+            fixture.order_id,
+            putaway_req(&fixture, &created.lpn_code),
+            Utc::now(),
+            "lpn-mix-first",
+            None,
+        )
+        .await
+        .expect("first sku");
+    let mut mixed = putaway_req(&fixture, &created.lpn_code);
+    mixed.product_code = "LPN-P-002".to_string();
+    mixed.batch_no = "LPN-B-002".to_string();
+    let denied = wave3
+        .putaway_receiving_order_and_inventory_with_audit(
+            &actor,
+            fixture.order_id,
+            mixed,
+            Utc::now(),
+            "lpn-mix-second",
+            None,
+        )
+        .await
+        .expect_err("default policy denies mix sku");
+    assert_eq!(denied, Wave3RepositoryError::LpnMixDenied);
+}
