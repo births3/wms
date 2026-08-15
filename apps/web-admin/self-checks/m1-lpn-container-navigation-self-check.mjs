@@ -16,8 +16,10 @@ assert.match(page, /gridProps=\{/);
 assert.match(page, /FormDialogTemplate/);
 assert.match(page, /header=\{\{ title: lpnContainerMenuItem.title/);
 assert.match(page, /创建容器/);
-assert.match(app, /id: "m1-lpn-containers"/);
-assert.match(app, /title: "M1 容器管理"/);
+assert.match(
+  app,
+  /\{ id: "m1-lpn-containers", title: "M1 容器管理", subtitle: "LPN \/ 类型策略", icon: PackageCheck \}/,
+);
 assert.match(renderer, /M1LpnContainerPage/);
 assert.match(views, /m1-lpn-containers/);
 assert.match(mock, /m1-lpn-containers/);
