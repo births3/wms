@@ -20,7 +20,7 @@ import {
 } from "@wms/ui";
 import { CheckCircle2, ClipboardCheck, PackageCheck, Send } from "lucide-react";
 
-import type { ReceivingOrder } from "@/features/inbound/inbound-queries";
+import type { ReceivingOrder, ReceivingOrderReceipt } from "@/features/inbound/inbound-queries";
 import type { InboundDialog } from "./M2InboundDialogs";
 import { inboundDocumentTypeLabel, inboundDocumentTypeOf } from "./m2-inbound-document-type";
 import {
@@ -63,6 +63,24 @@ interface M2InboundOrderTableProps {
   onClearQueryState?: () => void;
 }
 
+interface SalesReturnBatchItem {
+  batch_no?: string;
+  quantity?: string | number;
+  rejected_qty?: string | number;
+  reject_reason?: string;
+}
+
+function getReceiptDetails(row: ReceivingOrder) {
+  const receipt = (row as unknown as { receipt?: ReceivingOrderReceipt })?.receipt;
+  const details = receipt?.details;
+  const batches = (details?.sales_return_batches ?? []) as SalesReturnBatchItem[];
+  return {
+    receipt,
+    details,
+    batches,
+  };
+}
+
 export function buildInboundOrderColumns({
   mode,
   currentOwner,
@@ -72,7 +90,9 @@ export function buildInboundOrderColumns({
   currentOwner: OwnerContext;
   onOpenDetail: (id: string) => void;
 }): DataGridColumn<ReceivingOrder>[] {
-  return [
+  const isReceiving = mode === "receiving";
+
+  const baseColumns: DataGridColumn<ReceivingOrder>[] = [
     {
       key: "receipt_no",
       header: "ASN / 入库单",
@@ -85,7 +105,7 @@ export function buildInboundOrderColumns({
       copyValue: (row) => row.receipt_no,
       filter: { type: "text" },
       onDoubleClick: (row) => onOpenDetail(row.id),
-      render: (row) => <span className="text-primary">{row.receipt_no}</span>,
+      render: (row) => <span className="text-primary font-medium">{row.receipt_no}</span>,
     },
     {
       key: "owner",
@@ -102,8 +122,8 @@ export function buildInboundOrderColumns({
     {
       key: "document_type",
       header: "单据类型",
-      width: 150,
-      minWidth: 140,
+      width: 140,
+      minWidth: 130,
       sortable: true,
       sortValue: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
       filterValue: (row) => inboundDocumentTypeOf(row),
@@ -118,41 +138,266 @@ export function buildInboundOrderColumns({
       render: (row) => inboundDocumentTypeLabel(inboundDocumentTypeOf(row)),
     },
     {
-      key: "product",
-      header: "商品 / 数量",
-      width: 200,
-      minWidth: 180,
-      copyValue: (row) => {
-        const line = row.lines?.[0];
-        return `${line?.product_code ?? "-"} ${totalExpectedQty(row)} 件`;
-      },
-      filterValue: (row) => {
-        const line = row.lines?.[0];
-        return [line?.product_code ?? "", line?.batch_no ?? "", totalExpectedQty(row)].join(" ");
-      },
+      key: "product_code",
+      header: "商品编码",
+      mono: true,
+      width: 160,
+      minWidth: 140,
+      copyValue: (row) => row.lines?.[0]?.product_code ?? "-",
+      filterValue: (row) => row.lines?.map((l) => l.product_code).join(" ") ?? "",
       filter: { type: "text" },
-      render: (row) => (
-        <div className="text-sm">
-          <div className="font-medium">{row.lines?.[0]?.product_code ?? "-"}</div>
-          <div className="text-xs text-muted-foreground">{totalExpectedQty(row)} 件</div>
-        </div>
-      ),
+      render: (row) => <span className="font-mono text-xs">{row.lines?.[0]?.product_code ?? "-"}</span>,
     },
     {
-      key: "work_fields",
-      header: workFieldHeader(mode),
-      width: 440,
-      minWidth: 360,
-      filterValue: (row) => workFieldText(row, mode),
-      copyValue: (row) => workFieldText(row, mode),
-      filter: { type: "text" },
-      render: (row) => <WorkFieldSummary order={row} mode={mode} />,
+      key: "expected_qty",
+      header: "预报数量",
+      width: 120,
+      minWidth: 110,
+      align: "right",
+      sortable: true,
+      sortValue: (row) => totalExpectedQty(row),
+      filterValue: (row) => String(totalExpectedQty(row)),
+      copyValue: (row) => String(totalExpectedQty(row)),
+      render: (row) => <span className="font-mono font-medium">{totalExpectedQty(row)} 件</span>,
     },
+  ];
+
+  const receivingSpecificColumns: DataGridColumn<ReceivingOrder>[] = isReceiving
+    ? [
+        {
+          key: "delivery_qty",
+          header: "送货数量",
+          width: 120,
+          minWidth: 110,
+          align: "right",
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="font-mono text-xs">{details?.delivery_qty ? `${details.delivery_qty} 件` : "-"}</span>;
+          },
+        },
+        {
+          key: "actual_qty",
+          header: "实际到货数量",
+          width: 130,
+          minWidth: 120,
+          align: "right",
+          render: (row) => {
+            const { receipt } = getReceiptDetails(row);
+            return <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">{receipt?.actual_qty != null ? `${receipt.actual_qty} 件` : "-"}</span>;
+          },
+        },
+        {
+          key: "shortage_qty",
+          header: "缺货数量",
+          width: 110,
+          minWidth: 100,
+          align: "right",
+          render: (row) => {
+            const { receipt } = getReceiptDetails(row);
+            const qty = Number(receipt?.shortage_qty || 0);
+            return <span className={`font-mono text-xs ${qty > 0 ? "text-amber-600 font-semibold" : "text-muted-foreground"}`}>{receipt?.shortage_qty != null ? `${receipt.shortage_qty} 件` : "-"}</span>;
+          },
+        },
+        {
+          key: "rejected_qty",
+          header: "拒收数量",
+          width: 110,
+          minWidth: 100,
+          align: "right",
+          render: (row) => {
+            const { receipt } = getReceiptDetails(row);
+            const qty = Number(receipt?.rejected_qty || 0);
+            return <span className={`font-mono text-xs ${qty > 0 ? "text-destructive font-semibold" : "text-muted-foreground"}`}>{receipt?.rejected_qty != null ? `${receipt.rejected_qty} 件` : "-"}</span>;
+          },
+        },
+        {
+          key: "arrival_temperature",
+          header: "到货温度",
+          width: 120,
+          minWidth: 110,
+          render: (row) => {
+            const { receipt } = getReceiptDetails(row);
+            return (
+              <span className="font-mono text-xs">
+                {receipt?.arrival_temperature_celsius != null ? `${receipt.arrival_temperature_celsius} °C` : "-"}
+              </span>
+            );
+          },
+        },
+        {
+          key: "temperature_control_method",
+          header: "温控方式",
+          width: 120,
+          minWidth: 110,
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="text-xs">{details?.temperature_control_method || "-"}</span>;
+          },
+        },
+        {
+          key: "carrier",
+          header: "承运商",
+          width: 140,
+          minWidth: 120,
+          filter: { type: "text" },
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="text-xs">{details?.carrier || "-"}</span>;
+          },
+        },
+        {
+          key: "vehicle_no",
+          header: "车牌号",
+          mono: true,
+          width: 130,
+          minWidth: 120,
+          filter: { type: "text" },
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="font-mono text-xs">{details?.vehicle_no || "-"}</span>;
+          },
+        },
+        {
+          key: "origin",
+          header: "发运地点",
+          width: 140,
+          minWidth: 120,
+          filter: { type: "text" },
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="text-xs">{details?.origin || "-"}</span>;
+          },
+        },
+        {
+          key: "transport_mode",
+          header: "运输方式",
+          width: 120,
+          minWidth: 110,
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="text-xs">{details?.transport_mode || "-"}</span>;
+          },
+        },
+        {
+          key: "contact_person",
+          header: "联系人 / 电话",
+          width: 160,
+          minWidth: 140,
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            const name = details?.contact_name;
+            const phone = details?.contact_phone ? `${details.contact_phone.slice(0, 3)}****${details.contact_phone.slice(-4)}` : "";
+            return (
+              <div className="text-xs">
+                <div>{name || "-"}</div>
+                {phone && <div className="text-muted-foreground font-mono">{phone}</div>}
+              </div>
+            );
+          },
+        },
+        {
+          key: "seal_and_filing",
+          header: "印章 / 备案件核对",
+          width: 150,
+          minWidth: 140,
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            const seal = details?.seal_checked;
+            const filing = details?.filing_checked;
+            return (
+              <div className="text-xs">
+                <div>印章: {seal || "-"}</div>
+                <div className="text-muted-foreground">备案件: {filing || "-"}</div>
+              </div>
+            );
+          },
+        },
+        {
+          key: "departure_arrival_time",
+          header: "启运 / 到货时间",
+          width: 180,
+          minWidth: 160,
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return (
+              <div className="text-xs font-mono">
+                <div>启: {details?.departure_at ? formatDateTime(details.departure_at) : "-"}</div>
+                <div className="text-muted-foreground">到: {details?.arrival_at ? formatDateTime(details.arrival_at) : "-"}</div>
+              </div>
+            );
+          },
+        },
+        {
+          key: "storage_at",
+          header: "收货入库时间",
+          width: 170,
+          minWidth: 150,
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="font-mono text-xs">{details?.storage_at ? formatDateTime(details.storage_at) : "-"}</span>;
+          },
+        },
+        {
+          key: "second_receiver_id",
+          header: "第二收货员",
+          width: 130,
+          minWidth: 120,
+          render: (row) => {
+            const { details } = getReceiptDetails(row);
+            return <span className="text-xs">{details?.second_receiver_id || "-"}</span>;
+          },
+        },
+        {
+          key: "sales_return_summary",
+          header: "销售退货批号 / 拒收明细",
+          width: 220,
+          minWidth: 180,
+          render: (row) => {
+            const { batches } = getReceiptDetails(row);
+            if (batches.length === 0) return <span className="text-muted-foreground text-xs">-</span>;
+            return (
+              <div className="text-xs space-y-0.5">
+                {batches.slice(0, 2).map((b: SalesReturnBatchItem, i: number) => (
+                  <div key={i} className="font-mono">
+                    {b.batch_no} × {b.quantity} 件
+                    {Number(b.rejected_qty) > 0 && <span className="text-destructive ml-1">(拒{b.rejected_qty})</span>}
+                  </div>
+                ))}
+                {batches.length > 2 && <div className="text-muted-foreground">等共 {batches.length} 批</div>}
+              </div>
+            );
+          },
+        },
+        {
+          key: "exception_note",
+          header: "拒收备注",
+          width: 150,
+          minWidth: 130,
+          render: (row) => {
+            const { receipt } = getReceiptDetails(row);
+            return <span className="text-xs text-muted-foreground truncate">{receipt?.exception_note || "-"}</span>;
+          },
+        },
+      ]
+    : [
+        {
+          key: "work_fields",
+          header: workFieldHeader(mode),
+          width: 380,
+          minWidth: 320,
+          filterValue: (row) => workFieldText(row, mode),
+          copyValue: (row) => workFieldText(row, mode),
+          filter: { type: "text" },
+          render: (row) => <WorkFieldSummary order={row} mode={mode} />,
+        },
+      ];
+
+  const tailColumns: DataGridColumn<ReceivingOrder>[] = [
     {
       key: "expected_arrival_at",
       header: "预计到货",
-      width: 190,
-      minWidth: 180,
+      width: 170,
+      minWidth: 160,
       sortable: true,
       sortValue: (row) => row.expected_arrival_at ?? "",
       filterValue: (row) => row.expected_arrival_at,
@@ -163,8 +408,8 @@ export function buildInboundOrderColumns({
     {
       key: "created_at",
       header: "创建时间",
-      width: 190,
-      minWidth: 180,
+      width: 170,
+      minWidth: 160,
       sortable: true,
       sortValue: (row) => row.created_at,
       filterValue: (row) => row.created_at,
@@ -175,8 +420,8 @@ export function buildInboundOrderColumns({
     {
       key: "status",
       header: "状态",
-      width: 170,
-      minWidth: 150,
+      width: 160,
+      minWidth: 140,
       sortable: true,
       sortValue: (row) => statusLabel(row.status),
       filterValue: (row) => row.status,
@@ -190,6 +435,8 @@ export function buildInboundOrderColumns({
         : <span className="text-muted-foreground">-</span>,
     },
   ];
+
+  return [...baseColumns, ...receivingSpecificColumns, ...tailColumns];
 }
 
 export function M2InboundOrderTable({
@@ -246,7 +493,7 @@ export function M2InboundOrderTable({
       onSelectedRowKeysChange={onSelectOrderKeys}
       caption={isPending ? "加载入库单..." : undefined}
       emptyTitle="暂无入库单"
-      storageKey="m2-inbound-datagrid"
+      storageKey={`m2-inbound-datagrid-${mode}`}
       exportFileBaseName={exportFileBaseName}
       tableClassName="w-full min-w-full"
       refreshAction={refreshAction}
