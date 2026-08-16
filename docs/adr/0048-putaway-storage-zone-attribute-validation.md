@@ -39,13 +39,14 @@
    - 存储位（`storage`）：容器化管理（`allows_container = true`，位容一体，按托盘/LPN 追踪）；
    - 箱拣位（`case_pick`）与零拣位（`piece_pick`）：散货管理（`allows_container = false`，上架自动解绑脱离原容器，释放周转箱）。
 4. **上架 6 维正交校验流水线（叠加于既有上架事务，非替换）**：
-   - PDA 上架或系统推荐库位时，在既有上架逻辑（LPN 绑定、散件互斥、行锁加量，见 ADR-0047）之前执行前置校验：① 品类大区隔离校验 ➜ ② 温区环境匹配校验 ➜ ③ 容器质量锁状态校验（含目标库区 `zone.quality_color` 匹配，散货位读批次 `status`）➜ ④ 特药双人核验（叠加既有 M-VR 双人策略动态查询，见 US-M2-005 验收 8）➜ ⑤ 包装粒度作业形态防呆（存储位仅接受容器粒度上架，散件先组托或转拣选位；拣选位仅接受散货，容器上架自动解绑）➜ ⑥ 外用易串味互斥与容量防呆；③ 通过后进入既有 LPN/互斥/加量事务。
+   - PDA 上架或系统推荐库位时，在既有上架逻辑（LPN 绑定、散件互斥、行锁加量，见 ADR-0047）之前执行前置校验：① 品类大区隔离校验 ➜ ② 温区环境匹配校验 ➜ ③ 容器质量锁状态校验（含目标库区 `zone.quality_color` 匹配，散货位读批次 `status`）➜ ④ 特药双人核验（叠加既有 M-VR 双人策略动态查询，见 US-M2-005 验收 8）➜ ⑤ 包装粒度作业形态防呆（存储位仅接受容器粒度上架，散件先组托或转拣选位；拣选位仅接受散货，容器上架自动解绑）➜ ⑥ 外用易串味互斥与容量防呆（商品侧依据 `products.is_external_use` / `is_fragrant` 字段，与库区 `is_external_use_zone` / `is_fragrant_zone` 互斥校验）；③ 通过后进入既有 LPN/互斥/加量事务。
    - **6 维为固定业务骨架**：属 GSP 合规强制校验，硬编码实现，不允许配置关闭或弱化；仅 ④ 的双人策略经 M-VR 规则引擎动态扩展（US-M-VR-002）。
    - 质量锁处于隔离/不合格状态时，严禁上架到正常合格品货位，强阻断报错。
 5. **AGV 自动化货架与电子标签（PTL）架构**：
    - 库位编码绑定在移动货架格口上（如 `POD01-F2-03`），库位扩展 `is_agv_managed`、`agv_pod_code`（货架编码）；电子标签（PTL）地址不落库位字段，统一收敛到 `location_device_bindings` 绑定表（绑定角色 `ptl_light`）；
    - **Phase 1 直接落地预留**：`is_agv_managed`/`agv_pod_code` 字段与 `location_device_bindings` 绑定表随基础档案一起建（仅建字段与表，不接硬件），v1 后不再迁库；
    - 支持“货到人”拍灯作业：WMS 下发任务 ➜ RCS 调度 AGV 搬运货架至工作站 ➜ 电子标签亮绿灯提示待放入数量 ➜ 作业员拍灯确认完成账面更新。
+   - **中台设计详见模型 §6.1-§6.6**：四表 schema（`iot_devices` / `location_device_bindings` / `wcs_tasks` / `iot_event_logs`）、指令-事件闭环、PTL 拍灯流程、AGV 货到人账务联动、设备生命周期与 v1 范围建议由模型 §6 承接，本 ADR 不重复展开。
 6. **库存表原生承载补货在途双字段 (In-Transit Stock on Inventory Table)**：
    - 库存表（`inventory_batches`）直接维护目标侧 `qty_replenish_in_transit`（补货在途量）与来源侧 `qty_replenish_out_transit`（补货下架在途量）；
    - 补货任务生成时**同一事务内**原子增加目标库位 `qty_replenish_in_transit` 并增加来源库位 `qty_replenish_out_transit`（锁定来源在手量，防重复下架）；补货上架确认时双字段同时回冲、在途量原子转为在手量（`qty_on_hand`），保证高并发算单与可用量计算无需聚合任务表；`qty_frozen` 仅承载质检/质量冻结，与补货在途互不混淆。
@@ -53,13 +54,14 @@
    - 独立菜单维护补货策略（日常安全水位 Min-Max 触发 + 出库波次缺口即时触发双重驱动），按 FEFO 策略从高层存储位下架补货至箱拣/零拣位；
    - **Min-Max 数值只存补货策略表**（按货主 + 库位组/品类配置 `min_safety_threshold` / `max_replenish_target`，支持批量改一组拣选位），库位字段不存数值，仅挂 `replenish_strategy_id` 引用；
    - **补货任务实体**：`replenishment_tasks` 表承载作业过程（任务号走 M-CG、触发模式、优先级、来源/目标、数量、部分执行、状态机 `pending/in_progress/done/cancelled`），任务生成与确认同事务维护在途双字段；PDA 领取→来源下架→送达确认→账面转换五步作业流程；PC 提供策略配置页与任务大盘（取消/重派/超时告警）；并发规则（来源行锁、取消回冲、幂等防重）见模型 §5.4-§5.7。
+   - **引擎与权限**：巡检/触发调度复用既有 M-TE 任务引擎调度骨架（补货任务实体与状态机独立，不混入 M-TE 单据）；新增 H1 权限点 `m3.replenishment.manage`（PC 策略配置与大盘操作）+ `m3.replenishment.execute`（PDA 领取执行），无权限拒绝操作。
 8. **库位批量生成向导**：
    - PC 端支持按规则向导一键批量生成库位编码（静态高架及 AGV 移动货架格口）并赋默认属性，同时支持标准 Excel 模板导入导出双轨；
    - AGV 格口编码与三坐标对应：`POD[货架号]-F[层]-[格位]` ↔ `row_no`/`layer_no`/`column_no`（如 `POD01-F2-03` = row 01 / layer 2 / column 03）。
 9. **分期实施里程碑**：
    - **Phase 1**：基础档案模型、M1 字典挂载容器质量锁原因、批量生成向导、库存表在途量与 6 维正交上架校验基石、容器质量锁（人工加锁 + 权限 + M-QL 挂接）、AGV/PTL 预留字段与设备绑定表；
    - **Phase 2**：PC 独立补货策略与任务大盘、后端双重补货引擎与 PDA 补货作业（任务实体/状态机/并发规则见模型 §5.4-§5.7）；
-   - **Phase 3**：AGV 货架调度与 PTL 电子标签驱动软硬件集成。
+   - **Phase 3**：AGV 货架调度与 PTL 电子标签驱动软硬件集成（中台四表启用、指令-事件闭环与账务联动，详见模型 §6.1-§6.6）。
 
 ## 后果
 
@@ -67,7 +69,7 @@
 - 质量管理闭环：容器具备可配置的合格/隔离/不合格三级质量锁，锁原因直接通过 M1 系统字典无缝维护，零冗余。
 - 核心库存表增加 `qty_replenish_in_transit` / `qty_replenish_out_transit` 双字段，提升高并发下的实时可用量计算效率。
 - 新增独立的【补货策略配置】与【补货任务监控】前端管理界面与调度引擎。
-- **Phase 1 基线同步清单**（v1 前直接改基线，不做兼容过渡）：① `warehouse_zones.temperature_zone` 与 `products.storage_condition` 两处温区 CHECK 值域同步迁移至五温区新编码；② `warehouse_locations.status` 值域收敛为 `available/occupied/disabled`，存量 `locked` 迁移为 `lock_status='lock_all'`，`bound_owner_id` 改名 `current_owner_id`；③ `inventory_batches` 按 §4 迁移清单改名/新增字段（`product_code→product_id`、`quality_status→status`、`qty_locked→qty_frozen`、新增 `zone_id/container_lpn` 与在途双字段），并同步改 M3 召回/质检作业引用；④ 新增 `container_quality_lock_events` 纯审计表（含 `quality_liaison_id` 挂接列）与 `lpn_containers` 当前锁冗余字段；⑤ 新增补货策略表（含库位组两张表）与 `warehouse_locations.replenish_strategy_id` 引用、`location_device_bindings` 绑定表与 AGV 预留字段。
+- **Phase 1 基线同步清单**（v1 前直接改基线，不做兼容过渡）：① `warehouse_zones.temperature_zone` 与 `products.storage_condition` 两处温区 CHECK 值域同步迁移至五温区新编码；`products` 新增 `is_external_use` / `is_fragrant` 两字段（6 维⑥互斥校验的商品侧依据）；② `warehouse_locations.status` 值域收敛为 `available/occupied/disabled`，存量 `locked` 迁移为 `lock_status='lock_all'`，`bound_owner_id` 改名 `current_owner_id`；③ `inventory_batches` 按 §4 迁移清单改名/新增字段（`product_code→product_id`、`quality_status→status`、`qty_locked→qty_frozen`、新增 `zone_id/container_lpn` 与在途双字段），并同步改 M3 召回/质检作业引用；④ 新增 `container_quality_lock_events` 纯审计表（含 `quality_liaison_id` 挂接列）与 `lpn_containers` 当前锁冗余字段；⑤ 新增补货策略表（含库位组两张表）与 `warehouse_locations.replenish_strategy_id` 引用、`location_device_bindings` 绑定表与 AGV 预留字段（`is_agv_managed`/`agv_pod_code`/`agv_unreachable_at`）；⑥ 设备中台四表（`iot_devices`/`wcs_tasks`/`iot_event_logs` 于 Phase 2 建齐结构，无生成入口，见模型 §6.6）。
 
 ## 关联与参考
 

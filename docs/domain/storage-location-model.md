@@ -44,6 +44,13 @@
   - AGV 格口编码与三坐标的对应：`POD[货架号]-F[层]-[格位]` ↔ `row_no`=货架号、`layer_no`=层、`column_no`=格位（`POD01-F2-03` = row 01 / layer 2 / column 03）。
   - 电子标签（PTL）地址**不落在库位字段**，统一收敛到 `location_device_bindings` 绑定表（见 §6），绑定角色 `ptl_light`；绑定表 Phase 1 建表预留。
 
+### 1.3 商品侧空间属性 (Product Space Attributes)
+
+6 维校验⑥（外用/易串味互斥）需要商品侧标记作为校验依据，`products` 扩展两字段（Phase 1 同步基线）：
+
+- `is_external_use`: 是否外用药（与库区 `is_external_use_zone` 互斥校验：外用药仅可上外用药专区，非外用不可上）
+- `is_fragrant`: 是否易串味商品（与库区 `is_fragrant_zone` 互斥校验：易串味仅可上易串味专区，普通商品不可上与易串味混位）
+
 ---
 
 ## 2. 容器三类质量锁与 M1 系统字典维护机制 (Container Quality Locks)
@@ -157,7 +164,7 @@ CREATE TABLE inventory_batches (
 ## 5. 独立补货系统设计 (Replenishment Subsystem)
 
 ### 5.1 补货策略配置与触发模式
-1. **日常安全水位 Min-Max 驱动**：闲时/夜间巡检，当目标拣选位 `qty_on_hand + qty_replenish_in_transit <= min_safety_threshold` 时，自动生成从高层存储位下架补货任务至 `max_replenish_target`；
+1. **日常安全水位 Min-Max 驱动**：闲时/夜间巡检，当目标拣选位可用量口径 `qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit <= min_safety_threshold` 时，自动生成从高层存储位下架补货任务至 `max_replenish_target`（**与 §5.2 可用量公式同一口径**，避免账面够但被分配完导致巡检不触发）；
 2. **出库波次缺口即时驱动**：波次算单时若发现拣选位可用量不足以满足订单，即时触发高优先级波次紧急补货任务；
 3. **批次锁定与动线**：按 `FEFO`（近效期先出）锁定来源存储位托盘，送达拣选位扫码/拍灯确认后，在途量转为在手散件量，释放原托盘。
 
@@ -218,11 +225,11 @@ CREATE TABLE replenishment_location_group_members (
 ```
 
 - `warehouse_locations.replenish_strategy_id` 引用策略表（可空，未挂策略的拣选位不参与 Min-Max 巡检）。
-- Min-Max 巡检判定（目标拣选位）：`qty_on_hand + qty_replenish_in_transit <= min_safety_threshold` 触发，补货目标 `max_replenish_target`；波次缺口即时驱动按同一表配置。
+- Min-Max 巡检判定（目标拣选位，可用量口径）：`qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit <= min_safety_threshold` 触发，补货目标 `max_replenish_target`；波次缺口即时驱动按同一表配置。
 
 ### 5.4 补货任务实体与状态机 (Replenishment Task)
 
-任务在触发时同事务内生成并更新在途双字段（见 §5.2）；任务表仅记录作业过程，不参与算量：
+任务在触发时同事务内生成并更新在途双字段（见 §5.2）；任务表仅记录作业过程，不参与算量。**调度复用**：巡检/触发调度复用既有 M-TE 任务引擎调度骨架，补货任务实体与状态机独立，不混入 M-TE 单据；作业权限：PC 侧 `m3.replenishment.manage`（策略配置/大盘操作），PDA 侧 `m3.replenishment.execute`（领取执行）：
 
 ```sql
 CREATE TABLE replenishment_tasks (
@@ -239,6 +246,7 @@ CREATE TABLE replenishment_tasks (
     product_id UUID NOT NULL,
     batch_no VARCHAR(64) NOT NULL,
     qty NUMERIC(12, 4) NOT NULL CHECK (qty > 0),      -- 任务数量
+    picked_qty NUMERIC(12, 4) NOT NULL DEFAULT 0,     -- 已下架未送达量（PDA 下架时登记，确认时回冲）
     done_qty NUMERIC(12, 4) NOT NULL DEFAULT 0,       -- 已完成数量（支持部分执行）
     status VARCHAR(16) NOT NULL DEFAULT 'pending',    -- pending / in_progress / done / cancelled
     operator_id UUID,                           -- PDA 作业员（领取时写入）
@@ -264,9 +272,9 @@ CREATE INDEX IF NOT EXISTS replenishment_tasks_owner_source_batch_idx
 ### 5.5 PDA 补货作业流程
 
 1. **领取任务**：PDA 补货任务列表（按库位/优先级排序）领取 → `pending` ➜ `in_progress`，写 `operator_id`；同任务同时只允许一个作业员领取（乐观锁 version 校验）。
-2. **来源下架**：扫描来源库位/容器码 → 校验与任务 `source_*` 匹配；下架数量（可少于任务量）→ 来源侧不扣在手（已由 `qty_replenish_out_transit` 锁定），仅登记作业进度。
+2. **来源下架**：扫描来源库位/容器码 → 校验与任务 `source_*` 匹配；下架数量（可少于任务量）→ 来源侧不扣在手（已由 `qty_replenish_out_transit` 锁定），任务 `picked_qty += 下架量` 登记中间态（支撑 PDA 断网重连后恢复作业）；`picked_qty > qty` 拒绝（超量下架拦截）。
 3. **送达确认**：扫描目标拣选位码 → 校验目标位未被占用/无质量锁/品类温区匹配（复用 6 维校验②③⑥）→ 确认完成。
-4. **账面转换（同事务）**：来源位 `qty_on_hand −qty`、`qty_replenish_out_transit −qty`；目标位 `qty_on_hand +qty`、`qty_replenish_in_transit −qty`；任务 `done_qty += qty`；写入库存流水（movement_type = `replenish`）。整托全量补货完成后释放来源容器（`idle`，释放前校验该 LPN 在来源位无剩余在手量）。
+4. **账面转换（同事务）**：来源位 `qty_on_hand −qty`、`qty_replenish_out_transit −qty`；目标位 `qty_on_hand +qty`、`qty_replenish_in_transit −qty`；任务 `picked_qty −= qty`、`done_qty += qty`；写入库存流水（movement_type = `replenish`）。整托全量补货完成后释放来源容器（`idle`，释放前校验该 LPN 在来源位无剩余在手量）。
 5. **重复提交防重**：确认接口按任务 + 幂等键（Idempotency-Key）重放，version 乐观锁兜底。
 
 ### 5.6 PC 补货策略与任务大盘
@@ -282,7 +290,8 @@ CREATE INDEX IF NOT EXISTS replenishment_tasks_owner_source_batch_idx
 - **来源锁定**：任务生成与下架确认均以 `qty_replenish_out_transit` + 批次行锁为准；同一批次被两个任务同时锁定时，后生成者校验来源可用量不足则失败（等待下一巡检周期），不排队不覆盖。
 - **来源位动态占用**：任务生成后来源位被移库/质检隔离（`qty_frozen` 增加）导致可用量不足 → 确认时按 version 乐观锁校验，冲突则任务挂起并告警人工复核。
 - **目标位冲突**：确认时校验目标位当前质量状态与容量，不满足 PDA 强阻断（复用 6 维校验）。
-- **取消回冲**：取消/超时任务必须回冲双字段，防止在途量悬空（`qty_replenish_in_transit` 残留会导致水位误判不再触发）。
+- **取消回冲**：取消/超时任务必须回冲双字段，防止在途量悬空（`qty_replenish_in_transit` 残留会导致水位误判不再触发）；取消前校验 `picked_qty = 0`（已下架未送达的货不可随任务取消，需人工处置）。
+- **与既有 M3 作业锁互斥**：任务生成与送达确认时，目标位处于盘点锁/养护锁等既有 M3 作业锁状态则跳过或阻断（复用 M3 既有锁语义，不另行造锁）；来源位被移库/盘点占用的处理同 §5.2 可用量口径。
 - **幂等与重放**：生成接口按幂等键防重（双字段只 Δ 一次）；确认接口 version 乐观锁防重复确认。
 
 ---
@@ -295,5 +304,231 @@ CREATE INDEX IF NOT EXISTS replenishment_tasks_owner_source_batch_idx
 1. iot_devices              ── 登记所有物理设备实例 (IP、端口、协议、厂商、状态)
 2. location_device_bindings ── 库位与设备点位解耦映射 (绑定角色: ptl_light, rfid_antenna)
 3. wcs_tasks                ── 统一下发硬件指令 (搬运货架 pod_move, 亮灯 ptl_light_on, 分拣 sorter_divert)
-4. iot_event_logs           ── 接收硬件事件回传 (拍灭按键、DWS 称重体积数据、RFID 批量扫描 EPC)
+4. iot_event_logs           ── 接收硬件事件反馈 (拍灭按键、DWS 称重体积数据、RFID 批量扫描 EPC)
 ```
+
+以下 §6.1-§6.6 给出四表字段级 schema、指令-事件闭环、PTL 拍灯业务流程、AGV 货到人账务联动、设备生命周期与 v1 范围建议。
+
+### 6.1 中台表 schema（字段级设计）
+
+**`iot_devices`（设备主档）**：登记所有物理设备实例；设备为仓库级共享物理资产，不按货主隔离：
+
+```sql
+CREATE TABLE iot_devices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    warehouse_id UUID NOT NULL,                  -- 所属仓库
+    device_code VARCHAR(64) NOT NULL,            -- 设备编码（现场唯一，如 AGV-01 / PTL-03 / DWS-01）
+    device_type VARCHAR(16) NOT NULL,            -- 设备类型: agv / ptl_light / dws / rfid_antenna / stacker
+    vendor VARCHAR(64),                          -- 厂商
+    model VARCHAR(64),                           -- 型号
+    protocol VARCHAR(16) NOT NULL,               -- 通讯协议: http / tcp / modbus_tcp / mqtt 等
+    ip_address VARCHAR(64),                      -- 设备 IP 地址
+    port INT,                                    -- 设备端口
+    extra_config JSONB NOT NULL DEFAULT '{}',    -- 厂商私有参数（点位偏移、IO 映射等）
+    online_status VARCHAR(16) NOT NULL DEFAULT 'offline',  -- 在线状态: online / offline / disabled
+    last_heartbeat_at TIMESTAMPTZ,               -- 最近心跳时间（心跳判定在线）
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,       -- 启停开关（停用后不再下发新指令）
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (warehouse_id, device_code),
+    CHECK (device_type IN ('agv', 'ptl_light', 'dws', 'rfid_antenna', 'stacker')),
+    CHECK (online_status IN ('online', 'offline', 'disabled')),
+    CHECK (port IS NULL OR (port > 0 AND port < 65536))
+);
+
+CREATE INDEX IF NOT EXISTS iot_devices_warehouse_type_idx
+    ON iot_devices (warehouse_id, device_type);
+CREATE INDEX IF NOT EXISTS iot_devices_warehouse_status_idx
+    ON iot_devices (warehouse_id, online_status);
+```
+
+**`location_device_bindings`（库位-设备点位绑定）**：库位与设备点位解耦映射；**PTL 地址只落本表（`point_address`），不落库位字段**（§1.2）；AGV 车辆本体不按库位绑定（由 RCS 维护），绑定角色仅 `ptl_light` / `rfid_antenna` 两类点位设备：
+
+```sql
+CREATE TABLE location_device_bindings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    warehouse_id UUID NOT NULL,                  -- 所属仓库
+    location_id UUID NOT NULL,                   -- 库位（AGV 格口或固定库位）
+    device_id UUID NOT NULL REFERENCES iot_devices(id),
+    binding_role VARCHAR(16) NOT NULL,           -- 绑定角色: ptl_light / rfid_antenna
+    point_address VARCHAR(64),                   -- 设备点位地址（如 PTL 灯位地址/地址码；只落本表不落库位字段）
+    valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),  -- 绑定生效时间
+    valid_to TIMESTAMPTZ,                        -- 绑定有效期截止（NULL = 长期有效/当前生效）
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (binding_role IN ('ptl_light', 'rfid_antenna'))
+);
+
+CREATE UNIQUE INDEX location_device_bindings_active_uidx
+    ON location_device_bindings (location_id, binding_role)
+    WHERE valid_to IS NULL;                      -- 同一库位同一角色同时只有一条生效绑定
+CREATE INDEX IF NOT EXISTS location_device_bindings_device_idx
+    ON location_device_bindings (device_id, valid_to);
+```
+
+- **与 `warehouse_locations` 字段的关系**：`is_agv_managed` / `agv_pod_code` 标识"该库位是 AGV 移动货架格口"（货架级属性，随库位档案建），绑定表登记"该库位点位的具体设备实例"（点位级映射）；两者互补不重复——PTL/RFID 设备点位只经绑定表寻址，AGV 车辆调度不经绑定表。
+- 解绑采用软解绑（置 `valid_to` 保留历史绑定链），不物理删除；设备故障时绑定失效与降级规则见 §6.5。
+
+**`wcs_tasks`（指令任务）**：统一下发硬件指令；任务随业务事务生成（业务账不动，见 §6.2）：
+
+```sql
+CREATE TABLE wcs_tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,                      -- 货主（多货主隔离；指令服务于货主业务）
+    task_no VARCHAR(64) NOT NULL,                -- 编号（走 M-CG 编号规则）
+    task_type VARCHAR(16) NOT NULL,              -- 指令类型: pod_move / ptl_light_on / ptl_light_off / sorter_divert / dws_weigh / rfid_scan
+    device_id UUID NOT NULL REFERENCES iot_devices(id),  -- 目标设备（pod_move 为 RCS 网关实例，具体车辆由 RCS 分派）
+    location_id UUID,                            -- 关联库位（格口/拣选位；sorter_divert 为 NULL 关联分拣口）
+    business_ref_type VARCHAR(32),               -- 业务来源类型（putaway / replenish / pick 等）
+    business_ref_no VARCHAR(64),                 -- 业务单号（上架单/补货任务号/波次号）
+    payload JSONB NOT NULL DEFAULT '{}',         -- 指令载荷（ptl_light_on: {"qty":5,"color":"green"}；pod_move: {"pod_code":"POD-01","target_station":"ST-01"}）
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- 状态机: pending/sent/executing/succeeded/failed/timeout
+    ack_payload JSONB DEFAULT '{}',              -- 设备回执载荷（同步回执/终态回执）
+    error_code VARCHAR(32),                      -- 失败错误码（设备侧或协议层）
+    error_message TEXT,                          -- 失败原因描述
+    retry_count INT NOT NULL DEFAULT 0,          -- 已重试次数
+    max_retries INT NOT NULL DEFAULT 3,          -- 最大重试次数（超过进入 failed 终态人工介入）
+    idempotency_key VARCHAR(128) NOT NULL,       -- 幂等键（业务动作 ID + 指令类型，防重发重复执行）
+    sent_at TIMESTAMPTZ,                         -- 下发时间
+    finished_at TIMESTAMPTZ,                     -- 终态时间（succeeded / failed）
+    created_by TEXT NOT NULL,                    -- 触发来源（业务模块/人工用户名）
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version BIGINT NOT NULL DEFAULT 1,           -- 乐观锁（回执/重试并发更新）
+    UNIQUE (owner_id, task_no),
+    UNIQUE (idempotency_key),
+    CHECK (task_type IN ('pod_move', 'ptl_light_on', 'ptl_light_off', 'sorter_divert', 'dws_weigh', 'rfid_scan')),
+    CHECK (status IN ('pending', 'sent', 'executing', 'succeeded', 'failed', 'timeout')),
+    CHECK (retry_count >= 0 AND retry_count <= max_retries)
+);
+
+CREATE INDEX IF NOT EXISTS wcs_tasks_owner_status_idx
+    ON wcs_tasks (owner_id, status, updated_at);
+CREATE INDEX IF NOT EXISTS wcs_tasks_device_status_idx
+    ON wcs_tasks (device_id, status);
+CREATE INDEX IF NOT EXISTS wcs_tasks_business_ref_idx
+    ON wcs_tasks (owner_id, business_ref_type, business_ref_no);
+```
+
+**`iot_event_logs`（硬件事件日志）**：接收设备事件反馈；事件为追加式证据流，只 INSERT 禁止 UPDATE/DELETE（对齐项目审计原则）：
+
+```sql
+CREATE TABLE iot_event_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    warehouse_id UUID NOT NULL,                  -- 所属仓库
+    device_id UUID NOT NULL REFERENCES iot_devices(id),  -- 上报设备
+    event_type VARCHAR(16) NOT NULL,             -- 事件类型: ptl_press / rfid_batch / dws_result / heartbeat
+    task_id UUID REFERENCES wcs_tasks(id),       -- 关联指令任务（heartbeat 等无任务事件为 NULL）
+    location_id UUID,                            -- 事件点位库位
+    payload JSONB NOT NULL DEFAULT '{}',         -- 事件载荷（ptl_press: {"press_qty":5}；rfid_batch: {"epcs":[...]}；dws_result: {"weight_g":3520,"volume_cm3":2200,"pass":true}；heartbeat: {"battery":85}）
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),  -- 设备侧事件时间
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),  -- WMS 接收时间
+    CHECK (event_type IN ('ptl_press', 'rfid_batch', 'dws_result', 'heartbeat'))
+);
+
+CREATE INDEX IF NOT EXISTS iot_event_logs_device_time_idx
+    ON iot_event_logs (device_id, received_at);
+CREATE INDEX IF NOT EXISTS iot_event_logs_task_idx
+    ON iot_event_logs (task_id);
+CREATE INDEX IF NOT EXISTS iot_event_logs_location_time_idx
+    ON iot_event_logs (location_id, received_at);
+```
+
+### 6.2 指令-事件闭环（指令下发与账务确认）
+
+**双通道模型**：下行指令走 `wcs_tasks`（WMS → 设备/RCS 网关），上行确认走 `iot_event_logs` 异步事件 + `wcs_tasks.ack_payload` 同步回执两种形态；**业务动作只有收到确认回执才落账**，未确认前业务账不动。
+
+**状态机**：
+
+`pending`（业务事务内生成，业务账未动）➜ `sent`（派发器下发至设备/RCS 网关，写 `sent_at`）➜ `executing`（收到开始回执）➜ `succeeded`（收到成功回执且校验通过，账务确认同事务落账）；`failed`（收到失败回执或校验失败）/ `timeout`（超时未收到终态回执）为异常态，未超 `max_retries` 自动重试回 `sent`（`retry_count` +1），重试耗尽进入终态 `failed`（人工介入）。
+
+**回执两种形态**：
+- **同步回执**：设备/RCS 网关直接返回（如 `pod_move` 完成/失败）→ 校验后直接推进 `wcs_tasks` 状态；
+- **异步事件**：`ptl_press` / `rfid_batch` / `dws_result` 经 `iot_event_logs` 到达 → 事件处理进程按 `task_id` 匹配任务 → 校验载荷 → 同事务推进状态并落账。
+
+**指令 ↔ 事件 ↔ 账务确认对应规则**（三类枚举相互对应，缺一不可）：
+
+| 指令类型 (`wcs_tasks.task_type`) | 确认回执/事件 | 账务确认动作 |
+|---|---|---|
+| `ptl_light_on` | `ptl_press`（拍灯即确认） | 上架/补货/拣选数量落账（§6.3） |
+| `dws_weigh` | `dws_result` | DWS 称重通过才接收上架/复核，重量与预估校验 |
+| `rfid_scan` | `rfid_batch` | 读到目标 EPC 集合才确认下架/复核 |
+| `pod_move` | RCS 同步回执 | 纯物理位移不落库存账（§6.4），仅推进任务状态与格口可用性 |
+| `sorter_divert` | 分拣到位同步回执 | 分拣确认，驱动出库波次进度 |
+| `ptl_light_off` | 灭灯同步回执 | 不落账（闭环收尾） |
+
+**超时/失败重试策略**：
+- 自动重试上限 `max_retries = 3`，间隔递增退避（1 分钟 / 5 分钟 / 15 分钟）；重试仅允许从 `sent` / `executing` / `timeout` 发起，每次重试 `retry_count` +1 且 `version` 乐观锁递增；
+- 重试按 `idempotency_key` 幂等：同业务动作同指令类型只生成一条 `wcs_tasks`，重复下发由任务唯一性 + 设备侧协议幂等字段兜底；
+- 重试耗尽 → 终态 `failed` → **人工介入路径**：管理端异常任务大盘（失败任务/错误码/回执载荷）→ 人工可【重发】（重置 `retry_count` 重新入队）/【作废】（仅未落账任务，作废时补偿业务账并记录原因）/【跳过确认】（现场已人工完成，凭证据补录账务，记录操作人）。
+
+**并发与一致性规则**：
+- 回执更新用 `version` 乐观锁 + 状态前置校验：仅 `pending` / `sent` / `executing` 可接收回执，终态重复回执幂等忽略；
+- 事件→任务匹配按 `task_id`；事件处理进程消费 `iot_event_logs` 需按事件 ID 幂等（重复投递忽略）；
+- 账务确认与任务状态推进同事务：落账业务校验失败 → 任务回 `failed` 不回账，人工介入；
+- 未关联任务的设备事件（如 `heartbeat`）仅记日志与在线判定，不落账。
+
+### 6.3 PTL 拍灯业务流程细化（货到人 / 拣选拍灯）
+
+适用场景：货到人工作站（AGV 格口上架/补货/拣选拍灯）与普通拣选位亮灯提示。流程：
+
+1. **任务生成**：业务动作（上架、补货送达、拣选）在业务事务内生成 `wcs_tasks`（`task_type='ptl_light_on'`，`payload` 含提示数量与目标库位），业务账不动（补货在途双字段在补货任务生成时已 Δ，亮灯不重复 Δ）；
+2. **亮灯下发**：派发器下发 → `sent` → 设备亮绿灯提示待放入数量 → `executing`；
+3. **作业员放货**：按灯显示数量将货放入格口/拣选位；
+4. **拍灯按键**：放货完成拍灯 → 设备上报 `iot_event_logs` 事件 `ptl_press`（含 `task_id`、拍灯数量、时间）；
+5. **账务确认（拍灯即确认）**：事件处理进程校验事件与任务匹配 → **同事务落账**（上架 `qty_on_hand` +Δ；补货目标位在途回冲 + 在手转换；拣选扣减并释放分配）→ `wcs_tasks.status` ➜ `succeeded`；
+6. **闭环收尾**：账务确认后下发 `ptl_light_off` 灭灯（或设备自动灭灯），任务终态。
+
+**数量差异处理**：
+- 拍灯数量 = 提示数量 → 正常确认；
+- 拍灯数量 ≠ 提示数量 → 以拍灯数量为实际确认数量落账（拍灯即确认），同时记录差异并告警人工复核；差异超阈值（±20% 或绝对值 > 10，可配置）强阻断不落账，任务转人工处理；
+- 超时未拍灯 → `timeout` → 自动重试亮灯 1 次 → 仍无响应人工介入（人工清点实际数量后凭证据补录）。
+
+**并发与一致性规则**：
+- 同一 PTL 设备同一时刻仅一个未终态 `ptl_light_on` 任务（亮灯互斥，防串灯）；
+- 同任务重复拍灯事件幂等忽略（已 `succeeded` 不再落账，事件仍记录）；
+- 事件到达与落账同事务，落账失败任务回 `failed`；
+- 无匹配任务的 `ptl_press` 事件（设备自报/串灯）挂起短窗口等待任务，超窗告警人工处理。
+
+### 6.4 AGV 货到人账务联动
+
+**WMS 与 RCS 对接边界**：AGV 本体（路径规划、避障、充电、车况）由 RCS（Robot Control System）调度管理，**WMS 不直接控制 AGV**；WMS 仅经 `wcs_tasks`（`task_type='pod_move'`，payload 含货架编码与目标工作站）向 RCS 下发搬运需求，RCS 以同步回执反馈搬运结果（完成/失败/超时），WMS 据此推进任务状态与格口可用性。
+
+**格口库位是逻辑位置**：AGV 格口库位的 `row_no` / `layer_no` / `column_no` 对应 POD / F / 格位（§1.2），**账面 location 坐标是逻辑标识，不随货架物理移动变化**；货架当前物理位置（库区/工作站）由 RCS 维护，WMS 侧仅以 `pod_move` 任务状态推断"搬运中 / 已到位"。
+
+**搬运中库存可用性（格口临时不可达标记）**：
+- `warehouse_locations` 增加 `agv_unreachable_at TIMESTAMPTZ`（临时不可达标记）：`pod_move` 进入 `executing` 时置当前时间，任务终态（`succeeded` / `failed` / 作废）时清除；
+- 不可达期间：该货架全部格口库位禁止出库分配、拣选、上架与移库（**账面在手量不变，仅作业可用性隔离**）；
+- 到位（`succeeded`）后标记清除，格口恢复可用（工作站作业）；
+- 校验兜底：活跃 `pod_move` 与不可达标记不一致（有任务无标记 / 有标记无任务）时管理端告警；
+- 不采用"运行时由活跃 `pod_move` 任务推导"方案：库存可用性不应依赖任务表实时推导（慢查询且易漏判），显式标记更稳。
+
+**账务规则**：
+- `pod_move` 纯物理位移，不产生任何库存账变；
+- 格口内作业（拍灯 / 人工确认 / RFID）到达账务确认时才落账（§6.2 规则）；
+- 搬运中禁止对格口库存做任何账务动作（含移库、报损取样），需待到位后执行。
+
+**并发规则**：
+- 同一货架同一时刻仅一个未终态 `pod_move` 任务（一托一搬，防重复调度）；
+- 格口作业确认（拣选/上架/补货落账）前置校验不可达标记，不可达强阻断；
+- 搬运完成回执与格口作业落账可并发，以后者前置校验为准。
+
+### 6.5 设备生命周期（注册 / 启停 / 心跳 / 离线告警 / 绑定失效）
+
+1. **注册**：设备档案录入 `iot_devices`（仓库、编码、类型、厂商、型号、协议、IP/端口），按库位建立 `location_device_bindings`（角色、点位地址、有效期）；绑定前设备须在线并通过自检；
+2. **启停**：`enabled` 开关控制设备参与派发：停用后不再下发新指令、活跃任务停止重试并告警人工介入；历史任务与事件不受影响；
+3. **心跳与在线判定**：设备周期上报 `heartbeat` 事件 → `last_heartbeat_at` 更新；超过心跳阈值（默认 90 秒，可配置）未上报 → `online_status='offline'` → 触发离线告警（H4 企微通知 + 管理端告警中心）；设备恢复心跳或人工确认后回 `online`；
+4. **离线/故障影响面**：按绑定表反查该设备绑定库位集合，管理端展示受影响库位与待作业任务；
+5. **绑定失效与降级人工确认**：
+   - 设备离线/故障时绑定不自动删除（保留历史绑定链），作业侧按设备在线状态判定降级；人工解绑才置 `valid_to`；
+   - **该库位设备不可用 → 降级人工确认**：PTL 灯不可用 → 该库位拣选/上架降级为人工扫码确认（作业员 PDA 扫码核数，WMS 直接落账并记录"降级人工确认"与原因）；RFID 天线不可用 → 复核/下架降级人工扫码；AGV 不可用 → 不派发 `pod_move`（货到人工作站停用）；
+   - 绑定有效期到期（`valid_to` 到达）视同无绑定（走降级路径），运营在管理端续绑；
+6. **恢复与换绑**：设备恢复在线并通过自检后，新任务优先走自动确认；解绑/换绑操作需 H1 权限点（`m1.device-bind.manage`，Phase 3 预留）并留审计。
+
+### 6.6 v1 范围建议（Phase 1/2 只建结构与预留，Phase 3 实际接入）
+
+- **Phase 3 为软硬件集成**（RCS / PTL / DWS / RFID 厂商联调、指令-事件闭环、账务联动与人工介入），**v1 前只建表结构与字段预留**，见 ADR-0048 决策 5 "Phase 1 直接落地预留字段与绑定表"；
+- **Phase 1**：`is_agv_managed` / `agv_pod_code` 字段与 `location_device_bindings` 绑定表随基础档案建齐（仅建字段与表，不接硬件）；
+- **Phase 2（v1 前）**：§6.1 其余三张表（`iot_devices` / `wcs_tasks` / `iot_event_logs`）与 `warehouse_locations.agv_unreachable_at` 列结构建齐（含索引与 CHECK/UNIQUE 约束）：`iot_devices` 仅允许档案登记、`wcs_tasks` 不暴露指令生成入口、`iot_event_logs` 无写入来源、`agv_unreachable_at` 默认 NULL 不启用；
+- **Phase 3**：设备注册/绑定管理页面、指令派发器与事件处理进程、心跳/离线告警、重试与人工介入、AGV/RCS 与 PTL 厂商对接、账务联动上线；
+- 预留期不产生空转任务与孤儿事件；v1 前直接同步基线，v1 后不再迁库（对齐 ADR-0038 与 ADR-0048 基线同步策略）。

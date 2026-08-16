@@ -359,7 +359,7 @@ PDA 移库支持离线：扫码、件数核对、签字均可离线完成；本�
 
 ### 验收标准
 
-1. **补货策略配置**：PC 独立菜单维护补货策略（Min-Max 水位 / 触发模式 / 生效范围），Min-Max 数值只存策略表（按货主 + 库位组/品类配置），库位仅挂 `replenish_strategy_id` 引用；支持库位组维护与生效范围命中预览
+1. **补货策略配置**：PC 独立菜单维护补货策略（Min-Max 水位 / 触发模式 / 生效范围），Min-Max 数值只存策略表（按货主 + 库位组/品类配置），库位仅挂 `replenish_strategy_id` 引用；支持库位组维护与生效范围命中预览；策略配置与大盘操作需 `m3.replenishment.manage` 权限，PDA 领取执行需 `m3.replenishment.execute` 权限，无权限拒绝操作
 2. **双触发模式**：
    - 日常 Min-Max 巡检：`qty_on_hand + qty_replenish_in_transit <= min_safety_threshold` 触发，补至 `max_replenish_target`
    - 波次缺口即时触发：波次算单缺口生成 `urgent` 任务，对应订单行标记"等待补货"，任务 `done` 后重算单纳入拣选
