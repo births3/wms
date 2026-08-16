@@ -149,7 +149,8 @@ CREATE TABLE container_quality_lock_events (
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。
 - `qualified` 是默认无锁状态，不需要生成加锁事件；从隔离/不合格解除即 `release` 事件回到 `qualified`，`lock_category` 记 `NULL`。
 - 双人见证：加锁与解锁事件必须记录 `witness_id`（见证人），且见证人与操作人（`operated_by`）必须为不同用户（GSP 双人作业）；缺见证人或见证人重复时事务拒绝提交。
-- **M-QL 挂接（审批源）**：加锁/解锁为库存状态变更，审批源 = M-QL 质量联系单（`approval_source=M-QL` + 单号）；加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders`（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = lpn_code`）；**解锁前置条件：该容器当前锁关联的 M-QL 已办结（`closed`），未办结禁止解锁**；`release` 事件携带同一 `quality_liaison_id` 留痕（校验通过后写入）。
+- **M-QL 挂接（审批源）**：加锁/解锁为库存状态变更，审批源 = M-QL 质量联系单（`approval_source=M-QL` + 单号）；加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders`（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = lpn_code`）；`release` 事件携带同一 `quality_liaison_id` 留痕（校验通过后写入）。
+- **解锁前置 = 审批走完（closed 或 rejected 均可）**：关联 M-QL 状态为 **`closed`**（处置办结，正常解锁）或 **`rejected`**（质量部门不同意加锁/处置不成立，回退解锁）时允许解锁，其余状态（`pending_approval`/`approved`/`pending_erp_sync`/`landed`/`sync_failed`）禁止；`rejected` 解锁同样双人见证，回写规则不变（只回写本锁联动状态行），`release` 事件 `note` 记录驳回原因与审批人；`rejected` 后如需其他处置（改锁类别/转报损）先解锁再按新结论重新发起，不原地改单。**由此保证：审批无论同意还是驳回，锁都能随质量结论闭环解除，不存在"审批不同意但锁解不掉"的死锁。**
 - **外键约定**：新表外键统一单列引用目标表 PK（`REFERENCES xxx(id)`），对齐既有先例（`inventory_movements.batch_id`、`stock_adjustment_orders.quality_liaison_id`）；跨货主引用校验由 service 层 owner_id 校验兜底，不设复合外键。
 - **操作编排与权限链**：先建 M-QL（需 `mql.quality-liaison.write` 权限）→ 再加锁挂单号（需 `m1.quality-lock.manage` 权限）；管理端容器页提供"创建联系单并加锁"联动入口（一次录入，两步完成），不要求加锁操作员同时持有两权限。
 
