@@ -1,6 +1,6 @@
 # 空间、库位类型、容器质量锁、补货策略与自动化设备领域模型规范 (Storage Location & Quality Lock Model)
 
-本文档定义了 WMS 仓储空间层级、库区库位参数属性、三大作业类型、容器三类质量锁与 M1 系统字典复用机制、库存表在途模型、独立补货引擎以及 AGV/PTL/IoT 设备中台的领域规范。
+本文档定义了 WMS 仓储空间层级、库区库位参数属性、三大作业形态、容器三类质量锁与 M1 系统字典复用机制、库存表在途模型、独立补货引擎以及 AGV/PTL/IoT 设备中台的领域规范。
 
 ---
 
@@ -9,7 +9,7 @@
 ```
 🏢 仓库 (Warehouse)
   └── 库区 (Zone) ── [环境温区、品类大区准入、大类功能专区]
-        └── 库位 (Location) ── [作业类型、容器管理、安全特控、容量参数、补货水位、AGV与PTL绑定]
+        └── 库位 (Location) ── [作业形态、容器管理、安全特控、容量参数、补货水位、AGV与PTL绑定]
               └── 📦 容器 (LPN Container) ── [三类质量锁: 合格/隔离/不合格 + M1 系统字典原因]
 ```
 
@@ -25,11 +25,12 @@
 - `is_special_drug_zone`: 是否特殊药品专库（毒麻精放）
 
 ### 1.2 库位属性 (Location Attributes)
-- `location_type`:
+- `location_type`（**作业形态**，与 ADR-0048 标题"库位三级作业形态"统一用语）:
   - `storage`: 存储位 / 储备托盘位 / 高架位
   - `case_pick`: 箱拣位 / 整箱拣选位
   - `piece_pick`: 零拣位 / 拆零流利位
   - **概念注记（消除歧义）**：**整托（glossary #72）是作业粒度**——"以整个容器为一次作业对象"，容器可为托盘/周转箱/保温箱/出库箱等任意类型，**不限于托盘，也不专属存储位**；**存储位（glossary #73）是位置形态**——承载容器化库存的库位。两者正交：整托上架/移库/出库发生在存储位，整托与散货是作业粒度对，存储位/箱拣位/零拣位是位置形态三分。约束"存储位仅接受容器粒度上架"（6 维⑤）是位置形态设计，不改变整托定义。
+  - **多义词注记**：本文档中"**锁定**"按语境区分——① 容器质量锁（§2，质量管控）；② 库位锁定 `lock_status`（§1.2，作业禁入/禁出）；③ 批次行锁（SQL `FOR UPDATE`，并发控制）；④ 来源在手量锁定（`qty_replenish_out_transit`，账务预留）。"**在途**"按语境区分——① 补货在途双字段（账务口径，§5.2）；② 容器物理流转状态 `in_transit`（ADR-0047）；③ 收货/ASN 在途（M2 既有）。引用时如无上下文请带限定词。
 - `allows_container`:
   - `storage` 位 = `true`（支持托盘/LPN 容器化管理，位容一体）
   - `case_pick` / `piece_pick` 位 = `false`（散货管理，上架自动解绑脱离原容器）
@@ -61,7 +62,7 @@
 
 | 质量锁类别 | 编码 | 适用状态 | 作业约束 | 允许移库/上架目标库区（校验依据 `zone.quality_color`） |
 |---|---|---|---|---|
-| **合格锁** | `qualified` | 正常合格品 | 允许上架合格区、正常波次拣选、出库复核装车 | `qualified_green` 合格区（默认值，普通库区均为此） |
+| **合格锁** | `qualified` | 正常合格品 | 允许上架合格区、正常波次拣选、出库复核装车 | `qualified_green` 合格区（默认值，未设质量分区的库区均为合格区） |
 | **隔离锁** | `quarantine` | 隔离待检、温控异常、退货待查、抽检 | **禁止拣选与出库**；仅允许移库/上架至隔离库区 | `quarantine_yellow` 隔离区 |
 | **不合格锁** | `rejected` | 破损、过期、检验不合格、召回 | **绝对禁止出库与拣选**；仅允许移库/上架至不合格品库区 | `unqualified_red` 不合格品区 |
 
@@ -85,11 +86,11 @@
 
 | 容器质量锁 | 允许所在区域 | 禁止所在区域 |
 |---|---|---|
-| `qualified` | 合格区（默认，普通库区均此） | 隔离区、不合格品区（合格品不得滞留质量区） |
+| `qualified` | 合格区（默认，未设质量分区的库区均为合格区） | 隔离区、不合格品区（合格品不得滞留质量区） |
 | `quarantine` | 仅隔离区 `quarantine_yellow` | 合格区、不合格品区（两质量区互斥：待检≠不合格） |
 | `rejected` | 仅不合格品区 `unqualified_red` | 合格区、隔离区 |
 
-**② 加锁时位置处置**：加锁事务成功（含未上架容器）→ **同事务生成隔离移库任务**（移库类型 `lock_move`，目标 = 锁类别对应区域，系统推荐该区空闲位）；允许暂缓移库（当前作业不可中断等），但**暂缓期间容器禁止一切作业**；超时未移库（默认 2 小时，可配置）告警质量管理员（H4 企微 + 告警中心）；移库到位校验目标区 `quality_color` 匹配（6 维③ 的移库形态）。
+**② 加锁时位置处置**：加锁事务成功（含未上架容器）→ **同事务生成隔离移库任务**（移库类型 `lock_move`，**复用 M3-006 库内移库作业流**，携带 `lock_move` 类型标记与质量锁权限校验，不可与普通移库混淆）；目标 = 锁类别对应区域，系统推荐该区空闲位；允许暂缓移库（当前作业不可中断等），但**暂缓期间容器禁止一切作业**；超时未移库（默认 2 小时，可配置）告警质量管理员（H4 企微 + 告警中心）；移库到位校验目标区 `quality_color` 匹配（6 维③ 的移库形态）。
 
 **③ 解锁后位置处置**：解锁回 `qualified` → 同事务生成移回合格区移库任务（推荐原库位或系统推荐位）；移出前该容器仅允许移库作业、不参与新波次分配。
 
@@ -124,7 +125,7 @@
 CREATE TABLE container_quality_lock_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     container_id UUID NOT NULL REFERENCES lpn_containers(id),
-    container_code VARCHAR(64) NOT NULL,
+    lpn_code VARCHAR(64) NOT NULL,                 -- 冗余主档码（与 lpn_containers.lpn_code 同名，便于追溯）
     event_type VARCHAR(16) NOT NULL,               -- 'lock' | 'change_reason' | 'release'
     lock_category VARCHAR(32),                     -- 'qualified', 'quarantine', 'rejected'（release 事件为 NULL）
     reason_dict_item_code VARCHAR(64),             -- 关联 M1 system_dictionary_items.item_code
@@ -141,7 +142,7 @@ CREATE TABLE container_quality_lock_events (
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。
 - `qualified` 是默认无锁状态，不需要生成加锁事件；从隔离/不合格解除即 `release` 事件回到 `qualified`，`lock_category` 记 `NULL`。
 - 双人见证：加锁与解锁事件必须记录 `witness_id`（见证人），且见证人与操作人（`operated_by`）必须为不同用户（GSP 双人作业）；缺见证人或见证人重复时事务拒绝提交。
-- **M-QL 挂接**：加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders` 质量联系单（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = container_code`）；**解锁前置条件：该容器当前锁关联的 M-QL 已办结（`closed`），未办结禁止解锁**；`release` 事件携带同一 `quality_liaison_id` 留痕（校验通过后写入）。
+- **M-QL 挂接**：加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders` 质量联系单（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = lpn_code`）；**解锁前置条件：该容器当前锁关联的 M-QL 已办结（`closed`），未办结禁止解锁**；`release` 事件携带同一 `quality_liaison_id` 留痕（校验通过后写入）。
 - **操作编排与权限链**：先建 M-QL（需 `mql.quality-liaison.write` 权限）→ 再加锁挂单号（需 `m1.quality-lock.manage` 权限）；管理端容器页提供"创建联系单并加锁"联动入口（一次录入，两步完成），不要求加锁操作员同时持有两权限。
 
 ---
@@ -151,7 +152,7 @@ CREATE TABLE container_quality_lock_events (
 PC 管理端提供向导式批量生成器，支持规则定义与一键生成：
 - **普通静态货架规则**：`[前缀]-[巷道:01..05]-[排架:01..10]-[层:01..04]-[格位:01..06]`
 - **AGV 移动货架规则**：`POD[货架号:01..50]-F[层:1..5]-[格位:01..08]`
-- **属性批量填充**：生成时直接批量赋予作业类型（`location_type`）、温区及容器开关。
+- **属性批量填充**：生成时直接批量赋予作业形态（`location_type`）、温区及容器开关。
 - **导入导出**：支持 Excel 标准格式批量导入与全仓导出。
 
 ---
