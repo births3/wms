@@ -13,6 +13,7 @@ assert.match(nav, /title: "M1 容器管理"/);
 assert.match(page, /coreQueryFieldKeys=\{lpnCoreQueryFieldKeys\}/);
 assert.match(page, /key: "created_at"/);
 assert.match(page, /gridProps=\{/);
+assert.match(page, /storageKey: "m1-lpn-containers"/);
 assert.match(page, /FormDialogTemplate/);
 assert.match(page, /header=\{\{ title: lpnContainerMenuItem.title/);
 assert.match(page, /创建容器/);
