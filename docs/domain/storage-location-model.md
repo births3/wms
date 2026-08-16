@@ -220,6 +220,71 @@ CREATE TABLE replenishment_location_group_members (
 - `warehouse_locations.replenish_strategy_id` 引用策略表（可空，未挂策略的拣选位不参与 Min-Max 巡检）。
 - Min-Max 巡检判定（目标拣选位）：`qty_on_hand + qty_replenish_in_transit <= min_safety_threshold` 触发，补货目标 `max_replenish_target`；波次缺口即时驱动按同一表配置。
 
+### 5.4 补货任务实体与状态机 (Replenishment Task)
+
+任务在触发时同事务内生成并更新在途双字段（见 §5.2）；任务表仅记录作业过程，不参与算量：
+
+```sql
+CREATE TABLE replenishment_tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,
+    task_no VARCHAR(64) NOT NULL,               -- 编号（走 M-CG 编号规则）
+    trigger_mode VARCHAR(16) NOT NULL,          -- 'min_max' | 'wave_gap' | 'manual'
+    priority VARCHAR(16) NOT NULL DEFAULT 'normal',  -- 'normal' | 'urgent'（波次缺口任务为 urgent）
+    strategy_id UUID REFERENCES replenishment_strategies(id),
+    source_location_id UUID NOT NULL,           -- 来源存储位
+    source_batch_id UUID NOT NULL,              -- 来源批次（FEFO 锁定）
+    source_lpn_id UUID,                         -- 来源容器（整托下架，散货为 NULL）
+    target_location_id UUID NOT NULL,           -- 目标拣选位
+    product_id UUID NOT NULL,
+    batch_no VARCHAR(64) NOT NULL,
+    qty NUMERIC(12, 4) NOT NULL CHECK (qty > 0),      -- 任务数量
+    done_qty NUMERIC(12, 4) NOT NULL DEFAULT 0,       -- 已完成数量（支持部分执行）
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',    -- pending / in_progress / done / cancelled
+    operator_id UUID,                           -- PDA 作业员（领取时写入）
+    confirmed_at TIMESTAMPTZ,                   -- 目标位确认完成时间
+    cancel_reason TEXT,
+    created_by TEXT NOT NULL,                   -- 触发来源（巡检引擎/波次号/人工用户名）
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version BIGINT NOT NULL DEFAULT 1,
+    UNIQUE (owner_id, task_no)
+);
+
+CREATE INDEX IF NOT EXISTS replenishment_tasks_owner_status_target_idx
+    ON replenishment_tasks (owner_id, status, target_location_id);
+CREATE INDEX IF NOT EXISTS replenishment_tasks_owner_source_batch_idx
+    ON replenishment_tasks (owner_id, source_batch_id);
+```
+
+**状态机**：`pending`（已生成，双字段已 +Δ）➜ `in_progress`（PDA 领取，写 `operator_id`）➜ `done`（目标位确认完成，双字段回冲 + 在手转换）；`cancelled` 仅可从 `pending`/`in_progress` 由人工或超时触发（回冲双字段，来源解冻）。`done_qty = qty` 时任务才置 `done`；部分执行后剩余量仍由原任务承担。**取消前置：`done_qty = 0`**（未开始下架）；已部分执行的任务不可取消（下架的物理货已在流转），需完成剩余量或人工介入处理。
+
+**来源选择（FEFO）**：Min-Max 巡检按目标商品从来源候选存储位中选**效期最近**的批次锁定（近效期先补到拣选位，拣选位按 FEFO 出库）；任务生成时对 `source_batch_id` 行加行锁（`SELECT ... FOR UPDATE`）并校验来源可用量（§5.2 公式 > 0），不足则跳过该来源改选下一候选。
+
+### 5.5 PDA 补货作业流程
+
+1. **领取任务**：PDA 补货任务列表（按库位/优先级排序）领取 → `pending` ➜ `in_progress`，写 `operator_id`；同任务同时只允许一个作业员领取（乐观锁 version 校验）。
+2. **来源下架**：扫描来源库位/容器码 → 校验与任务 `source_*` 匹配；下架数量（可少于任务量）→ 来源侧不扣在手（已由 `qty_replenish_out_transit` 锁定），仅登记作业进度。
+3. **送达确认**：扫描目标拣选位码 → 校验目标位未被占用/无质量锁/品类温区匹配（复用 6 维校验②③⑥）→ 确认完成。
+4. **账面转换（同事务）**：来源位 `qty_on_hand −qty`、`qty_replenish_out_transit −qty`；目标位 `qty_on_hand +qty`、`qty_replenish_in_transit −qty`；任务 `done_qty += qty`；写入库存流水（movement_type = `replenish`）。整托全量补货完成后释放来源容器（`idle`，释放前校验该 LPN 在来源位无剩余在手量）。
+5. **重复提交防重**：确认接口按任务 + 幂等键（Idempotency-Key）重放，version 乐观锁兜底。
+
+### 5.6 PC 补货策略与任务大盘
+
+- **策略配置页**：策略 CRUD（Min-Max/触发模式/生效范围）、库位组维护（`replenishment_location_groups` + 成员）、生效范围预览（命中拣选位列表与当前水位）。
+- **任务大盘**：
+  - 列表：任务号/触发模式/优先级/来源/目标/数量/状态/作业员/时间；按状态、库位、货主过滤；
+  - 操作：**取消**（仅 `pending`/`in_progress` 且 `done_qty = 0`，回冲双字段）、**重派**（重置 `operator_id` 释放任务）、**手动发起**（选来源存储位/批次/目标拣选位/数量，生成 `trigger_mode='manual'` 任务）、**超时告警**（`urgent` 任务超时未领取高亮并自动取消回冲）；
+  - **波次联动**：波次缺口任务生成时对应订单行标记"等待补货"；任务 `done` 后波次重新算单纳入拣选；任务取消则缺口订单行拆单或降级待下一波次。
+
+### 5.7 并发与一致性
+
+- **来源锁定**：任务生成与下架确认均以 `qty_replenish_out_transit` + 批次行锁为准；同一批次被两个任务同时锁定时，后生成者校验来源可用量不足则失败（等待下一巡检周期），不排队不覆盖。
+- **来源位动态占用**：任务生成后来源位被移库/质检隔离（`qty_frozen` 增加）导致可用量不足 → 确认时按 version 乐观锁校验，冲突则任务挂起并告警人工复核。
+- **目标位冲突**：确认时校验目标位当前质量状态与容量，不满足 PDA 强阻断（复用 6 维校验）。
+- **取消回冲**：取消/超时任务必须回冲双字段，防止在途量悬空（`qty_replenish_in_transit` 残留会导致水位误判不再触发）。
+- **幂等与重放**：生成接口按幂等键防重（双字段只 Δ 一次）；确认接口 version 乐观锁防重复确认。
+
 ---
 
 ## 6. AGV、电子标签与通用硬件设备中台架构 (IoT / WCS Layer)
