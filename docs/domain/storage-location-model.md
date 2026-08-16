@@ -182,8 +182,10 @@ CREATE TABLE inventory_batches (
     qty_frozen NUMERIC(12, 4) NOT NULL DEFAULT 0,               -- 质检/质量冻结量
 
     status VARCHAR(32) NOT NULL DEFAULT 'qualified',            -- qualified, quarantined, unqualified, loss_deducted, pending_destruction（对齐 M3 字典）
+    recall_flag BOOLEAN NOT NULL DEFAULT FALSE, -- 召回标记（保留既有，M3 召回流程引用）
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    version BIGINT NOT NULL DEFAULT 1           -- 乐观锁（保留既有）
 );
 ```
 
@@ -195,7 +197,10 @@ CREATE TABLE inventory_batches (
 | `quality_status` (TEXT，值域走 M3 `inventory_quality_status` 字典) | `status` | 改名对齐既有字典五值（`qualified/quarantined/unqualified/loss_deducted/pending_destruction`）；同步改 M3 召回/质检作业引用 |
 | `qty_locked` | `qty_frozen` | 语义不变（质检/质量冻结），改名同步改 M3 作业引用 |
 | `location_code` (TEXT) | `location_id` (UUID 外键) + 冗余 `zone_id` | zone 可由 location 推导，冗余仅用于避免跨表 join；`zone_id` 必须与 location 所属 zone 一致 |
+| `recall_flag` / `version` | 保留（schema 中未省略） | 召回标记与乐观锁继续使用，M3 召回/质检作业引用不改名 |
+| （无） | `warehouse_id` | 新增冗余列（与 `zone_id` 同理由，可由 location 推导），迁移回填 |
 | （无） | `container_lpn` | 已有 lpn_container 切片部分落地，本文档确认纳入统一模型 |
+| （无） | `qty_allocated` | 新增分配占用冗余列：与既有 `inventory_allocations` 分配流水**同事务维护**（分配/释放时同步增减），算单直接读库存行、不再 join 分配表；既有分配数据按行汇总回填 |
 | （无） | `qty_replenish_in_transit` / `qty_replenish_out_transit` | 补货在途双字段，见 §5 |
 
 唯一约束相应调整为 `UNIQUE (owner_id, product_id, batch_no, location_id, status)`（整托场景下 `container_lpn` 不参与唯一约束，同托同品同批加量走行锁合并）。
