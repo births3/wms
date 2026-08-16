@@ -38,7 +38,7 @@
    - **挂接 M-QL 质量联系单（审批源）**：加锁/解锁为库存状态变更，**审批源 = M-QL 质量联系单**（`approval_source=M-QL` + 单号，对齐 M3-003 审批源链治理）；加锁事件关联 `quality_liaison_orders`（`rejected` 必填、`quarantine` 选填；对齐 `stock_adjustment_orders.quality_liaison_id` 既有先例，`related_document_type = 'container_quality_lock'`）；**解锁前置 = 审批走完**：M-QL 为 `closed`（处置办结）或 `rejected`（质量不同意加锁，回退解锁）均可解锁，其余状态禁止；驳回解锁同样双人见证、回写规则不变、事件记录驳回原因，需其他处置先解锁再重新发起——保证审批无论同意还是驳回锁都能闭环解除，无死锁。
    - **与批次库存质量状态联动**：容器质量锁 `quarantine ⇒ inventory_batches.status='quarantined'`、`rejected ⇒ 'unqualified'`、`qualified ⇒ 'qualified'`（值域对齐既有 M3 `inventory_quality_status` 字典），加锁/换原因/解锁时同步容器下所有库存行并写入库存流水。
    - **加锁前置与解锁回写**：仅 `in_use` 的容器可加锁（含未上架容器：验收/移入时异常可先锁，无库存行则批次联动为空操作，上架由 6 维③ 兜底阻断）；`idle`/`in_transit`/`recycling`/`shipped` 禁止；解锁只回写仍处于本锁联动状态的批次行，锁期间被质检/召回等其他流程变更过的行不回写、提示人工复核，禁止无条件回写 `qualified`。
-   - **加锁时已分配占用的处置**：加锁联动同事务释放容器下批次行已分配量（`qty_allocated`）并通知波次/订单行重新算单，释放后不得再拣选（拣选校验读质量锁强阻断兜底）。
+   - **加锁时已分配占用的处置**：加锁联动同事务释放容器下批次行已分配量（`qty_allocated`）并标记订单行"等待重新分配"，释放后不得再拣选（拣选校验读质量锁强阻断兜底）；**波次重算单为异步通知**（事务提交后发事件由波次模块消费，不在加锁事务内同步调用）。
    - **M-QL 操作编排**：先建 M-QL（`mql.quality-liaison.write`）→ 再加锁挂单（`m1.quality-lock.manage`）；管理端提供"创建联系单并加锁"联动入口，不要求操作员同时持有两权限。
 3. **容器管理模式**：
    - 存储位（`storage`）：容器化管理（`allows_container = true`，位容一体，按容器/LPN 追踪；整托为作业粒度概念，与位置形态正交，见 glossary #72/#73）；
