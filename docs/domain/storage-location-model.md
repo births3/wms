@@ -52,11 +52,11 @@
 
 | 质量锁类别 | 编码 | 适用状态 | 作业约束 | 允许移库/上架目标库区（校验依据 `zone.quality_color`） |
 |---|---|---|---|---|
-| **合格锁** | `qualified` | 正常合格品 | 允许上架合格区、正常波次拣选、出库复核装车 | `qualified_green` 合格区（或任一未设质量分区的普通库区） |
+| **合格锁** | `qualified` | 正常合格品 | 允许上架合格区、正常波次拣选、出库复核装车 | `qualified_green` 合格区（默认值，普通库区均为此） |
 | **隔离锁** | `quarantine` | 隔离待检、温控异常、退货待查、抽检 | **禁止拣选与出库**；仅允许移库/上架至隔离库区 | `quarantine_yellow` 隔离区 |
 | **不合格锁** | `rejected` | 破损、过期、检验不合格、召回 | **绝对禁止出库与拣选**；仅允许移库/上架至不合格品库区 | `unqualified_red` 不合格品区 |
 
-**与批次库存质量状态的联动**：容器质量锁是容器级状态，其下各批次库存行（`inventory_batches.status`，值域对齐既有 M3 `inventory_quality_status` 字典）按锁类别联动映射：`quarantine ⇒ quarantined`（隔离）、`rejected ⇒ unqualified`（不合格）、`qualified ⇒ qualified`。加锁/换原因/解锁时对容器下所有库存行同步状态并写入库存流水；上架 6 维校验（ADR-0048 决策 4 第③步）优先读容器质量锁（容器管理位），散货位读批次 `status`，两处任一非 `qualified` 即强阻断。
+**与批次库存质量状态的联动**：容器质量锁是容器级状态，其下各批次库存行（`inventory_batches.status`，值域对齐既有 M3 `inventory_quality_status` 字典五值：`qualified/quarantined/unqualified/loss_deducted/pending_destruction`）按锁类别联动映射：`quarantine ⇒ quarantined`（隔离）、`rejected ⇒ unqualified`（不合格）、`qualified ⇒ qualified`；`loss_deducted`（报损扣减）与 `pending_destruction`（待销毁）由报损/销毁流程管理，不参与质量锁联动。加锁/换原因/解锁时对容器下所有库存行同步状态并写入库存流水；上架 6 维校验（ADR-0048 决策 4 第③步）优先读容器质量锁（容器管理位），散货位读批次 `status`，两处任一非 `qualified` 即强阻断。
 
 **触发源仅人工**：加锁/换原因/解锁均为人工操作（管理端容器页 + PDA 扫码），不设系统自动加锁；温控超标、召回令等场景由运营人员依据证据（温控记录、召回文件）人工发起。操作需要 H1 权限点 `m1.quality-lock.manage`（加锁/换原因/解锁），无权限拒绝操作。
 
@@ -90,7 +90,7 @@ CREATE TABLE container_quality_lock_events (
 
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。
 - `qualified` 是默认无锁状态，不需要生成加锁事件；从隔离/不合格解除即 `release` 事件回到 `qualified`，`lock_category` 记 `NULL`。
-- 双人见证：加锁与解锁事件必须记录 `witness_id`，缺少见证人时事务拒绝提交。
+- 双人见证：加锁与解锁事件必须记录 `witness_id`（见证人），且见证人与操作人（`operated_by`）必须为不同用户（GSP 双人作业）；缺见证人或见证人重复时事务拒绝提交。
 - **M-QL 挂接**：加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders` 质量联系单（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = container_code`）；**解锁前置条件：关联 M-QL 已办结（`closed`），未办结禁止解锁**。
 
 ---
@@ -129,7 +129,7 @@ CREATE TABLE inventory_batches (
     qty_replenish_out_transit NUMERIC(12, 4) NOT NULL DEFAULT 0, -- 补货下架在途量 (该库位正被补货取走，来源侧)
     qty_frozen NUMERIC(12, 4) NOT NULL DEFAULT 0,               -- 质检/质量冻结量
 
-    status VARCHAR(32) NOT NULL DEFAULT 'qualified',            -- qualified, quarantined, unqualified（对齐 M3 字典）
+    status VARCHAR(32) NOT NULL DEFAULT 'qualified',            -- qualified, quarantined, unqualified, loss_deducted, pending_destruction（对齐 M3 字典）
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -140,7 +140,7 @@ CREATE TABLE inventory_batches (
 | 既有字段 | 新模型 | 迁移说明 |
 |---|---|---|
 | `product_code` (TEXT) | `product_id` (UUID) | 关联商品主档；既有库存行按商品主档回填 ID |
-| `quality_status` (TEXT，值域走 M3 `inventory_quality_status` 字典) | `status` (`qualified/quarantined/unqualified`) | 改名对齐既有字典三态（`loss_deducted`/`pending_destruction` 保留在字典中）；同步改 M3 召回/质检作业引用 |
+| `quality_status` (TEXT，值域走 M3 `inventory_quality_status` 字典) | `status` | 改名对齐既有字典五值（`qualified/quarantined/unqualified/loss_deducted/pending_destruction`）；同步改 M3 召回/质检作业引用 |
 | `qty_locked` | `qty_frozen` | 语义不变（质检/质量冻结），改名同步改 M3 作业引用 |
 | `location_code` (TEXT) | `location_id` (UUID 外键) + 冗余 `zone_id` | zone 可由 location 推导，冗余仅用于避免跨表 join；`zone_id` 必须与 location 所属 zone 一致 |
 | （无） | `container_lpn` | 已有 lpn_container 切片部分落地，本文档确认纳入统一模型 |
@@ -193,7 +193,27 @@ CREATE TABLE replenishment_strategies (
 );
 ```
 
-- `warehouse_locations.replenish_strategy_id` 引用本表（可空，未挂策略的拣选位不参与 Min-Max 巡检）。
+策略 scope 的 `location_group` 类型需要库位组实体（按组批量挂策略与批量改水位）：
+
+```sql
+CREATE TABLE replenishment_location_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,
+    group_code VARCHAR(64) NOT NULL,
+    group_name VARCHAR(128) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (owner_id, group_code)
+);
+
+CREATE TABLE replenishment_location_group_members (
+    group_id UUID NOT NULL REFERENCES replenishment_location_groups(id),
+    location_id UUID NOT NULL,
+    PRIMARY KEY (group_id, location_id)
+);
+```
+
+- `warehouse_locations.replenish_strategy_id` 引用策略表（可空，未挂策略的拣选位不参与 Min-Max 巡检）。
 - Min-Max 巡检判定（目标拣选位）：`qty_on_hand + qty_replenish_in_transit <= min_safety_threshold` 触发，补货目标 `max_replenish_target`；波次缺口即时驱动按同一表配置。
 
 ---
