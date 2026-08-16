@@ -67,7 +67,7 @@
 - 质量管理闭环：容器具备可配置的合格/隔离/不合格三级质量锁，锁原因直接通过 M1 系统字典无缝维护，零冗余。
 - 核心库存表增加 `qty_replenish_in_transit` / `qty_replenish_out_transit` 双字段，提升高并发下的实时可用量计算效率。
 - 新增独立的【补货策略配置】与【补货任务监控】前端管理界面与调度引擎。
-- **Phase 1 基线同步清单**（v1 前直接改基线，不做兼容过渡）：① `warehouse_zones.temperature_zone` CHECK 值域迁移至五温区新编码；② `warehouse_locations.status` 值域收敛为 `available/occupied/disabled`，存量 `locked` 迁移为 `lock_status='lock_all'`，`bound_owner_id` 改名 `current_owner_id`；③ `inventory_batches` 按 §4 迁移清单改名/新增字段（`product_code→product_id`、`quality_status→status`、`qty_locked→qty_frozen`、新增 `zone_id/container_lpn` 与在途双字段），并同步改 M3 召回/质检作业引用；④ 新增 `container_quality_lock_events` 纯审计表（含 `quality_liaison_id` 挂接列）与 `lpn_containers` 当前锁冗余字段；⑤ 新增补货策略表（含库位组两张表）与 `warehouse_locations.replenish_strategy_id` 引用、`location_device_bindings` 绑定表与 AGV 预留字段。
+- **Phase 1 基线同步清单**（v1 前直接改基线，不做兼容过渡）：① `warehouse_zones.temperature_zone` 与 `products.storage_condition` 两处温区 CHECK 值域同步迁移至五温区新编码；② `warehouse_locations.status` 值域收敛为 `available/occupied/disabled`，存量 `locked` 迁移为 `lock_status='lock_all'`，`bound_owner_id` 改名 `current_owner_id`；③ `inventory_batches` 按 §4 迁移清单改名/新增字段（`product_code→product_id`、`quality_status→status`、`qty_locked→qty_frozen`、新增 `zone_id/container_lpn` 与在途双字段），并同步改 M3 召回/质检作业引用；④ 新增 `container_quality_lock_events` 纯审计表（含 `quality_liaison_id` 挂接列）与 `lpn_containers` 当前锁冗余字段；⑤ 新增补货策略表（含库位组两张表）与 `warehouse_locations.replenish_strategy_id` 引用、`location_device_bindings` 绑定表与 AGV 预留字段。
 
 ## 关联与参考
 
