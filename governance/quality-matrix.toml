@@ -5988,6 +5988,7 @@ types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
 api_paths = [
   "POST /api/v1/master-data/lpn-containers/{id}/quality-lock",
   "PATCH /api/v1/master-data/lpn-containers/{id}/quality-lock",
+  "POST /api/v1/master-data/lpn-containers/{id}/quality-lock/release",
 ]
 database_objects = ["container_quality_lock_events", "lpn_containers", "quality_liaison_orders"]
 reason = "方案与验收标准已定稿（ADR-0048、storage-location-model §2）；未实施。待 Phase 1 实施：事件表/主档冗余字段迁移、加锁/换原因/解锁接口、权限点 m1.quality-lock.manage、双人见证、M-QL 挂接与解锁前置校验、批次状态联动、管理端容器页操作与 PDA 扫码。"

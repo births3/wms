@@ -144,6 +144,9 @@ CREATE TABLE container_quality_lock_events (
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     note TEXT
 );
+
+CREATE INDEX IF NOT EXISTS container_quality_lock_events_container_idx
+    ON container_quality_lock_events (container_id, occurred_at DESC);
 ```
 
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。
