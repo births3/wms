@@ -76,7 +76,7 @@
 6. **作业阻断**：
    - `quarantine`：禁止拣选与出库，仅允许移库/上架至隔离库区（`zone.quality_color = quarantine_yellow`）
    - `rejected`：绝对禁止正常流转，仅允许移入不合格品库区（`unqualified_red`）
-7. **批次状态联动**：加锁/换原因/解锁时容器下所有 `inventory_batches.status` 同步 `quarantined`/`unqualified`/`qualified` 并写入库存流水
+7. **批次状态联动**：加锁/换原因/解锁时容器下所有 `inventory_batches.status` 同步 `quarantined`/`unqualified`/`qualified` 并写入库存流水；**加锁时同事务释放已分配量（`qty_allocated`）并通知波次/订单行重新算单**
 8. **审计留痕**：加锁/换原因/解锁事件写入 `container_quality_lock_events`（纯 INSERT 审计表），全生命周期可追溯
 9. **当前锁状态**：容器主档 `lpn_containers.current_lock_category` 实时反映当前锁，列表可筛选
 10. **加锁前置状态**：仅 `in_use` 且挂载库存行的容器可加锁；`idle`/`in_transit`/`recycling`/`shipped` 禁止

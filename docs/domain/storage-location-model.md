@@ -16,6 +16,7 @@
 ### 1.1 库区属性 (Zone Attributes)
 - `temperature_zone`: 常温 (`normal_10_30`), 阴凉 (`cool_le_20`), 冷藏 (`cold_2_8`), 冷冻 (`freeze_le_minus_20`), 超低温 (`ultra_cold_minus_80`)
   - **基线同步**：既有 CHECK 值域为 `frozen/cold/cool/normal`，Phase 1 同步基线时改 CHECK 并迁移存量数据（`normal→normal_10_30`、`cool→cool_le_20`、`cold→cold_2_8`、`frozen→freeze_le_minus_20`），另新增 `ultra_cold_minus_80`；既有 `frozen` 语义即为 ≤ -20℃ 冷冻，迁移后含义不变。
+  - **温区匹配规则（6 维校验②）**：目标库位温区范围必须**被商品存储温区范围包含**（库位温区上限 ≤ 商品温区上限 且 库位温区下限 ≥ 商品温区下限）。例：商品要求 `cold_2_8` → 仅可上 `cold_2_8` 库区；要求 `normal_10_30` → 可上 `normal_10_30` 或 `cool_le_20`（10-20 ⊂ 10-30，更凉不违规）；要求 `cool_le_20` → 不可上 `normal_10_30`（上限 30 超 20）也不可上 `cold_2_8`（下限 2 低于 10 常规阴凉下限，按实际温度区间判定）。
 - `quality_color`: `qualified_green` (合格区), `quarantine_yellow` (隔离区), `unqualified_red` (不合格品区)
   - 质量分区是**容器质量锁移库目标校验的依据**（见 §2.1）：隔离锁仅允许移至 `quarantine_yellow` 库区，不合格锁仅允许移至 `unqualified_red` 库区。
 - `allowed_categories`: `["drug", "medical_device", "health_food", "disinfectant", "hazardous", "cosmetics"]`（药 / 械 / 保健品 / 消杀 / 危险品 / 日化，即非药大类）
@@ -67,6 +68,7 @@
 
 **加锁前置状态与解锁回写（防止覆盖竞态）**：
 - **加锁前置**：仅 `in_use` 且挂载库存行的容器可加锁；`idle`（空容器）、`in_transit`、`recycling`、`shipped` 状态禁止加锁（无内容物可锁或流转中不可锁）。
+- **加锁时已分配占用的处置**：加锁联动时，对容器下批次行 `qty_allocated > 0` 的已分配量**释放分配并通知对应波次/订单行重新算单**（订单行标记"等待重新分配"，对齐补货取消的波次联动语义）；已释放的分配不得再拣选（拣选校验读容器质量锁强阻断兜底）。释放分配与状态联动同事务。
 - **解锁回写规则**：解锁只回写**仍处于本锁联动状态**的批次行（`quarantined`/`unqualified` 且由本锁设置）；锁期间被质检/召回等其他流程变更过的行**不回写、不覆盖**，解锁操作完成后提示人工复核这些行。禁止无条件将全部行回写 `qualified`（会抹掉锁期间产生的质检结论）。
 
 **触发源仅人工**：加锁/换原因/解锁均为人工操作（管理端容器页 + PDA 扫码），不设系统自动加锁；温控超标、召回令等场景由运营人员依据证据（温控记录、召回文件）人工发起。操作需要 H1 权限点 `m1.quality-lock.manage`（加锁/换原因/解锁），无权限拒绝操作。
@@ -103,6 +105,7 @@ CREATE TABLE container_quality_lock_events (
 - `qualified` 是默认无锁状态，不需要生成加锁事件；从隔离/不合格解除即 `release` 事件回到 `qualified`，`lock_category` 记 `NULL`。
 - 双人见证：加锁与解锁事件必须记录 `witness_id`（见证人），且见证人与操作人（`operated_by`）必须为不同用户（GSP 双人作业）；缺见证人或见证人重复时事务拒绝提交。
 - **M-QL 挂接**：加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders` 质量联系单（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = container_code`）；**解锁前置条件：该容器当前锁关联的 M-QL 已办结（`closed`），未办结禁止解锁**；`release` 事件携带同一 `quality_liaison_id` 留痕（校验通过后写入）。
+- **操作编排与权限链**：先建 M-QL（需 `mql.quality-liaison.write` 权限）→ 再加锁挂单号（需 `m1.quality-lock.manage` 权限）；管理端容器页提供"创建联系单并加锁"联动入口（一次录入，两步完成），不要求加锁操作员同时持有两权限。
 
 ---
 
