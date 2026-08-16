@@ -72,7 +72,7 @@
 2. **锁原因复用 M1 系统字典**：隔离原因字典 `container_quarantine_reason`、不合格原因字典 `container_rejected_reason`，管理端【系统字典】维护，锁事件关联 `system_dictionary_items.item_code`
 3. **仅人工加锁**：管理端容器页 / PDA 扫码操作加锁、换原因、解锁；无 `m1.quality-lock.manage` 权限拒绝操作
 4. **双人见证**：加锁与解锁必须填写见证人 `witness_id`，且见证人与操作人必须为不同用户，缺见证人或见证人重复事务拒绝
-5. **挂接 M-QL 质量联系单**：`rejected` 必填、`quarantine` 选填关联 `quality_liaison_orders`；**解锁前置条件：关联单已办结（`closed`）**
+5. **挂接 M-QL 质量联系单（审批源）**：加锁/解锁为库存状态变更，**审批源 = M-QL 质量联系单**（`approval_source=M-QL` + 单号）；`rejected` 必填、`quarantine` 选填关联 `quality_liaison_orders`；**解锁前置条件：关联单已办结（`closed`）**
 6. **作业阻断**：
    - `quarantine`：禁止拣选与出库，仅允许移库/上架至隔离库区（`zone.quality_color = quarantine_yellow`）
    - `rejected`：绝对禁止正常流转，仅允许移入不合格品库区（`unqualified_red`）
