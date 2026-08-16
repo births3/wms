@@ -29,12 +29,13 @@
      - 隔离原因字典：`container_quarantine_reason`（预置温控异常、包装破损待检、销退待验、例行抽样等）；
      - 不合格原因字典：`container_rejected_reason`（预置药品过期、破损泄漏、检验不合格、药监召回等）；
      - 运营人员直接在管理端【系统字典】菜单下维护字典项，无需新造配置表。
-   - **触发源仅人工加锁**：加锁/换原因/解锁均为人工操作（管理端容器页 + PDA 扫码操作），不做系统自动加锁；温控超标、召回令等场景由运营人员依据证据（温控记录、召回文件）人工发起。
+   - **触发源仅人工加锁**：加锁/换原因/解锁均为人工操作（管理端容器页 + PDA 扫码操作），不做系统自动加锁；温控超标、召回令、养护异常（M3-004）等场景由运营人员依据证据（温控记录、召回文件、养护记录）人工发起。
+   - **适用边界**：容器质量锁为容器（整托）粒度——个别件异常先拆托或按批次行质检处理；散货位（`allows_container=false`）无容器可锁，异常走既有 M3 质检流程（批次 `status`/`qty_frozen`），6 维③ 散货位读批次 `status` 兜底。
    - **操作权限**：新增 H1 权限点 `m1.quality-lock.manage`（加锁/换原因/解锁），无权限用户禁止操作；操作日志进审计事件表。
    - **锁事件表为纯审计表（只 INSERT，禁止 UPDATE/DELETE）**：加锁/换原因/解锁均插入新事件行，当前锁冗余在容器主档（`lpn_containers.current_lock_category`）同事务维护；加锁与解锁必须双人见证（`witness_id` 与 `operated_by` 必须为不同用户），缺见证人或见证人重复拒绝提交。
    - **挂接 M-QL 质量联系单**：加锁事件关联 `quality_liaison_orders` 质量联系单（`rejected` 必填、`quarantine` 选填；对齐 `stock_adjustment_orders.quality_liaison_id` 既有先例，`related_document_type = 'container_quality_lock'`）；**解锁前置条件：关联 M-QL 已办结（`closed`），未办结禁止解锁**。
    - **与批次库存质量状态联动**：容器质量锁 `quarantine ⇒ inventory_batches.status='quarantined'`、`rejected ⇒ 'unqualified'`、`qualified ⇒ 'qualified'`（值域对齐既有 M3 `inventory_quality_status` 字典），加锁/换原因/解锁时同步容器下所有库存行并写入库存流水。
-   - **加锁前置与解锁回写**：仅 `in_use` 且挂载库存行的容器可加锁（`idle`/`in_transit`/`recycling`/`shipped` 禁止）；解锁只回写仍处于本锁联动状态的批次行，锁期间被质检/召回等其他流程变更过的行不回写、提示人工复核，禁止无条件回写 `qualified`。
+   - **加锁前置与解锁回写**：仅 `in_use` 的容器可加锁（含未上架容器：验收/移入时异常可先锁，无库存行则批次联动为空操作，上架由 6 维③ 兜底阻断）；`idle`/`in_transit`/`recycling`/`shipped` 禁止；解锁只回写仍处于本锁联动状态的批次行，锁期间被质检/召回等其他流程变更过的行不回写、提示人工复核，禁止无条件回写 `qualified`。
    - **加锁时已分配占用的处置**：加锁联动同事务释放容器下批次行已分配量（`qty_allocated`）并通知波次/订单行重新算单，释放后不得再拣选（拣选校验读质量锁强阻断兜底）。
    - **M-QL 操作编排**：先建 M-QL（`mql.quality-liaison.write`）→ 再加锁挂单（`m1.quality-lock.manage`）；管理端提供"创建联系单并加锁"联动入口，不要求操作员同时持有两权限。
 3. **容器管理模式**：
