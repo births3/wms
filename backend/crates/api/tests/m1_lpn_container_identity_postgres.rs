@@ -9,8 +9,8 @@ use wms_api::{
 mod lpn_support;
 mod postgres_test_support;
 use lpn_support::{
-    at, batch_container_lpn, create_req, ctx, loose_putaway_req, putaway_req, seed_lpn_numbering,
-    seed_putaway,
+    at, batch_container_lpn, batch_qty, create_req, ctx, loose_putaway_req, lpn_status,
+    putaway_count, putaway_req, seed_lpn_numbering, seed_putaway,
 };
 use postgres_test_support::ensure_audit_partition;
 
@@ -50,32 +50,15 @@ async fn putaway_rejects_lpn_after_loose_same_sku_batch_location(pool: PgPool) {
         .expect_err("lpn must not claim loose stock");
     assert_eq!(denied, Wave3RepositoryError::LpnNotUsable);
     assert_eq!(batch_container_lpn(&pool, fixture.owner_id).await, None);
-    let qty: wms_domain::Quantity = sqlx::query_scalar(
-        "SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
-    )
-    .bind(fixture.owner_id)
-    .fetch_one(&pool)
-    .await
-    .expect("loose qty unchanged");
-    assert_eq!(qty, 2.into());
-    let status: String = sqlx::query_scalar(
-        "SELECT status FROM lpn_containers WHERE owner_id = $1 AND lpn_code = $2",
-    )
-    .bind(fixture.owner_id)
-    .bind(&created.lpn_code)
-    .fetch_one(&pool)
-    .await
-    .expect("lpn stays idle");
-    assert_eq!(status, "idle");
-    let putaway_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $2",
-    )
-    .bind(fixture.owner_id)
-    .bind(fixture.order_id)
-    .fetch_one(&pool)
-    .await
-    .expect("putaway rows");
-    assert_eq!(putaway_count, 1);
+    assert_eq!(batch_qty(&pool, fixture.owner_id).await, 2.into());
+    assert_eq!(
+        lpn_status(&pool, fixture.owner_id, &created.lpn_code).await,
+        "idle"
+    );
+    assert_eq!(
+        putaway_count(&pool, fixture.owner_id, fixture.order_id).await,
+        1
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -119,21 +102,13 @@ async fn putaway_rejects_loose_after_lpn_same_sku_batch_location(pool: PgPool) {
             .as_deref(),
         Some(created.lpn_code.as_str())
     );
-    let qty: wms_domain::Quantity = sqlx::query_scalar(
-        "SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
-    )
-    .bind(fixture.owner_id)
-    .fetch_one(&pool)
-    .await
-    .expect("lpn qty unchanged");
-    assert_eq!(qty, 2.into());
-    let putaway_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $2",
-    )
-    .bind(fixture.owner_id)
-    .bind(fixture.order_id)
-    .fetch_one(&pool)
-    .await
-    .expect("putaway rows");
-    assert_eq!(putaway_count, 1);
+    assert_eq!(batch_qty(&pool, fixture.owner_id).await, 2.into());
+    assert_eq!(
+        lpn_status(&pool, fixture.owner_id, &created.lpn_code).await,
+        "in_use"
+    );
+    assert_eq!(
+        putaway_count(&pool, fixture.owner_id, fixture.order_id).await,
+        1
+    );
 }

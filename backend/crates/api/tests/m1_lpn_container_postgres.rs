@@ -12,7 +12,8 @@ use wms_domain::{CreateLpnContainerRequest, UpdateLpnContainerRequest, LPN_CONTA
 mod lpn_support;
 mod postgres_test_support;
 use lpn_support::{
-    at, create_req, ctx, insert_owner, putaway_req, seed_lpn_numbering, seed_putaway,
+    at, batch_container_lpn, batch_qty, create_req, ctx, insert_owner, lpn_product_codes,
+    lpn_status, putaway_count, putaway_req, seed_lpn_numbering, seed_putaway,
 };
 use postgres_test_support::ensure_audit_partition;
 
@@ -368,7 +369,7 @@ async fn putaway_mix_sku_follows_type_policy(pool: PgPool) {
     .expect("second inspection");
 
     let lpn_repo = PgLpnContainerRepository::new(pool.clone());
-    let wave3 = PgWave3Repository::new(pool);
+    let wave3 = PgWave3Repository::new(pool.clone());
     let created = lpn_repo
         .create(&actor, create_req(), at(9), "lpn-mix-create")
         .await
@@ -399,6 +400,14 @@ async fn putaway_mix_sku_follows_type_policy(pool: PgPool) {
         .await
         .expect_err("default policy denies mix sku");
     assert_eq!(denied, Wave3RepositoryError::LpnMixDenied);
+    assert_eq!(
+        lpn_product_codes(&pool, fixture.owner_id, &created.lpn_code).await,
+        vec!["LPN-P-001".to_string()]
+    );
+    assert_eq!(
+        putaway_count(&pool, fixture.owner_id, fixture.order_id).await,
+        1
+    );
 
     lpn_repo
         .upsert_type_policy(
@@ -423,6 +432,14 @@ async fn putaway_mix_sku_follows_type_policy(pool: PgPool) {
         .await
         .expect_err("mix sku without mix batch still denies other batch");
     assert_eq!(still_denied, Wave3RepositoryError::LpnMixDenied);
+    assert_eq!(
+        lpn_product_codes(&pool, fixture.owner_id, &created.lpn_code).await,
+        vec!["LPN-P-001".to_string()]
+    );
+    assert_eq!(
+        putaway_count(&pool, fixture.owner_id, fixture.order_id).await,
+        1
+    );
 
     lpn_repo
         .upsert_type_policy(
@@ -446,6 +463,14 @@ async fn putaway_mix_sku_follows_type_policy(pool: PgPool) {
         )
         .await
         .expect("policy on allows mix sku");
+    assert_eq!(
+        lpn_product_codes(&pool, fixture.owner_id, &created.lpn_code).await,
+        vec!["LPN-P-001".to_string(), "LPN-P-002".to_string()]
+    );
+    assert_eq!(
+        putaway_count(&pool, fixture.owner_id, fixture.order_id).await,
+        2
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -584,7 +609,7 @@ async fn putaway_rejects_second_lpn_on_same_sku_batch_location(pool: PgPool) {
     seed_lpn_numbering(&pool, at(0), fixture.owner_id).await;
     let actor = ctx(fixture.owner_id);
     let lpn_repo = PgLpnContainerRepository::new(pool.clone());
-    let wave3 = PgWave3Repository::new(pool);
+    let wave3 = PgWave3Repository::new(pool.clone());
     let first = lpn_repo
         .create(&actor, create_req(), at(9), "lpn-identity-a")
         .await
@@ -616,4 +641,23 @@ async fn putaway_rejects_second_lpn_on_same_sku_batch_location(pool: PgPool) {
         .await
         .expect_err("second lpn must not overwrite first");
     assert_eq!(denied, Wave3RepositoryError::LpnNotUsable);
+    assert_eq!(
+        batch_container_lpn(&pool, fixture.owner_id)
+            .await
+            .as_deref(),
+        Some(first.lpn_code.as_str())
+    );
+    assert_eq!(batch_qty(&pool, fixture.owner_id).await, 2.into());
+    assert_eq!(
+        lpn_status(&pool, fixture.owner_id, &first.lpn_code).await,
+        "in_use"
+    );
+    assert_eq!(
+        lpn_status(&pool, fixture.owner_id, &second.lpn_code).await,
+        "idle"
+    );
+    assert_eq!(
+        putaway_count(&pool, fixture.owner_id, fixture.order_id).await,
+        1
+    );
 }

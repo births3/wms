@@ -227,3 +227,48 @@ pub async fn batch_container_lpn(pool: &PgPool, owner_id: Uuid) -> Option<String
     .await
     .expect("batch container_lpn")
 }
+
+#[allow(dead_code)]
+pub async fn batch_qty(pool: &PgPool, owner_id: Uuid) -> wms_domain::Quantity {
+    sqlx::query_scalar(
+        "SELECT qty_on_hand FROM inventory_batches WHERE owner_id = $1 AND product_code = 'LPN-P-001' AND batch_no = 'LPN-B-001'",
+    )
+    .bind(owner_id)
+    .fetch_one(pool)
+    .await
+    .expect("batch qty")
+}
+
+#[allow(dead_code)]
+pub async fn lpn_status(pool: &PgPool, owner_id: Uuid, lpn_code: &str) -> String {
+    sqlx::query_scalar("SELECT status FROM lpn_containers WHERE owner_id = $1 AND lpn_code = $2")
+        .bind(owner_id)
+        .bind(lpn_code)
+        .fetch_one(pool)
+        .await
+        .expect("lpn status")
+}
+
+#[allow(dead_code)]
+pub async fn putaway_count(pool: &PgPool, owner_id: Uuid, order_id: Uuid) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $2",
+    )
+    .bind(owner_id)
+    .bind(order_id)
+    .fetch_one(pool)
+    .await
+    .expect("putaway rows")
+}
+
+#[allow(dead_code)]
+pub async fn lpn_product_codes(pool: &PgPool, owner_id: Uuid, lpn_code: &str) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT product_code FROM inventory_batches WHERE owner_id = $1 AND container_lpn = $2 ORDER BY product_code",
+    )
+    .bind(owner_id)
+    .bind(lpn_code)
+    .fetch_all(pool)
+    .await
+    .expect("lpn product codes")
+}

@@ -273,6 +273,12 @@ mod tests {
         );
         assert_eq!(decide_lpn_mix(false, false, &existing, "P1", "B1"), Ok(()));
         assert_eq!(decide_lpn_mix(true, true, &existing, "P2", "B2"), Ok(()));
+        assert_eq!(
+            decide_lpn_mix(true, false, &existing, "P2", "B2"),
+            Err(LpnMixDenied::Batch)
+        );
+        assert_eq!(decide_lpn_mix(true, false, &existing, "P2", "B1"), Ok(()));
+        assert_eq!(decide_lpn_mix(false, true, &existing, "P1", "B2"), Ok(()));
     }
 
     #[test]
