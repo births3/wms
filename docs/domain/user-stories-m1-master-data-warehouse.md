@@ -79,6 +79,8 @@
 7. **批次状态联动**：加锁/换原因/解锁时容器下所有 `inventory_batches.status` 同步 `quarantined`/`unqualified`/`qualified` 并写入库存流水
 8. **审计留痕**：加锁/换原因/解锁事件写入 `container_quality_lock_events`（纯 INSERT 审计表），全生命周期可追溯
 9. **当前锁状态**：容器主档 `lpn_containers.current_lock_category` 实时反映当前锁，列表可筛选
+10. **加锁前置状态**：仅 `in_use` 且挂载库存行的容器可加锁；`idle`/`in_transit`/`recycling`/`shipped` 禁止
+11. **解锁回写防覆盖**：解锁只回写仍处于本锁联动状态的批次行；锁期间被质检/召回等其他流程变更过的行不回写，解锁完成后提示人工复核
 
 ---
 

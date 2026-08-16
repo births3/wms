@@ -58,6 +58,10 @@
 
 **与批次库存质量状态的联动**：容器质量锁是容器级状态，其下各批次库存行（`inventory_batches.status`，值域对齐既有 M3 `inventory_quality_status` 字典五值：`qualified/quarantined/unqualified/loss_deducted/pending_destruction`）按锁类别联动映射：`quarantine ⇒ quarantined`（隔离）、`rejected ⇒ unqualified`（不合格）、`qualified ⇒ qualified`；`loss_deducted`（报损扣减）与 `pending_destruction`（待销毁）由报损/销毁流程管理，不参与质量锁联动。加锁/换原因/解锁时对容器下所有库存行同步状态并写入库存流水；上架 6 维校验（ADR-0048 决策 4 第③步）优先读容器质量锁（容器管理位），散货位读批次 `status`，两处任一非 `qualified` 即强阻断。
 
+**加锁前置状态与解锁回写（防止覆盖竞态）**：
+- **加锁前置**：仅 `in_use` 且挂载库存行的容器可加锁；`idle`（空容器）、`in_transit`、`recycling`、`shipped` 状态禁止加锁（无内容物可锁或流转中不可锁）。
+- **解锁回写规则**：解锁只回写**仍处于本锁联动状态**的批次行（`quarantined`/`unqualified` 且由本锁设置）；锁期间被质检/召回等其他流程变更过的行**不回写、不覆盖**，解锁操作完成后提示人工复核这些行。禁止无条件将全部行回写 `qualified`（会抹掉锁期间产生的质检结论）。
+
 **触发源仅人工**：加锁/换原因/解锁均为人工操作（管理端容器页 + PDA 扫码），不设系统自动加锁；温控超标、召回令等场景由运营人员依据证据（温控记录、召回文件）人工发起。操作需要 H1 权限点 `m1.quality-lock.manage`（加锁/换原因/解锁），无权限拒绝操作。
 
 ### 2.2 复用 M1 系统字典维护锁原因 (`system_dictionary_items`)
@@ -91,7 +95,7 @@ CREATE TABLE container_quality_lock_events (
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。
 - `qualified` 是默认无锁状态，不需要生成加锁事件；从隔离/不合格解除即 `release` 事件回到 `qualified`，`lock_category` 记 `NULL`。
 - 双人见证：加锁与解锁事件必须记录 `witness_id`（见证人），且见证人与操作人（`operated_by`）必须为不同用户（GSP 双人作业）；缺见证人或见证人重复时事务拒绝提交。
-- **M-QL 挂接**：加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders` 质量联系单（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = container_code`）；**解锁前置条件：关联 M-QL 已办结（`closed`），未办结禁止解锁**。
+- **M-QL 挂接**：加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders` 质量联系单（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = container_code`）；**解锁前置条件：该容器当前锁关联的 M-QL 已办结（`closed`），未办结禁止解锁**；`release` 事件携带同一 `quality_liaison_id` 留痕（校验通过后写入）。
 
 ---
 
