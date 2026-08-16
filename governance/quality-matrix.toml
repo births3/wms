@@ -5991,7 +5991,7 @@ api_paths = [
   "POST /api/v1/master-data/lpn-containers/{id}/quality-lock/release",
 ]
 database_objects = ["container_quality_lock_events", "lpn_containers", "quality_liaison_orders"]
-reason = "方案与验收标准已定稿（ADR-0048、storage-location-model §2）；未实施。待 Phase 1 实施：事件表/主档冗余字段迁移、加锁/换原因/解锁接口、权限点 m1.quality-lock.manage、双人见证、M-QL 挂接与解锁前置校验、批次状态联动、管理端容器页操作与 PDA 扫码。"
+reason = "方案与验收标准已定稿（ADR-0048、storage-location-model §2，含锁-区域映射/装箱加锁/带锁感知/在途拣选收口）；未实施。待 Phase 1 实施：事件表/主档冗余字段迁移、加锁/换原因/解锁接口、权限点 m1.quality-lock.manage、双人见证、M-QL 挂接与解锁前置校验（closed/rejected）、批次状态联动、锁-区域移库任务、管理端容器页操作与 PDA 扫码。"
 owner = "M1 基础档案模块负责人"
 resume_when = "Phase 1 启动后实施。"
 
