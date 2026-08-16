@@ -1,0 +1,316 @@
+site_name: WMS 用户故事文档
+site_description: 医药冷链 GSP 合规仓储管理系统 — 用户故事 + 设计文档
+site_author: WMS 项目组
+
+# 路径配置
+docs_dir: docs
+
+# 主题
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs            # 顶部 tab 分类
+    - navigation.tabs.sticky     # tab 跟随滚动
+    - navigation.sections        # 侧边栏分组展开
+    - navigation.expand          # 默认展开侧边栏
+    - navigation.path            # 显示当前路径面包屑
+    - navigation.indexes         # 分组首页（README.md 自动作为分组首页）
+    - navigation.top             # 返回顶部按钮
+    - search.highlight           # 搜索高亮
+    - search.suggest             # 搜索建议
+    - search.share               # 搜索结果分享
+    - content.code.copy          # 代码复制按钮
+    - toc.follow                 # 右侧目录跟随滚动
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换深色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换浅色模式
+  icon:
+    repo: fontawesome/brands/git-alt
+
+# Markdown 扩展
+markdown_extensions:
+  - admonition                   # !!! note 提示框
+  - attr_list                    # 给元素加属性
+  - md_in_html                   # HTML 内嵌 markdown（折叠块用）
+  - tables
+  - footnotes
+  - toc:
+      permalink: true            # 标题旁锚点链接
+  - pymdownx.details             # <details> 折叠块美化
+  - pymdownx.superfences:        # 增强代码块（含 mermaid 自定义围栏）
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+# 插件
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+
+# Hooks
+hooks:
+  - scripts/mkdocs_copy_md_hook.py
+
+# 导航树
+nav:
+  - 首页: index.md
+  - 系统蓝图: wms-blueprint-outline.md
+  - 功能范围说明书: wms-scope-spec.md
+  - 业务故事:
+    - M1 基础档案:
+      - 商品/供应商/客户: domain/user-stories-m1-master-data-product.md
+      - 仓库/库位/配置: domain/user-stories-m1-master-data-warehouse.md
+    - M2 入库:
+      - ASN 与收货: domain/user-stories-m2-inbound-asn.md
+      - 验收与上架: domain/user-stories-m2-inbound-verify.md
+      - PC Web 三页设计规划: m2-inbound-web-design-plan.md
+    - M3 库存:
+      - 查询与批次: domain/user-stories-m3-inventory-query.md
+      - 养护/盘点/移库: domain/user-stories-m3-inventory-operation.md
+    - M4 出库:
+      - 订单与波次: domain/user-stories-m4-outbound-order.md
+      - 拣选/复核/发货: domain/user-stories-m4-outbound-pick.md
+      - 退货处理: domain/user-stories-m4-outbound-return.md
+      - PC Web 页面设计规划: m4-outbound-web-design-plan.md
+      - 出库流程 PlantUML 图文: diagrams/m4-outbound/docu.md
+    - M5 冷链数据集成: domain/user-stories-m5-cold-chain.md
+    - M6 报表与审计: domain/user-stories-m6-audit-report.md
+    - M8 连锁药店: domain/user-stories-m8-retail-chain.md
+    - M9 计费: domain/user-stories-m9-billing.md
+    - M10 TMS 集成: domain/user-stories-m10-tms-plus.md
+    - "~~M11 监管 EDI~~ (v7 移除)": domain/user-stories-m11-regulatory-edi.md
+  - 横向业务:
+    - M-TE 任务引擎: domain/user-stories-mte-task-engine.md
+    - M-RP 补货: domain/user-stories-mrp-replenishment.md
+    - M-PK 包装站: domain/user-stories-mpk-packing-station.md
+    - M-VR 规则引擎: domain/user-stories-mvr-validation-rules.md
+    - M-TC 追溯码: domain/user-stories-mtc-traceability-code.md
+    - M-QL 质量联系单: domain/user-stories-mql-quality-liaison.md
+    - M-CG 编码生成: domain/user-stories-mcg-code-generator.md
+    - M-CG 单据号图文说明: diagrams/mcg-document-numbering/docu.md
+    - M-SA 报损报溢: domain/user-stories-msa-stock-adjustment.md
+    - M-BA 批号调整 (v21): domain/user-stories-mba-batch-adjustment.md
+    - M-RC 对账: domain/user-stories-mrc-reconciliation.md
+    - M-DI 药检单: domain/user-stories-mdi-drug-inspection.md
+    - M-PM 参数对照 (v24): domain/user-stories-mpm-parameter-mapping.md
+  - 横向能力:
+    - H4 企业微信: domain/user-stories-h4-wechat-notify.md
+    - H4 参数测试入口设计: superpowers/specs/2026-07-10-h4-wechat-settings-test-action-design.md
+    - H4 参数测试入口实现计划: superpowers/plans/2026-07-10-h4-wechat-settings-test-action.md
+    - H5 快递: domain/user-stories-h5-express.md
+    - H6 状态机引擎: domain/user-stories-h6-state-machine.md
+    - H8 ERP 防腐层: domain/user-stories-h8-erp-integration.md
+    - H9 打印模板引擎: domain/user-stories-h9-print-template.md
+    - H9 打印组套与 Print Agent: domain/user-stories-h9-print-orchestration.md
+    - H-Driver 司机端 (W4.E): domain/user-stories-h-driver.md
+    - H-Store 门店用户端 (W4.E): domain/user-stories-h-store.md
+    - H1 权限与多租户 (W1.A): domain/user-stories-h1-auth-tenant.md
+    - H1 菜单管理设计: h1-menu-management-design.md
+    - H1-006 API Key 生命周期切片: h1-006-api-key-lifecycle-slice.md
+    - H1-006 API Key 管理端页面设计: h1-006-api-key-lifecycle-web-design-plan.md
+    - H2 审计追踪 + 事件总线 (W1.B): domain/user-stories-h2-audit-trail.md
+    - H3 跨端契约 OpenAPI (W1.C): domain/user-stories-h3-contract.md
+    - H3 API 文档与对接说明: api/h3-api-access.md
+    - H3 OpenAPI curl 示例: api/curl-examples.md
+    - H3 OpenAPI 变更日志: api/openapi-changelog.md
+    - H3 API 列表分页统一规范: api/api-pagination-standards.md
+    - H-DOCK 月台预约管理 (W4-5 可选): domain/user-stories-h-dock-management.md
+    - H-AL 告警引擎 (W1+): domain/user-stories-h-alert.md
+  - 设计决策:
+    - ADR 索引: adr/README.md
+    - ADR-0001 技术栈: adr/0001-tech-stack.md
+    - ADR-0002 仓库结构: adr/0002-monorepo-structure.md
+    - ADR-0003 治理模型: adr/0003-governance-model.md
+    - ADR-0004 波次路线 (已取代): adr/0004-phase-roadmap.md
+    - ADR-0006 TDD 与测试层: adr/0006-tdd-and-test-layers.md
+    - ADR-0007 路线边界对齐: adr/0007-roadmap-v03-boundary-alignment.md
+    - ADR-0008 借鉴 Odoo 的 9 个设计: adr/0008-borrow-from-odoo.md
+    - ADR-0010 错误码体系: adr/0010-error-codes.md
+    - ADR-0011 可观测性方案: adr/0011-observability.md
+    - ADR-0012 限界上下文: adr/0012-bounded-contexts.md
+    - ADR-0013 配置与 secrets: adr/0013-config-secrets.md
+    - ADR-0014 数据迁移: adr/0014-data-migration.md
+    - ADR-0015 多端业务规则: adr/0015-multi-end-rules.md
+    - ADR-0016 部署形态: adr/0016-deployment.md
+    - ADR-0018 弹性工程: adr/0018-resilience-engineering.md
+    - ADR-0019 货主自定义属性: adr/0019-tenant-custom-fields.md
+    - ADR-0021 高保真原型策略: adr/0021-high-fidelity-prototype-strategy.md
+    - ADR-0022 原型组件规范: adr/0022-prototype-component-spec.md
+    - ADR-0023 业务报表策略: adr/0023-business-report-strategy.md
+    - ADR-0024 鉴权模型: adr/0024-auth-model.md
+    - ADR-0025 审计存储模型: adr/0025-audit-storage-model.md
+    - ADR-0026 跨端契约管线: adr/0026-cross-end-contract-pipeline.md
+    - ADR-0027 PDA 离线模型: adr/0027-pda-offline-model.md
+    - ADR-0028 组件库抽离: adr/0028-component-library-extraction.md
+    - ADR-0029 前端原型先行（历史）: adr/0029-frontend-as-prototype-workflow.md
+    - ADR-0030 统一外部集成能力: adr/0030-integration-capability.md
+    - ADR-0031 H-FILE 附件能力: adr/0031-file-attachment-capability.md
+    - ADR-0032 H-APV 审批引擎: adr/0032-approval-engine.md
+    - ADR-0033 H-SCH 调度引擎: adr/0033-scheduler-engine.md
+    - ADR-0034 Wave 3 业务表 PG 模型: adr/0034-wave-3-operational-postgres-schema.md
+    - ADR-0035 Wave 6 证据收口: adr/0035-wave-6-pre-release-evidence-closeout.md
+    - ADR-0036 打印模板引擎: adr/0036-print-template-engine.md
+    - ADR-0037 轻量治理控制链: adr/0037-lightweight-governance-control-chain.md
+    - ADR-0038 首版前兼容策略: adr/0038-pre-v1-compatibility-policy.md
+    - ADR-0039 打印组套与 Print Agent: adr/0039-print-suite-and-agent.md
+    - ADR-0040 Print Agent 机器协议: adr/0040-print-agent-machine-protocol.md
+    - ADR-0041 H9 打印编排细化: adr/0041-print-orchestration-refinement.md
+    - ADR-0042 药检单客户平台: adr/0042-drug-inspection-customer-portal.md
+    - ADR-0043 直接生产前端开发: adr/0043-direct-production-frontend-workflow.md
+    - ADR-0044 PostgreSQL 幂等权威存储: adr/0044-postgresql-idempotency-authority.md
+    - ADR-0045 首版前保留 migration 链: adr/0045-pre-v1-migration-chain.md
+    - ADR-0046 高风险写入撤销存储 fail-closed: adr/0046-high-risk-write-revocation-fail-closed.md
+    - ADR-0047 容器整托不变量与强制取号: adr/0047-lpn-container-invariants.md
+    - ADR-0048 药品上架多维空间属性校验与补货策略: adr/0048-putaway-storage-zone-attribute-validation.md
+    - 技术 Spike:
+      - Spike 索引: spikes/README.md
+      - SPIKE-001 Axum + JWT: spikes/spike-001-axum-jwt.md
+      - SPIKE-001 PDA 离线 token 状态机: spikes/spike-001-pda-offline-state.md
+      - SPIKE-002 H2 append-only: spikes/spike-002-h2-append-only.md
+      - SPIKE-003 OpenAPI → TS: spikes/spike-003-utoipa-openapi-ts-pipeline.md
+      - SPIKE-004 SQLx offline: spikes/spike-004-sqlx-offline.md
+      - SPIKE-005 RN 扫枪: spikes/spike-005-rn-scanner.md
+      - SPIKE-005B WebView/Capacitor PDA: spikes/spike-005b-webview-capacitor-pda.md
+  - 架构与领域:
+    - 模块依赖图: architecture-dependencies.md
+    - AI 动态项目图谱: agent-knowledge-graph.md
+    - 前后端分层设计规范: layered-design.md
+    - 库位与补货领域模型: domain/storage-location-model.md
+    - 波次与出库箱领域模型: domain/wave-model.md
+    - 概念审计: concept-audit.md
+    - 业务澄清记录: domain/clarifications.md
+    - 术语表: glossary.md
+    - 错误码字典: error-codes.md
+    - 基础设施技术规格: infra/technical-specs.md
+    - 数据库设计与命名规范: database/database-design-standards.md
+    - 数据库表目录: database/table-catalog.md
+    - 数据库设计审查矩阵: database/database-design-review.md
+    - 文件存储方案: infra/file-storage.md
+    - H9 独立浏览器 Render Worker: infra/h9-render-worker.md
+    - 缓存策略: infra/cache-strategy.md
+    - 易用性基线 (v25): infra/usability-baseline.md
+    - 分库分表决策矩阵 (v25): infra/sharding-decision-matrix.md
+    - 遗留系统分析:
+      - 分析索引: legacy-analysis/README.md
+      - Oracle WMS 对照矩阵: legacy-analysis/legacy-comparison-matrix.md
+      - 表结构对比待办: domain/todo-legacy-comparison.md
+  - 评审记录:
+    - US-H9-001 打印模板类型字典验收 (2026-07-26): reviews/us-h9-001-acceptance-2026-07-26.md
+    - US-H9-002 字段库生成与元数据维护验收 (2026-07-26): reviews/us-h9-002-acceptance-2026-07-26.md
+    - US-H9-003 模板设计与版本管理验收 (2026-07-26): reviews/us-h9-003-acceptance-2026-07-26.md
+    - US-H9-004 预览与浏览器打印验收 (2026-07-26): reviews/us-h9-004-acceptance-2026-07-26.md
+    - US-H9-005 业务模块接入规则验收 (2026-07-26): reviews/us-h9-005-acceptance-2026-07-26.md
+    - US-H9-006 随货同行单归集与截单验收 (2026-07-26): reviews/us-h9-006-acceptance-2026-07-26.md
+    - US-H9-007 归集维度规则配置验收 (2026-07-27): reviews/us-h9-007-acceptance-2026-07-27.md
+    - US-H9-008 打印组套配置与就绪策略验收 (2026-07-27): reviews/us-h9-008-acceptance-2026-07-27.md
+    - US-H9-009 分类 PDF 渲染与留存验收 (2026-07-28): reviews/us-h9-009-acceptance-2026-07-28.md
+    - US-H9-011 打印机、纸盒与设备租约验收 (2026-07-27): reviews/us-h9-011-acceptance-2026-07-27.md
+    - M2 入库模块整体审查 (2026-07-18): reviews/m2-overall-review-2026-07-18.md
+    - M3 库存模块整体审查 (2026-07-18): reviews/m3-overall-review-2026-07-18.md
+    - 延期故事快速闭环审计 (2026-07-15): reviews/deferred-story-closure-audit-2026-07-15.md
+    - 项目图谱设计问题整改任务与验收标准: reviews/project-graph-design-remediation-2026-07-31.md
+    - Redis 必要性评估任务: reviews/redis-necessity-assessment-task-2026-07-31.md
+    - 全项目治理真实缺口修复计划: reviews/governance-remediation-plan-2026-07-11.md
+    - 用户故事审计 v1-v10: reviews/user-stories-audit-2026-05-16.md
+    - 软件设计审计 (12 维度): reviews/software-design-audit-2026-05-18.md
+    - 模式提炼 (4 方法): reviews/pattern-extraction-2026-05-18.md
+    - 用户故事矩阵审计: reviews/user-stories-matrix-audit-2026-05-18.md
+    - 波次参数对标 - Manhattan: reviews/wave-parameters-comparison-manhattan.md
+    - Wave 6 任务完成审计: reviews/wave-6-task-completion-audit-2026-06-04.md
+    - H8 Worker Key 审查与运行记录 (2026-08-12): reviews/h8-worker-key-review-and-runtime-record-2026-08-12.md
+    - 用户故事审查规范: review-guidelines-user-stories.md
+    - Wave 复盘:
+      - 复盘索引: retros/README.md
+      - Wave 0 回顾: retros/wave-0-retro.md
+      - Wave 0.5 回顾: retros/wave-0.5-retro.md
+      - Wave 1 回顾: retros/wave-1-retro.md
+      - Wave 2 回顾: retros/wave-2-retro.md
+      - Wave 5 回顾: retros/wave-5-retro.md
+  - GSP 合规追溯:
+    - 总索引: compliance/README.md
+    - 第 5 章 质量管理体系: compliance/gsp-ch5-warehouse-management.md
+    - 第 6 章 采购与验收: compliance/gsp-ch6-procurement-acceptance.md
+    - 第 7 章 储存与养护: compliance/gsp-ch7-storage-maintenance.md
+    - 第 8 章 销售与出库: compliance/gsp-ch8-sales-delivery.md
+    - 冷链专项: compliance/gsp-ch9-cold-chain.md
+    - 追溯与不合格品: compliance/gsp-ch10-traceability.md
+    - 特殊药品 (v24): compliance/gsp-special-drugs.md
+    - 字段追溯矩阵 (v25): compliance/gsp-field-traceability.md
+    - 字段编码规范 (v2): compliance/gsp-field-coding-standards.md
+    - 业务规则字段注册表 (v2): compliance/gsp-business-rules-registry.md
+  - 治理:
+    - 治理总文档: governance.md
+    - 全链路质量矩阵方法: governance/quality-matrix-method.md
+    - 全链路质量矩阵: governance/quality-matrix.md
+    - 项目级 RTM: requirements-traceability-matrix.md
+    - AI 协作规范: agent-collaboration.md
+    - AI 默认本地提交规则: agent-commit-rules.md
+    - AI Loop Engineering: agent-loop-engineering.md
+    - AI 常用文档索引: agent-document-index.md
+    - 编码规范: coding-standards.md
+    - 前端编码规范: frontend-coding-standards.md
+    - 原型组件注册表: prototypes/component-registry.md
+    - 原型转生产清单: prototypes/prototype-to-production.md
+    - Matrix E2E 截图门禁: prototypes/matrix-e2e-screenshot-gate.md
+    - 视觉基线接受标准: prototypes/baseline-acceptance.md
+    - R3 原型矩阵: prototypes/prototype-matrix-r3.md
+    - 原型证明报告: prototypes/prototype-proof-report.md
+    - 视觉打磨自查: prototypes/visual-review-batch1.md
+  - 运行手册:
+    - Gitea Issue Agent: runbooks/gitea-issue-agent.md
+    - 本地开发服务: runbooks/local-dev-services.md
+    - Wave 1 H2 开发环境: runbooks/wave-1-h2-dev-environment.md
+    - H8 ERP 接口表同步: runbooks/h8-erp-interface-table-sync.md
+    - H8 ERP 消息性能验收: runbooks/h8-erp-message-performance.md
+    - 药检单客户平台: runbooks/drug-inspection-customer-portal.md
+    - Wave 1 运行证据: runbooks/wave-1-runtime-evidence.md
+    - H1 撤销存储故障: runbooks/auth-revocation-degradation.md
+    - Wave 2 运行证据: runbooks/wave-2-runtime-evidence.md
+    - Wave 2 预发布环境: runbooks/wave-2-staging-environment.md
+    - AR-09 Render Worker Compose 隔离烟测: runbooks/h9-render-worker-compose-smoke.md
+    - Wave 3 PDA 就绪: runbooks/wave-3-pda-readiness.md
+    - Wave 4 外部依赖证据: runbooks/wave-4-external-dependencies.md
+    - Wave 5 硬件证据: runbooks/wave-5-hardware-evidence.md
+    - Wave 5 TMS 证据: runbooks/wave-5-tms-evidence.md
+    - Wave 6 收口: runbooks/wave-6-closeout.md
+    - Wave 6 部署证据: runbooks/wave-6-deploy-evidence.md
+    - Wave 6 证据预检: runbooks/wave-6-evidence-preflight.md
+    - Wave 6 预发布部署干跑: runbooks/wave-6-staging-deploy-dry-run.md
+
+# 额外配置
+extra:
+  generator: false               # 隐藏 "Made with Material for MkDocs"
+
+# 排除不参与构建的文件
+exclude_docs: |
+  adr/README.md.disabled
+  domain/.gitkeep
+  compliance/.gitkeep
+
+# Mermaid 渲染（v14 新增）
+extra_javascript:
+  - https://unpkg.com/mermaid@10.6.1/dist/mermaid.min.js
+  - js/mermaid-init.js
+
+extra_css:
+  - css/print.css
