@@ -217,6 +217,12 @@ CREATE TABLE inventory_batches (
 
 唯一约束相应调整为 `UNIQUE (owner_id, product_id, batch_no, location_id, status)`（整托场景下 `container_lpn` 不参与唯一约束，同托同品同批加量走行锁合并）。
 
+**索引同步变更**（与改名/新增字段一致，实施时同步重建）：
+- `inventory_batches_owner_product_batch_idx` → `(owner_id, product_id, batch_no)`（算单按商品过滤）
+- `inventory_batches_owner_location_status_idx` → `(owner_id, location_id, status)`（锁状态过滤/质量区查询；算单三层过滤的 `status != 'qualified'` 排除走此索引）
+- `inventory_batches_owner_expiry_idx` 保留 `(owner_id, expiry_date)`（FEFO 来源选择）
+- 新增建议：`(owner_id, zone_id, status)`（质量区算单排除的 zone 维度过滤）
+
 ---
 
 ## 5. 独立补货系统设计 (Replenishment Subsystem)
