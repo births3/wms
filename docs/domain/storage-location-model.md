@@ -37,11 +37,12 @@
 - `current_owner_id`: 当前占用货主 ID（多货主隔离：非空闲库位清空前禁止其他货主存入；**基线同步**：既有 `bound_owner_id` 改名而来，语义不变）
 - `lock_status`: `normal` (正常), `lock_in` (禁入), `lock_out` (禁出), `lock_all` (全锁)
   - **与既有 `status` 的关系（基线同步）**：作业锁定只认 `lock_status`；既有 `status` 值域收敛为 `available/occupied/disabled`（物理/档案状态），存量 `locked` 迁移为 `lock_status='lock_all'`，不再作为独立 status 值。
+- `replenish_strategy_id`: 补货策略引用（Min-Max 数值不存库位字段，见 §5.3）
 - `pick_zone_level`: `gold` (黄金拣选层), `normal` (普通层), `deep` (偏远层)
-- `is_agv_managed`: 是否为 AGV 搬运移动货架位
+- `is_agv_managed`: 是否为 AGV 搬运移动货架位（Phase 1 建字段预留，不接硬件）
 - `agv_pod_code`: 所属 AGV 移动货架/背篓编码 (如 `POD-001`)
   - AGV 格口编码与三坐标的对应：`POD[货架号]-F[层]-[格位]` ↔ `row_no`=货架号、`layer_no`=层、`column_no`=格位（`POD01-F2-03` = row 01 / layer 2 / column 03）。
-  - 电子标签（PTL）地址**不落在库位字段**，统一收敛到 `location_device_bindings` 绑定表（见 §6），绑定角色 `ptl_light`。
+  - 电子标签（PTL）地址**不落在库位字段**，统一收敛到 `location_device_bindings` 绑定表（见 §6），绑定角色 `ptl_light`；绑定表 Phase 1 建表预留。
 
 ---
 
@@ -56,6 +57,8 @@
 | **不合格锁** | `rejected` | 破损、过期、检验不合格、召回 | **绝对禁止出库与拣选**；仅允许移库/上架至不合格品库区 | `unqualified_red` 不合格品区 |
 
 **与批次库存质量状态的联动**：容器质量锁是容器级状态，其下各批次库存行（`inventory_batches.status`，值域对齐既有 M3 `inventory_quality_status` 字典）按锁类别联动映射：`quarantine ⇒ quarantined`（隔离）、`rejected ⇒ unqualified`（不合格）、`qualified ⇒ qualified`。加锁/换原因/解锁时对容器下所有库存行同步状态并写入库存流水；上架 6 维校验（ADR-0048 决策 4 第③步）优先读容器质量锁（容器管理位），散货位读批次 `status`，两处任一非 `qualified` 即强阻断。
+
+**触发源仅人工**：加锁/换原因/解锁均为人工操作（管理端容器页 + PDA 扫码），不设系统自动加锁；温控超标、召回令等场景由运营人员依据证据（温控记录、召回文件）人工发起。操作需要 H1 权限点 `m1.quality-lock.manage`（加锁/换原因/解锁），无权限拒绝操作。
 
 ### 2.2 复用 M1 系统字典维护锁原因 (`system_dictionary_items`)
 
@@ -77,6 +80,7 @@ CREATE TABLE container_quality_lock_events (
     reason_dict_item_code VARCHAR(64),             -- 关联 M1 system_dictionary_items.item_code
     reason_desc TEXT,
     evidence_urls JSONB DEFAULT '[]',              -- 现场照片/药检单附件
+    quality_liaison_id UUID REFERENCES quality_liaison_orders(id),  -- 挂接 M-QL 质量联系单（rejected 必填，quarantine 选填）
     operated_by UUID NOT NULL,                     -- 加锁/换原因/解锁操作人
     witness_id UUID,                               -- 双人见证（加锁/解锁按 GSP 双人作业要求）
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -87,6 +91,7 @@ CREATE TABLE container_quality_lock_events (
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。
 - `qualified` 是默认无锁状态，不需要生成加锁事件；从隔离/不合格解除即 `release` 事件回到 `qualified`，`lock_category` 记 `NULL`。
 - 双人见证：加锁与解锁事件必须记录 `witness_id`，缺少见证人时事务拒绝提交。
+- **M-QL 挂接**：加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders` 质量联系单（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = container_code`）；**解锁前置条件：关联 M-QL 已办结（`closed`），未办结禁止解锁**。
 
 ---
 
@@ -164,6 +169,32 @@ CREATE TABLE inventory_batches (
 ```
 
 `qty_frozen` 仅承载质检/质量冻结（含容器质量锁联动冻结），与补货在途互不混淆。
+
+### 5.3 补货策略表（Min-Max 数值唯一归属）
+
+Min-Max 数值只存策略表（按货主 + 库位组/品类配置），库位仅挂 `replenish_strategy_id` 引用，不存数值；改一处策略即对整组拣选位生效：
+
+```sql
+CREATE TABLE replenishment_strategies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,                     -- 货主（多货主隔离，策略按货主配置）
+    strategy_code VARCHAR(64) NOT NULL,
+    strategy_name VARCHAR(128) NOT NULL,
+    scope_type VARCHAR(16) NOT NULL,            -- 'location_group' | 'category'：按库位组或按品类
+    scope_ref UUID NOT NULL,                    -- 库位组 ID 或品类 ID
+    location_type VARCHAR(16) NOT NULL,         -- 'case_pick' | 'piece_pick'（只对拣选位生效）
+    min_safety_threshold NUMERIC(12, 4) NOT NULL,  -- 低于此值触发补货
+    max_replenish_target NUMERIC(12, 4) NOT NULL,  -- 补到为止
+    trigger_modes TEXT[] NOT NULL DEFAULT '{min_max, wave_gap}',  -- 驱动模式：安全水位/波次缺口
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (owner_id, strategy_code)
+);
+```
+
+- `warehouse_locations.replenish_strategy_id` 引用本表（可空，未挂策略的拣选位不参与 Min-Max 巡检）。
+- Min-Max 巡检判定（目标拣选位）：`qty_on_hand + qty_replenish_in_transit <= min_safety_threshold` 触发，补货目标 `max_replenish_target`；波次缺口即时驱动按同一表配置。
 
 ---
 
