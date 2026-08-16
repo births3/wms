@@ -332,7 +332,7 @@ async fn upsert_type_policy_writes_audit(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn putaway_denies_mixed_sku_when_policy_off(pool: PgPool) {
+async fn putaway_mix_sku_follows_type_policy(pool: PgPool) {
     ensure_audit_partition(&pool, at(0)).await;
     let fixture = seed_putaway(&pool).await;
     seed_lpn_numbering(&pool, at(0), fixture.owner_id).await;
@@ -405,12 +405,36 @@ async fn putaway_denies_mixed_sku_when_policy_off(pool: PgPool) {
             &actor,
             wms_domain::UpsertLpnContainerTypePolicyRequest {
                 container_type: LPN_CONTAINER_TYPE_PALLET.to_string(),
+                allow_mix_batch: false,
+                allow_mix_sku: true,
+            },
+        )
+        .await
+        .expect("open mix sku only");
+    let still_denied = wave3
+        .putaway_receiving_order_and_inventory_with_audit(
+            &actor,
+            fixture.order_id,
+            mixed.clone(),
+            Utc::now(),
+            "lpn-mix-sku-only",
+            None,
+        )
+        .await
+        .expect_err("mix sku without mix batch still denies other batch");
+    assert_eq!(still_denied, Wave3RepositoryError::LpnMixDenied);
+
+    lpn_repo
+        .upsert_type_policy(
+            &actor,
+            wms_domain::UpsertLpnContainerTypePolicyRequest {
+                container_type: LPN_CONTAINER_TYPE_PALLET.to_string(),
                 allow_mix_batch: true,
                 allow_mix_sku: true,
             },
         )
         .await
-        .expect("open mix sku");
+        .expect("open mix sku and batch");
     wave3
         .putaway_receiving_order_and_inventory_with_audit(
             &actor,

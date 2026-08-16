@@ -67,6 +67,15 @@ async fn putaway_rejects_lpn_after_loose_same_sku_batch_location(pool: PgPool) {
     .await
     .expect("lpn stays idle");
     assert_eq!(status, "idle");
+    let putaway_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $2",
+    )
+    .bind(fixture.owner_id)
+    .bind(fixture.order_id)
+    .fetch_one(&pool)
+    .await
+    .expect("putaway rows");
+    assert_eq!(putaway_count, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -118,4 +127,13 @@ async fn putaway_rejects_loose_after_lpn_same_sku_batch_location(pool: PgPool) {
     .await
     .expect("lpn qty unchanged");
     assert_eq!(qty, 2.into());
+    let putaway_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM receiving_putaways WHERE owner_id = $1 AND receiving_order_id = $2",
+    )
+    .bind(fixture.owner_id)
+    .bind(fixture.order_id)
+    .fetch_one(&pool)
+    .await
+    .expect("putaway rows");
+    assert_eq!(putaway_count, 1);
 }
