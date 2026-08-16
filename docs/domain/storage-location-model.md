@@ -66,7 +66,7 @@
 | **隔离锁** | `quarantine` | 隔离待检、温控异常、退货待查、抽检 | **禁止拣选与出库**；仅允许移库/上架至隔离库区 | `quarantine_yellow` 隔离区 |
 | **不合格锁** | `rejected` | 破损、过期、检验不合格、召回 | **绝对禁止出库与拣选**；仅允许移库/上架至不合格品库区 | `unqualified_red` 不合格品区 |
 
-**与批次库存质量状态的联动**：容器质量锁是容器级状态，其下各批次库存行（`inventory_batches.status`，值域对齐既有 M3 `inventory_quality_status` 字典五值：`qualified/quarantined/unqualified/loss_deducted/pending_destruction`）按锁类别联动映射：`quarantine ⇒ quarantined`（隔离）、`rejected ⇒ unqualified`（不合格）、`qualified ⇒ qualified`；`loss_deducted`（报损扣减）与 `pending_destruction`（待销毁）由报损/销毁流程管理，不参与质量锁联动。加锁/换原因/解锁时对容器下所有库存行同步状态并写入库存流水；上架 6 维校验（ADR-0048 决策 4 第③步）优先读容器质量锁（容器管理位），散货位读批次 `status`，两处任一非 `qualified` 即强阻断。
+**与批次库存质量状态的联动（因-果关系）**：容器质量锁是**管控动作（因）**，批次质量状态是**库存行表现（果）**——容器加锁，其下各批次库存行（`inventory_batches.status`，值域对齐既有 M3 `inventory_quality_status` 字典五值：`qualified/quarantined/unqualified/loss_deducted/pending_destruction`）按锁类别联动映射：`quarantine ⇒ quarantined`（隔离）、`rejected ⇒ unqualified`（不合格）、`qualified ⇒ qualified`；`loss_deducted`（报损扣减）与 `pending_destruction`（待销毁）由报损/销毁流程管理，不参与质量锁联动。**反向不成立**：批次状态可脱离容器锁单独存在（散货轻量路径，M3 质检直接置状态，无容器锁）；容器锁一定伴随批次联动。加锁/换原因/解锁时对容器下所有库存行同步状态并写入库存流水；上架 6 维校验（ADR-0048 决策 4 第③步）优先读容器质量锁（容器管理位），散货位读批次 `status`，两处任一非 `qualified` 即强阻断。四概念对照（容器质量锁/批次质量状态/库位锁定 `lock_status`/数量冻结 `qty_frozen`）见 §1.2 多义词注记。
 
 **加锁前置状态与解锁回写（防止覆盖竞态）**：
 - **加锁前置**：仅 `in_use` 的容器可加锁（含**未上架容器**：验收/移入容器时发现异常可先锁，无需等待上架）；`idle`（空容器）、`in_transit`、`recycling`、`shipped` 状态禁止加锁（无内容物可锁或流转中不可锁）。
