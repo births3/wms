@@ -3759,15 +3759,34 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-detail.png",
   "artifacts/screenshot-portal/real-web/m4-outbound/outbound-wave-cancelled.png",
 ]
-reason = "已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选明细和 M-TE 拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、任务执行回写、异常回滚和完整波次规则证据尚未闭环。"
+reason = "已补 M4 PC 波次列表、详情、创建、刷新和未拣选取消真实 API：后端在同一事务内校验已确认订单、按合格库存进行货主隔离锁定、生成按库位排序的拣选明细和 M-TE 拣选任务、更新订单入波次，取消时释放库存锁定并恢复订单状态，且写入幂等和审计；独立 PostgreSQL 回归与临时数据库浏览器 E2E 已验证列表读取、创建响应、库存分配、拣选任务、刷新回显、详情读取、取消响应和真实页面截图。故事仍不能整体关闭：容量/完整路径规则、任务执行回写、异常回滚和完整波次规则证据尚未闭环；另波次模板（货主级+平台默认继承、5 种类型、合单条件组、容量七项、触发方式、变更直接生效仅审计、创建即全字段快照）、波次状态机（pending/allocating/released/picking/reviewing/completed + partial_failed/cancelled）与随货同行单维度参数化（order/wave）已随 wave-model.md 定稿未实施（登记见 US-M4-002b）。"
 owner = "M4 模块负责人"
 resume_when = "补齐容量与完整路径规则、真正下发状态、拣选任务执行、异常回滚和全链路真实 E2E/截图证据后移入 stories。"
+
+[[deferred_stories]]
+id = "US-M4-002b"
+title = "波次模板与出库箱"
+module = "M4"
+story_file = "docs/domain/wave-model.md"
+types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
+api_paths = [
+  "GET /api/v1/wave-templates",
+  "POST /api/v1/wave-templates",
+  "GET /api/v1/wave-templates/{id}",
+  "PUT /api/v1/wave-templates/{id}",
+  "POST /api/v1/lpn-containers/{id}/bind-tote",
+  "POST /api/v1/lpn-containers/{id}/unbind-tote",
+]
+database_objects = ["wave_templates", "container_lines", "lpn_containers", "outbound_pick_tasks"]
+reason = "wave-model.md 已定稿未实施：波次模板（货主级+平台默认继承、5 种类型、合单条件组、容量上限七项、触发方式、变更直接生效仅审计、创建即全字段快照）、出库箱（lpn_containers 的 outbound_box 容器 + box_no/LPN 合一 + 1..N 周转箱绑定 + 一条箱明细只能绑定一个周转箱）、拣选入箱双模式（direct_box/bound_tote，pick_container_mode 模板字段）、复核双模式（review_mode box/tote）、缺口处理三策略（wait_and_split/hold_wave/fail_order）、集货/装箱装车/发运扫码（staging_scan_mode/loading_scan_mode）及随货同行单维度参数化（order/wave）均未实施。"
+owner = "M4 模块负责人"
+resume_when = "wave-model.md 进入已批准实施波次后实施，并补齐前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
 [[deferred_stories]]
 id = "US-M4-003"
 title = "PDA 拣选作业"
 module = "M4"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。拣选入箱双模式（direct_box 直装=箱级等待 / bound_tote 绑定周转箱=任务级等待，pick_container_mode 模板字段）、出库箱（outbound_box 容器 + box_no/LPN 合一 + 拣选任务挂 box_id 按箱聚合）、周转箱绑定（1..N、一条箱明细只能绑定一个周转箱）与缺口处理三策略（wait_and_split 默认 / hold_wave 窗口 / fail_order + urgent 补货联动）已随 wave-model.md 定稿未实施（登记见 US-M4-002b）。"
 owner = "M4 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
@@ -3833,7 +3852,7 @@ evidence_refs = [
   "shared/openapi/openapi.json",
   "packages/api-client/src/schema.ts",
 ]
-reason = "已补出库复核查询/提交闭环：状态、逐行商品/数量、拣选与复核分离、短拣、货主隔离、幂等和审计；PC 页面提交前查询 M-VR 出库/复核策略，服务端按整单最严格策略强制第二复核员资质和已通过的 H4 主管审批，并在 outbound_review_records 落规则/双人/审批证据；全量复核完成后原子创建 M-TE 装车任务，短拣不提前创建。一次性 PostgreSQL 真实浏览器 E2E 已验证策略展示、第二人提交与成功回显。故事仍不能整体关闭：装车任务执行回写、PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据尚未闭环。"
+reason = "已补出库复核查询/提交闭环：状态、逐行商品/数量、拣选与复核分离、短拣、货主隔离、幂等和审计；PC 页面提交前查询 M-VR 出库/复核策略，服务端按整单最严格策略强制第二复核员资质和已通过的 H4 主管审批，并在 outbound_review_records 落规则/双人/审批证据；全量复核完成后原子创建 M-TE 装车任务，短拣不提前创建。一次性 PostgreSQL 真实浏览器 E2E 已验证策略展示、第二人提交与成功回显。故事仍不能整体关闭：装车任务执行回写、PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据尚未闭环；另复核双模式（review_mode：box 按出库箱聚合 / tote 按周转箱逐箱，问题箱 exception 不阻塞）、集货位（location_type='staging' + STG 位号编排 + staging_scan_mode 扫码强度）、装箱+装车合并（明细转移+数量校验+周转箱释放回 idle，装箱确认失败 exception）与发运（loading_scan_mode 默认 mandatory、随货同行单核对）已随 wave-model.md 定稿未实施（登记见 US-M4-002b）。"
 owner = "M4 模块负责人"
 resume_when = "补齐 PDA 整件/零件扫码、离线冲突、追溯码和真实 PDA/外部运行证据后再移入 stories。"
 
