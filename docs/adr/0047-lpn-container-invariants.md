@@ -29,6 +29,7 @@ v1 要做整托作业，PDA 只负责扫码。第一刀已有 `lpn_containers` �
 
 - L11：`create_replays_same_idempotency_key_without_second_row`（同一 `Idempotency-Key` 重放，只 1 行）。
 - L6：`concurrent_same_sku_batch_putaway_adds_qty`（同 LPN/库位/SKU/批号并发加数量，在手合计正确）。
+- 散件/整托互斥：`m1_lpn_container_identity_postgres`（散件后再挂 LPN、LPN 后再上散件均拒绝且行数回滚）；`putaway_rejects_second_lpn_on_same_sku_batch_location`（第二托不得覆盖第一托，第二托保持 `idle`）。
 - 质量矩阵类型含 `concurrent_resource`，由脚本推导覆盖 L6。
 
 ## 稀疏仓库接线
@@ -46,6 +47,7 @@ v1 要做整托作业，PDA 只负责扫码。第一刀已有 `lpn_containers` �
 | `backend/crates/api/src/openapi_doc.rs` | 五个 LPN path 操作 |
 | `backend/crates/api/examples/wms_api_e2e.rs` | `lpn_container_router` + `wms_api_e2e_seed_lpn` |
 | `backend/crates/api/examples/support/wms_api_e2e_seed_data.rs` | `seed_lpn_putaway_order` |
+| `backend/crates/api/src/wave3_repository_part1b.rs` | 上架事务在 `bind_lpn_for_putaway` 之前调用 `enforce_inventory_identity`；整文件勿提交 |
 | `docs/error-codes.md` | `M1_LPN_*` / `M2_LPN_*` |
 | `docs/glossary.md` | #53 容器、#54 LPN、#72 整托 |
 | `governance/quality-matrix.toml` | `[[stories]] US-M1-004a`，含 L6 |
