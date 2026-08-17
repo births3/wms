@@ -361,7 +361,7 @@ PDA 移库支持离线：扫码、件数核对、签字均可离线完成；本�
 
 1. **补货策略配置**：PC 独立菜单维护补货策略（Min-Max 水位 / 触发模式 / 生效范围），Min-Max 数值只存策略表（按货主 + 库位组/品类配置），库位仅挂 `replenish_strategy_id` 引用；支持库位组维护与生效范围命中预览；策略配置与大盘操作需 `m3.replenishment.manage` 权限，PDA 领取执行需 `m3.replenishment.execute` 权限，无权限拒绝操作
 2. **双触发模式**：
-   - 日常 Min-Max 巡检：`qty_on_hand + qty_replenish_in_transit <= min_safety_threshold` 触发，补至 `max_replenish_target`
+   - 日常 Min-Max 巡检（可用量口径）：`qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit <= min_safety_threshold` 触发，补至 `max_replenish_target`（任务量 = min(目标量, 来源可下架量)，最小包装取整）
    - 波次缺口即时触发：波次算单缺口生成 `urgent` 任务，对应订单行标记"等待补货"，任务 `done` 后重算单纳入拣选
 3. **任务生成**：任务号走 M-CG 编号规则；生成同事务维护在途双字段（目标位 `qty_replenish_in_transit` +Δ、来源位 `qty_replenish_out_transit` +Δ）；按 FEFO 选来源（近效期先补），来源批次行锁防重复下架
 4. **PDA 作业流程**：领取（`pending`→`in_progress`，同一任务仅一名作业员）→ 扫来源库位/容器下架（不扣在手）→ 送达扫目标位（复用 6 维校验②③⑥）→ 确认完成同事务账面转换（来源/目标在手增减 + 双字段回冲 + 库存流水）
