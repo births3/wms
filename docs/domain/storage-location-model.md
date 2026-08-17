@@ -41,6 +41,7 @@
 - `lock_status`: `normal` (正常), `lock_in` (禁入), `lock_out` (禁出), `lock_all` (全锁)
   - **与既有 `status` 的关系（基线同步）**：作业锁定只认 `lock_status`；既有 `status` 值域收敛为 `available/occupied/disabled`（物理/档案状态），存量 `locked` 迁移为 `lock_status='lock_all'`，不再作为独立 status 值。
 - `replenish_strategy_id`: 补货策略引用（Min-Max 数值不存库位字段，见 §5.3）
+- `pick_sequence_no` / `putaway_sequence_no`: **拣选/上架路径顺序字段**——拣选任务 `route_sequence` 与 PDA 上架推荐按此排序（NULL 回落 `location_code` 升序，兼容存量）；**路径策略以字段为唯一权威**（M4-010 升序/S 型等退化为字段排序，不另做动态派生）；批量生成向导按巷道-排-层-格自然序自动生成（支持巷道方向翻转参数），Excel 导入可覆盖
 - `pick_zone_level`: `gold` (黄金拣选层), `normal` (普通层), `deep` (偏远层)
 - `is_agv_managed`: 是否为 AGV 搬运移动货架位（Phase 1 建字段预留，不接硬件）
 - `agv_pod_code`: 所属 AGV 移动货架/背篓编码 (如 `POD-001`)
@@ -229,9 +230,12 @@ CREATE TABLE inventory_batches (
 ## 5. 独立补货系统设计 (Replenishment Subsystem)
 
 ### 5.1 补货策略配置与触发模式
-1. **日常安全水位 Min-Max 驱动**：闲时/夜间巡检，当目标拣选位可用量口径 `qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit <= min_safety_threshold` 时，自动生成从高层存储位下架补货任务至 `max_replenish_target`（**与 §5.2 可用量公式同一口径**，避免账面够但被分配完导致巡检不触发）；
-2. **出库波次缺口即时驱动**：波次算单时若发现拣选位可用量不足以满足订单，即时触发高优先级波次紧急补货任务；
-3. **批次锁定与动线**：按 `FEFO`（近效期先出）锁定来源存储位托盘，送达拣选位扫码/拍灯确认后，在途量转为在手散件量，释放原托盘。
+1. **日常安全水位 Min-Max 驱动**：巡检按**时段+频率双参数**执行（白天每 60 分钟 / 夜间每 15 分钟，可配置）；当目标拣选位可用量口径 `qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit <= min_safety_threshold` 时，按策略动线（§5.3）自动生成补货任务至 `max_replenish_target`（**与 §5.2 可用量公式同一口径**，避免账面够但被分配完导致巡检不触发）；
+2. **出库波次缺口即时驱动**：波次算单时若发现拣选位可用量不足以满足订单，**缺口量 = 订单需求 − 当前可用量（含在途）**，缺口 > 在途量才触发 urgent 补货任务（`urgent_qty = 缺口 − 在途量`）；巡检任务的在途量已自然覆盖缺口时不重复生成（**在途双字段是唯一权威**）；
+3. **批次锁定与动线**：**来源选择按 FEFO**（近效期批次先补到拣选位，拣选位按订单 FEFO 出库），锁定来源批次行；送达拣选位扫码/拍灯确认后，在途量转为在手散件量，释放原托盘；
+4. **数量计算（双约束 + 包装取整）**：目标量 = `max_replenish_target − 当前可用量`；实际任务量 = `min(目标量, 来源可下架量)`，按最小包装粒度取整（尾数不足 1 包装留待下轮）；来源可下架量 = `qty_on_hand − qty_allocated − qty_frozen − qty_replenish_out_transit`；
+5. **目标位校验**：生成时复用 6 维校验②③⑥（温区匹配/容器质量锁状态/容量防呆——`max_replenish_target` 不超目标位剩余容量与混品上限），任一不过则该位跳过本轮并记巡检日志；
+6. **生成失败处理**：每次失败写巡检日志（目标位/商品/原因）；同一目标位同因连续 3 次失败触发告警（H4 企微 + 大盘高亮），防"静默缺货"。
 
 ### 5.2 在途双字段与实时可用量公式
 
@@ -256,9 +260,11 @@ CREATE TABLE replenishment_strategies (
     owner_id UUID NOT NULL,                     -- 货主（多货主隔离，策略按货主配置）
     strategy_code VARCHAR(64) NOT NULL,
     strategy_name VARCHAR(128) NOT NULL,
-    scope_type VARCHAR(16) NOT NULL,            -- 'location_group' | 'category'：按库位组或按品类
-    scope_ref UUID NOT NULL,                    -- 库位组 ID 或品类 ID
+    scope_type VARCHAR(16) NOT NULL,            -- 'location_group' | 'category' | 'product'：库位组/品类/单商品
+    scope_ref UUID NOT NULL,                    -- 库位组 ID / 品类 ID / product_id
     location_type VARCHAR(16) NOT NULL,         -- 'case_pick' | 'piece_pick'（只对拣选位生效）
+    source_type VARCHAR(16) NOT NULL DEFAULT 'storage',  -- 动线来源形态：storage / case_pick
+    target_type VARCHAR(16) NOT NULL,           -- 动线目标形态：case_pick / piece_pick
     min_safety_threshold NUMERIC(12, 4) NOT NULL,  -- 低于此值触发补货
     max_replenish_target NUMERIC(12, 4) NOT NULL,  -- 补到为止
     trigger_modes TEXT[] NOT NULL DEFAULT '{min_max, wave_gap}',  -- 驱动模式：安全水位/波次缺口
@@ -291,6 +297,8 @@ CREATE TABLE replenishment_location_group_members (
 
 - `warehouse_locations.replenish_strategy_id` 引用策略表（可空，未挂策略的拣选位不参与 Min-Max 巡检）。
 - Min-Max 巡检判定（目标拣选位，可用量口径）：`qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit <= min_safety_threshold` 触发，补货目标 `max_replenish_target`；波次缺口即时驱动按同一表配置。
+- **scope 维度与优先级**：`product`（scope_ref=商品 ID，精确到商品，药品场景必备）> `category` > `location_group`（最粗兜底）；同目标位多策略命中时取最精确维度。
+- **补货动线（可配置）**：`source_type → target_type` 合法组合——`storage→case_pick`（整箱补货，整托动线）、`storage→piece_pick`（拆零补货）、`case_pick→piece_pick`（二级动线，可选启用）；`source_type='case_pick'` 时来源为散货位，下架按箱取件（无 LPN）；动线校验叠加 GSP 强制项（温区/品类/容器质量锁）。
 
 ### 5.4 补货任务实体与状态机 (Replenishment Task)
 
@@ -332,15 +340,26 @@ CREATE INDEX IF NOT EXISTS replenishment_tasks_owner_source_batch_idx
 
 **状态机**：`pending`（已生成，双字段已 +Δ）➜ `in_progress`（PDA 领取，写 `operator_id`）➜ `done`（目标位确认完成，双字段回冲 + 在手转换）；`cancelled` 仅可从 `pending`/`in_progress` 由人工或超时触发（回冲双字段，来源解冻）。`done_qty = qty` 时任务才置 `done`；部分执行后剩余量仍由原任务承担。**取消前置：`done_qty = 0`**（未开始下架）；已部分执行的任务不可取消（下架的物理货已在流转），需完成剩余量或人工介入处理。
 
-**来源选择（FEFO）**：Min-Max 巡检按目标商品从来源候选存储位中选**效期最近**的批次锁定（近效期先补到拣选位，拣选位按 FEFO 出库）；任务生成时对 `source_batch_id` 行加行锁（`SELECT ... FOR UPDATE`）并校验来源可用量（§5.2 公式 > 0），不足则跳过该来源改选下一候选。
+**来源选择（FEFO）与作业顺序**：
+- **来源选择按 FEFO**：按目标商品从来源候选（策略动线内）选**效期最近**的批次锁定（近效期先补到拣选位，拣选位按订单 FEFO 出库）；任务生成时对 `source_batch_id` 行加行锁（`SELECT ... FOR UPDATE`）并校验来源可用量（§5.2 公式 > 0），不足则跳过改选下一候选；一任务一批次，来源批次不足时按 FEFO 顺序生成多个任务。
+- **作业顺序不按 FEFO**：效期由订单分配决定，补货作业顺序不影响出库效期——PDA 任务列表排序 = **urgent 置顶 → 目标位路径（`pick_sequence_no`）顺路 → 任务号**。
+- **整托 vs 拆托**：任务量 ≥ 整托量 80%（参数可配）→ 整托下架（搬托拆箱，`source_lpn_id` 有值，完成后释放容器）；明显小于整托 → 拆托取件（托留原位，任务完成不释放容器）；两模式在手扣减口径一致。
 
 ### 5.5 PDA 补货作业流程
 
-1. **领取任务**：PDA 补货任务列表（按库位/优先级排序）领取 → `pending` ➜ `in_progress`，写 `operator_id`；同任务同时只允许一个作业员领取（乐观锁 version 校验）。
+**下发与领取规则**：
+- **下发**：urgent 任务生成即推送提醒（PDA 红点/声音），普通任务靠列表拉取（推送失败回落列表不阻塞）；
+- **领取范围**：按作业员绑定的库区/库位组领取（一次一个任务，完成后再领）；urgent 任务可跨区领取（紧急时任何补货员可接）；同任务同时只允许一个作业员领取（乐观锁 version 校验）；
+- **urgent 插队**：列表置顶**不打断当前作业**（打断有货损/找货风险）；10 分钟未领取告警主管，20 分钟未领取自动取消（回冲双字段）+ 通知波次侧缺口未补；
+- **作业超时**：领取后 1 小时无进度（`picked_qty` 无变化）告警主管，可强制改派；不自动取消（货可能已在下架途中，自动取消会悬账）；
+- **改派与退回**：改派重置 `operator_id`（记流水）；退回回 `pending` + 原因（来源货不对/目标位异常），可重新领取；来源货不对时来源侧触发人工核查。
+
+1. **领取任务**：PDA 补货任务列表（按 §5.4 作业顺序：urgent 置顶 → 目标位路径顺路 → 任务号）领取 → `pending` ➜ `in_progress`，写 `operator_id`。
 2. **来源下架**：扫描来源库位/容器码 → 校验与任务 `source_*` 匹配；下架数量（可少于任务量）→ 来源侧不扣在手（已由 `qty_replenish_out_transit` 锁定），任务 `picked_qty += 下架量` 登记中间态（支撑 PDA 断网重连后恢复作业）；`picked_qty > qty` 拒绝（超量下架拦截）。
 3. **送达确认**：扫描目标拣选位码 → 校验目标位未被占用/无质量锁/品类温区匹配（复用 6 维校验②③⑥）→ 确认完成。
 4. **账面转换（同事务）**：来源位 `qty_on_hand −qty`、`qty_replenish_out_transit −qty`；目标位 `qty_on_hand +qty`、`qty_replenish_in_transit −qty`；任务 `picked_qty −= qty`、`done_qty += qty`；写入库存流水（movement_type = `replenish`）。整托全量补货完成后释放来源容器（`idle`，释放前校验该 LPN 在来源位无剩余在手量）。
 5. **重复提交防重**：确认接口按任务 + 幂等键（Idempotency-Key）重放，version 乐观锁兜底。
+6. **完成联动（两个异步事件）**：任务 `done` 后——① 发波次重算单事件（订单行"等待补货"重新算单，见 wave-model §6）；② 目标位水位重判（可用量重新计算，仍 < min 且来源有量则由下一轮巡检自然补发，无需任务级联动）。
 
 ### 5.6 PC 补货策略与任务大盘
 

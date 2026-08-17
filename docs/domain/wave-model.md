@@ -162,7 +162,7 @@ CREATE INDEX IF NOT EXISTS container_lines_order_line_idx ON container_lines (or
 
 ## 4. 拣选任务 (M-TE Pick Task)
 
-- **既有任务实体不变**（行级 + 库位 + `route_sequence` 路径排序，pick_mode 分 PIECE_FULL/PIECE_LOOSE），扩展：
+- **既有任务实体不变**（行级 + 库位 + `route_sequence` 路径排序，pick_mode 分 PIECE_FULL/PIECE_LOOSE），`route_sequence` 按**库位 `pick_sequence_no` 优先排序**（NULL 回落 location_code，见 storage-location-model §1.2；路径策略以顺序字段为唯一权威），扩展：
 
 ```sql
 ALTER TABLE outbound_pick_tasks
