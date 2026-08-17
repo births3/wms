@@ -133,6 +133,7 @@
 -- 容器质量锁事件表（纯审计，只 INSERT）
 CREATE TABLE container_quality_lock_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,                        -- 货主（多货主隔离，审计查询按货主过滤）
     container_id UUID NOT NULL REFERENCES lpn_containers(id),
     lpn_code VARCHAR(64) NOT NULL,                 -- 冗余主档码（与 lpn_containers.lpn_code 同名，便于追溯）
     event_type VARCHAR(16) NOT NULL,               -- 'lock' | 'change_reason' | 'release'
@@ -148,7 +149,7 @@ CREATE TABLE container_quality_lock_events (
 );
 
 CREATE INDEX IF NOT EXISTS container_quality_lock_events_container_idx
-    ON container_quality_lock_events (container_id, occurred_at DESC);
+    ON container_quality_lock_events (owner_id, container_id, occurred_at DESC);
 ```
 
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。

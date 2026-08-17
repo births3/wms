@@ -142,6 +142,7 @@ ALTER TABLE lpn_containers
 -- 通用容器明细表（内容物：拣选周转箱/出库箱/保温箱；存储托盘可不用，经 inventory_batches.container_lpn 反查）
 CREATE TABLE container_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID NOT NULL,                        -- 货主（多货主隔离；由所属容器/订单推导）
     container_id UUID NOT NULL REFERENCES lpn_containers(id),
     product_id UUID NOT NULL,
     batch_no VARCHAR(64) NOT NULL,
@@ -154,7 +155,7 @@ CREATE TABLE container_lines (
     UNIQUE (container_id, product_id, batch_no, order_line_id, source_ref_no)  -- 同箱同品同批可多行（不同订单行/来源），明细行不跨周转箱由绑定规则保证
 );
 
-CREATE INDEX IF NOT EXISTS container_lines_container_idx ON container_lines (container_id);
+CREATE INDEX IF NOT EXISTS container_lines_container_idx ON container_lines (owner_id, container_id);
 CREATE INDEX IF NOT EXISTS container_lines_order_line_idx ON container_lines (order_line_id) WHERE order_line_id IS NOT NULL;
 ```
 
