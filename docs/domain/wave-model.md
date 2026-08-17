@@ -56,8 +56,12 @@ CREATE TABLE wave_templates (
     created_by TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (owner_id, template_code)
+    UNIQUE (owner_id, template_code)              -- 货主模板：owner_id 非空参与唯一；平台默认模板经下方部分唯一索引约束
 );
+
+-- 平台默认模板（owner_id IS NULL）同一 template_code 仅一条
+CREATE UNIQUE INDEX IF NOT EXISTS wave_templates_global_code_uidx
+    ON wave_templates (template_code) WHERE owner_id IS NULL;
 ```
 
 ---
@@ -147,7 +151,7 @@ CREATE TABLE container_lines (
     order_line_id UUID,                        -- 出库箱场景引用 outbound_order_lines；拣选周转箱可为 NULL
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (container_id, product_id, batch_no)
+    UNIQUE (container_id, product_id, batch_no, order_line_id, source_ref_no)  -- 同箱同品同批可多行（不同订单行/来源），明细行不跨周转箱由绑定规则保证
 );
 
 CREATE INDEX IF NOT EXISTS container_lines_container_idx ON container_lines (container_id);
@@ -188,7 +192,7 @@ ALTER TABLE outbound_pick_tasks
 ### 5.3 装箱 + 装车（发货前，装车台合并执行）
 
 - 按绑定关系把周转箱货装入出库箱 → **装箱确认**：`container_lines` 明细转移至出库箱 + 数量校验（转出=转入）+ 周转箱清空回 `idle`（可循环复用）；
-- 装箱确认成功 → 出库箱 `shipped` → 直接装车；失败 → `exception` 人工处理；
+- 装箱确认成功 → 出库箱 `box_status='shipped'` 且容器生命周期 `container.status='shipped'`（随货发出，两状态同事务联动，对齐 ADR-0047 容器状态机）→ 直接装车；失败 → `exception` 人工处理；
 - 装车核对：`loading_scan_mode`（默认 mandatory 逐箱核对）。
 
 ### 5.4 发运与随货同行单
@@ -202,7 +206,7 @@ ALTER TABLE outbound_pick_tasks
 
 - **算单口径**：可用量 = `qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit`（拣选位，见 storage-location-model §5.2）；排除质量区库位、带锁库存、盘点中批次（默认全开，模板可配）；
 - **缺口处理（模板字段三策略）**：
-  - `wait_and_split`（默认）：缺口订单行标记"等待补货"、出库箱/任务标记待补货，波次继续下发；补货 done 后异步重算单纳入（事件驱动，见 storage-location-model §2.1 异步通知）；
+  - `wait_and_split`（默认）：缺口订单行标记"等待补货"、出库箱/任务标记待补货，波次继续下发；补货 done 后异步重算单纳入（事件驱动，见 storage-location-model §2.1 异步通知）——**重算单目标：原波次未完成（未进入 completed）则补算回原波次，原波次已完成则并入下一波次或临时补波**；
   - `hold_wave`：波次挂起等待补货（urgent 场景，等待窗口模板可配，默认 30 分钟，超时转 wait_and_split）；
   - `fail_order`：整订单失败回滚（现状语义，可配置为某货主默认）；
 - **urgent 补货联动**：波次算单缺口即时触发 `priority='urgent'` 补货任务（storage-location-model §5.1），任务 done 后订单行重新算单。
