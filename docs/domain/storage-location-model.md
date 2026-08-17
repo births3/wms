@@ -271,7 +271,11 @@ CREATE TABLE replenishment_strategies (
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (owner_id, strategy_code)
+    UNIQUE (owner_id, strategy_code),
+    CHECK (scope_type IN ('location_group', 'category', 'product')),
+    CHECK (source_type IN ('storage', 'case_pick')),
+    CHECK (target_type IN ('case_pick', 'piece_pick'))
+    -- 动线合法组合（storage→case_pick / storage→piece_pick / case_pick→piece_pick）由代码校验，CHECK 只限单字段值域
 );
 ```
 
