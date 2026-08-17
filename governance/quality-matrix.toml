@@ -6003,7 +6003,7 @@ id = "US-M1-004b"
 title = "容器质量锁管理"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
-types = ["write", "api_change", "frontend_interaction", "audit_compliance"]
+types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
 api_paths = [
   "POST /api/v1/master-data/lpn-containers/{id}/quality-lock",
   "PATCH /api/v1/master-data/lpn-containers/{id}/quality-lock",
