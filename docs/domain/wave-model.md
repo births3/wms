@@ -192,7 +192,7 @@ ALTER TABLE outbound_pick_tasks
 
 ### 5.3 装箱 + 装车（发货前，装车台合并执行）
 
-- 按绑定关系把周转箱货装入出库箱 → **装箱确认**：`container_lines` 明细转移至出库箱 + 数量校验（转出=转入）+ 周转箱清空回 `idle`（可循环复用）；
+- 按绑定关系把周转箱货装入出库箱 → **装箱确认**：`container_lines` 明细转移至出库箱（UPDATE `container_id` 归属）+ 数量校验（转出=转入）+ 周转箱清空回 `idle`（可循环复用）；**装箱流水留痕**：每次装箱记录来源周转箱/目标出库箱/时间/操作人/明细快照（明细归属变化可追溯，周转箱历史内容物可查）；
 - 装箱确认成功 → 出库箱 `box_status='shipped'` 且容器生命周期 `container.status='shipped'`（随货发出，两状态同事务联动，对齐 ADR-0047 容器状态机）→ 直接装车；失败 → `exception` 人工处理；
 - 装车核对：`loading_scan_mode`（默认 mandatory 逐箱核对）。
 
