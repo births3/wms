@@ -153,6 +153,7 @@ CREATE INDEX IF NOT EXISTS container_quality_lock_events_container_idx
 ```
 
 - 当前锁推导：`lpn_containers.current_lock_category` 为权威字段（与事件表同事务维护）；事件表仅用于审计追溯与解锁留痕，查询历史直接 `SELECT ... WHERE container_id = $1 ORDER BY occurred_at`。
+- **并发防护与幂等**：加锁/换原因/解锁事务对容器行 `SELECT ... FOR UPDATE` 行锁串行（`lpn_containers` 无 version 列，不新增列，行锁足够——事件表只 INSERT 无冲突）；加锁/换原因/解锁接口按 `Idempotency-Key` 幂等（重放不重复生成事件、不重复联动批次）。
 - `qualified` 是默认无锁状态，不需要生成加锁事件；从隔离/不合格解除即 `release` 事件回到 `qualified`，`lock_category` 记 `NULL`。
 - 双人见证：加锁与解锁事件必须记录 `witness_id`（见证人），且见证人与操作人（`operated_by`）必须为不同用户（GSP 双人作业）；缺见证人或见证人重复时事务拒绝提交。
 - **M-QL 挂接（审批源）**：加锁/解锁为库存状态变更，审批源 = M-QL 质量联系单（`approval_source=M-QL` + 单号）；加锁事件必须（`rejected`）/ 可以（`quarantine`）关联 `quality_liaison_orders`（对齐 `stock_adjustment_orders.quality_liaison_id` 先例，`related_document_type = 'container_quality_lock'`、`related_document_no = lpn_code`）；`release` 事件携带同一 `quality_liaison_id` 留痕（校验通过后写入）。
