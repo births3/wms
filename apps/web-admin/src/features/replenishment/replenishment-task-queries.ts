@@ -16,11 +16,16 @@ function idempotencyKey() {
   return `web-m3-replenishment-task-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
 }
 
-function asData<T>(result: { data?: unknown; error?: unknown; response: { status: number } }, fallback: string): T {
-  if (!result.data) {
-    throw new ApiError(result.error, fallback, result.response.status);
+function requireData<T>(
+  data: T | undefined,
+  error: unknown,
+  status: number,
+  fallback: string,
+): T {
+  if (data === undefined) {
+    throw new ApiError(error, fallback, status);
   }
-  return result.data as T;
+  return data;
 }
 
 export function useReplenishmentTasksQuery() {
@@ -28,7 +33,7 @@ export function useReplenishmentTasksQuery() {
     queryKey: replenishmentTasksQueryKey,
     queryFn: async () => {
       const result = await api.GET("/api/v1/replenishment/tasks");
-      return asData<ReplenishmentTaskListResponse>(result, "读取补货任务失败");
+      return requireData(result.data, result.error, result.response.status, "读取补货任务失败");
     },
     retry: false,
   });
@@ -42,7 +47,7 @@ export function useCreateReplenishmentTaskMutation() {
         params: { header: { "Idempotency-Key": idempotencyKey() } },
         body,
       });
-      return asData<ReplenishmentTask>(result, "手工发起补货任务失败");
+      return requireData(result.data, result.error, result.response.status, "手工发起补货任务失败");
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: replenishmentTasksQueryKey }),
   });
@@ -56,7 +61,7 @@ export function useCancelReplenishmentTaskMutation() {
         params: { path: { id: input.id }, header: { "Idempotency-Key": idempotencyKey() } },
         body: { version: input.version, reason: input.reason },
       });
-      return asData<ReplenishmentTask>(result, "取消补货任务失败");
+      return requireData(result.data, result.error, result.response.status, "取消补货任务失败");
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: replenishmentTasksQueryKey }),
   });
@@ -70,7 +75,7 @@ export function useReassignReplenishmentTaskMutation() {
         params: { path: { id: input.id }, header: { "Idempotency-Key": idempotencyKey() } },
         body: { version: input.version },
       });
-      return asData<ReplenishmentTask>(result, "改派补货任务失败");
+      return requireData(result.data, result.error, result.response.status, "改派补货任务失败");
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: replenishmentTasksQueryKey }),
   });

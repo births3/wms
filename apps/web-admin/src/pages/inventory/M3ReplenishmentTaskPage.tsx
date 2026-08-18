@@ -235,7 +235,16 @@ function statusTone(row: ReplenishmentTask): "pending" | "completed" | "isolated
   return "pending";
 }
 function isTimeoutRow(row: ReplenishmentTask) {
-  return row.priority === "urgent" && (row.status === "pending" || row.status === "in_progress");
+  const now = Date.now();
+  const createdAt = Date.parse(row.created_at ?? "");
+  const lastProgressAt = Date.parse(row.last_progress_at ?? "");
+  if (row.priority === "urgent" && row.status === "pending" && Number.isFinite(createdAt)) {
+    return now - createdAt >= 10 * 60 * 1000;
+  }
+  if (row.status === "in_progress" && Number.isFinite(lastProgressAt)) {
+    return now - lastProgressAt >= 60 * 60 * 1000;
+  }
+  return false;
 }
 function filterRows(rows: ReplenishmentTask[], query: QueryPanelValue) {
   const status = queryString(query.status);
