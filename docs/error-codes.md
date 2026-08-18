@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 64 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 128 | 业务异常（数据冲突 / 校验失败）|
+| error | 131 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **203** | — |
+| **合计** | **206** | — |
 
 ---
 
@@ -95,7 +95,7 @@
 | H8 | 1 | ERP 接口表探查 |
 | H_DOCK | 11 | 月台预约 |
 | H_AL | 28 | 告警引擎 |
-| M1 | 29 | 主数据校验 / 配置中心 |
+| M1 | 32 | 主数据校验 / 配置中心 |
 | M2 | 18 | 入库流程 |
 | M3 | 8 | 库存与状态 |
 | M4 | 10 | 出库与拣选 |
@@ -1565,6 +1565,39 @@ error_codes:
     related_fields: []
     related_stories: [US-M1-004b]
     introduced_in: v26
+  - code: M1_QUALITY_LOCK_REASON_INVALID
+    module: M1
+    category: QUALITY_LOCK
+    detail: REASON_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '质量锁原因字典项无效或已停用'
+    message_en: 'Quality lock reason dictionary item is invalid or disabled'
+    related_fields: []
+    related_stories: [US-M1-004b]
+    introduced_in: v26
+  - code: M1_QUALITY_LOCK_MQL_REQUIRED
+    module: M1
+    category: QUALITY_LOCK
+    detail: MQL_REQUIRED
+    http_status: 422
+    severity: error
+    message_zh: '不合格质量锁必须关联 M-QL 质量联系单'
+    message_en: 'Rejected quality lock requires an M-QL liaison order'
+    related_fields: []
+    related_stories: [US-M1-004b]
+    introduced_in: v26
+  - code: M1_QUALITY_LOCK_NOT_LOCKED
+    module: M1
+    category: QUALITY_LOCK
+    detail: NOT_LOCKED
+    http_status: 422
+    severity: error
+    message_zh: '当前容器未处于加锁状态'
+    message_en: 'Container is not quality-locked'
+    related_fields: []
+    related_stories: [US-M1-004b]
+    introduced_in: v26
 
 
   - code: M2_PUTAWAY_ZONE_CATEGORY_DENIED
@@ -2629,3 +2662,4 @@ error_codes:
 | 2026-07-15 | v3.8 | 登记 M-TE 任务释放条件未满足错误码；脚本统计当前合计 148 项 |
 | 2026-07-21 | v3.10 | 登记 US-H8-004 接口表探查凭据未配置错误码；脚本统计当前合计 175 项 |
 | 2026-08-17 | v3.11 | 登记 M1_QUALITY_LOCK_*（5 项）与 M2_PUTAWAY_*（7 项）容器质量锁/6 维校验错误码；脚本统计当前合计 203 项 |
+| 2026-08-18 | v3.12 | 补登记 M1_QUALITY_LOCK_REASON_INVALID / MQL_REQUIRED / NOT_LOCKED；脚本统计当前合计 206 项 |

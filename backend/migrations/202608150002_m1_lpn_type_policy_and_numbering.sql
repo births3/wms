@@ -18,6 +18,19 @@ CREATE TABLE IF NOT EXISTS lpn_container_type_policies (
 
 GRANT SELECT, INSERT, UPDATE ON lpn_container_type_policies TO wms_app;
 
+UPDATE system_dictionary_categories
+   SET param_schema = jsonb_set(
+           jsonb_set(
+               param_schema,
+               '{properties,workflow_template,enum}',
+               '["purchase_inbound", "sales_return", "other_inbound", "purchase_return_outbound", "sales_outbound", "sample_outbound", "other_outbound", "stock_loss", "stock_surplus", "quality_liaison", "lpn_container"]'::jsonb
+           ),
+           '{properties,batch_policy,enum}',
+           '["standard_batch", "specified_batch", "optional", "none"]'::jsonb
+       ),
+       updated_at = now()
+ WHERE dict_code = 'document_type';
+
 INSERT INTO system_dictionary_items (
     id, dict_code, item_code, item_name, enabled, owner_id, params, source, created_at, updated_at
 )

@@ -15,9 +15,10 @@ v1 要做整托作业，PDA 只负责扫码。第一刀已有 `lpn_containers` �
 2. **上架可以不填 LPN**（散件）。填了则必须已在主档；`idle`/`in_use` 可用；`in_use` 仅允许同一库位加货；跨库位或在途/回收/已出库走 `M2_LPN_BINDNG_FAILED`，找不到才 `M2_LPN_NOT_FOUND`。
 3. **同库位再上同一 LPN 永远允许加量**；并发用行锁串行后都成功。
 4. **混批、混品按容器类型配置，默认都关。** 策略表按货主+类型存两布尔。上架用该 LPN 已有 `inventory_batches.container_lpn` 判断。容器物理上可装多品，默认策略关掉。
-5. **创建只在 PC。** 客户端不传 `lpn_code`；服务端按类型走 M-CG（五种类型五条规则）。规则或字典缺失则失败，禁止手填回退。
+5. **创建只在 PC。** 客户端不传 `lpn_code`；服务端按类型走 M-CG（五种类型五条规则）。规则或字典缺失则失败，禁止手填回退。批量新增走 `POST .../lpn-containers/batch-create`，同一类型/容量一次取 1-100 个号，同一事务、同一幂等键；数量非法返回 `M1_LPN_BATCH_COUNT_INVALID`。
 6. **上架成功必须回写批次 `container_lpn`。** 否则类型策略无法看见托上已有商品/批号。
 7. **本切片不做 PDA、不做容器内容物表、不做嵌套/回收状态机。**
+8. **删除是软删除。** `DELETE` 把空闲容器标为 `disabled`，行仍保留、LPN 码不回收；默认列表不展示；`GET` 仍可按 ID 读取。在用/在途/回收中/已出库，或库存仍挂该 LPN，一律 `M1_LPN_NOT_DELETABLE`。禁止用 `PATCH status=disabled` 绕过。
 
 ## 后果
 
@@ -42,9 +43,10 @@ v1 要做整托作业，PDA 只负责扫码。第一刀已有 `lpn_containers` �
 | `apps/web-admin/src/app-shell/admin-view.ts` | 联合类型字面量 `"m1-lpn-containers"`，不要写成 `typeof LPN_CONTAINER_VIEW_ID`。 |
 | `apps/web-admin/src/app-shell/AdminViewRenderer.tsx` | `if (view === "m1-lpn-containers") return <M1LpnContainerPage />` |
 | `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` | `m1-lpn-containers` |
+| `apps/web-admin/dev-mocks/lpn-container-dev-mock.ts` | 列表/单建/批量新增/软删除 mock |
 | `backend/crates/domain/src/lib.rs` | `mod lpn_container; pub use lpn_container::*;` |
 | `backend/crates/api/src/lib.rs` | `pub mod lpn_container_handlers;` / `lpn_container_repository` |
-| `backend/crates/api/src/openapi_doc.rs` | 五个 LPN path 操作 |
+| `backend/crates/api/src/openapi_doc.rs` | LPN path 操作（含 batch-create / GET / PATCH / DELETE） |
 | `backend/crates/api/examples/wms_api_e2e.rs` | `lpn_container_router` + `wms_api_e2e_seed_lpn` |
 | `backend/crates/api/examples/support/wms_api_e2e_seed_data.rs` | `seed_lpn_putaway_order` |
 | `backend/crates/api/src/wave3_repository_part1b.rs` | 上架事务在 `bind_lpn_for_putaway` 之前调用 `enforce_inventory_identity`；整文件勿提交 |

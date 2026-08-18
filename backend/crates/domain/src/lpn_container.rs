@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::container_quality_lock::LPN_LOCK_CATEGORY_QUALIFIED;
+
 pub const LPN_CONTAINER_TYPE_PALLET: &str = "pallet";
 pub const LPN_CONTAINER_TYPE_TOTE: &str = "tote";
 pub const LPN_CONTAINER_TYPE_OUTBOUND_BOX: &str = "outbound_box";
@@ -14,6 +16,7 @@ pub const LPN_CONTAINER_STATUS_IN_USE: &str = "in_use";
 pub const LPN_CONTAINER_STATUS_IN_TRANSIT: &str = "in_transit";
 pub const LPN_CONTAINER_STATUS_RECYCLING: &str = "recycling";
 pub const LPN_CONTAINER_STATUS_SHIPPED: &str = "shipped";
+pub const LPN_CONTAINER_STATUS_DISABLED: &str = "disabled";
 
 const VALID_TYPES: &[&str] = &[
     LPN_CONTAINER_TYPE_PALLET,
@@ -29,6 +32,7 @@ const VALID_STATUSES: &[&str] = &[
     LPN_CONTAINER_STATUS_IN_TRANSIT,
     LPN_CONTAINER_STATUS_RECYCLING,
     LPN_CONTAINER_STATUS_SHIPPED,
+    LPN_CONTAINER_STATUS_DISABLED,
 ];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,6 +41,7 @@ pub enum LpnContainerValidationError {
     CodeTooLong,
     TypeInvalid,
     StatusInvalid,
+    BatchCountInvalid,
 }
 
 pub const LPN_CODE_MAX_LEN: usize = 64;
@@ -50,6 +55,8 @@ pub struct LpnContainer {
     pub capacity_cm3: Option<i64>,
     pub status: String,
     pub location_id: Option<Uuid>,
+    pub current_lock_category: Option<String>,
+    pub current_lock_reason_item_code: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -63,6 +70,15 @@ pub struct LpnContainerListResponse {
 pub struct CreateLpnContainerRequest {
     pub container_type: String,
     pub capacity_cm3: Option<i64>,
+}
+
+pub const LPN_BATCH_CREATE_MAX_COUNT: i32 = 100;
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BatchCreateLpnContainerRequest {
+    pub container_type: String,
+    pub capacity_cm3: Option<i64>,
+    pub count: i32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -99,6 +115,13 @@ pub fn lpn_status_allows_putaway(status: &str) -> bool {
     matches!(
         status,
         LPN_CONTAINER_STATUS_IDLE | LPN_CONTAINER_STATUS_IN_USE
+    )
+}
+
+pub fn lpn_status_allows_soft_delete(status: &str) -> bool {
+    matches!(
+        status,
+        LPN_CONTAINER_STATUS_IDLE | LPN_CONTAINER_STATUS_DISABLED
     )
 }
 
@@ -168,9 +191,30 @@ impl CreateLpnContainerRequest {
             capacity_cm3: self.capacity_cm3,
             status: LPN_CONTAINER_STATUS_IDLE.to_string(),
             location_id: None,
+            current_lock_category: Some(LPN_LOCK_CATEGORY_QUALIFIED.to_string()),
+            current_lock_reason_item_code: None,
             created_at: now,
             updated_at: now,
         })
+    }
+}
+
+impl BatchCreateLpnContainerRequest {
+    pub fn validate(&self) -> Result<(), LpnContainerValidationError> {
+        if !is_valid_lpn_container_type(self.container_type.trim()) {
+            return Err(LpnContainerValidationError::TypeInvalid);
+        }
+        if self.count < 1 || self.count > LPN_BATCH_CREATE_MAX_COUNT {
+            return Err(LpnContainerValidationError::BatchCountInvalid);
+        }
+        Ok(())
+    }
+
+    pub fn item_request(&self) -> CreateLpnContainerRequest {
+        CreateLpnContainerRequest {
+            container_type: self.container_type.trim().to_string(),
+            capacity_cm3: self.capacity_cm3,
+        }
     }
 }
 
@@ -231,6 +275,43 @@ mod tests {
         assert_eq!(
             sample_request("nest").validate(),
             Err(LpnContainerValidationError::TypeInvalid)
+        );
+    }
+
+    #[test]
+    fn batch_create_rejects_invalid_type_or_count() {
+        let valid = BatchCreateLpnContainerRequest {
+            container_type: LPN_CONTAINER_TYPE_PALLET.to_string(),
+            capacity_cm3: Some(1_000),
+            count: 3,
+        };
+        assert_eq!(valid.validate(), Ok(()));
+        assert_eq!(
+            BatchCreateLpnContainerRequest {
+                container_type: "nest".to_string(),
+                capacity_cm3: None,
+                count: 3,
+            }
+            .validate(),
+            Err(LpnContainerValidationError::TypeInvalid)
+        );
+        assert_eq!(
+            BatchCreateLpnContainerRequest {
+                container_type: LPN_CONTAINER_TYPE_PALLET.to_string(),
+                capacity_cm3: None,
+                count: 0,
+            }
+            .validate(),
+            Err(LpnContainerValidationError::BatchCountInvalid)
+        );
+        assert_eq!(
+            BatchCreateLpnContainerRequest {
+                container_type: LPN_CONTAINER_TYPE_PALLET.to_string(),
+                capacity_cm3: None,
+                count: LPN_BATCH_CREATE_MAX_COUNT + 1,
+            }
+            .validate(),
+            Err(LpnContainerValidationError::BatchCountInvalid)
         );
     }
 
@@ -297,6 +378,21 @@ mod tests {
         assert!(!lpn_status_allows_putaway(LPN_CONTAINER_STATUS_SHIPPED));
         assert!(!lpn_status_allows_putaway(LPN_CONTAINER_STATUS_IN_TRANSIT));
         assert!(!lpn_status_allows_putaway(LPN_CONTAINER_STATUS_RECYCLING));
+        assert!(!lpn_status_allows_putaway(LPN_CONTAINER_STATUS_DISABLED));
+    }
+
+    #[test]
+    fn only_idle_or_already_disabled_allows_soft_delete() {
+        assert!(lpn_status_allows_soft_delete(LPN_CONTAINER_STATUS_IDLE));
+        assert!(lpn_status_allows_soft_delete(LPN_CONTAINER_STATUS_DISABLED));
+        assert!(!lpn_status_allows_soft_delete(LPN_CONTAINER_STATUS_IN_USE));
+        assert!(!lpn_status_allows_soft_delete(
+            LPN_CONTAINER_STATUS_IN_TRANSIT
+        ));
+        assert!(!lpn_status_allows_soft_delete(LPN_CONTAINER_STATUS_SHIPPED));
+        assert!(!lpn_status_allows_soft_delete(
+            LPN_CONTAINER_STATUS_RECYCLING
+        ));
     }
 
     #[test]

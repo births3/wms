@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, patch},
+    routing::get,
     Json, Router,
 };
 use chrono::Utc;
@@ -11,8 +11,11 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 use wms_domain::{
-    CreateLpnContainerRequest, ErrorResponse, LpnContainer, LpnContainerListResponse,
-    LpnContainerTypePolicy, UpdateLpnContainerRequest, UpsertLpnContainerTypePolicyRequest,
+    ApplyContainerQualityLockRequest, BatchCreateLpnContainerRequest,
+    ChangeContainerQualityLockReasonRequest, CreateLpnContainerRequest, ErrorResponse,
+    LpnContainer, LpnContainerListResponse, LpnContainerTypePolicy,
+    ReleaseContainerQualityLockRequest, UpdateLpnContainerRequest,
+    UpsertLpnContainerTypePolicyRequest,
 };
 
 use crate::{
@@ -22,6 +25,7 @@ use crate::{
 
 const READ_PERMISSION: &str = "m1.master_data.read";
 const WRITE_PERMISSION: &str = "m1.master_data.write";
+const QUALITY_LOCK_PERMISSION: &str = "m1.quality-lock.manage";
 const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
 
 #[derive(Clone, Debug)]
@@ -100,10 +104,22 @@ impl IntoResponse for LpnContainerHandlerError {
                 "M1_LPN_TYPE_INVALID",
                 "LPN 容器类型非法".to_string(),
             ),
+            LpnContainerHandlerError::Repository(
+                LpnContainerRepositoryError::BatchCountInvalid,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LPN_BATCH_COUNT_INVALID",
+                "批量新增数量必须为 1-100".to_string(),
+            ),
             LpnContainerHandlerError::Repository(LpnContainerRepositoryError::StatusInvalid) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M1_LPN_STATUS_INVALID",
                 "LPN 容器状态非法".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::NotDeletable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LPN_NOT_DELETABLE",
+                "在用或作业中的容器不能删除，请先解绑".to_string(),
             ),
             LpnContainerHandlerError::Repository(
                 LpnContainerRepositoryError::NumberingUnavailable,
@@ -111,6 +127,48 @@ impl IntoResponse for LpnContainerHandlerError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M1_LPN_NUMBERING_UNAVAILABLE",
                 "该容器类型未配置可用编号规则".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::StateInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_QUALITY_LOCK_STATE_INVALID",
+                "容器状态非 in_use，禁止加锁".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::WitnessInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_QUALITY_LOCK_WITNESS_INVALID",
+                "见证人缺失或与操作人相同，双人见证不成立".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::MqlNotFinal) => (
+                StatusCode::CONFLICT,
+                "M1_QUALITY_LOCK_MQL_NOT_FINAL",
+                "关联 M-QL 未办结（closed/rejected），禁止解锁".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::ZoneMismatch) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_QUALITY_LOCK_ZONE_MISMATCH",
+                "目标库区质量分区与锁类别不匹配".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(
+                LpnContainerRepositoryError::LocationTypeInvalid,
+            ) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_QUALITY_LOCK_LOCATION_TYPE_INVALID",
+                "加锁容器目标位非存储位（禁上箱拣/零拣位）".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::ReasonInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_QUALITY_LOCK_REASON_INVALID",
+                "质量锁原因字典项无效或已停用".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::MqlRequired) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_QUALITY_LOCK_MQL_REQUIRED",
+                "不合格质量锁必须关联 M-QL 质量联系单".to_string(),
+            ),
+            LpnContainerHandlerError::Repository(LpnContainerRepositoryError::NotLocked) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_QUALITY_LOCK_NOT_LOCKED",
+                "当前容器未处于加锁状态".to_string(),
             ),
             LpnContainerHandlerError::Repository(
                 LpnContainerRepositoryError::IdempotencyConflict,
@@ -150,8 +208,23 @@ pub fn lpn_container_router(state: LpnContainerAppState) -> Router {
             get(list_lpn_containers_handler).post(create_lpn_container_handler),
         )
         .route(
+            "/api/v1/master-data/lpn-containers/batch-create",
+            axum::routing::post(batch_create_lpn_containers_handler),
+        )
+        .route(
             "/api/v1/master-data/lpn-containers/:id",
-            patch(update_lpn_container_handler),
+            get(get_lpn_container_handler)
+                .patch(update_lpn_container_handler)
+                .delete(delete_lpn_container_handler),
+        )
+        .route(
+            "/api/v1/master-data/lpn-containers/:id/quality-lock",
+            axum::routing::post(apply_quality_lock_handler)
+                .patch(change_quality_lock_reason_handler),
+        )
+        .route(
+            "/api/v1/master-data/lpn-containers/:id/quality-lock/release",
+            axum::routing::post(release_quality_lock_handler),
         )
         .route(
             "/api/v1/master-data/lpn-container-type-policies",
@@ -177,6 +250,31 @@ async fn list_lpn_containers_handler(
             )
             .await?,
     }))
+}
+
+async fn get_lpn_container_handler(
+    ctx: AuthContext,
+    State(state): State<LpnContainerAppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<LpnContainer>, LpnContainerHandlerError> {
+    require_read_permission(&ctx)?;
+    Ok(Json(state.repository.get(&ctx, id).await?))
+}
+
+async fn batch_create_lpn_containers_handler(
+    ctx: AuthContext,
+    State(state): State<LpnContainerAppState>,
+    headers: HeaderMap,
+    Json(request): Json<BatchCreateLpnContainerRequest>,
+) -> Result<Json<LpnContainerListResponse>, LpnContainerHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .batch_create(&ctx, request, Utc::now(), &idempotency_key)
+            .await?,
+    ))
 }
 
 async fn create_lpn_container_handler(
@@ -208,6 +306,73 @@ async fn update_lpn_container_handler(
         state
             .repository
             .update(&ctx, id, request, Utc::now(), &idempotency_key)
+            .await?,
+    ))
+}
+
+async fn delete_lpn_container_handler(
+    ctx: AuthContext,
+    State(state): State<LpnContainerAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<LpnContainer>, LpnContainerHandlerError> {
+    ctx.require_permission(WRITE_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .delete(&ctx, id, Utc::now(), &idempotency_key)
+            .await?,
+    ))
+}
+
+async fn apply_quality_lock_handler(
+    ctx: AuthContext,
+    State(state): State<LpnContainerAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<ApplyContainerQualityLockRequest>,
+) -> Result<Json<LpnContainer>, LpnContainerHandlerError> {
+    ctx.require_permission(QUALITY_LOCK_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .apply_quality_lock(&ctx, id, request, Utc::now(), &idempotency_key)
+            .await?,
+    ))
+}
+
+async fn change_quality_lock_reason_handler(
+    ctx: AuthContext,
+    State(state): State<LpnContainerAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<ChangeContainerQualityLockReasonRequest>,
+) -> Result<Json<LpnContainer>, LpnContainerHandlerError> {
+    ctx.require_permission(QUALITY_LOCK_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .change_quality_lock_reason(&ctx, id, request, Utc::now(), &idempotency_key)
+            .await?,
+    ))
+}
+
+async fn release_quality_lock_handler(
+    ctx: AuthContext,
+    State(state): State<LpnContainerAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(request): Json<ReleaseContainerQualityLockRequest>,
+) -> Result<Json<LpnContainer>, LpnContainerHandlerError> {
+    ctx.require_permission(QUALITY_LOCK_PERMISSION)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    Ok(Json(
+        state
+            .repository
+            .release_quality_lock(&ctx, id, request, Utc::now(), &idempotency_key)
             .await?,
     ))
 }

@@ -340,7 +340,7 @@ async fn putaway_mix_sku_follows_type_policy(pool: PgPool) {
     let actor = ctx(fixture.owner_id);
     let product_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO products (id, owner_id, erp_goods_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 2002, 'LPN-P-002', 'p2', '1', 'normal', 10, 'active')",
+        "INSERT INTO products (id, owner_id, erp_goods_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 2002, 'LPN-P-002', 'p2', '1', 'normal_10_30', 10, 'active')",
     )
     .bind(product_id)
     .bind(fixture.owner_id)
