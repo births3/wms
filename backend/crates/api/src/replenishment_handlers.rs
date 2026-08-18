@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post, put},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -14,8 +15,9 @@ use wms_domain::{
     BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
     CancelReplenishmentTaskRequest, ClaimReplenishmentTaskRequest, ConfirmReplenishmentTaskRequest,
     CreateReplenishmentTaskRequest, ErrorResponse, PickReplenishmentTaskRequest,
-    ReassignReplenishmentTaskRequest, ReplenishmentLocationGroup, ReplenishmentPreviewResponse,
-    ReplenishmentStrategy, ReplenishmentTask, ReturnReplenishmentTaskRequest,
+    ReassignReplenishmentTaskRequest, ReplenishmentLocationGroup,
+    ReplenishmentLocationGroupListResponse, ReplenishmentPreviewResponse, ReplenishmentStrategy,
+    ReplenishmentStrategyListResponse, ReplenishmentTask, ReturnReplenishmentTaskRequest,
     UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
 
@@ -47,7 +49,15 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
     Router::new()
         .route(
             "/api/v1/replenishment/strategies",
-            post(create_strategy_handler),
+            get(list_strategies_handler).post(create_strategy_handler),
+        )
+        .route(
+            "/api/v1/replenishment/strategies/:id",
+            get(get_strategy_handler).put(update_strategy_handler),
+        )
+        .route(
+            "/api/v1/replenishment/strategies/:id/disable",
+            post(disable_strategy_handler),
         )
         .route(
             "/api/v1/replenishment/strategies/:id/locations",
@@ -59,7 +69,7 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
         )
         .route(
             "/api/v1/replenishment/location-groups",
-            post(create_location_group_handler),
+            get(list_location_groups_handler).post(create_location_group_handler),
         )
         .route("/api/v1/replenishment/tasks", post(create_task_handler))
         .route(
@@ -87,6 +97,74 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
             post(return_task_handler),
         )
         .with_state(state)
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+struct ListStrategiesQuery {
+    keyword: Option<String>,
+    enabled: Option<bool>,
+    scope_type: Option<String>,
+}
+
+async fn list_strategies_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Query(query): Query<ListStrategiesQuery>,
+) -> Result<Json<ReplenishmentStrategyListResponse>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    Ok(Json(
+        state
+            .service
+            .list_strategies(
+                &ctx,
+                query.keyword.as_deref(),
+                query.enabled,
+                query.scope_type.as_deref(),
+            )
+            .await?,
+    ))
+}
+
+async fn get_strategy_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ReplenishmentStrategy>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    Ok(Json(state.service.get_strategy(&ctx, id).await?))
+}
+
+async fn update_strategy_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<UpsertReplenishmentStrategyRequest>,
+) -> Result<Json<ReplenishmentStrategy>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state.service.update_strategy(&ctx, id, req, &key).await?,
+    ))
+}
+
+async fn disable_strategy_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<ReplenishmentStrategy>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.disable_strategy(&ctx, id, &key).await?))
+}
+
+async fn list_location_groups_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+) -> Result<Json<ReplenishmentLocationGroupListResponse>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    Ok(Json(state.service.list_location_groups(&ctx).await?))
 }
 
 async fn create_strategy_handler(

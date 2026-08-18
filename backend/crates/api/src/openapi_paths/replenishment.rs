@@ -2,6 +2,66 @@
 use super::*;
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/replenishment/strategies",
+    tag = "replenishment",
+    params(
+        ("keyword" = Option<String>, Query, description = "策略编码或名称"),
+        ("enabled" = Option<bool>, Query, description = "启停"),
+        ("scope_type" = Option<String>, Query, description = "范围类型"),
+    ),
+    responses((status = 200, description = "策略列表", body = ReplenishmentStrategyListResponse)),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_replenishment_strategies() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/replenishment/strategies/{id}",
+    tag = "replenishment",
+    params(("id" = Uuid, Path, description = "策略 ID")),
+    responses((status = 200, description = "策略详情", body = ReplenishmentStrategy)),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_replenishment_strategy() {}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/replenishment/strategies/{id}",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "策略 ID"),
+        ("Idempotency-Key" = String, Header, description = "更新幂等键"),
+    ),
+    request_body = UpsertReplenishmentStrategyRequest,
+    responses((status = 200, description = "更新补货策略", body = ReplenishmentStrategy)),
+)]
+#[allow(dead_code)]
+pub(crate) fn update_replenishment_strategy() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/strategies/{id}/disable",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "策略 ID"),
+        ("Idempotency-Key" = String, Header, description = "停用幂等键"),
+    ),
+    responses((status = 200, description = "停用补货策略", body = ReplenishmentStrategy)),
+)]
+#[allow(dead_code)]
+pub(crate) fn disable_replenishment_strategy() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/replenishment/location-groups",
+    tag = "replenishment",
+    responses((status = 200, description = "库位组列表", body = ReplenishmentLocationGroupListResponse)),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_replenishment_location_groups() {}
+
+#[utoipa::path(
     post,
     path = "/api/v1/replenishment/strategies",
     tag = "replenishment",

@@ -276,3 +276,71 @@ async fn category_scope_ref_must_be_special_drug_dictionary_item(pool: PgPool) {
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(body["code"], "M3_REPLENISH_SCOPE_NOT_FOUND");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn list_update_and_disable_strategy(pool: PgPool) {
+    let owner_id = seed_owner(&pool).await;
+    let product_id = seed_product(&pool, owner_id, "RP-LIST").await;
+    let created = post_strategy(
+        app(pool.clone(), owner_id),
+        valid_body("LIST-01", product_id),
+        Some("rp-list-create"),
+    )
+    .await;
+    assert_eq!(created.0, StatusCode::OK);
+    let id = created.1["id"].as_str().expect("id");
+
+    let listed = app(pool.clone(), owner_id)
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/replenishment/strategies?keyword=LIST-01")
+                .body(Body::empty())
+                .expect("list"),
+        )
+        .await
+        .expect("oneshot");
+    assert_eq!(listed.status(), StatusCode::OK);
+    let listed_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(listed.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    assert_eq!(listed_json["data"][0]["strategy_code"], "LIST-01");
+
+    let mut update_body = valid_body("LIST-01", product_id);
+    update_body["strategy_name"] = serde_json::json!("更新后名称");
+    let updated = app(pool.clone(), owner_id)
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/v1/replenishment/strategies/{id}"))
+                .header("content-type", "application/json")
+                .header("idempotency-key", "rp-list-update")
+                .body(Body::from(update_body.to_string()))
+                .expect("put"),
+        )
+        .await
+        .expect("oneshot");
+    assert_eq!(updated.status(), StatusCode::OK);
+
+    let disabled = app(pool, owner_id)
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/v1/replenishment/strategies/{id}/disable"))
+                .header("idempotency-key", "rp-list-disable")
+                .body(Body::empty())
+                .expect("disable"),
+        )
+        .await
+        .expect("oneshot");
+    assert_eq!(disabled.status(), StatusCode::OK);
+    let disabled_json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(disabled.into_body(), usize::MAX)
+            .await
+            .expect("body"),
+    )
+    .expect("json");
+    assert_eq!(disabled_json["enabled"], false);
+}

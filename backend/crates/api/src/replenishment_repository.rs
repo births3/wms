@@ -1,5 +1,7 @@
 //! 补货策略与库位组存取。
 
+#[path = "replenishment_repository_strategy.rs"]
+mod strategy;
 #[path = "replenishment_repository_task.rs"]
 mod task;
 
@@ -200,148 +202,6 @@ impl PgReplenishmentRepository {
         .bind(group_id)
         .fetch_one(&self.pool)
         .await
-    }
-
-    pub async fn replace_strategy_locations(
-        &self,
-        tx: &mut Transaction<'_, Postgres>,
-        owner_id: Uuid,
-        strategy_id: Uuid,
-        target_type: &str,
-        location_ids: &[Uuid],
-    ) -> Result<BindReplenishmentLocationsResponse, ReplenishmentRepoError> {
-        let conflicting: Option<Uuid> = sqlx::query_scalar(
-            r#"
-            SELECT id
-              FROM warehouse_locations
-             WHERE owner_id = $1
-               AND id = ANY($2)
-               AND replenish_strategy_id IS NOT NULL
-               AND replenish_strategy_id <> $3
-             LIMIT 1
-            "#,
-        )
-        .bind(owner_id)
-        .bind(location_ids)
-        .bind(strategy_id)
-        .fetch_optional(&mut **tx)
-        .await
-        .map_err(ReplenishmentRepoError::Database)?;
-        if conflicting.is_some() {
-            return Err(ReplenishmentRepoError::LocationBound);
-        }
-
-        let typed: i64 = sqlx::query_scalar(
-            r#"
-            SELECT COUNT(*)
-              FROM warehouse_locations
-             WHERE owner_id = $1
-               AND id = ANY($2)
-               AND location_type = $3
-            "#,
-        )
-        .bind(owner_id)
-        .bind(location_ids)
-        .bind(target_type)
-        .fetch_one(&mut **tx)
-        .await
-        .map_err(ReplenishmentRepoError::Database)?;
-        if typed as usize != location_ids.len() {
-            return Err(ReplenishmentRepoError::LocationTypeMismatch);
-        }
-
-        sqlx::query(
-            r#"
-            UPDATE warehouse_locations
-               SET replenish_strategy_id = NULL,
-                   updated_at = now()
-             WHERE owner_id = $1
-               AND replenish_strategy_id = $2
-               AND NOT (id = ANY($3))
-            "#,
-        )
-        .bind(owner_id)
-        .bind(strategy_id)
-        .bind(location_ids)
-        .execute(&mut **tx)
-        .await
-        .map_err(ReplenishmentRepoError::Database)?;
-
-        sqlx::query(
-            r#"
-            UPDATE warehouse_locations
-               SET replenish_strategy_id = $2,
-                   updated_at = now()
-             WHERE owner_id = $1
-               AND id = ANY($3)
-            "#,
-        )
-        .bind(owner_id)
-        .bind(strategy_id)
-        .bind(location_ids)
-        .execute(&mut **tx)
-        .await
-        .map_err(ReplenishmentRepoError::Database)?;
-
-        Ok(BindReplenishmentLocationsResponse {
-            strategy_id,
-            location_ids: location_ids.to_vec(),
-        })
-    }
-
-    pub async fn preview_strategy(
-        &self,
-        owner_id: Uuid,
-        strategy: &ReplenishmentStrategy,
-    ) -> Result<Vec<ReplenishmentPreviewItem>, sqlx::Error> {
-        sqlx::query_as::<_, PreviewRow>(
-            r#"
-            SELECT location.id,
-                   location.location_code,
-                   $4::uuid AS product_id,
-                   COALESCE((
-                       SELECT SUM(
-                           qty_on_hand - qty_allocated - qty_frozen + qty_replenish_in_transit
-                       )
-                         FROM inventory_batches
-                        WHERE owner_id = location.owner_id
-                          AND location_id = location.id
-                          AND status = 'qualified'
-                          AND ($4::uuid IS NULL OR product_id = $4)
-                   ), 0) AS available_qty
-              FROM warehouse_locations location
-             WHERE location.owner_id = $1
-               AND location.replenish_strategy_id = $2
-               AND location.location_type = $3
-               AND location.status <> 'disabled'
-            "#,
-        )
-        .bind(owner_id)
-        .bind(strategy.id)
-        .bind(&strategy.target_type)
-        .bind(if strategy.scope_type == "product" {
-            Some(strategy.scope_ref)
-        } else {
-            None
-        })
-        .fetch_all(&self.pool)
-        .await
-        .map(|rows| {
-            rows.into_iter()
-                .map(|row| {
-                    let would_trigger = row.available_qty <= strategy.min_safety_threshold;
-                    ReplenishmentPreviewItem {
-                        location_id: row.id,
-                        location_code: row.location_code,
-                        product_id: row.product_id,
-                        available_qty: row.available_qty,
-                        min_safety_threshold: strategy.min_safety_threshold,
-                        max_replenish_target: strategy.max_replenish_target,
-                        would_trigger,
-                    }
-                })
-                .collect()
-        })
     }
 
     pub async fn upsert_location_group(
@@ -698,7 +558,7 @@ pub enum ReplenishmentRepoError {
 }
 
 #[derive(sqlx::FromRow)]
-struct StrategyRow {
+pub(crate) struct StrategyRow {
     id: Uuid,
     owner_id: Uuid,
     strategy_code: String,
@@ -711,6 +571,15 @@ struct StrategyRow {
     min_safety_threshold: Quantity,
     max_replenish_target: Quantity,
     trigger_modes: Vec<String>,
+    enabled: bool,
+}
+
+#[derive(sqlx::FromRow)]
+pub(crate) struct GroupRow {
+    id: Uuid,
+    owner_id: Uuid,
+    group_code: String,
+    group_name: String,
     enabled: bool,
 }
 
@@ -735,7 +604,7 @@ impl From<StrategyRow> for ReplenishmentStrategy {
 }
 
 #[derive(sqlx::FromRow)]
-struct PreviewRow {
+pub(crate) struct PreviewRow {
     id: Uuid,
     location_code: String,
     product_id: Option<Uuid>,

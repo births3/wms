@@ -16,9 +16,10 @@ use uuid::Uuid;
 use wms_domain::{
     task_qty, validate_replenish_route, zone_treats_as_qualified,
     BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
-    CreateReplenishmentTaskRequest, Quantity, ReplenishmentLocationGroup,
-    ReplenishmentPreviewResponse, ReplenishmentStrategy, ReplenishmentTask,
-    UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
+    CreateReplenishmentTaskRequest, PageMeta, Quantity, ReplenishmentLocationGroup,
+    ReplenishmentLocationGroupListResponse, ReplenishmentPreviewResponse, ReplenishmentStrategy,
+    ReplenishmentStrategyListResponse, ReplenishmentTask, UpsertReplenishmentLocationGroupRequest,
+    UpsertReplenishmentStrategyRequest,
 };
 
 use crate::{
@@ -133,6 +134,171 @@ impl ReplenishmentService {
         .await?;
         tx.commit().await?;
         Ok(created)
+    }
+
+    pub async fn list_strategies(
+        &self,
+        ctx: &AuthContext,
+        keyword: Option<&str>,
+        enabled: Option<bool>,
+        scope_type: Option<&str>,
+    ) -> Result<ReplenishmentStrategyListResponse, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        let data = self
+            .repo
+            .list_strategies(ctx.owner_id, keyword, enabled, scope_type)
+            .await?;
+        let count = u32::try_from(data.len()).unwrap_or(u32::MAX);
+        Ok(ReplenishmentStrategyListResponse {
+            data,
+            page: PageMeta {
+                next_cursor: None,
+                count,
+                total: Some(count),
+            },
+        })
+    }
+
+    pub async fn get_strategy(
+        &self,
+        ctx: &AuthContext,
+        strategy_id: Uuid,
+    ) -> Result<ReplenishmentStrategy, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        self.repo
+            .get_strategy(ctx.owner_id, strategy_id)
+            .await?
+            .ok_or(ReplenishmentError::TaskNotFound)
+    }
+
+    pub async fn update_strategy(
+        &self,
+        ctx: &AuthContext,
+        strategy_id: Uuid,
+        req: UpsertReplenishmentStrategyRequest,
+        idempotency_key: &str,
+    ) -> Result<ReplenishmentStrategy, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        self.validate_strategy(ctx.owner_id, &req).await?;
+        let hash = idempotency::request_hash(&req)?;
+        let path = format!("/api/v1/replenishment/strategies/{strategy_id}");
+        let mut tx = self.repo.pool().begin().await?;
+        idempotency::lock_key(
+            &mut tx,
+            "replenishment_strategy",
+            ctx.owner_id,
+            idempotency_key,
+        )
+        .await?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "PUT",
+            &path,
+            Utc::now(),
+        )
+        .await?
+        {
+            return Ok(replay);
+        }
+        let updated = self
+            .repo
+            .update_strategy(&mut tx, ctx.owner_id, strategy_id, &req)
+            .await?
+            .ok_or(ReplenishmentError::TaskNotFound)?;
+        idempotency::store_success_with_status(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "PUT",
+            &path,
+            200,
+            "replenishment_strategy",
+            &updated.id.to_string(),
+            &updated,
+            Utc::now(),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(updated)
+    }
+
+    pub async fn disable_strategy(
+        &self,
+        ctx: &AuthContext,
+        strategy_id: Uuid,
+        idempotency_key: &str,
+    ) -> Result<ReplenishmentStrategy, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        let path = format!("/api/v1/replenishment/strategies/{strategy_id}/disable");
+        let hash = idempotency::request_hash(&strategy_id)?;
+        let mut tx = self.repo.pool().begin().await?;
+        idempotency::lock_key(
+            &mut tx,
+            "replenishment_strategy",
+            ctx.owner_id,
+            idempotency_key,
+        )
+        .await?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            Utc::now(),
+        )
+        .await?
+        {
+            return Ok(replay);
+        }
+        let updated = self
+            .repo
+            .disable_strategy(&mut tx, ctx.owner_id, strategy_id)
+            .await?
+            .ok_or(ReplenishmentError::TaskNotFound)?;
+        idempotency::store_success_with_status(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            200,
+            "replenishment_strategy",
+            &updated.id.to_string(),
+            &updated,
+            Utc::now(),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(updated)
+    }
+
+    pub async fn list_location_groups(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<ReplenishmentLocationGroupListResponse, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        let data = self.repo.list_location_groups(ctx.owner_id).await?;
+        let count = u32::try_from(data.len()).unwrap_or(u32::MAX);
+        Ok(ReplenishmentLocationGroupListResponse {
+            data,
+            page: PageMeta {
+                next_cursor: None,
+                count,
+                total: Some(count),
+            },
+        })
     }
 
     pub async fn bind_locations(
