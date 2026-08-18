@@ -1,18 +1,26 @@
 use chrono::{DateTime, Utc};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::json;
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     decide_lpn_mix, decide_lpn_putaway_bind, lpn_inventory_identity_allows,
-    lpn_numbering_document_type, CreateLpnContainerRequest, LpnContainer, LpnContainerTypePolicy,
-    LpnContainerValidationError, LpnMixDenied, LpnPutawayBindDecision, UpdateLpnContainerRequest,
-    UpsertLpnContainerTypePolicyRequest,
+    lpn_numbering_document_type, lpn_status_allows_soft_delete, validate_apply_lock,
+    validate_change_reason, validate_release_lock, ApplyContainerQualityLockRequest,
+    BatchCreateLpnContainerRequest, ChangeContainerQualityLockReasonRequest,
+    ContainerQualityLockValidationError, CreateLpnContainerRequest, LpnContainer,
+    LpnContainerListResponse, LpnContainerTypePolicy, LpnContainerValidationError, LpnMixDenied,
+    LpnPutawayBindDecision, ReleaseContainerQualityLockRequest, UpdateLpnContainerRequest,
+    UpsertLpnContainerTypePolicyRequest, LPN_CONTAINER_STATUS_DISABLED,
+    LPN_LOCK_CATEGORY_QUALIFIED, LPN_LOCK_CATEGORY_QUARANTINE, LPN_LOCK_CATEGORY_REJECTED,
 };
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
     idempotency,
+    inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED, STATUS_UNQUALIFIED},
     operation_context::OperationContext as AuthContext,
+    system_dictionary::validate_container_quality_lock_reason_in_tx,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -23,8 +31,18 @@ pub enum LpnContainerRepositoryError {
     CodeTooLong,
     TypeInvalid,
     StatusInvalid,
+    BatchCountInvalid,
+    NotDeletable,
     IdempotencyConflict,
     NumberingUnavailable,
+    StateInvalid,
+    WitnessInvalid,
+    MqlNotFinal,
+    ZoneMismatch,
+    LocationTypeInvalid,
+    ReasonInvalid,
+    MqlRequired,
+    NotLocked,
     Audit(String),
     Database(String),
     Serialize(String),
@@ -60,6 +78,23 @@ impl From<LpnContainerValidationError> for LpnContainerRepositoryError {
             LpnContainerValidationError::CodeTooLong => Self::CodeTooLong,
             LpnContainerValidationError::TypeInvalid => Self::TypeInvalid,
             LpnContainerValidationError::StatusInvalid => Self::StatusInvalid,
+            LpnContainerValidationError::BatchCountInvalid => Self::BatchCountInvalid,
+        }
+    }
+}
+
+impl From<ContainerQualityLockValidationError> for LpnContainerRepositoryError {
+    fn from(error: ContainerQualityLockValidationError) -> Self {
+        match error {
+            ContainerQualityLockValidationError::StateInvalid => Self::StateInvalid,
+            ContainerQualityLockValidationError::WitnessInvalid => Self::WitnessInvalid,
+            ContainerQualityLockValidationError::MqlNotFinal => Self::MqlNotFinal,
+            ContainerQualityLockValidationError::ZoneMismatch => Self::ZoneMismatch,
+            ContainerQualityLockValidationError::LocationTypeInvalid => Self::LocationTypeInvalid,
+            ContainerQualityLockValidationError::CategoryInvalid => Self::TypeInvalid,
+            ContainerQualityLockValidationError::ReasonRequired => Self::ReasonInvalid,
+            ContainerQualityLockValidationError::MqlRequired => Self::MqlRequired,
+            ContainerQualityLockValidationError::NotLocked => Self::NotLocked,
         }
     }
 }
@@ -69,17 +104,27 @@ pub struct PgLpnContainerRepository {
     pool: PgPool,
 }
 
+/// 超时未完成的 lock_move 移库任务（scan_overdue_lock_moves 返回项）。
+#[derive(Clone, Debug)]
+pub struct OverdueLockMove {
+    pub container_id: Uuid,
+    pub lpn_code: String,
+    pub task_created_at: DateTime<Utc>,
+}
+
 #[derive(Clone, Debug, FromRow)]
-struct LpnContainerRow {
-    id: Uuid,
-    owner_id: Uuid,
-    lpn_code: String,
-    container_type: String,
-    capacity_cm3: Option<i64>,
-    status: String,
-    location_id: Option<Uuid>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+pub(crate) struct LpnContainerRow {
+    pub(crate) id: Uuid,
+    pub(crate) owner_id: Uuid,
+    pub(crate) lpn_code: String,
+    pub(crate) container_type: String,
+    pub(crate) capacity_cm3: Option<i64>,
+    pub(crate) status: String,
+    pub(crate) location_id: Option<Uuid>,
+    pub(crate) current_lock_category: Option<String>,
+    pub(crate) current_lock_reason_item_code: Option<String>,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) updated_at: DateTime<Utc>,
 }
 
 impl From<LpnContainerRow> for LpnContainer {
@@ -92,6 +137,8 @@ impl From<LpnContainerRow> for LpnContainer {
             capacity_cm3: row.capacity_cm3,
             status: row.status,
             location_id: row.location_id,
+            current_lock_category: row.current_lock_category,
+            current_lock_reason_item_code: row.current_lock_reason_item_code,
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
@@ -132,55 +179,7 @@ impl PgLpnContainerRepository {
         {
             return Ok(replay);
         }
-        let id = Uuid::new_v4();
-        let generated_no = crate::document_numbering::PgDocumentNumberingService::new()
-            .generate_in_tx(
-                &mut tx,
-                ctx,
-                crate::document_numbering::GenerateDocumentNumberRequest {
-                    document_type: lpn_numbering_document_type(&req.container_type),
-                    idempotency_key: format!("m1-lpn-create:{id}"),
-                    source_module: "M1".to_string(),
-                    source_document_id: Some(id),
-                },
-                now,
-            )
-            .await
-            .map_err(|error| match error {
-                crate::document_numbering::DocumentNumberingError::RuleNotFound
-                | crate::document_numbering::DocumentNumberingError::DocumentTypeInvalid
-                | crate::document_numbering::DocumentNumberingError::InvalidRule => {
-                    LpnContainerRepositoryError::NumberingUnavailable
-                }
-                other => LpnContainerRepositoryError::Database(format!("{other:?}")),
-            })?
-            .value
-            .generated_no;
-        let container = req
-            .clone()
-            .into_new_container(id, ctx.owner_id, generated_no, now)?;
-        let row = sqlx::query_as::<_, LpnContainerRow>(
-            r#"
-            INSERT INTO lpn_containers (
-                id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
-            )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)
-            RETURNING id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
-            "#,
-        )
-        .bind(container.id)
-        .bind(container.owner_id)
-        .bind(&container.lpn_code)
-        .bind(&container.container_type)
-        .bind(container.capacity_cm3)
-        .bind(&container.status)
-        .bind(container.location_id)
-        .bind(now)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(map_write_error)?;
-        let created: LpnContainer = row.into();
-        append_lpn_audit(&mut tx, ctx, "create_lpn_container", &created, now).await?;
+        let created = insert_new_container_in_tx(&mut tx, ctx, &req, now).await?;
         store_idempotency_success(
             &mut tx,
             ctx.owner_id,
@@ -208,12 +207,16 @@ impl PgLpnContainerRepository {
         let keyword = keyword.map(str::trim).filter(|value| !value.is_empty());
         let rows = sqlx::query_as::<_, LpnContainerRow>(
             r#"
-            SELECT id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
+            SELECT id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id,
+                   current_lock_category, current_lock_reason_item_code, created_at, updated_at
               FROM lpn_containers
              WHERE owner_id = $1
                AND ($2::text IS NULL OR lpn_code ILIKE '%' || $2 || '%' OR container_type ILIKE '%' || $2 || '%')
                AND ($3::text IS NULL OR container_type = $3)
-               AND ($4::text IS NULL OR status = $4)
+               AND CASE
+                     WHEN $4::text IS NULL THEN status <> 'disabled'
+                     ELSE status = $4
+                   END
              ORDER BY lpn_code
             "#,
         )
@@ -227,96 +230,6 @@ impl PgLpnContainerRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    pub async fn update(
-        &self,
-        ctx: &AuthContext,
-        id: Uuid,
-        req: UpdateLpnContainerRequest,
-        now: DateTime<Utc>,
-        idempotency_key: &str,
-    ) -> Result<LpnContainer, LpnContainerRepositoryError> {
-        req.validate()?;
-        let request_hash = request_hash(&serde_json::json!({
-            "id": id,
-            "request": &req,
-        }))?;
-        let path = "/api/v1/master-data/lpn-containers/{id}";
-        let mut tx = self.pool.begin().await.map_err(map_db_error)?;
-        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
-        if let Some(replay) = replay_idempotency::<LpnContainer>(
-            &mut tx,
-            ctx.owner_id,
-            idempotency_key,
-            &request_hash,
-            "PATCH",
-            path,
-            now,
-        )
-        .await?
-        {
-            return Ok(replay);
-        }
-        let before = sqlx::query_as::<_, LpnContainerRow>(
-            r#"
-            SELECT id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
-              FROM lpn_containers
-             WHERE id = $1 AND owner_id = $2
-             FOR UPDATE
-            "#,
-        )
-        .bind(id)
-        .bind(ctx.owner_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(map_db_error)?
-        .ok_or(LpnContainerRepositoryError::NotFound)?;
-        let status = req
-            .status
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or(&before.status);
-        let location_id = req.location_id.or(before.location_id);
-        let capacity_cm3 = req.capacity_cm3.or(before.capacity_cm3);
-        let row = sqlx::query_as::<_, LpnContainerRow>(
-            r#"
-            UPDATE lpn_containers
-               SET status = $3,
-                   location_id = $4,
-                   capacity_cm3 = $5,
-                   updated_at = $6
-             WHERE id = $1 AND owner_id = $2
-            RETURNING id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
-            "#,
-        )
-        .bind(id)
-        .bind(ctx.owner_id)
-        .bind(status)
-        .bind(location_id)
-        .bind(capacity_cm3)
-        .bind(now)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(map_write_error)?;
-        let updated: LpnContainer = row.into();
-        append_lpn_audit(&mut tx, ctx, "update_lpn_container", &updated, now).await?;
-        store_idempotency_success(
-            &mut tx,
-            ctx.owner_id,
-            idempotency_key,
-            &request_hash,
-            "PATCH",
-            path,
-            "lpn_container",
-            &updated.id.to_string(),
-            &updated,
-            now,
-        )
-        .await?;
-        tx.commit().await.map_err(map_db_error)?;
-        Ok(updated)
-    }
-
     pub async fn bind_lpn_for_putaway(
         tx: &mut Transaction<'_, Postgres>,
         ctx: &AuthContext,
@@ -328,7 +241,8 @@ impl PgLpnContainerRepository {
     ) -> Result<LpnContainer, LpnPutawayBindError> {
         let row = sqlx::query_as::<_, LpnContainerRow>(
             r#"
-            SELECT id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
+            SELECT id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id,
+                   current_lock_category, current_lock_reason_item_code, created_at, updated_at
               FROM lpn_containers
              WHERE owner_id = $1 AND lpn_code = $2
              FOR UPDATE
@@ -363,7 +277,8 @@ impl PgLpnContainerRepository {
                    location_id = $3,
                    updated_at = $4
              WHERE id = $1 AND owner_id = $2
-            RETURNING id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id, created_at, updated_at
+            RETURNING id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id,
+                      current_lock_category, current_lock_reason_item_code, created_at, updated_at
             "#,
         )
         .bind(row.id)
@@ -389,7 +304,7 @@ impl PgLpnContainerRepository {
         product_code: &str,
         batch_no: &str,
         location_id: Uuid,
-        quality_status: &str,
+        status: &str,
         incoming_lpn: Option<&str>,
     ) -> Result<(), LpnPutawayBindError> {
         let existing: Option<Option<String>> = sqlx::query_scalar(
@@ -400,7 +315,7 @@ impl PgLpnContainerRepository {
                AND product_code = $2
                AND batch_no = $3
                AND location_id = $4
-               AND quality_status = $5
+               AND status = $5
              FOR UPDATE
             "#,
         )
@@ -408,7 +323,7 @@ impl PgLpnContainerRepository {
         .bind(product_code)
         .bind(batch_no)
         .bind(location_id)
-        .bind(quality_status)
+        .bind(status)
         .fetch_optional(&mut **tx)
         .await
         .map_err(|error| LpnPutawayBindError::Database(error.to_string()))?;
@@ -565,6 +480,66 @@ async fn append_lpn_audit(
         .map_err(|error| LpnContainerRepositoryError::Audit(format!("{error:?}")))
 }
 
+async fn insert_new_container_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    req: &CreateLpnContainerRequest,
+    now: DateTime<Utc>,
+) -> Result<LpnContainer, LpnContainerRepositoryError> {
+    let id = Uuid::new_v4();
+    let generated_no = crate::document_numbering::PgDocumentNumberingService::new()
+        .generate_in_tx(
+            tx,
+            ctx,
+            crate::document_numbering::GenerateDocumentNumberRequest {
+                document_type: lpn_numbering_document_type(&req.container_type),
+                idempotency_key: format!("m1-lpn-create:{id}"),
+                source_module: "M1".to_string(),
+                source_document_id: Some(id),
+            },
+            now,
+        )
+        .await
+        .map_err(|error| match error {
+            crate::document_numbering::DocumentNumberingError::RuleNotFound
+            | crate::document_numbering::DocumentNumberingError::DocumentTypeInvalid
+            | crate::document_numbering::DocumentNumberingError::InvalidRule => {
+                LpnContainerRepositoryError::NumberingUnavailable
+            }
+            other => LpnContainerRepositoryError::Database(format!("{other:?}")),
+        })?
+        .value
+        .generated_no;
+    let container = req
+        .clone()
+        .into_new_container(id, ctx.owner_id, generated_no, now)?;
+    let row = sqlx::query_as::<_, LpnContainerRow>(
+        r#"
+        INSERT INTO lpn_containers (
+            id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id,
+            current_lock_category, current_lock_reason_item_code, created_at, updated_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,'qualified',NULL,$8,$8)
+        RETURNING id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id,
+                  current_lock_category, current_lock_reason_item_code, created_at, updated_at
+        "#,
+    )
+    .bind(container.id)
+    .bind(container.owner_id)
+    .bind(&container.lpn_code)
+    .bind(&container.container_type)
+    .bind(container.capacity_cm3)
+    .bind(&container.status)
+    .bind(container.location_id)
+    .bind(now)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(map_write_error)?;
+    let created: LpnContainer = row.into();
+    append_lpn_audit(tx, ctx, "create_lpn_container", &created, now).await?;
+    Ok(created)
+}
+
 async fn lock_idempotency_key(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
@@ -608,7 +583,7 @@ async fn store_idempotency_success<T: Serialize>(
     value: &T,
     now: DateTime<Utc>,
 ) -> Result<(), LpnContainerRepositoryError> {
-    idempotency::store_success(
+    Ok(idempotency::store_success(
         tx,
         owner_id,
         idempotency_key,
@@ -620,8 +595,7 @@ async fn store_idempotency_success<T: Serialize>(
         value,
         now,
     )
-    .await
-    .map_err(Into::into)
+    .await?)
 }
 
 fn request_hash(value: &serde_json::Value) -> Result<String, LpnContainerRepositoryError> {
@@ -650,3 +624,7 @@ fn map_write_error(error: sqlx::Error) -> LpnContainerRepositoryError {
     }
     map_db_error(error)
 }
+
+include!("lpn_container_repository_quality_lock.rs");
+include!("lpn_container_repository_quality_lock_ops.rs");
+include!("lpn_container_repository_write.rs");
