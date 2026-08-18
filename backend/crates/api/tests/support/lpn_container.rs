@@ -1,8 +1,14 @@
 use chrono::{DateTime, TimeZone, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
-use wms_api::{auth::AuthContext, inventory::STATUS_QUALIFIED};
-use wms_domain::{CreateLpnContainerRequest, PutawayRequest, LPN_CONTAINER_TYPE_PALLET};
+use wms_api::{
+    auth::AuthContext, inventory::STATUS_QUALIFIED,
+    lpn_container_repository::PgLpnContainerRepository,
+};
+use wms_domain::{
+    CreateLpnContainerRequest, LpnContainer, PutawayRequest, UpdateLpnContainerRequest,
+    LPN_CONTAINER_STATUS_IN_USE, LPN_CONTAINER_TYPE_PALLET,
+};
 
 pub async fn insert_owner(pool: &PgPool, owner_id: Uuid) {
     sqlx::query(
@@ -92,6 +98,61 @@ pub async fn seed_lpn_numbering(pool: &PgPool, now: DateTime<Utc>, owner_id: Uui
         .await
         .expect("lpn numbering rule");
     }
+    seed_quality_lock_move_targets(pool, owner_id).await;
+}
+
+/// 为加锁隔离移库准备隔离区/不合格区存储位。
+pub async fn seed_quality_lock_move_targets(pool: &PgPool, owner_id: Uuid) {
+    let warehouse_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status) VALUES ($1, $2, $3, '质量锁测试仓', 'normal', 'active') ON CONFLICT DO NOTHING",
+    )
+    .bind(warehouse_id)
+    .bind(owner_id)
+    .bind(format!("QLWH{}", &owner_id.to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("quality lock warehouse");
+    for (suffix, color) in [
+        ("Q", "quarantine_yellow"),
+        ("R", "unqualified_red"),
+        ("G", "qualified_green"),
+    ] {
+        let zone_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO warehouse_zones (
+                id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone,
+                quality_color, allowed_categories, is_external_use_zone, is_fragrant_zone,
+                is_special_drug_zone, status
+            ) VALUES ($1, $2, $3, $4, $5, 'normal_10_30', $6, '[]'::jsonb, false, false, false, 'active')
+            "#,
+        )
+        .bind(zone_id)
+        .bind(owner_id)
+        .bind(warehouse_id)
+        .bind(format!("QLZ{suffix}"))
+        .bind(format!("质量锁{suffix}区"))
+        .bind(color)
+        .execute(pool)
+        .await
+        .expect("quality lock zone");
+        sqlx::query(
+            r#"
+            INSERT INTO warehouse_locations (
+                id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no,
+                location_type, allows_container, status, max_volume_cm3, used_volume_cm3
+            ) VALUES (gen_random_uuid(), $1, $2, $3, $4, 1, 1, 1, 'storage', true, 'available', 100000, 0)
+            "#,
+        )
+        .bind(owner_id)
+        .bind(warehouse_id)
+        .bind(zone_id)
+        .bind(format!("QLLOC-{suffix}-01"))
+        .execute(pool)
+        .await
+        .expect("quality lock location");
+    }
 }
 
 pub fn create_req() -> CreateLpnContainerRequest {
@@ -99,6 +160,32 @@ pub fn create_req() -> CreateLpnContainerRequest {
         container_type: LPN_CONTAINER_TYPE_PALLET.to_string(),
         capacity_cm3: Some(8000),
     }
+}
+
+/// 创建容器并置为 in_use（质量锁相关测试共用夹具）。
+#[allow(dead_code)]
+pub async fn setup_container_in_use(
+    repo: &PgLpnContainerRepository,
+    actor: &AuthContext,
+    key: &str,
+) -> LpnContainer {
+    let created = repo
+        .create(actor, create_req(), at(1), &format!("{key}-c"))
+        .await
+        .expect("create container");
+    repo.update(
+        actor,
+        created.id,
+        UpdateLpnContainerRequest {
+            status: Some(LPN_CONTAINER_STATUS_IN_USE.to_string()),
+            location_id: None,
+            capacity_cm3: None,
+        },
+        at(2),
+        &format!("{key}-u"),
+    )
+    .await
+    .expect("set container in_use")
 }
 
 pub struct PutawayFixture {
@@ -127,7 +214,7 @@ pub async fn seed_putaway(pool: &PgPool) -> PutawayFixture {
     .await
     .expect("warehouse");
     sqlx::query(
-        "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1, $2, $3, 'Z1', 'zone', 'normal', 'qualified_green', 'active')",
+        "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1, $2, $3, 'Z1', 'zone', 'normal_10_30', 'qualified_green', 'active')",
     )
     .bind(zone_id)
     .bind(owner_id)
@@ -146,7 +233,7 @@ pub async fn seed_putaway(pool: &PgPool) -> PutawayFixture {
     .await
     .expect("location");
     sqlx::query(
-        "INSERT INTO products (id, owner_id, erp_goods_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 2001, 'LPN-P-001', 'p', '1', 'normal', 10, 'active')",
+        "INSERT INTO products (id, owner_id, erp_goods_id, product_code, product_name, specification, storage_condition, volume_cm3, status) VALUES ($1, $2, 2001, 'LPN-P-001', 'p', '1', 'normal_10_30', 10, 'active')",
     )
     .bind(product_id)
     .bind(owner_id)
