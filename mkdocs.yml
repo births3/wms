@@ -196,6 +196,8 @@ nav:
     - AI 动态项目图谱: agent-knowledge-graph.md
     - 前后端分层设计规范: layered-design.md
     - 库位与补货领域模型: domain/storage-location-model.md
+    - Phase 2 补货技术规范: domain/replenishment-phase2-spec.md
+    - Phase 2 补货工单清单: domain/replenishment-phase2-tickets.md
     - 波次与出库箱领域模型: domain/wave-model.md
     - 概念审计: concept-audit.md
     - 业务澄清记录: domain/clarifications.md
