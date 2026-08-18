@@ -5,6 +5,8 @@ mod strategy;
 #[path = "replenishment_repository_task.rs"]
 mod task;
 
+pub use task::{ExecuteListFilter, OperatorZoneScope, TargetLocationScope};
+
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{

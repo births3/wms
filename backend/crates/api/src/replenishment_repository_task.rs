@@ -5,32 +5,161 @@ use wms_domain::{Quantity, ReplenishmentTask};
 
 use super::{PgReplenishmentRepository, TaskRow};
 
+pub struct ExecuteListFilter {
+    pub user_id: Uuid,
+    pub allowed_zone_ids: Vec<Uuid>,
+    pub open_warehouse_ids: Vec<Uuid>,
+}
+
+pub struct OperatorZoneScope {
+    pub allowed_zone_ids: Vec<Uuid>,
+    pub open_warehouse_ids: Vec<Uuid>,
+}
+
+pub struct TargetLocationScope {
+    pub zone_id: Uuid,
+    pub warehouse_id: Uuid,
+}
+
+impl OperatorZoneScope {
+    pub fn allows(&self, location: &TargetLocationScope) -> bool {
+        self.allowed_zone_ids.contains(&location.zone_id)
+            || self.open_warehouse_ids.contains(&location.warehouse_id)
+    }
+
+    pub fn to_list_filter(&self, user_id: Uuid) -> ExecuteListFilter {
+        ExecuteListFilter {
+            user_id,
+            allowed_zone_ids: self.allowed_zone_ids.clone(),
+            open_warehouse_ids: self.open_warehouse_ids.clone(),
+        }
+    }
+}
+
 impl PgReplenishmentRepository {
     pub async fn list_tasks(
         &self,
         owner_id: Uuid,
         status: Option<&str>,
         trigger_mode: Option<&str>,
+        execute: Option<&ExecuteListFilter>,
     ) -> Result<Vec<ReplenishmentTask>, sqlx::Error> {
+        let execute_user = execute.map(|item| item.user_id);
+        let allowed_zones = execute
+            .map(|item| item.allowed_zone_ids.as_slice())
+            .unwrap_or(&[]);
+        let open_warehouses = execute
+            .map(|item| item.open_warehouse_ids.as_slice())
+            .unwrap_or(&[]);
         sqlx::query_as::<_, TaskRow>(
             r#"
-            SELECT id, owner_id, task_no, trigger_mode, priority, strategy_id,
-                   source_location_id, source_batch_id, source_lpn_id, target_location_id,
-                   product_id, batch_no, qty, picked_qty, done_qty, status, operator_id,
-                   created_by, version
-              FROM replenishment_tasks
-             WHERE owner_id = $1
-               AND ($2::text IS NULL OR status = $2)
-               AND ($3::text IS NULL OR trigger_mode = $3)
-             ORDER BY CASE WHEN priority = 'urgent' THEN 0 ELSE 1 END, created_at
+            SELECT t.id, t.owner_id, t.task_no, t.trigger_mode, t.priority, t.strategy_id,
+                   t.source_location_id, t.source_batch_id, t.source_lpn_id, t.target_location_id,
+                   t.product_id, t.batch_no, t.qty, t.picked_qty, t.done_qty, t.status, t.operator_id,
+                   t.created_by, t.version
+              FROM replenishment_tasks t
+              JOIN warehouse_locations loc
+                ON loc.id = t.target_location_id
+               AND loc.owner_id = t.owner_id
+             WHERE t.owner_id = $1
+               AND ($2::text IS NULL OR t.status = $2)
+               AND ($3::text IS NULL OR t.trigger_mode = $3)
+               AND (
+                    $4::uuid IS NULL
+                    OR t.operator_id = $4
+                    OR (
+                        t.status = 'pending'
+                        AND (
+                            t.priority = 'urgent'
+                            OR loc.zone_id = ANY($5)
+                            OR loc.warehouse_id = ANY($6)
+                        )
+                    )
+               )
+             ORDER BY
+               CASE WHEN $4::uuid IS NULL THEN t.created_at END ASC,
+               CASE WHEN $4::uuid IS NOT NULL AND t.priority = 'urgent' THEN 0 ELSE 1 END,
+               loc.pick_sequence_no ASC NULLS LAST,
+               t.task_no
             "#,
         )
         .bind(owner_id)
         .bind(status)
         .bind(trigger_mode)
+        .bind(execute_user)
+        .bind(allowed_zones)
+        .bind(open_warehouses)
         .fetch_all(&self.pool)
         .await
         .map(|rows| rows.into_iter().map(Into::into).collect())
+    }
+
+    pub async fn operator_replenish_zone_scope(
+        &self,
+        owner_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<OperatorZoneScope, sqlx::Error> {
+        let rows: Vec<(Vec<Uuid>, Uuid)> = sqlx::query_as(
+            r#"
+            SELECT task_group.zone_ids, task_group.warehouse_id
+              FROM task_groups task_group
+             WHERE task_group.owner_id = $1
+               AND task_group.enabled
+               AND 'replenish' = ANY(task_group.task_type_codes)
+               AND EXISTS (
+                    SELECT 1
+                      FROM task_group_memberships membership
+                     WHERE membership.task_group_id = task_group.id
+                       AND membership.owner_id = $1
+                       AND membership.user_id = $2
+                       AND (
+                            membership.qualification_valid_until IS NULL
+                            OR membership.qualification_valid_until > now()
+                       )
+               )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut allowed_zone_ids = Vec::new();
+        let mut open_warehouse_ids = Vec::new();
+        for (zone_ids, warehouse_id) in rows {
+            if zone_ids.is_empty() {
+                open_warehouse_ids.push(warehouse_id);
+            } else {
+                allowed_zone_ids.extend(zone_ids);
+            }
+        }
+        Ok(OperatorZoneScope {
+            allowed_zone_ids,
+            open_warehouse_ids,
+        })
+    }
+
+    pub async fn target_location_scope(
+        &self,
+        owner_id: Uuid,
+        location_id: Uuid,
+    ) -> Result<Option<TargetLocationScope>, sqlx::Error> {
+        sqlx::query_as(
+            r#"
+            SELECT zone_id, warehouse_id
+              FROM warehouse_locations
+             WHERE owner_id = $1 AND id = $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|row| {
+            row.map(|(zone_id, warehouse_id)| TargetLocationScope {
+                zone_id,
+                warehouse_id,
+            })
+        })
     }
 
     pub async fn list_task_owner_ids(&self) -> Result<Vec<Uuid>, sqlx::Error> {

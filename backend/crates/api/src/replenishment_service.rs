@@ -54,6 +54,7 @@ pub enum ReplenishmentError {
     StateInvalid,
     CancelBlocked,
     ReturnBlocked,
+    ZoneDenied,
     IdempotencyRequired,
     IdempotencyConflict,
     Database(sqlx::Error),
@@ -509,13 +510,20 @@ impl ReplenishmentService {
         status: Option<&str>,
         trigger_mode: Option<&str>,
     ) -> Result<ReplenishmentTaskListResponse, ReplenishmentError> {
-        if ctx.require_permission(MANAGE).is_err() {
+        let execute = if ctx.require_permission(MANAGE).is_ok() {
+            None
+        } else {
             ctx.require_permission(EXECUTE)
                 .map_err(|_| ReplenishmentError::PermissionDenied)?;
-        }
+            let scope = self
+                .repo
+                .operator_replenish_zone_scope(ctx.owner_id, ctx.user_id)
+                .await?;
+            Some(scope.to_list_filter(ctx.user_id))
+        };
         let data = self
             .repo
-            .list_tasks(ctx.owner_id, status, trigger_mode)
+            .list_tasks(ctx.owner_id, status, trigger_mode, execute.as_ref())
             .await?;
         let count = u32::try_from(data.len()).unwrap_or(u32::MAX);
         Ok(ReplenishmentTaskListResponse {

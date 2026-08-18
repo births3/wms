@@ -36,6 +36,7 @@ fn ctx(owner_id: Uuid, user_id: Uuid, permission: &str) -> AuthContext {
 
 struct World {
     owner_id: Uuid,
+    replenish_group_id: Uuid,
     storage_id: Uuid,
     pick_id: Uuid,
     source_batch_id: Uuid,
@@ -94,6 +95,21 @@ async fn seed_world(pool: &PgPool, on_hand: i64) -> World {
     .execute(pool)
     .await
     .expect("zone");
+    let replenish_group_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO task_groups (
+            id, owner_id, task_group_code, task_group_name, warehouse_id,
+            zone_ids, task_type_codes, enabled
+        ) VALUES ($1, $2, 'replenish-all', '全仓补货班组', $3, '{}', ARRAY['replenish'], TRUE)
+        "#,
+    )
+    .bind(replenish_group_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .execute(pool)
+    .await
+    .expect("open replenish group");
     let storage_id = seed_loc(pool, owner_id, warehouse_id, zone_id, "ST-01", "storage").await;
     let pick_id = seed_loc(pool, owner_id, warehouse_id, zone_id, "PP-01", "piece_pick").await;
     let source_batch_id = Uuid::new_v4();
@@ -122,10 +138,41 @@ async fn seed_world(pool: &PgPool, on_hand: i64) -> World {
     .expect("batch");
     World {
         owner_id,
+        replenish_group_id,
         storage_id,
         pick_id,
         source_batch_id,
     }
+}
+
+async fn seed_operator(pool: &PgPool, world: &World) -> Uuid {
+    let operator_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1, $2, '作业员', 'test-hash', 'active')",
+    )
+    .bind(operator_id)
+    .bind(format!("op-{}", &operator_id.simple().to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("user");
+    sqlx::query(
+        "INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary) VALUES ($1, $2, TRUE, TRUE)",
+    )
+    .bind(operator_id)
+    .bind(world.owner_id)
+    .execute(pool)
+    .await
+    .expect("binding");
+    sqlx::query(
+        "INSERT INTO task_group_memberships (task_group_id, owner_id, user_id) VALUES ($1, $2, $3)",
+    )
+    .bind(world.replenish_group_id)
+    .bind(world.owner_id)
+    .bind(operator_id)
+    .execute(pool)
+    .await
+    .expect("membership");
+    operator_id
 }
 
 async fn seed_loc(
@@ -223,7 +270,7 @@ async fn claim_pick(
     tag: &str,
 ) -> (Uuid, serde_json::Value) {
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(pool, world).await;
     let claimed = post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &uri(id, "claim"),
@@ -305,7 +352,7 @@ async fn confirm_when_source_frozen_suspends_task(pool: PgPool) {
     let world = seed_world(&pool, 10).await;
     let task = create_task(&pool, &world, 10, "ex-17-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &uri(id, "claim"),

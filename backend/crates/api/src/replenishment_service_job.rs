@@ -50,6 +50,20 @@ impl ReplenishmentService {
         if task.version != req.version || task.status != REPLENISH_STATUS_PENDING {
             return Err(ReplenishmentError::ClaimConflict);
         }
+        if task.priority != "urgent" {
+            let location = self
+                .repo
+                .target_location_scope(ctx.owner_id, task.target_location_id)
+                .await?
+                .ok_or(ReplenishmentError::TaskNotFound)?;
+            let scope = self
+                .repo
+                .operator_replenish_zone_scope(ctx.owner_id, ctx.user_id)
+                .await?;
+            if !scope.allows(&location) {
+                return Err(ReplenishmentError::ZoneDenied);
+            }
+        }
         if self
             .repo
             .operator_has_in_progress(&mut tx, ctx.owner_id, ctx.user_id, task.id)

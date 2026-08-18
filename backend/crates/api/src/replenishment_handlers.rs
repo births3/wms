@@ -423,6 +423,11 @@ impl IntoResponse for ReplenishmentHandlerError {
                 "M3_REPLENISH_RETURN_BLOCKED",
                 "已下架的补货任务不可退回",
             ),
+            Self::Service(ReplenishmentError::ZoneDenied) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_ZONE_DENIED",
+                "普通补货任务目标库区不在作业员班组",
+            ),
             Self::Service(ReplenishmentError::SourceUnavailable) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M3_REPLENISH_SOURCE_UNAVAILABLE",

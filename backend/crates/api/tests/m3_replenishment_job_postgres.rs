@@ -36,6 +36,7 @@ fn auth(owner_id: Uuid, user_id: Uuid, permission: &str) -> AuthContext {
 
 struct World {
     owner_id: Uuid,
+    replenish_group_id: Uuid,
     product_id: Uuid,
     storage_id: Uuid,
     pick_id: Uuid,
@@ -96,6 +97,8 @@ async fn seed_world(pool: &PgPool, source_on_hand: i64, with_lpn: bool) -> World
     .execute(pool)
     .await
     .expect("zone");
+    let replenish_group_id =
+        seed_open_replenish_group(pool, owner_id, warehouse_id, "replenish-all").await;
     let storage_id = seed_location(pool, owner_id, warehouse_id, zone_id, "ST-01", "storage").await;
     let pick_id = seed_location(pool, owner_id, warehouse_id, zone_id, "PP-01", "piece_pick").await;
     let source_lpn_id = if with_lpn {
@@ -147,12 +150,68 @@ async fn seed_world(pool: &PgPool, source_on_hand: i64, with_lpn: bool) -> World
     .expect("batch");
     World {
         owner_id,
+        replenish_group_id,
         product_id,
         storage_id,
         pick_id,
         source_batch_id,
         source_lpn_id,
     }
+}
+
+async fn seed_open_replenish_group(
+    pool: &PgPool,
+    owner_id: Uuid,
+    warehouse_id: Uuid,
+    code: &str,
+) -> Uuid {
+    let group_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO task_groups (
+            id, owner_id, task_group_code, task_group_name, warehouse_id,
+            zone_ids, task_type_codes, enabled
+        ) VALUES ($1, $2, $3, '全仓补货班组', $4, '{}', ARRAY['replenish'], TRUE)
+        "#,
+    )
+    .bind(group_id)
+    .bind(owner_id)
+    .bind(code)
+    .bind(warehouse_id)
+    .execute(pool)
+    .await
+    .expect("open replenish group");
+    group_id
+}
+
+async fn seed_operator(pool: &PgPool, world: &World) -> Uuid {
+    let operator_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1, $2, '作业员', 'test-hash', 'active')",
+    )
+    .bind(operator_id)
+    .bind(format!("op-{}", &operator_id.simple().to_string()[..8]))
+    .execute(pool)
+    .await
+    .expect("user");
+    sqlx::query(
+        "INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary) VALUES ($1, $2, TRUE, TRUE)",
+    )
+    .bind(operator_id)
+    .bind(world.owner_id)
+    .execute(pool)
+    .await
+    .expect("binding");
+    sqlx::query(
+        "INSERT INTO task_group_memberships (task_group_id, owner_id, user_id) VALUES ($1, $2, $3)",
+    )
+    .bind(world.replenish_group_id)
+    .bind(world.owner_id)
+    .bind(operator_id)
+    .execute(pool)
+    .await
+    .expect("membership");
+    operator_id
 }
 
 async fn seed_location(
@@ -251,7 +310,7 @@ async fn pick_wrong_location_is_source_mismatch(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-18-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
@@ -280,15 +339,17 @@ async fn second_claim_same_version_conflicts(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-5-create").await;
     let id = task["id"].as_str().expect("id");
+    let first_op = seed_operator(&pool, &world).await;
+    let second_op = seed_operator(&pool, &world).await;
     let first = json_post(
-        app(pool.clone(), execute_ctx(world.owner_id, Uuid::new_v4())),
+        app(pool.clone(), execute_ctx(world.owner_id, first_op)),
         &task_uri(id, "claim"),
         serde_json::json!({ "version": task["version"] }),
         "job-5-a",
     )
     .await;
     let second = json_post(
-        app(pool, execute_ctx(world.owner_id, Uuid::new_v4())),
+        app(pool, execute_ctx(world.owner_id, second_op)),
         &task_uri(id, "claim"),
         serde_json::json!({ "version": task["version"] }),
         "job-5-b",
@@ -305,7 +366,7 @@ async fn pick_over_remaining_qty_is_exceeded(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-6-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
@@ -345,7 +406,7 @@ async fn confirm_converts_on_hand_and_finishes_task(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-7-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
@@ -411,7 +472,7 @@ async fn partial_confirm_keeps_in_progress(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-8-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
@@ -452,7 +513,7 @@ async fn confirm_blocked_when_target_zone_not_qualified(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-12-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
@@ -509,7 +570,7 @@ async fn confirm_idempotent_replay_does_not_double(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-13-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
@@ -593,7 +654,7 @@ async fn confirm_full_lpn_releases_container_to_idle(pool: PgPool) {
     let world = seed_world(&pool, 10, true).await;
     let task = create_task(&pool, &world, 10, "job-16-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
@@ -638,7 +699,7 @@ async fn confirm_without_pick_is_state_invalid(pool: PgPool) {
     let world = seed_world(&pool, 10, false).await;
     let task = create_task(&pool, &world, 10, "job-29-create").await;
     let id = task["id"].as_str().expect("id");
-    let op = Uuid::new_v4();
+    let op = seed_operator(&pool, &world).await;
     let claimed = json_post(
         app(pool.clone(), execute_ctx(world.owner_id, op)),
         &task_uri(id, "claim"),
