@@ -78,6 +78,14 @@ impl ReplenishmentService {
             .save_task(&mut tx, &task, req.version)
             .await?
             .ok_or(ReplenishmentError::ClaimConflict)?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "claim_replenishment_task",
+            "replenishment_task",
+            &saved.id.to_string(),
+        )
+        .await?;
         store_job(&mut tx, ctx, idempotency_key, &hash, &path, &saved).await?;
         tx.commit().await?;
         Ok(saved)
@@ -123,6 +131,14 @@ impl ReplenishmentService {
         if !can_pick(&task.status) || task.operator_id != Some(ctx.user_id) {
             return Err(ReplenishmentError::StateInvalid);
         }
+        let source_route = self
+            .repo
+            .load_location_route(&mut tx, ctx.owner_id, task.source_location_id)
+            .await?
+            .ok_or(ReplenishmentError::TaskNotFound)?;
+        if source_route.lock_status == "lock_in" || source_route.lock_status == "lock_all" {
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
         if self
             .suspend_if_source_short(&mut tx, ctx, &mut task, req.version)
             .await?
@@ -158,6 +174,14 @@ impl ReplenishmentService {
             .save_task(&mut tx, &task, req.version)
             .await?
             .ok_or(ReplenishmentError::StateInvalid)?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "pick_replenishment_task",
+            "replenishment_task",
+            &saved.id.to_string(),
+        )
+        .await?;
         store_job(&mut tx, ctx, idempotency_key, &hash, &path, &saved).await?;
         tx.commit().await?;
         Ok(saved)
@@ -271,6 +295,14 @@ impl ReplenishmentService {
             .save_task(&mut tx, &task, req.version)
             .await?
             .ok_or(ReplenishmentError::StateInvalid)?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "confirm_replenishment_task",
+            "replenishment_task",
+            &saved.id.to_string(),
+        )
+        .await?;
         if saved.status == REPLENISH_STATUS_DONE {
             publish_event_in_tx(
                 &mut tx,

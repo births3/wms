@@ -57,14 +57,24 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         wave_id: Uuid,
     ) -> Result<Vec<WaveGapLine>, sqlx::Error> {
-        sqlx::query_as::<_, (Uuid, Uuid, i32, Uuid, Quantity, Uuid)>(
+        sqlx::query_as::<_, (Uuid, Uuid, i32, Uuid, Quantity, Uuid, Option<Uuid>)>(
             r#"
             SELECT wave_order.wave_id,
                    outbound.id,
                    line.line_no,
                    product.id,
                    line.planned_qty,
-                   outbound.warehouse_id
+                   outbound.warehouse_id,
+                   (
+                        SELECT pick.location_id
+                          FROM outbound_pick_tasks pick
+                         WHERE pick.owner_id = wave_order.owner_id
+                           AND pick.wave_id = wave_order.wave_id
+                           AND pick.outbound_order_id = outbound.id
+                           AND pick.line_no = line.line_no
+                         ORDER BY pick.route_sequence ASC, pick.id
+                         LIMIT 1
+                   )
               FROM outbound_wave_orders wave_order
               JOIN outbound_orders outbound
                 ON outbound.id = wave_order.outbound_order_id
@@ -93,6 +103,7 @@ impl PgReplenishmentRepository {
                         product_id,
                         demand_qty,
                         warehouse_id,
+                        pick_location_id,
                     )| WaveGapLine {
                         wave_id,
                         outbound_order_id,
@@ -100,6 +111,7 @@ impl PgReplenishmentRepository {
                         product_id,
                         demand_qty,
                         warehouse_id,
+                        pick_location_id,
                     },
                 )
                 .collect()

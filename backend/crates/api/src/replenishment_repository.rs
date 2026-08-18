@@ -683,6 +683,7 @@ pub struct WaveGapLine {
     pub product_id: Uuid,
     pub demand_qty: Quantity,
     pub warehouse_id: Uuid,
+    pub pick_location_id: Option<Uuid>,
 }
 
 #[derive(sqlx::FromRow)]

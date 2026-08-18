@@ -160,7 +160,10 @@ impl ReplenishmentService {
                 .repo
                 .list_pick_target_candidates(owner_id, line.warehouse_id, line.product_id)
                 .await?;
-            let Some(target_location_id) = candidates.into_iter().next() else {
+            let Some(target_location_id) = line
+                .pick_location_id
+                .or_else(|| candidates.into_iter().next())
+            else {
                 continue;
             };
             match self

@@ -95,6 +95,14 @@ impl ReplenishmentService {
             )
             .await?
             .ok_or(ReplenishmentError::StateInvalid)?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "cancel_replenishment_task",
+            "replenishment_task",
+            &saved.id.to_string(),
+        )
+        .await?;
         publish_bus(
             &mut tx,
             ctx.owner_id,
@@ -158,6 +166,14 @@ impl ReplenishmentService {
             .save_exception(&mut tx, &task, req.version, None, None, true)
             .await?
             .ok_or(ReplenishmentError::StateInvalid)?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "reassign_replenishment_task",
+            "replenishment_task",
+            &saved.id.to_string(),
+        )
+        .await?;
         store_job(&mut tx, ctx, idempotency_key, &hash, &path, &saved).await?;
         tx.commit().await?;
         Ok(saved)
@@ -223,6 +239,14 @@ impl ReplenishmentService {
             )
             .await?
             .ok_or(ReplenishmentError::StateInvalid)?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "return_replenishment_task",
+            "replenishment_task",
+            &saved.id.to_string(),
+        )
+        .await?;
         if req.return_reason == "source_mismatch" {
             publish_bus(
                 &mut tx,
