@@ -308,7 +308,7 @@ async fn generate_min_max_creates_pending_qty_and_dual_transit(pool: PgPool) {
     let service = ReplenishmentService::new(
         wms_api::replenishment_repository::PgReplenishmentRepository::new(pool.clone()),
     );
-    let task = service
+    let created = service
         .generate_task(
             &ctx(world.owner_id),
             strategy_id,
@@ -316,8 +316,9 @@ async fn generate_min_max_creates_pending_qty_and_dual_transit(pool: PgPool) {
             world.product_id,
         )
         .await
-        .expect("generate")
-        .expect("task created");
+        .expect("generate");
+    assert_eq!(created.len(), 1);
+    let task = &created[0];
 
     assert_eq!(task.status, "pending");
     assert_eq!(task.trigger_mode, "min_max");
@@ -425,7 +426,7 @@ async fn generate_selects_earliest_expiry_source_batch(pool: PgPool) {
     let service = ReplenishmentService::new(
         wms_api::replenishment_repository::PgReplenishmentRepository::new(pool.clone()),
     );
-    let task = service
+    let created = service
         .generate_task(
             &ctx(world.owner_id),
             strategy_id,
@@ -433,11 +434,85 @@ async fn generate_selects_earliest_expiry_source_batch(pool: PgPool) {
             world.product_id,
         )
         .await
-        .expect("generate")
-        .expect("task");
-    assert_eq!(task.source_batch_id, world.source_batch_id);
-    assert_ne!(task.source_batch_id, later);
-    assert_eq!(task.qty, Quantity::from(10));
+        .expect("generate");
+    assert_eq!(created.len(), 2);
+    assert_eq!(created[0].source_batch_id, world.source_batch_id);
+    assert_eq!(created[0].qty, Quantity::from(10));
+    assert_eq!(created[1].source_batch_id, later);
+    assert_eq!(created[1].qty, Quantity::from(8));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn generate_sets_source_lpn_when_qty_meets_full_lpn_ratio(pool: PgPool) {
+    let world = seed_world(&pool, 0, 10).await;
+    let lpn_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO lpn_containers (
+            id, owner_id, lpn_code, container_type, status, location_id, created_at, updated_at
+        ) VALUES ($1, $2, 'LPN-GEN-01', 'pallet', 'in_use', $3, now(), now())
+        "#,
+    )
+    .bind(lpn_id)
+    .bind(world.owner_id)
+    .bind(world.storage_id)
+    .execute(&pool)
+    .await
+    .expect("lpn");
+    sqlx::query(
+        "UPDATE inventory_batches SET container_lpn = 'LPN-GEN-01' WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.source_batch_id)
+    .bind(world.owner_id)
+    .execute(&pool)
+    .await
+    .expect("bind lpn");
+    let strategy_id = insert_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
+    let service = ReplenishmentService::new(
+        wms_api::replenishment_repository::PgReplenishmentRepository::new(pool.clone()),
+    );
+    let created = service
+        .generate_task(
+            &ctx(world.owner_id),
+            strategy_id,
+            world.pick_id,
+            world.product_id,
+        )
+        .await
+        .expect("generate");
+    assert_eq!(created.len(), 1);
+    assert_eq!(created[0].qty, Quantity::from(10));
+    assert_eq!(created[0].source_lpn_id, Some(lpn_id));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn generate_writes_audit_event(pool: PgPool) {
+    let world = seed_world(&pool, 2, 30).await;
+    let strategy_id = insert_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
+    let service = ReplenishmentService::new(
+        wms_api::replenishment_repository::PgReplenishmentRepository::new(pool.clone()),
+    );
+    let created = service
+        .generate_task(
+            &ctx(world.owner_id),
+            strategy_id,
+            world.pick_id,
+            world.product_id,
+        )
+        .await
+        .expect("generate");
+    assert_eq!(created.len(), 1);
+    let audits: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1 AND action = 'create_replenishment_task'
+        "#,
+    )
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("audit");
+    assert_eq!(audits, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -532,6 +532,85 @@ async fn patrol_fails_when_target_temperature_mismatches(pool: PgPool) {
     assert_eq!(fails, 1);
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn patrol_fefo_continues_to_next_batch_when_first_is_short(pool: PgPool) {
+    let world = seed_world(&pool, 0, 6).await;
+    seed_batch(
+        &pool,
+        world.owner_id,
+        world.product_id,
+        world.storage_id,
+        "ST-01",
+        "B-SRC-2",
+        30,
+        NaiveDate::from_ymd_opt(2028, 6, 1).expect("later"),
+        None,
+    )
+    .await;
+    let created = service(pool.clone())
+        .run_min_max_patrol(chrono::Utc::now())
+        .await
+        .expect("patrol");
+    let mut mine: Vec<_> = created
+        .into_iter()
+        .filter(|task| task.owner_id == world.owner_id)
+        .collect();
+    mine.sort_by_key(|task| task.qty);
+    assert_eq!(mine.len(), 2);
+    assert_eq!(mine[0].source_batch_id, world.source_batch_id);
+    assert_eq!(mine[0].qty, Quantity::from(6));
+    assert_eq!(mine[1].qty, Quantity::from(14));
+    assert_ne!(mine[1].source_batch_id, world.source_batch_id);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn patrol_skips_target_under_inventory_count(pool: PgPool) {
+    let world = seed_world(&pool, 2, 30).await;
+    let count_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_counts (
+            id, owner_id, count_type, status, started_at, created_by, created_at, updated_at
+        ) VALUES ($1, $2, 'cycle', 'in_progress', now(), $3, now(), now())
+        "#,
+    )
+    .bind(count_id)
+    .bind(world.owner_id)
+    .bind(Uuid::new_v4())
+    .execute(&pool)
+    .await
+    .expect("count");
+    let pick_batch: Uuid = sqlx::query_scalar(
+        "SELECT id FROM inventory_batches WHERE owner_id = $1 AND location_id = $2 LIMIT 1",
+    )
+    .bind(world.owner_id)
+    .bind(world.pick_id)
+    .fetch_one(&pool)
+    .await
+    .expect("pick batch");
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_count_lines (
+            id, count_id, owner_id, inventory_batch_id, location_id, location_code,
+            product_code, batch_no, book_qty, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, 'PP-01', 'P-PT', 'B-PICK', 2, now(), now())
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(count_id)
+    .bind(world.owner_id)
+    .bind(pick_batch)
+    .bind(world.pick_id)
+    .execute(&pool)
+    .await
+    .expect("count line");
+    let created = service(pool)
+        .run_min_max_patrol(chrono::Utc::now())
+        .await
+        .expect("patrol");
+    assert!(created.iter().all(|task| task.owner_id != world.owner_id));
+}
+
 #[test]
 fn min_max_job_is_registered_on_mte_skeleton() {
     assert_eq!(replenishment_min_max_job::JOB_NAME, "replenishment_min_max");
