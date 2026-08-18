@@ -202,6 +202,43 @@ pub struct ReplenishmentLocationGroupListResponse {
     pub page: PageMeta,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CreateReplenishmentTaskRequest {
+    pub source_location_id: Uuid,
+    pub source_batch_id: Uuid,
+    pub target_location_id: Uuid,
+    #[schema(value_type = String, format = "decimal")]
+    pub qty: Quantity,
+    #[serde(default)]
+    pub source_lpn_id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentTask {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub task_no: String,
+    pub trigger_mode: String,
+    pub priority: String,
+    pub strategy_id: Option<Uuid>,
+    pub source_location_id: Uuid,
+    pub source_batch_id: Uuid,
+    pub source_lpn_id: Option<Uuid>,
+    pub target_location_id: Uuid,
+    pub product_id: Uuid,
+    pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
+    pub qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub picked_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub done_qty: Quantity,
+    pub status: String,
+    pub operator_id: Option<Uuid>,
+    pub created_by: String,
+    pub version: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

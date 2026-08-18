@@ -4,8 +4,8 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     BindReplenishmentLocationsResponse, Quantity, ReplenishmentLocationGroup,
-    ReplenishmentPreviewItem, ReplenishmentStrategy, UpsertReplenishmentLocationGroupRequest,
-    UpsertReplenishmentStrategyRequest,
+    ReplenishmentPreviewItem, ReplenishmentStrategy, ReplenishmentTask,
+    UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
 
 pub struct PgReplenishmentRepository {
@@ -341,6 +341,222 @@ impl PgReplenishmentRepository {
             location_ids: req.location_ids.clone(),
         })
     }
+
+    pub async fn pick_available_qty(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        location_id: Uuid,
+        product_id: Uuid,
+    ) -> Result<Quantity, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(
+                qty_on_hand - qty_allocated - qty_frozen + qty_replenish_in_transit
+            ), 0)
+              FROM inventory_batches
+             WHERE owner_id = $1
+               AND location_id = $2
+               AND product_id = $3
+               AND status = 'qualified'
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .bind(product_id)
+        .fetch_one(&mut **tx)
+        .await
+    }
+
+    pub async fn default_pack_ratio(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        product_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        let ratio: Option<i64> = sqlx::query_scalar(
+            r#"
+            SELECT ratio_to_base
+              FROM product_packaging_levels
+             WHERE owner_id = $1
+               AND product_id = $2
+               AND is_default
+            "#,
+        )
+        .bind(owner_id)
+        .bind(product_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+        Ok(ratio.unwrap_or(1))
+    }
+
+    pub async fn load_location_route(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        location_id: Uuid,
+    ) -> Result<Option<LocationRouteRow>, sqlx::Error> {
+        sqlx::query_as::<_, LocationRouteRow>(
+            r#"
+            SELECT location.id,
+                   location.location_type,
+                   location.lock_status,
+                   location.replenish_strategy_id,
+                   zone.quality_color,
+                   zone.temperature_zone,
+                   zone.is_external_use_zone,
+                   zone.is_fragrant_zone
+              FROM warehouse_locations location
+              JOIN warehouse_zones zone
+                ON zone.id = location.zone_id
+               AND zone.owner_id = location.owner_id
+             WHERE location.owner_id = $1
+               AND location.id = $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .fetch_optional(&mut **tx)
+        .await
+    }
+
+    pub async fn lock_source_batch(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        batch_id: Uuid,
+    ) -> Result<Option<SourceBatchLock>, sqlx::Error> {
+        sqlx::query_as::<_, SourceBatchLock>(
+            r#"
+            SELECT batch.id,
+                   batch.location_id,
+                   batch.product_id,
+                   batch.batch_no,
+                   batch.status,
+                   batch.qty_on_hand - batch.qty_allocated - batch.qty_frozen
+                       - batch.qty_replenish_out_transit AS available_qty,
+                   location.location_type,
+                   location.lock_status,
+                   container.current_lock_category
+              FROM inventory_batches batch
+              JOIN warehouse_locations location
+                ON location.id = batch.location_id
+               AND location.owner_id = batch.owner_id
+              LEFT JOIN lpn_containers container
+                ON container.owner_id = batch.owner_id
+               AND container.lpn_code = batch.container_lpn
+             WHERE batch.owner_id = $1
+               AND batch.id = $2
+             FOR UPDATE OF batch
+            "#,
+        )
+        .bind(owner_id)
+        .bind(batch_id)
+        .fetch_optional(&mut **tx)
+        .await
+    }
+
+    pub async fn lock_fefo_source(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        product_id: Uuid,
+        source_type: &str,
+        min_qty: Quantity,
+    ) -> Result<Option<SourceBatchLock>, sqlx::Error> {
+        sqlx::query_as::<_, SourceBatchLock>(
+            r#"
+            SELECT batch.id,
+                   batch.location_id,
+                   batch.product_id,
+                   batch.batch_no,
+                   batch.status,
+                   batch.qty_on_hand - batch.qty_allocated - batch.qty_frozen
+                       - batch.qty_replenish_out_transit AS available_qty,
+                   location.location_type,
+                   location.lock_status,
+                   container.current_lock_category
+              FROM inventory_batches batch
+              JOIN warehouse_locations location
+                ON location.id = batch.location_id
+               AND location.owner_id = batch.owner_id
+              LEFT JOIN lpn_containers container
+                ON container.owner_id = batch.owner_id
+               AND container.lpn_code = batch.container_lpn
+             WHERE batch.owner_id = $1
+               AND batch.product_id = $2
+               AND batch.status = 'qualified'
+               AND location.location_type = $3
+               AND location.lock_status IN ('normal', 'lock_in')
+               AND COALESCE(container.current_lock_category, 'qualified')
+                   NOT IN ('quarantine', 'rejected')
+               AND batch.qty_on_hand - batch.qty_allocated - batch.qty_frozen
+                   - batch.qty_replenish_out_transit >= $4
+             ORDER BY batch.expiry_date ASC NULLS LAST, batch.id
+             FOR UPDATE OF batch
+             LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(product_id)
+        .bind(source_type)
+        .bind(min_qty)
+        .fetch_optional(&mut **tx)
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_task(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        id: Uuid,
+        task_no: &str,
+        trigger_mode: &str,
+        priority: &str,
+        strategy_id: Option<Uuid>,
+        source: &SourceBatchLock,
+        source_lpn_id: Option<Uuid>,
+        target_location_id: Uuid,
+        product_id: Uuid,
+        qty: Quantity,
+        created_by: &str,
+    ) -> Result<ReplenishmentTask, sqlx::Error> {
+        sqlx::query_as::<_, TaskRow>(
+            r#"
+            INSERT INTO replenishment_tasks (
+                id, owner_id, task_no, trigger_mode, priority, strategy_id,
+                source_location_id, source_batch_id, source_lpn_id, target_location_id,
+                product_id, batch_no, qty, status, created_by
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                $7, $8, $9, $10,
+                $11, $12, $13, 'pending', $14
+            )
+            RETURNING id, owner_id, task_no, trigger_mode, priority, strategy_id,
+                      source_location_id, source_batch_id, source_lpn_id, target_location_id,
+                      product_id, batch_no, qty, picked_qty, done_qty, status,
+                      operator_id, created_by, version
+            "#,
+        )
+        .bind(id)
+        .bind(owner_id)
+        .bind(task_no)
+        .bind(trigger_mode)
+        .bind(priority)
+        .bind(strategy_id)
+        .bind(source.location_id)
+        .bind(source.id)
+        .bind(source_lpn_id)
+        .bind(target_location_id)
+        .bind(product_id)
+        .bind(&source.batch_no)
+        .bind(qty)
+        .bind(created_by)
+        .fetch_one(&mut **tx)
+        .await
+        .map(Into::into)
+    }
 }
 
 #[derive(Debug)]
@@ -393,4 +609,78 @@ struct PreviewRow {
     location_code: String,
     product_id: Option<Uuid>,
     available_qty: Quantity,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct LocationRouteRow {
+    pub id: Uuid,
+    pub location_type: String,
+    pub lock_status: String,
+    pub replenish_strategy_id: Option<Uuid>,
+    pub quality_color: String,
+    pub temperature_zone: String,
+    pub is_external_use_zone: bool,
+    pub is_fragrant_zone: bool,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct SourceBatchLock {
+    pub id: Uuid,
+    pub location_id: Uuid,
+    pub product_id: Option<Uuid>,
+    pub batch_no: String,
+    pub status: String,
+    pub available_qty: Quantity,
+    pub location_type: String,
+    pub lock_status: String,
+    pub current_lock_category: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct TaskRow {
+    id: Uuid,
+    owner_id: Uuid,
+    task_no: String,
+    trigger_mode: String,
+    priority: String,
+    strategy_id: Option<Uuid>,
+    source_location_id: Uuid,
+    source_batch_id: Uuid,
+    source_lpn_id: Option<Uuid>,
+    target_location_id: Uuid,
+    product_id: Uuid,
+    batch_no: String,
+    qty: Quantity,
+    picked_qty: Quantity,
+    done_qty: Quantity,
+    status: String,
+    operator_id: Option<Uuid>,
+    created_by: String,
+    version: i64,
+}
+
+impl From<TaskRow> for ReplenishmentTask {
+    fn from(row: TaskRow) -> Self {
+        Self {
+            id: row.id,
+            owner_id: row.owner_id,
+            task_no: row.task_no,
+            trigger_mode: row.trigger_mode,
+            priority: row.priority,
+            strategy_id: row.strategy_id,
+            source_location_id: row.source_location_id,
+            source_batch_id: row.source_batch_id,
+            source_lpn_id: row.source_lpn_id,
+            target_location_id: row.target_location_id,
+            product_id: row.product_id,
+            batch_no: row.batch_no,
+            qty: row.qty,
+            picked_qty: row.picked_qty,
+            done_qty: row.done_qty,
+            status: row.status,
+            operator_id: row.operator_id,
+            created_by: row.created_by,
+            version: row.version,
+        }
+    }
 }

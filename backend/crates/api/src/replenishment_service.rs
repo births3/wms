@@ -1,18 +1,25 @@
-//! 补货策略与库位组用例编排。
+//! 补货策略、库位组与任务生成用例编排。
 
 use chrono::Utc;
 use uuid::Uuid;
 use wms_domain::{
-    validate_replenish_route, BindReplenishmentLocationsRequest,
-    BindReplenishmentLocationsResponse, ReplenishmentLocationGroup, ReplenishmentPreviewResponse,
-    ReplenishmentStrategy, UpsertReplenishmentLocationGroupRequest,
-    UpsertReplenishmentStrategyRequest,
+    task_qty, validate_replenish_route, zone_treats_as_qualified,
+    BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
+    CreateReplenishmentTaskRequest, Quantity, ReplenishmentLocationGroup,
+    ReplenishmentPreviewResponse, ReplenishmentStrategy, ReplenishmentTask,
+    UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
 
 use crate::{
     auth::AuthContext,
+    document_numbering::{
+        DocumentNumberingError, GenerateDocumentNumberRequest, PgDocumentNumberingService,
+    },
     idempotency::{self, IdempotencyError},
-    replenishment_repository::{PgReplenishmentRepository, ReplenishmentRepoError},
+    inventory::reserve_replenish_in_tx,
+    replenishment_repository::{
+        PgReplenishmentRepository, ReplenishmentRepoError, SourceBatchLock,
+    },
 };
 
 const MANAGE: &str = "m3.replenishment.manage";
@@ -24,6 +31,9 @@ pub enum ReplenishmentError {
     ScopeNotFound,
     LocationBound,
     TaskNotFound,
+    SourceUnavailable,
+    NumberingUnavailable,
+    PutawayBlocked,
     IdempotencyRequired,
     IdempotencyConflict,
     Database(sqlx::Error),
@@ -218,6 +228,267 @@ impl ReplenishmentService {
         Ok(group)
     }
 
+    pub async fn generate_task(
+        &self,
+        ctx: &AuthContext,
+        strategy_id: Uuid,
+        target_location_id: Uuid,
+        product_id: Uuid,
+    ) -> Result<Option<ReplenishmentTask>, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        let strategy = self
+            .repo
+            .get_strategy(ctx.owner_id, strategy_id)
+            .await?
+            .ok_or(ReplenishmentError::TaskNotFound)?;
+        if !strategy.enabled || !strategy.trigger_modes.iter().any(|mode| mode == "min_max") {
+            return Ok(None);
+        }
+        let mut tx = self.repo.pool().begin().await?;
+        let target = self
+            .repo
+            .load_location_route(&mut tx, ctx.owner_id, target_location_id)
+            .await?
+            .ok_or(ReplenishmentError::ScopeNotFound)?;
+        if target.replenish_strategy_id != Some(strategy.id) {
+            return Ok(None);
+        }
+        self.ensure_target_putaway(&target, &strategy.target_type)?;
+        let available = self
+            .repo
+            .pick_available_qty(&mut tx, ctx.owner_id, target_location_id, product_id)
+            .await?;
+        if available > strategy.min_safety_threshold {
+            return Ok(None);
+        }
+        let pack = self
+            .repo
+            .default_pack_ratio(&mut tx, ctx.owner_id, product_id)
+            .await?;
+        let need = strategy.max_replenish_target - available;
+        let source = self
+            .repo
+            .lock_fefo_source(
+                &mut tx,
+                ctx.owner_id,
+                product_id,
+                &strategy.source_type,
+                Quantity::from(pack),
+            )
+            .await?
+            .ok_or(ReplenishmentError::SourceUnavailable)?;
+        self.ensure_source_ok(&source, &strategy.source_type, None)?;
+        let qty = task_qty(need, source.available_qty, pack);
+        if qty <= Quantity::ZERO {
+            return Ok(None);
+        }
+        let created = self
+            .persist_task(
+                &mut tx,
+                ctx,
+                &source,
+                target_location_id,
+                qty,
+                "min_max",
+                "normal",
+                Some(strategy.id),
+                None,
+                "system:min_max",
+            )
+            .await?;
+        tx.commit().await?;
+        Ok(Some(created))
+    }
+
+    pub async fn create_task(
+        &self,
+        ctx: &AuthContext,
+        req: CreateReplenishmentTaskRequest,
+        idempotency_key: &str,
+    ) -> Result<ReplenishmentTask, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        let hash = idempotency::request_hash(&req)?;
+        let mut tx = self.repo.pool().begin().await?;
+        idempotency::lock_key(&mut tx, "replenishment_task", ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            "/api/v1/replenishment/tasks",
+            Utc::now(),
+        )
+        .await?
+        {
+            return Ok(replay);
+        }
+        let source = self
+            .repo
+            .lock_source_batch(&mut tx, ctx.owner_id, req.source_batch_id)
+            .await?
+            .ok_or(ReplenishmentError::SourceUnavailable)?;
+        if source.location_id != req.source_location_id {
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
+        let product_id = source.product_id.ok_or(ReplenishmentError::ScopeNotFound)?;
+        let pack = self
+            .repo
+            .default_pack_ratio(&mut tx, ctx.owner_id, product_id)
+            .await?;
+        if task_qty(req.qty, req.qty, pack) != req.qty || req.qty <= Quantity::ZERO {
+            return Err(ReplenishmentError::StrategyInvalid);
+        }
+        let target = self
+            .repo
+            .load_location_route(&mut tx, ctx.owner_id, req.target_location_id)
+            .await?
+            .ok_or(ReplenishmentError::ScopeNotFound)?;
+        if validate_replenish_route(&source.location_type, &target.location_type).is_err() {
+            return Err(ReplenishmentError::StrategyInvalid);
+        }
+        self.ensure_target_putaway(&target, &target.location_type)?;
+        self.ensure_source_ok(&source, &source.location_type, req.source_lpn_id)?;
+        if source.available_qty < req.qty {
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
+        let created = self
+            .persist_task(
+                &mut tx,
+                ctx,
+                &source,
+                req.target_location_id,
+                req.qty,
+                "manual",
+                "normal",
+                None,
+                req.source_lpn_id,
+                &ctx.actor_name,
+            )
+            .await?;
+        idempotency::store_success_with_status(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            "/api/v1/replenishment/tasks",
+            200,
+            "replenishment_task",
+            &created.id.to_string(),
+            &created,
+            Utc::now(),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(created)
+    }
+
+    fn ensure_target_putaway(
+        &self,
+        target: &crate::replenishment_repository::LocationRouteRow,
+        expected_type: &str,
+    ) -> Result<(), ReplenishmentError> {
+        if target.location_type != expected_type {
+            return Err(ReplenishmentError::StrategyInvalid);
+        }
+        if !zone_treats_as_qualified(&target.quality_color) {
+            return Err(ReplenishmentError::PutawayBlocked);
+        }
+        if target.lock_status == "lock_in" || target.lock_status == "lock_all" {
+            return Err(ReplenishmentError::PutawayBlocked);
+        }
+        Ok(())
+    }
+
+    fn ensure_source_ok(
+        &self,
+        source: &SourceBatchLock,
+        expected_type: &str,
+        source_lpn_id: Option<Uuid>,
+    ) -> Result<(), ReplenishmentError> {
+        if source.location_type != expected_type {
+            return Err(ReplenishmentError::StrategyInvalid);
+        }
+        if source.status != "qualified" {
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
+        if source.lock_status == "lock_out" || source.lock_status == "lock_all" {
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
+        if matches!(
+            source.current_lock_category.as_deref(),
+            Some("quarantine") | Some("rejected")
+        ) {
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
+        if expected_type == "case_pick" && source_lpn_id.is_some() {
+            return Err(ReplenishmentError::StrategyInvalid);
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn persist_task(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        ctx: &AuthContext,
+        source: &SourceBatchLock,
+        target_location_id: Uuid,
+        qty: Quantity,
+        trigger_mode: &str,
+        priority: &str,
+        strategy_id: Option<Uuid>,
+        source_lpn_id: Option<Uuid>,
+        created_by: &str,
+    ) -> Result<ReplenishmentTask, ReplenishmentError> {
+        let task_id = Uuid::new_v4();
+        let now = Utc::now();
+        let numbered = PgDocumentNumberingService::new()
+            .generate_in_tx(
+                tx,
+                ctx,
+                GenerateDocumentNumberRequest {
+                    document_type: "replenishment_task".into(),
+                    idempotency_key: format!("m3-replenish-task:{task_id}"),
+                    source_module: "M3".into(),
+                    source_document_id: Some(task_id),
+                },
+                now,
+            )
+            .await?;
+        let product_id = source.product_id.ok_or(ReplenishmentError::ScopeNotFound)?;
+        let created = self
+            .repo
+            .insert_task(
+                tx,
+                ctx.owner_id,
+                task_id,
+                &numbered.value.generated_no,
+                trigger_mode,
+                priority,
+                strategy_id,
+                source,
+                source_lpn_id,
+                target_location_id,
+                product_id,
+                qty,
+                created_by,
+            )
+            .await?;
+        reserve_replenish_in_tx(tx, ctx.owner_id, source.id, target_location_id, qty, now)
+            .await
+            .map_err(|error| match error {
+                crate::inventory::InventoryReplenishError::Insufficient => {
+                    ReplenishmentError::SourceUnavailable
+                }
+                _ => ReplenishmentError::PutawayBlocked,
+            })?;
+        Ok(created)
+    }
+
     async fn validate_strategy(
         &self,
         owner_id: Uuid,
@@ -291,6 +562,18 @@ impl From<ReplenishmentRepoError> for ReplenishmentError {
             ReplenishmentRepoError::LocationBound => Self::LocationBound,
             ReplenishmentRepoError::LocationTypeMismatch => Self::StrategyInvalid,
             ReplenishmentRepoError::Database(error) => Self::Database(error),
+        }
+    }
+}
+
+impl From<DocumentNumberingError> for ReplenishmentError {
+    fn from(value: DocumentNumberingError) -> Self {
+        match value {
+            DocumentNumberingError::RuleNotFound
+            | DocumentNumberingError::DocumentTypeInvalid
+            | DocumentNumberingError::InvalidRule => Self::NumberingUnavailable,
+            DocumentNumberingError::IdempotencyConflict => Self::IdempotencyConflict,
+            other => Self::Database(sqlx::Error::Protocol(format!("{other:?}"))),
         }
     }
 }
