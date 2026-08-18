@@ -399,6 +399,139 @@ async fn patrol_generates_for_empty_product_scope_location(pool: PgPool) {
     assert_eq!(in_t, Quantity::from(20));
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn patrol_category_scope_skips_unrelated_product(pool: PgPool) {
+    let world = seed_world(&pool, 2, 30).await;
+    let other = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO products (
+            id, owner_id, product_code, product_name, specification, status,
+            special_drug_category, created_at, updated_at
+        ) VALUES ($1, $2, $3, '无关商品', '1', 'pending_mapping', 'none', now(), now())
+        "#,
+    )
+    .bind(other)
+    .bind(world.owner_id)
+    .bind(format!("P-O-{}", &other.simple().to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("other product");
+    seed_batch(
+        &pool,
+        world.owner_id,
+        other,
+        world.pick_id,
+        "PP-01",
+        "B-OTHER",
+        2,
+        NaiveDate::from_ymd_opt(2028, 1, 1).expect("d"),
+        None,
+    )
+    .await;
+    sqlx::query(
+        "UPDATE products SET special_drug_category = 'narcotic' WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.product_id)
+    .bind(world.owner_id)
+    .execute(&pool)
+    .await
+    .expect("mark narcotic");
+    sqlx::query(
+        r#"
+        UPDATE replenishment_strategies
+           SET scope_type = 'category',
+               scope_ref = '10000000-0000-0000-0000-000000000022'
+         WHERE id = $1 AND owner_id = $2
+        "#,
+    )
+    .bind(world.strategy_id)
+    .bind(world.owner_id)
+    .execute(&pool)
+    .await
+    .expect("category scope");
+    let created = service(pool.clone())
+        .run_min_max_patrol(chrono::Utc::now())
+        .await
+        .expect("patrol");
+    let mine: Vec<_> = created
+        .into_iter()
+        .filter(|task| task.owner_id == world.owner_id)
+        .collect();
+    assert_eq!(mine.len(), 1);
+    assert_eq!(mine[0].product_id, world.product_id);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn patrol_skips_target_lock_out_and_source_lock_in(pool: PgPool) {
+    let world = seed_world(&pool, 2, 30).await;
+    sqlx::query(
+        "UPDATE warehouse_locations SET lock_status = 'lock_out' WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.pick_id)
+    .bind(world.owner_id)
+    .execute(&pool)
+    .await
+    .expect("lock target");
+    let blocked = service(pool.clone())
+        .run_min_max_patrol(chrono::Utc::now())
+        .await
+        .expect("target lock");
+    assert!(blocked.iter().all(|task| task.owner_id != world.owner_id));
+    sqlx::query(
+        "UPDATE warehouse_locations SET lock_status = 'normal' WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.pick_id)
+    .bind(world.owner_id)
+    .execute(&pool)
+    .await
+    .expect("unlock target");
+    sqlx::query(
+        "UPDATE warehouse_locations SET lock_status = 'lock_in' WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.storage_id)
+    .bind(world.owner_id)
+    .execute(&pool)
+    .await
+    .expect("lock source");
+    let source_blocked = service(pool)
+        .run_min_max_patrol(chrono::Utc::now())
+        .await
+        .expect("source lock");
+    assert!(source_blocked
+        .iter()
+        .all(|task| task.owner_id != world.owner_id));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn patrol_fails_when_target_temperature_mismatches(pool: PgPool) {
+    let world = seed_world(&pool, 2, 30).await;
+    sqlx::query(
+        "UPDATE products SET storage_condition = 'cold_2_8' WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.product_id)
+    .bind(world.owner_id)
+    .execute(&pool)
+    .await
+    .expect("cold product");
+    let created = service(pool.clone())
+        .run_min_max_patrol(chrono::Utc::now())
+        .await
+        .expect("patrol");
+    assert!(created.iter().all(|task| task.owner_id != world.owner_id));
+    let fails: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM event_bus_event
+         WHERE owner_id = $1 AND event_type = 'replenishment.patrol_fail'
+        "#,
+    )
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("fail events");
+    assert_eq!(fails, 1);
+}
+
 #[test]
 fn min_max_job_is_registered_on_mte_skeleton() {
     assert_eq!(replenishment_min_max_job::JOB_NAME, "replenishment_min_max");

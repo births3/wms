@@ -321,3 +321,87 @@ async fn wave_gap_returns_empty_when_available_covers_demand(pool: PgPool) {
             .expect("tasks");
     assert_eq!(tasks, 0);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn fill_wave_pick_gaps_creates_urgent_from_wave_lines(pool: PgPool) {
+    let world = seed_world(&pool, 0, 30).await;
+    insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
+    let warehouse_id: Uuid = sqlx::query_scalar(
+        "SELECT warehouse_id FROM warehouse_locations WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.pick_id)
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("warehouse");
+    let wave_id = Uuid::new_v4();
+    let order_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_waves (id, owner_id, wave_no, status, created_at, updated_at)
+        VALUES ($1, $2, $3, 'released', now(), now())
+        "#,
+    )
+    .bind(wave_id)
+    .bind(world.owner_id)
+    .bind(format!("WV-{}", &wave_id.simple().to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("wave");
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_orders (
+            id, owner_id, document_type, wms_order_no, warehouse_id,
+            customer_id, delivery_address_id, delivery_address_snapshot,
+            status, short_pick, created_at, updated_at
+        ) VALUES (
+            $1, $2, 'sales_outbound', $3, $4,
+            $5, $5, '{}'::jsonb,
+            'confirmed', FALSE, now(), now()
+        )
+        "#,
+    )
+    .bind(order_id)
+    .bind(world.owner_id)
+    .bind(format!("SO-{}", &order_id.simple().to_string()[..8]))
+    .bind(warehouse_id)
+    .bind(Uuid::new_v4())
+    .execute(&pool)
+    .await
+    .expect("order");
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_order_lines (
+            id, outbound_order_id, owner_id, line_no, product_code, batch_no, planned_qty
+        ) VALUES ($1, $2, $3, 1, $4, 'B-SRC', 8)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(order_id)
+    .bind(world.owner_id)
+    .bind(format!("P-{}", &world.product_id.simple().to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("line");
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_wave_orders (id, owner_id, wave_id, outbound_order_id, created_at)
+        VALUES ($1, $2, $3, $4, now())
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(world.owner_id)
+    .bind(wave_id)
+    .bind(order_id)
+    .execute(&pool)
+    .await
+    .expect("wave order");
+    let created = service(pool.clone())
+        .fill_wave_pick_gaps(world.owner_id, wave_id)
+        .await
+        .expect("fill");
+    assert_eq!(created.len(), 1);
+    assert_eq!(created[0].trigger_mode, "wave_gap");
+    assert_eq!(created[0].priority, "urgent");
+    assert_eq!(created[0].qty, Quantity::from(8));
+}
