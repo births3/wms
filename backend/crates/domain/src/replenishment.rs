@@ -1,5 +1,10 @@
 //! Phase 2 补货领域不变量（US-M3-012 / ADR-0048）。无 IO。
 
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use crate::common::PageMeta;
 use crate::quantity::Quantity;
 
 pub const LOCATION_TYPE_STORAGE: &str = "storage";
@@ -93,6 +98,108 @@ pub fn can_confirm(status: &str, picked_qty: Quantity) -> bool {
         return false;
     }
     status == REPLENISH_STATUS_IN_PROGRESS || status == REPLENISH_STATUS_SUSPENDED
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertReplenishmentStrategyRequest {
+    pub strategy_code: String,
+    pub strategy_name: String,
+    pub scope_type: String,
+    pub scope_ref: Uuid,
+    pub source_type: String,
+    pub target_type: String,
+    #[schema(value_type = String, format = "decimal")]
+    pub min_safety_threshold: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub max_replenish_target: Quantity,
+    pub trigger_modes: Vec<String>,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentStrategy {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub strategy_code: String,
+    pub strategy_name: String,
+    pub scope_type: String,
+    pub scope_ref: Uuid,
+    pub location_type: String,
+    pub source_type: String,
+    pub target_type: String,
+    #[schema(value_type = String, format = "decimal")]
+    pub min_safety_threshold: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub max_replenish_target: Quantity,
+    pub trigger_modes: Vec<String>,
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentStrategyListResponse {
+    pub data: Vec<ReplenishmentStrategy>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BindReplenishmentLocationsRequest {
+    pub location_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BindReplenishmentLocationsResponse {
+    pub strategy_id: Uuid,
+    pub location_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentPreviewItem {
+    pub location_id: Uuid,
+    pub location_code: String,
+    pub product_id: Option<Uuid>,
+    #[schema(value_type = String, format = "decimal")]
+    pub available_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub min_safety_threshold: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub max_replenish_target: Quantity,
+    pub would_trigger: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentPreviewResponse {
+    pub data: Vec<ReplenishmentPreviewItem>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpsertReplenishmentLocationGroupRequest {
+    pub group_code: String,
+    pub group_name: String,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub location_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentLocationGroup {
+    pub id: Uuid,
+    pub owner_id: Uuid,
+    pub group_code: String,
+    pub group_name: String,
+    pub enabled: bool,
+    pub location_ids: Vec<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentLocationGroupListResponse {
+    pub data: Vec<ReplenishmentLocationGroup>,
+    pub page: PageMeta,
 }
 
 #[cfg(test)]

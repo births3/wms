@@ -1,0 +1,199 @@
+use std::sync::Arc;
+
+use axum::{
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+    routing::{get, post, put},
+    Json, Router,
+};
+use serde_json::json;
+use sqlx::PgPool;
+use uuid::Uuid;
+use wms_domain::{
+    BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse, ErrorResponse,
+    ReplenishmentLocationGroup, ReplenishmentPreviewResponse, ReplenishmentStrategy,
+    UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
+};
+
+use crate::{
+    auth::{AuthContext, AuthError},
+    replenishment_repository::PgReplenishmentRepository,
+    replenishment_service::{ReplenishmentError, ReplenishmentService},
+};
+
+const MANAGE: &str = "m3.replenishment.manage";
+
+#[derive(Clone)]
+pub struct ReplenishmentAppState {
+    service: Arc<ReplenishmentService>,
+}
+
+impl ReplenishmentAppState {
+    pub fn with_postgres(pool: PgPool) -> Self {
+        Self {
+            service: Arc::new(ReplenishmentService::new(PgReplenishmentRepository::new(
+                pool,
+            ))),
+        }
+    }
+}
+
+pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
+    Router::new()
+        .route(
+            "/api/v1/replenishment/strategies",
+            post(create_strategy_handler),
+        )
+        .route(
+            "/api/v1/replenishment/strategies/:id/locations",
+            put(bind_locations_handler),
+        )
+        .route(
+            "/api/v1/replenishment/strategies/:id/preview",
+            get(preview_handler),
+        )
+        .route(
+            "/api/v1/replenishment/location-groups",
+            post(create_location_group_handler),
+        )
+        .with_state(state)
+}
+
+async fn create_strategy_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    headers: HeaderMap,
+    Json(req): Json<UpsertReplenishmentStrategyRequest>,
+) -> Result<Json<ReplenishmentStrategy>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.create_strategy(&ctx, req, &key).await?))
+}
+
+async fn bind_locations_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<BindReplenishmentLocationsRequest>,
+) -> Result<Json<BindReplenishmentLocationsResponse>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state.service.bind_locations(&ctx, id, req, &key).await?,
+    ))
+}
+
+async fn preview_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ReplenishmentPreviewResponse>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    Ok(Json(state.service.preview(&ctx, id).await?))
+}
+
+async fn create_location_group_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    headers: HeaderMap,
+    Json(req): Json<UpsertReplenishmentLocationGroupRequest>,
+) -> Result<Json<ReplenishmentLocationGroup>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state.service.upsert_location_group(&ctx, req, &key).await?,
+    ))
+}
+
+fn require_manage(ctx: &AuthContext) -> Result<(), ReplenishmentHandlerError> {
+    ctx.require_permission(MANAGE)
+        .map_err(ReplenishmentHandlerError::Auth)
+}
+
+fn idempotency_key(headers: &HeaderMap) -> Result<String, ReplenishmentHandlerError> {
+    headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .ok_or(ReplenishmentHandlerError::MissingIdempotencyKey)
+}
+
+enum ReplenishmentHandlerError {
+    Auth(AuthError),
+    Service(ReplenishmentError),
+    MissingIdempotencyKey,
+}
+
+impl From<ReplenishmentError> for ReplenishmentHandlerError {
+    fn from(value: ReplenishmentError) -> Self {
+        Self::Service(value)
+    }
+}
+
+impl IntoResponse for ReplenishmentHandlerError {
+    fn into_response(self) -> Response {
+        if let Self::Auth(error) = self {
+            return error.into_response();
+        }
+        let (status, code, message) = match self {
+            Self::Service(ReplenishmentError::PermissionDenied) => (
+                StatusCode::FORBIDDEN,
+                "M3_REPLENISH_PERMISSION_DENIED",
+                "补货权限不足",
+            ),
+            Self::Service(ReplenishmentError::StrategyInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_STRATEGY_INVALID",
+                "补货策略动线、范围或水位非法",
+            ),
+            Self::Service(ReplenishmentError::ScopeNotFound) => (
+                StatusCode::NOT_FOUND,
+                "M3_REPLENISH_SCOPE_NOT_FOUND",
+                "补货策略范围引用不存在或不属于本货主",
+            ),
+            Self::Service(ReplenishmentError::LocationBound) => (
+                StatusCode::CONFLICT,
+                "M3_REPLENISH_LOCATION_BOUND",
+                "库位已挂其他补货策略",
+            ),
+            Self::Service(ReplenishmentError::TaskNotFound) => (
+                StatusCode::NOT_FOUND,
+                "M3_REPLENISH_TASK_NOT_FOUND",
+                "补货策略不存在",
+            ),
+            Self::Service(ReplenishmentError::IdempotencyConflict) => (
+                StatusCode::CONFLICT,
+                "M3_REPLENISH_IDEMPOTENCY_CONFLICT",
+                "补货写请求幂等键冲突",
+            ),
+            Self::MissingIdempotencyKey
+            | Self::Service(ReplenishmentError::IdempotencyRequired) => (
+                StatusCode::BAD_REQUEST,
+                "M3_REPLENISH_IDEMPOTENCY_REQUIRED",
+                "补货写请求缺少幂等键",
+            ),
+            Self::Service(ReplenishmentError::Database(_)) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "M3_REPLENISH_STATE_INVALID",
+                "补货策略处理失败",
+            ),
+            Self::Auth(_) => unreachable!("auth error returned above"),
+        };
+        (
+            status,
+            Json(ErrorResponse {
+                code: code.to_string(),
+                message: message.to_string(),
+                severity: "error".to_string(),
+                details: json!({}),
+                trace_id: "unavailable".to_string(),
+                retry_hint: None,
+            }),
+        )
+            .into_response()
+    }
+}
