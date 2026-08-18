@@ -1,42 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { components } from "@wms/api-client";
 
 import { ApiError } from "@/features/auth/auth-queries";
 import { api } from "@/lib/api";
 
-export type ReplenishmentTask = {
-  id: string;
-  owner_id: string;
-  task_no: string;
-  trigger_mode: string;
-  priority: string;
-  strategy_id: string | null;
-  source_location_id: string;
-  source_batch_id: string;
-  source_lpn_id: string | null;
-  target_location_id: string;
-  product_id: string;
-  batch_no: string;
-  qty: string;
-  picked_qty: string;
-  done_qty: string;
-  status: string;
-  operator_id: string | null;
-  created_by: string;
-  version: number;
-};
-
-export type ReplenishmentTaskListResponse = {
-  data: ReplenishmentTask[];
-  page: { count: number; next_cursor: string | null };
-};
-
-export type CreateReplenishmentTaskRequest = {
-  source_location_id: string;
-  source_batch_id: string;
-  target_location_id: string;
-  qty: string;
-  source_lpn_id?: string | null;
-};
+export type ReplenishmentTask = components["schemas"]["ReplenishmentTask"];
+export type ReplenishmentTaskListResponse =
+  components["schemas"]["ReplenishmentTaskListResponse"];
+export type CreateReplenishmentTaskRequest =
+  components["schemas"]["CreateReplenishmentTaskRequest"];
 
 export const replenishmentTasksQueryKey = ["replenishment", "tasks"] as const;
 

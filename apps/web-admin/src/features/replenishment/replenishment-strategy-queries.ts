@@ -1,60 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { components } from "@wms/api-client";
 
 import { ApiError } from "@/features/auth/auth-queries";
 import { api } from "@/lib/api";
 
-export type ReplenishmentStrategy = {
-  id: string;
-  owner_id: string;
-  strategy_code: string;
-  strategy_name: string;
-  scope_type: string;
-  scope_ref: string;
-  location_type: string;
-  source_type: string;
-  target_type: string;
-  min_safety_threshold: string;
-  max_replenish_target: string;
-  trigger_modes: string[];
-  enabled: boolean;
-};
-
-export type UpsertReplenishmentStrategyRequest = {
-  strategy_code: string;
-  strategy_name: string;
-  scope_type: string;
-  scope_ref: string;
-  source_type: string;
-  target_type: string;
-  min_safety_threshold: string;
-  max_replenish_target: string;
-  trigger_modes: string[];
-  enabled: boolean;
-};
-
-export type ReplenishmentStrategyListResponse = {
-  data: ReplenishmentStrategy[];
-  page: { count: number; next_cursor: string | null };
-};
-
-export type ReplenishmentPreviewItem = {
-  location_id: string;
-  location_code: string;
-  product_id: string | null;
-  available_qty: string;
-  min_safety_threshold: string;
-  max_replenish_target: string;
-  would_trigger: boolean;
-};
-
-export type ReplenishmentLocationGroup = {
-  id: string;
-  owner_id: string;
-  group_code: string;
-  group_name: string;
-  enabled: boolean;
-  location_ids: string[];
-};
+export type ReplenishmentStrategy = components["schemas"]["ReplenishmentStrategy"];
+export type UpsertReplenishmentStrategyRequest =
+  components["schemas"]["UpsertReplenishmentStrategyRequest"];
+export type ReplenishmentStrategyListResponse =
+  components["schemas"]["ReplenishmentStrategyListResponse"];
+export type ReplenishmentPreviewItem = components["schemas"]["ReplenishmentPreviewItem"];
+export type ReplenishmentLocationGroup = components["schemas"]["ReplenishmentLocationGroup"];
 
 export const replenishmentStrategiesQueryKey = ["replenishment", "strategies"] as const;
 export const replenishmentLocationGroupsQueryKey = ["replenishment", "location-groups"] as const;
