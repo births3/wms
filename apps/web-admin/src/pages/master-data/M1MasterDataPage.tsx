@@ -380,7 +380,7 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
         max_volume_cm3: 5_000_000,
         max_sku_count: 1,
         location_type: locationBatchType,
-        bound_owner_id: locationBatchScope.ownerId,
+        current_owner_id: locationBatchScope.ownerId,
       });
       await rowsQuery.refetch();
       setLocationBatchOpen(false);
@@ -737,7 +737,7 @@ export function masterDataPrintTarget(
         used_volume_cm3: integer(fields.usedVolumeCm3),
         max_sku_count: integer(fields.maxSku),
         location_type: fields.locationTypeCode,
-        bound_owner_id: fields.boundOwnerId,
+        current_owner_id: fields.boundOwnerId,
         status: row.status,
         created_at: row.createdAt,
         updated_at: row.updatedAt,
