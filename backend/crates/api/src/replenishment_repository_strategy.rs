@@ -229,6 +229,8 @@ impl PgReplenishmentRepository {
             .execute(&mut **tx)
             .await?;
         }
+        self.sync_group_strategy_locations(tx, owner_id, group.id, &req.location_ids)
+            .await?;
         Ok(Some(ReplenishmentLocationGroup {
             id: group.id,
             owner_id: group.owner_id,

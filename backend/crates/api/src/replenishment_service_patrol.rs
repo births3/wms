@@ -40,6 +40,15 @@ impl ReplenishmentService {
                                 now,
                             )
                             .await?;
+                            self.maybe_alert_patrol_fail_repeat(
+                                strategy.owner_id,
+                                strategy.id,
+                                location_id,
+                                product_id,
+                                "source_unavailable",
+                                now,
+                            )
+                            .await?;
                         }
                         Err(error) => return Err(error),
                     }
@@ -91,6 +100,84 @@ impl ReplenishmentService {
                 "product_id": product_id,
                 "reason_code": reason_code,
                 "strategy_id": strategy_id
+            }),
+            now,
+        )
+        .await
+        .map_err(|error| {
+            ReplenishmentError::Database(sqlx::Error::Protocol(format!("{error:?}")))
+        })?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn maybe_alert_patrol_fail_repeat(
+        &self,
+        owner_id: Uuid,
+        strategy_id: Uuid,
+        location_id: Uuid,
+        product_id: Uuid,
+        reason_code: &str,
+        now: DateTime<Utc>,
+    ) -> Result<(), ReplenishmentError> {
+        let fail_times: Vec<DateTime<Utc>> = sqlx::query_scalar(
+            r#"
+            SELECT created_at
+              FROM event_bus_event
+             WHERE owner_id = $1
+               AND event_type = 'replenishment.patrol_fail'
+               AND payload ->> 'target_location_id' = $2
+               AND payload ->> 'product_id' = $3
+               AND payload ->> 'reason_code' = $4
+             ORDER BY created_at DESC
+             LIMIT 3
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id.to_string())
+        .bind(product_id.to_string())
+        .bind(reason_code)
+        .fetch_all(self.repo.pool())
+        .await?;
+        let Some(oldest) = fail_times.get(2).copied() else {
+            return Ok(());
+        };
+        let generated_after: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                  FROM replenishment_tasks
+                 WHERE owner_id = $1
+                   AND target_location_id = $2
+                   AND product_id = $3
+                   AND created_at > $4
+            )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .bind(product_id)
+        .bind(oldest)
+        .fetch_one(self.repo.pool())
+        .await?;
+        if generated_after {
+            return Ok(());
+        }
+        let mut tx = self.repo.pool().begin().await?;
+        publish_event_in_tx(
+            &mut tx,
+            owner_id,
+            &format!("replenishment.patrol_fail_repeat:{strategy_id}:{location_id}:{product_id}:{reason_code}"),
+            "replenishment_patrol_fail_repeat",
+            "M3",
+            "replenishment_task",
+            &strategy_id.to_string(),
+            json!({
+                "target_location_id": location_id,
+                "product_id": product_id,
+                "reason_code": reason_code,
+                "strategy_id": strategy_id,
+                "consecutive_fail_count": 3
             }),
             now,
         )

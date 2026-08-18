@@ -123,6 +123,28 @@ impl PgReplenishmentRepository {
         .await
     }
 
+    pub async fn strategy_has_open_tasks(
+        &self,
+        owner_id: Uuid,
+        strategy_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                  FROM replenishment_tasks
+                 WHERE owner_id = $1
+                   AND strategy_id = $2
+                   AND status IN ('pending', 'in_progress', 'suspended')
+            )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(strategy_id)
+        .fetch_one(&self.pool)
+        .await
+    }
+
     pub async fn get_strategy(
         &self,
         owner_id: Uuid,
@@ -255,6 +277,8 @@ impl PgReplenishmentRepository {
             .execute(&mut **tx)
             .await?;
         }
+        self.sync_group_strategy_locations(tx, owner_id, group_id, &req.location_ids)
+            .await?;
         Ok(ReplenishmentLocationGroup {
             id: group_id,
             owner_id,
@@ -263,6 +287,63 @@ impl PgReplenishmentRepository {
             enabled: req.enabled,
             location_ids: req.location_ids.clone(),
         })
+    }
+
+    pub async fn sync_group_strategy_locations(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        group_id: Uuid,
+        location_ids: &[Uuid],
+    ) -> Result<(), sqlx::Error> {
+        let strategies: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT id, target_type
+              FROM replenishment_strategies
+             WHERE owner_id = $1
+               AND scope_type = 'location_group'
+               AND scope_ref = $2
+               AND enabled
+            "#,
+        )
+        .bind(owner_id)
+        .bind(group_id)
+        .fetch_all(&mut **tx)
+        .await?;
+        for (strategy_id, target_type) in strategies {
+            sqlx::query(
+                r#"
+                UPDATE warehouse_locations
+                   SET replenish_strategy_id = NULL,
+                       updated_at = now()
+                 WHERE owner_id = $1
+                   AND replenish_strategy_id = $2
+                   AND NOT (id = ANY($3))
+                "#,
+            )
+            .bind(owner_id)
+            .bind(strategy_id)
+            .bind(location_ids)
+            .execute(&mut **tx)
+            .await?;
+            sqlx::query(
+                r#"
+                UPDATE warehouse_locations
+                   SET replenish_strategy_id = $2,
+                       updated_at = now()
+                 WHERE owner_id = $1
+                   AND id = ANY($3)
+                   AND location_type = $4
+                "#,
+            )
+            .bind(owner_id)
+            .bind(strategy_id)
+            .bind(location_ids)
+            .bind(target_type)
+            .execute(&mut **tx)
+            .await?;
+        }
+        Ok(())
     }
 
     pub async fn pick_available_qty(
