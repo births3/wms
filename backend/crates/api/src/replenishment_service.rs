@@ -6,6 +6,8 @@ mod exception;
 mod job;
 #[path = "replenishment_service_patrol.rs"]
 mod patrol;
+#[path = "replenishment_service_timeout.rs"]
+mod timeout;
 #[path = "replenishment_service_wave.rs"]
 mod wave;
 

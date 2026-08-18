@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{Quantity, ReplenishmentTask};
@@ -5,6 +6,60 @@ use wms_domain::{Quantity, ReplenishmentTask};
 use super::{PgReplenishmentRepository, TaskRow};
 
 impl PgReplenishmentRepository {
+    pub async fn list_task_owner_ids(&self) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT DISTINCT owner_id
+              FROM replenishment_tasks
+             WHERE owner_id IS NOT NULL
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn list_urgent_pending_since(
+        &self,
+        owner_id: Uuid,
+        created_before: DateTime<Utc>,
+    ) -> Result<Vec<(Uuid, i64)>, sqlx::Error> {
+        sqlx::query_as(
+            r#"
+            SELECT id, version
+              FROM replenishment_tasks
+             WHERE owner_id = $1
+               AND priority = 'urgent'
+               AND status = 'pending'
+               AND created_at <= $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(created_before)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn list_stale_in_progress(
+        &self,
+        owner_id: Uuid,
+        progress_before: DateTime<Utc>,
+    ) -> Result<Vec<(Uuid, i64, DateTime<Utc>)>, sqlx::Error> {
+        sqlx::query_as(
+            r#"
+            SELECT id, version, last_progress_at
+              FROM replenishment_tasks
+             WHERE owner_id = $1
+               AND status = 'in_progress'
+               AND last_progress_at IS NOT NULL
+               AND last_progress_at <= $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(progress_before)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     pub async fn lock_task(
         &self,
         tx: &mut Transaction<'_, Postgres>,
