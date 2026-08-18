@@ -29,6 +29,8 @@ type DevGroup = {
   location_ids: string[];
 };
 
+const tasks: Array<Record<string, unknown> & { id: string; status: string; version: number; operator_id: string | null }> = [];
+
 const strategies: DevStrategy[] = [
   {
     id: "00000000-0000-0000-0000-00000000b001",
@@ -172,6 +174,55 @@ export async function handleReplenishmentDevMock(
       groups.unshift(next);
       sendJson(res, 200, next);
     }
+    return true;
+  }
+
+  if (pathname === "/api/v1/replenishment/tasks" && req.method === "GET") {
+    sendJson(res, 200, page(tasks));
+    return true;
+  }
+  if (pathname === "/api/v1/replenishment/tasks" && req.method === "POST") {
+    const body = asRecord(await readJsonBody(req));
+    const created = {
+      id: crypto.randomUUID(),
+      owner_id: OWNER_ID,
+      task_no: `RP-${Date.now()}`,
+      trigger_mode: "manual",
+      priority: "normal",
+      strategy_id: null,
+      source_location_id: String(body.source_location_id ?? ""),
+      source_batch_id: String(body.source_batch_id ?? ""),
+      source_lpn_id: body.source_lpn_id ? String(body.source_lpn_id) : null,
+      target_location_id: String(body.target_location_id ?? ""),
+      product_id: "00000000-0000-0000-0000-00000000c001",
+      batch_no: "DEV-BATCH",
+      qty: String(body.qty ?? "1"),
+      picked_qty: "0",
+      done_qty: "0",
+      status: "pending",
+      operator_id: null,
+      created_by: "manual",
+      version: 1,
+    };
+    tasks.unshift(created);
+    sendJson(res, 200, created);
+    return true;
+  }
+  const taskMatch = pathname.match(/^\/api\/v1\/replenishment\/tasks\/([^/]+)\/(cancel|reassign)$/);
+  if (taskMatch && req.method === "POST") {
+    const task = tasks.find((item) => item.id === decodeURIComponent(taskMatch[1]));
+    if (!task) {
+      sendError(res, 404, "M3_REPLENISH_TASK_NOT_FOUND", "补货任务不存在");
+      return true;
+    }
+    if (taskMatch[2] === "cancel") {
+      task.status = "cancelled";
+    } else {
+      task.status = "pending";
+      task.operator_id = null;
+    }
+    task.version += 1;
+    sendJson(res, 200, task);
     return true;
   }
 
