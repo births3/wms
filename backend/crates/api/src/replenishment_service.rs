@@ -6,6 +6,8 @@ mod exception;
 mod job;
 #[path = "replenishment_service_patrol.rs"]
 mod patrol;
+#[path = "replenishment_service_wave.rs"]
+mod wave;
 
 use chrono::Utc;
 use uuid::Uuid;
@@ -51,6 +53,22 @@ pub enum ReplenishmentError {
     IdempotencyRequired,
     IdempotencyConflict,
     Database(sqlx::Error),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct WaveLink {
+    pub wave_id: Uuid,
+    pub outbound_order_id: Uuid,
+    pub outbound_line_no: i32,
+}
+
+pub struct CreateWaveGapTasksRequest {
+    pub wave_id: Uuid,
+    pub outbound_order_id: Uuid,
+    pub outbound_line_no: i32,
+    pub product_id: Uuid,
+    pub demand_qty: Quantity,
+    pub target_location_id: Uuid,
 }
 
 pub struct ReplenishmentService {
@@ -309,6 +327,7 @@ impl ReplenishmentService {
                 Some(strategy.id),
                 None,
                 "system:min_max",
+                None,
             )
             .await?;
         tx.commit().await?;
@@ -380,6 +399,7 @@ impl ReplenishmentService {
                 None,
                 req.source_lpn_id,
                 &ctx.actor_name,
+                None,
             )
             .await?;
         idempotency::store_success_with_status(
@@ -457,6 +477,7 @@ impl ReplenishmentService {
         strategy_id: Option<Uuid>,
         source_lpn_id: Option<Uuid>,
         created_by: &str,
+        wave: Option<WaveLink>,
     ) -> Result<ReplenishmentTask, ReplenishmentError> {
         let task_id = Uuid::new_v4();
         let now = Utc::now();
@@ -490,6 +511,9 @@ impl ReplenishmentService {
                 product_id,
                 qty,
                 created_by,
+                wave.map(|link| link.wave_id),
+                wave.map(|link| link.outbound_order_id),
+                wave.map(|link| link.outbound_line_no),
             )
             .await?;
         reserve_replenish_in_tx(tx, ctx.owner_id, source.id, target_location_id, qty, now)

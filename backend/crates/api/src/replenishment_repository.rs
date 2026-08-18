@@ -583,17 +583,22 @@ impl PgReplenishmentRepository {
         product_id: Uuid,
         qty: Quantity,
         created_by: &str,
+        wave_id: Option<Uuid>,
+        outbound_order_id: Option<Uuid>,
+        outbound_line_no: Option<i32>,
     ) -> Result<ReplenishmentTask, sqlx::Error> {
         sqlx::query_as::<_, TaskRow>(
             r#"
             INSERT INTO replenishment_tasks (
                 id, owner_id, task_no, trigger_mode, priority, strategy_id,
                 source_location_id, source_batch_id, source_lpn_id, target_location_id,
-                product_id, batch_no, qty, status, created_by
+                product_id, batch_no, qty, status, created_by,
+                wave_id, outbound_order_id, outbound_line_no
             ) VALUES (
                 $1, $2, $3, $4, $5, $6,
                 $7, $8, $9, $10,
-                $11, $12, $13, 'pending', $14
+                $11, $12, $13, 'pending', $14,
+                $15, $16, $17
             )
             RETURNING id, owner_id, task_no, trigger_mode, priority, strategy_id,
                       source_location_id, source_batch_id, source_lpn_id, target_location_id,
@@ -615,9 +620,73 @@ impl PgReplenishmentRepository {
         .bind(&source.batch_no)
         .bind(qty)
         .bind(created_by)
+        .bind(wave_id)
+        .bind(outbound_order_id)
+        .bind(outbound_line_no)
         .fetch_one(&mut **tx)
         .await
         .map(Into::into)
+    }
+
+    pub async fn find_wave_gap_strategy(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        product_id: Uuid,
+        target_location_id: Uuid,
+    ) -> Result<Option<ReplenishmentStrategy>, sqlx::Error> {
+        sqlx::query_as::<_, StrategyRow>(
+            r#"
+            SELECT id, owner_id, strategy_code, strategy_name, scope_type, scope_ref,
+                   location_type, source_type, target_type,
+                   min_safety_threshold, max_replenish_target, trigger_modes, enabled
+              FROM replenishment_strategies strategy
+             WHERE strategy.owner_id = $1
+               AND strategy.enabled
+               AND 'wave_gap' = ANY(strategy.trigger_modes)
+               AND (
+                    (strategy.scope_type = 'product' AND strategy.scope_ref = $2)
+                    OR (
+                        strategy.scope_type = 'category'
+                        AND EXISTS (
+                            SELECT 1
+                              FROM products product
+                              JOIN system_dictionary_items item
+                                ON item.id = strategy.scope_ref
+                               AND item.dict_code = 'special_drug_category'
+                               AND (item.owner_id IS NULL OR item.owner_id = $1)
+                             WHERE product.owner_id = $1
+                               AND product.id = $2
+                               AND product.special_drug_category = item.item_code
+                        )
+                    )
+                    OR (
+                        strategy.scope_type = 'location_group'
+                        AND EXISTS (
+                            SELECT 1
+                              FROM replenishment_location_groups grp
+                              JOIN replenishment_location_group_members member
+                                ON member.group_id = grp.id
+                             WHERE grp.owner_id = $1
+                               AND grp.id = strategy.scope_ref
+                               AND member.location_id = $3
+                        )
+                    )
+               )
+             ORDER BY CASE strategy.scope_type
+                        WHEN 'product' THEN 0
+                        WHEN 'category' THEN 1
+                        ELSE 2
+                      END
+             LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(product_id)
+        .bind(target_location_id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map(|row| row.map(Into::into))
     }
 }
 
