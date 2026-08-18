@@ -1,5 +1,7 @@
 //! 补货策略、库位组与任务生成用例编排。
 
+#[path = "replenishment_service_exception.rs"]
+mod exception;
 #[path = "replenishment_service_job.rs"]
 mod job;
 
@@ -42,6 +44,8 @@ pub enum ReplenishmentError {
     SourceMismatch,
     TargetMismatch,
     StateInvalid,
+    CancelBlocked,
+    ReturnBlocked,
     IdempotencyRequired,
     IdempotencyConflict,
     Database(sqlx::Error),

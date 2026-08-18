@@ -109,6 +109,14 @@ impl ReplenishmentService {
         if !can_pick(&task.status) || task.operator_id != Some(ctx.user_id) {
             return Err(ReplenishmentError::StateInvalid);
         }
+        if self
+            .suspend_if_source_short(&mut tx, ctx, &mut task, req.version)
+            .await?
+            .is_some()
+        {
+            tx.commit().await?;
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
         let source_code = self
             .repo
             .location_code(&mut tx, ctx.owner_id, task.source_location_id)
@@ -177,6 +185,15 @@ impl ReplenishmentService {
             .ok_or(ReplenishmentError::TaskNotFound)?;
         if task.version != req.version {
             return Err(ReplenishmentError::StateInvalid);
+        }
+        if task.picked_qty <= Quantity::ZERO
+            && self
+                .suspend_if_source_short(&mut tx, ctx, &mut task, req.version)
+                .await?
+                .is_some()
+        {
+            tx.commit().await?;
+            return Err(ReplenishmentError::SourceUnavailable);
         }
         if !can_confirm(&task.status, task.picked_qty) || task.operator_id != Some(ctx.user_id) {
             return Err(ReplenishmentError::StateInvalid);

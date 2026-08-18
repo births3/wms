@@ -262,6 +262,25 @@ pub struct ConfirmReplenishmentTaskRequest {
     pub qty: Quantity,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CancelReplenishmentTaskRequest {
+    pub version: i64,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReassignReplenishmentTaskRequest {
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReturnReplenishmentTaskRequest {
+    pub version: i64,
+    pub return_reason: String,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

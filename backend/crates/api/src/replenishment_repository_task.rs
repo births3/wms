@@ -1,6 +1,6 @@
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
-use wms_domain::ReplenishmentTask;
+use wms_domain::{Quantity, ReplenishmentTask};
 
 use super::{PgReplenishmentRepository, TaskRow};
 
@@ -155,6 +155,73 @@ impl PgReplenishmentRepository {
         .bind(task.operator_id)
         .bind(task.picked_qty)
         .bind(task.done_qty)
+        .fetch_optional(&mut **tx)
+        .await
+        .map(|row| row.map(Into::into))
+    }
+
+    pub async fn source_available(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        batch_id: Uuid,
+    ) -> Result<Option<Quantity>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT qty_on_hand - qty_allocated - qty_frozen - qty_replenish_out_transit
+              FROM inventory_batches
+             WHERE owner_id = $1 AND id = $2
+             FOR UPDATE
+            "#,
+        )
+        .bind(owner_id)
+        .bind(batch_id)
+        .fetch_optional(&mut **tx)
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn save_exception(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        task: &ReplenishmentTask,
+        expected_version: i64,
+        cancel_reason: Option<&str>,
+        return_reason: Option<&str>,
+        clear_claimed: bool,
+    ) -> Result<Option<ReplenishmentTask>, sqlx::Error> {
+        sqlx::query_as::<_, TaskRow>(
+            r#"
+            UPDATE replenishment_tasks
+               SET status = $4,
+                   operator_id = $5,
+                   picked_qty = $6,
+                   done_qty = $7,
+                   cancel_reason = COALESCE($8, cancel_reason),
+                   return_reason = COALESCE($9, return_reason),
+                   claimed_at = CASE WHEN $10 THEN NULL ELSE claimed_at END,
+                   last_progress_at = now(),
+                   updated_at = now(),
+                   version = version + 1
+             WHERE owner_id = $1
+               AND id = $2
+               AND version = $3
+            RETURNING id, owner_id, task_no, trigger_mode, priority, strategy_id,
+                      source_location_id, source_batch_id, source_lpn_id, target_location_id,
+                      product_id, batch_no, qty, picked_qty, done_qty, status,
+                      operator_id, created_by, version
+            "#,
+        )
+        .bind(task.owner_id)
+        .bind(task.id)
+        .bind(expected_version)
+        .bind(&task.status)
+        .bind(task.operator_id)
+        .bind(task.picked_qty)
+        .bind(task.done_qty)
+        .bind(cancel_reason)
+        .bind(return_reason)
+        .bind(clear_claimed)
         .fetch_optional(&mut **tx)
         .await
         .map(|row| row.map(Into::into))
