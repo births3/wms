@@ -12,9 +12,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
-    ClaimReplenishmentTaskRequest, ConfirmReplenishmentTaskRequest, CreateReplenishmentTaskRequest,
-    ErrorResponse, PickReplenishmentTaskRequest, ReplenishmentLocationGroup,
-    ReplenishmentPreviewResponse, ReplenishmentStrategy, ReplenishmentTask,
+    CancelReplenishmentTaskRequest, ClaimReplenishmentTaskRequest, ConfirmReplenishmentTaskRequest,
+    CreateReplenishmentTaskRequest, ErrorResponse, PickReplenishmentTaskRequest,
+    ReassignReplenishmentTaskRequest, ReplenishmentLocationGroup, ReplenishmentPreviewResponse,
+    ReplenishmentStrategy, ReplenishmentTask, ReturnReplenishmentTaskRequest,
     UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
 
@@ -72,6 +73,18 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
         .route(
             "/api/v1/replenishment/tasks/:id/confirm",
             post(confirm_task_handler),
+        )
+        .route(
+            "/api/v1/replenishment/tasks/:id/cancel",
+            post(cancel_task_handler),
+        )
+        .route(
+            "/api/v1/replenishment/tasks/:id/reassign",
+            post(reassign_task_handler),
+        )
+        .route(
+            "/api/v1/replenishment/tasks/:id/return",
+            post(return_task_handler),
         )
         .with_state(state)
 }
@@ -132,6 +145,44 @@ async fn pick_task_handler(
     require_execute(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok(Json(state.service.pick_task(&ctx, id, req, &key).await?))
+}
+
+async fn cancel_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<CancelReplenishmentTaskRequest>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.cancel_task(&ctx, id, req, &key).await?))
+}
+
+async fn reassign_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<ReassignReplenishmentTaskRequest>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state.service.reassign_task(&ctx, id, req, &key).await?,
+    ))
+}
+
+async fn return_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<ReturnReplenishmentTaskRequest>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    require_execute(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.return_task(&ctx, id, req, &key).await?))
 }
 
 async fn confirm_task_handler(
@@ -257,6 +308,16 @@ impl IntoResponse for ReplenishmentHandlerError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M3_REPLENISH_STATE_INVALID",
                 "补货任务状态不允许该动作",
+            ),
+            Self::Service(ReplenishmentError::CancelBlocked) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_CANCEL_BLOCKED",
+                "已下架或已送达的补货任务不可取消",
+            ),
+            Self::Service(ReplenishmentError::ReturnBlocked) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_RETURN_BLOCKED",
+                "已下架的补货任务不可退回",
             ),
             Self::Service(ReplenishmentError::SourceUnavailable) => (
                 StatusCode::UNPROCESSABLE_ENTITY,

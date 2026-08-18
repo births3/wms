@@ -131,3 +131,51 @@ pub(crate) fn pick_replenishment_task() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn confirm_replenishment_task() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/tasks/{id}/cancel",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "任务 ID"),
+        ("Idempotency-Key" = String, Header, description = "取消幂等键"),
+    ),
+    request_body = CancelReplenishmentTaskRequest,
+    responses(
+        (status = 200, description = "取消补货任务", body = ReplenishmentTask),
+        (status = 422, description = "已下架不可取消", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn cancel_replenishment_task() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/tasks/{id}/reassign",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "任务 ID"),
+        ("Idempotency-Key" = String, Header, description = "改派幂等键"),
+    ),
+    request_body = ReassignReplenishmentTaskRequest,
+    responses((status = 200, description = "改派回池", body = ReplenishmentTask)),
+)]
+#[allow(dead_code)]
+pub(crate) fn reassign_replenishment_task() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/tasks/{id}/return",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "任务 ID"),
+        ("Idempotency-Key" = String, Header, description = "退回幂等键"),
+    ),
+    request_body = ReturnReplenishmentTaskRequest,
+    responses(
+        (status = 200, description = "退回待领", body = ReplenishmentTask),
+        (status = 422, description = "已下架不可退回", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn return_replenishment_task() {}
