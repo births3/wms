@@ -79,3 +79,55 @@ pub(crate) fn create_replenishment_location_group() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn create_replenishment_task() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/tasks/{id}/claim",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "任务 ID"),
+        ("Idempotency-Key" = String, Header, description = "领取幂等键"),
+    ),
+    request_body = ClaimReplenishmentTaskRequest,
+    responses(
+        (status = 200, description = "领取补货任务", body = ReplenishmentTask),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 409, description = "领取冲突", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn claim_replenishment_task() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/tasks/{id}/pick",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "任务 ID"),
+        ("Idempotency-Key" = String, Header, description = "下架幂等键"),
+    ),
+    request_body = PickReplenishmentTaskRequest,
+    responses(
+        (status = 200, description = "补货下架登记", body = ReplenishmentTask),
+        (status = 422, description = "扫码不符或超量", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn pick_replenishment_task() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/tasks/{id}/confirm",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "任务 ID"),
+        ("Idempotency-Key" = String, Header, description = "确认幂等键"),
+    ),
+    request_body = ConfirmReplenishmentTaskRequest,
+    responses(
+        (status = 200, description = "补货送达确认", body = ReplenishmentTask),
+        (status = 422, description = "状态非法或上架阻断", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn confirm_replenishment_task() {}

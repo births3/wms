@@ -12,7 +12,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
     BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
-    CreateReplenishmentTaskRequest, ErrorResponse, ReplenishmentLocationGroup,
+    ClaimReplenishmentTaskRequest, ConfirmReplenishmentTaskRequest, CreateReplenishmentTaskRequest,
+    ErrorResponse, PickReplenishmentTaskRequest, ReplenishmentLocationGroup,
     ReplenishmentPreviewResponse, ReplenishmentStrategy, ReplenishmentTask,
     UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
@@ -24,6 +25,7 @@ use crate::{
 };
 
 const MANAGE: &str = "m3.replenishment.manage";
+const EXECUTE: &str = "m3.replenishment.execute";
 
 #[derive(Clone)]
 pub struct ReplenishmentAppState {
@@ -59,6 +61,18 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
             post(create_location_group_handler),
         )
         .route("/api/v1/replenishment/tasks", post(create_task_handler))
+        .route(
+            "/api/v1/replenishment/tasks/:id/claim",
+            post(claim_task_handler),
+        )
+        .route(
+            "/api/v1/replenishment/tasks/:id/pick",
+            post(pick_task_handler),
+        )
+        .route(
+            "/api/v1/replenishment/tasks/:id/confirm",
+            post(confirm_task_handler),
+        )
         .with_state(state)
 }
 
@@ -96,6 +110,42 @@ async fn preview_handler(
     Ok(Json(state.service.preview(&ctx, id).await?))
 }
 
+async fn claim_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<ClaimReplenishmentTaskRequest>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    require_execute(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.claim_task(&ctx, id, req, &key).await?))
+}
+
+async fn pick_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<PickReplenishmentTaskRequest>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    require_execute(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.pick_task(&ctx, id, req, &key).await?))
+}
+
+async fn confirm_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<ConfirmReplenishmentTaskRequest>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    require_execute(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.confirm_task(&ctx, id, req, &key).await?))
+}
+
 async fn create_task_handler(
     ctx: AuthContext,
     State(state): State<ReplenishmentAppState>,
@@ -122,6 +172,11 @@ async fn create_location_group_handler(
 
 fn require_manage(ctx: &AuthContext) -> Result<(), ReplenishmentHandlerError> {
     ctx.require_permission(MANAGE)
+        .map_err(ReplenishmentHandlerError::Auth)
+}
+
+fn require_execute(ctx: &AuthContext) -> Result<(), ReplenishmentHandlerError> {
+    ctx.require_permission(EXECUTE)
         .map_err(ReplenishmentHandlerError::Auth)
 }
 
@@ -177,6 +232,31 @@ impl IntoResponse for ReplenishmentHandlerError {
                 StatusCode::NOT_FOUND,
                 "M3_REPLENISH_TASK_NOT_FOUND",
                 "补货策略不存在",
+            ),
+            Self::Service(ReplenishmentError::ClaimConflict) => (
+                StatusCode::CONFLICT,
+                "M3_REPLENISH_CLAIM_CONFLICT",
+                "补货任务领取冲突",
+            ),
+            Self::Service(ReplenishmentError::QtyExceeded) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_QTY_EXCEEDED",
+                "补货下架或确认数量超过剩余量",
+            ),
+            Self::Service(ReplenishmentError::SourceMismatch) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_SOURCE_MISMATCH",
+                "扫描来源库位或容器与任务不符",
+            ),
+            Self::Service(ReplenishmentError::TargetMismatch) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_TARGET_MISMATCH",
+                "扫描目标库位与任务不符",
+            ),
+            Self::Service(ReplenishmentError::StateInvalid) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_STATE_INVALID",
+                "补货任务状态不允许该动作",
             ),
             Self::Service(ReplenishmentError::SourceUnavailable) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
