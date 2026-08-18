@@ -1,5 +1,8 @@
 //! 补货策略、库位组与任务生成用例编排。
 
+#[path = "replenishment_service_job.rs"]
+mod job;
+
 use chrono::Utc;
 use uuid::Uuid;
 use wms_domain::{
@@ -34,6 +37,11 @@ pub enum ReplenishmentError {
     SourceUnavailable,
     NumberingUnavailable,
     PutawayBlocked,
+    ClaimConflict,
+    QtyExceeded,
+    SourceMismatch,
+    TargetMismatch,
+    StateInvalid,
     IdempotencyRequired,
     IdempotencyConflict,
     Database(sqlx::Error),

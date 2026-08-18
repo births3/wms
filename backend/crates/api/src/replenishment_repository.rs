@@ -1,5 +1,8 @@
 //! 补货策略与库位组存取。
 
+#[path = "replenishment_repository_task.rs"]
+mod task;
+
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{

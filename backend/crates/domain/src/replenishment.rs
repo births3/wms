@@ -239,6 +239,29 @@ pub struct ReplenishmentTask {
     pub version: i64,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ClaimReplenishmentTaskRequest {
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PickReplenishmentTaskRequest {
+    pub version: i64,
+    pub scanned_location_code: String,
+    #[serde(default)]
+    pub scanned_lpn_code: Option<String>,
+    #[schema(value_type = String, format = "decimal")]
+    pub qty: Quantity,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ConfirmReplenishmentTaskRequest {
+    pub version: i64,
+    pub scanned_location_code: String,
+    #[schema(value_type = String, format = "decimal")]
+    pub qty: Quantity,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
