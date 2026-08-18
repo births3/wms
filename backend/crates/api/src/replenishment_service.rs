@@ -28,6 +28,7 @@ use wms_domain::{
 };
 
 use crate::{
+    audit::{append_event_in_tx, AuditWriteRequest},
     auth::AuthContext,
     document_numbering::{
         DocumentNumberingError, GenerateDocumentNumberRequest, PgDocumentNumberingService,
@@ -137,6 +138,14 @@ impl ReplenishmentService {
             &created.id.to_string(),
             &created,
             Utc::now(),
+        )
+        .await?;
+        write_audit(
+            &mut tx,
+            ctx,
+            "create_replenishment_strategy",
+            "replenishment_strategy",
+            &created.id.to_string(),
         )
         .await?;
         tx.commit().await?;
@@ -253,6 +262,14 @@ impl ReplenishmentService {
             Utc::now(),
         )
         .await?;
+        write_audit(
+            &mut tx,
+            ctx,
+            "bind_replenishment_locations",
+            "replenishment_strategy",
+            &strategy.id.to_string(),
+        )
+        .await?;
         tx.commit().await?;
         Ok(bound)
     }
@@ -321,89 +338,16 @@ impl ReplenishmentService {
             Utc::now(),
         )
         .await?;
-        tx.commit().await?;
-        Ok(group)
-    }
-
-    pub async fn generate_task(
-        &self,
-        ctx: &AuthContext,
-        strategy_id: Uuid,
-        target_location_id: Uuid,
-        product_id: Uuid,
-    ) -> Result<Option<ReplenishmentTask>, ReplenishmentError> {
-        ctx.require_permission(MANAGE)
-            .map_err(|_| ReplenishmentError::PermissionDenied)?;
-        let strategy = self
-            .repo
-            .get_strategy(ctx.owner_id, strategy_id)
-            .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
-        if !strategy.enabled || !strategy.trigger_modes.iter().any(|mode| mode == "min_max") {
-            return Ok(None);
-        }
-        let mut tx = self.repo.pool().begin().await?;
-        let target = self
-            .repo
-            .load_location_route(&mut tx, ctx.owner_id, target_location_id)
-            .await?
-            .ok_or(ReplenishmentError::ScopeNotFound)?;
-        if target.replenish_strategy_id != Some(strategy.id) {
-            return Ok(None);
-        }
-        let available = self
-            .repo
-            .pick_available_qty(&mut tx, ctx.owner_id, target_location_id, product_id)
-            .await?;
-        if available > strategy.min_safety_threshold {
-            return Ok(None);
-        }
-        let pack = self
-            .repo
-            .default_pack_ratio(&mut tx, ctx.owner_id, product_id)
-            .await?;
-        let need = strategy.max_replenish_target - available;
-        let source = self
-            .repo
-            .lock_fefo_source(
-                &mut tx,
-                ctx.owner_id,
-                product_id,
-                &strategy.source_type,
-                Quantity::from(pack),
-            )
-            .await?
-            .ok_or(ReplenishmentError::SourceUnavailable)?;
-        self.ensure_source_ok(&source, &strategy.source_type, None)?;
-        let qty = task_qty(need, source.available_qty, pack);
-        if qty <= Quantity::ZERO {
-            return Ok(None);
-        }
-        self.ensure_target_putaway(
-            ctx.owner_id,
-            &target,
-            &strategy.target_type,
-            product_id,
-            qty,
+        write_audit(
+            &mut tx,
+            ctx,
+            "upsert_replenishment_location_group",
+            "replenishment_location_group",
+            &group.id.to_string(),
         )
         .await?;
-        let created = self
-            .persist_task(
-                &mut tx,
-                ctx,
-                &source,
-                target_location_id,
-                qty,
-                "min_max",
-                "normal",
-                Some(strategy.id),
-                None,
-                "system:min_max",
-                None,
-            )
-            .await?;
         tx.commit().await?;
-        Ok(Some(created))
+        Ok(group)
     }
 
     pub async fn list_tasks(
@@ -548,6 +492,13 @@ impl ReplenishmentService {
         if target.lock_status == "lock_out" || target.lock_status == "lock_all" {
             return Err(ReplenishmentError::PutawayBlocked);
         }
+        if self
+            .repo
+            .location_has_work_lock(owner_id, target.id)
+            .await?
+        {
+            return Err(ReplenishmentError::PutawayBlocked);
+        }
         let Some(product) = self
             .repo
             .load_product_putaway_attrs(owner_id, product_id)
@@ -666,6 +617,14 @@ impl ReplenishmentService {
                 }
                 _ => ReplenishmentError::PutawayBlocked,
             })?;
+        write_audit(
+            tx,
+            ctx,
+            "create_replenishment_task",
+            "replenishment_task",
+            &created.id.to_string(),
+        )
+        .await?;
         Ok(created)
     }
 
@@ -718,6 +677,41 @@ impl ReplenishmentService {
         }
         Ok(())
     }
+}
+
+pub(crate) fn resolve_source_lpn(
+    source: &SourceBatchLock,
+    qty: Quantity,
+    source_type: &str,
+) -> Option<Uuid> {
+    if source_type == "case_pick" {
+        return None;
+    }
+    let lpn_id = source.container_id?;
+    if source.lpn_on_hand <= Quantity::ZERO {
+        return None;
+    }
+    if qty * Quantity::from(10) >= source.lpn_on_hand * Quantity::from(8) {
+        Some(lpn_id)
+    } else {
+        None
+    }
+}
+
+pub(crate) async fn write_audit(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ctx: &AuthContext,
+    action: &str,
+    resource_type: &str,
+    resource_id: &str,
+) -> Result<(), ReplenishmentError> {
+    append_event_in_tx(
+        tx,
+        &AuditWriteRequest::from_auth_context(ctx, action, "M3", resource_type, resource_id, None),
+    )
+    .await
+    .map_err(|error| ReplenishmentError::Database(sqlx::Error::Protocol(format!("{error:?}"))))?;
+    Ok(())
 }
 
 impl From<sqlx::Error> for ReplenishmentError {

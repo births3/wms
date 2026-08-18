@@ -280,7 +280,13 @@ impl ReplenishmentService {
                 "M3",
                 "replenishment_task",
                 &saved.id.to_string(),
-                json!({ "task_id": saved.id, "done_qty": saved.done_qty }),
+                json!({
+                    "task_id": saved.id,
+                    "done_qty": saved.done_qty,
+                    "wave_id": saved.wave_id,
+                    "outbound_order_id": saved.outbound_order_id,
+                    "outbound_line_no": saved.outbound_line_no
+                }),
                 now,
             )
             .await

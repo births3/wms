@@ -3,7 +3,8 @@ use uuid::Uuid;
 use wms_domain::{task_qty, Quantity, ReplenishmentTask};
 
 use super::{
-    CreateWaveGapTasksRequest, ReplenishmentError, ReplenishmentService, WaveLink, MANAGE,
+    resolve_source_lpn, CreateWaveGapTasksRequest, ReplenishmentError, ReplenishmentService,
+    WaveLink, MANAGE,
 };
 use crate::{auth::AuthContext, h2_lifecycle::publish_event_in_tx};
 
@@ -37,14 +38,6 @@ impl ReplenishmentService {
             Some(found) => (found.source_type.as_str(), Some(found.id)),
             None => ("storage", None),
         };
-        self.ensure_target_putaway(
-            ctx.owner_id,
-            &target,
-            &target.location_type,
-            req.product_id,
-            req.demand_qty,
-        )
-        .await?;
         let available = self
             .repo
             .pick_available_qty(
@@ -89,6 +82,21 @@ impl ReplenishmentService {
             if qty <= Quantity::ZERO {
                 break;
             }
+            match self
+                .ensure_target_putaway(
+                    ctx.owner_id,
+                    &target,
+                    &target.location_type,
+                    req.product_id,
+                    qty,
+                )
+                .await
+            {
+                Ok(()) => {}
+                Err(ReplenishmentError::PutawayBlocked) if !created.is_empty() => break,
+                Err(error) => return Err(error),
+            }
+            let source_lpn_id = resolve_source_lpn(&source, qty, source_type);
             let task = self
                 .persist_task(
                     &mut tx,
@@ -99,7 +107,7 @@ impl ReplenishmentService {
                     "wave_gap",
                     "urgent",
                     strategy_id,
-                    None,
+                    source_lpn_id,
                     &created_by,
                     Some(wave),
                 )
@@ -148,7 +156,14 @@ impl ReplenishmentService {
         let lines = self.repo.list_wave_gap_lines(owner_id, wave_id).await?;
         let mut created = Vec::new();
         for line in lines {
-            let tasks = self
+            let candidates = self
+                .repo
+                .list_pick_target_candidates(owner_id, line.warehouse_id, line.product_id)
+                .await?;
+            let Some(target_location_id) = candidates.into_iter().next() else {
+                continue;
+            };
+            match self
                 .create_wave_gap_tasks(
                     &ctx,
                     CreateWaveGapTasksRequest {
@@ -157,11 +172,18 @@ impl ReplenishmentService {
                         outbound_line_no: line.outbound_line_no,
                         product_id: line.product_id,
                         demand_qty: line.demand_qty,
-                        target_location_id: line.target_location_id,
+                        target_location_id,
                     },
                 )
-                .await?;
-            created.extend(tasks);
+                .await
+            {
+                Ok(tasks) => created.extend(tasks),
+                Err(ReplenishmentError::PutawayBlocked)
+                | Err(ReplenishmentError::SourceUnavailable)
+                | Err(ReplenishmentError::StrategyInvalid)
+                | Err(ReplenishmentError::ScopeNotFound) => {}
+                Err(error) => return Err(error),
+            }
         }
         Ok(created)
     }

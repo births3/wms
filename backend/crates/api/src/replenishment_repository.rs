@@ -445,7 +445,16 @@ impl PgReplenishmentRepository {
                        - batch.qty_replenish_out_transit AS available_qty,
                    location.location_type,
                    location.lock_status,
-                   container.current_lock_category
+                   container.current_lock_category,
+                   container.id AS container_id,
+                   COALESCE((
+                        SELECT SUM(peer.qty_on_hand)
+                          FROM inventory_batches peer
+                         WHERE peer.owner_id = batch.owner_id
+                           AND peer.location_id = batch.location_id
+                           AND peer.container_lpn IS NOT NULL
+                           AND peer.container_lpn = batch.container_lpn
+                   ), 0) AS lpn_on_hand
               FROM inventory_batches batch
               JOIN warehouse_locations location
                 ON location.id = batch.location_id
@@ -483,7 +492,16 @@ impl PgReplenishmentRepository {
                        - batch.qty_replenish_out_transit AS available_qty,
                    location.location_type,
                    location.lock_status,
-                   container.current_lock_category
+                   container.current_lock_category,
+                   container.id AS container_id,
+                   COALESCE((
+                        SELECT SUM(peer.qty_on_hand)
+                          FROM inventory_batches peer
+                         WHERE peer.owner_id = batch.owner_id
+                           AND peer.location_id = batch.location_id
+                           AND peer.container_lpn IS NOT NULL
+                           AND peer.container_lpn = batch.container_lpn
+                   ), 0) AS lpn_on_hand
               FROM inventory_batches batch
               JOIN warehouse_locations location
                 ON location.id = batch.location_id
@@ -511,67 +529,6 @@ impl PgReplenishmentRepository {
         .bind(min_qty)
         .fetch_optional(&mut **tx)
         .await
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub async fn insert_task(
-        &self,
-        tx: &mut Transaction<'_, Postgres>,
-        owner_id: Uuid,
-        id: Uuid,
-        task_no: &str,
-        trigger_mode: &str,
-        priority: &str,
-        strategy_id: Option<Uuid>,
-        source: &SourceBatchLock,
-        source_lpn_id: Option<Uuid>,
-        target_location_id: Uuid,
-        product_id: Uuid,
-        qty: Quantity,
-        created_by: &str,
-        wave_id: Option<Uuid>,
-        outbound_order_id: Option<Uuid>,
-        outbound_line_no: Option<i32>,
-    ) -> Result<ReplenishmentTask, sqlx::Error> {
-        sqlx::query_as::<_, TaskRow>(
-            r#"
-            INSERT INTO replenishment_tasks (
-                id, owner_id, task_no, trigger_mode, priority, strategy_id,
-                source_location_id, source_batch_id, source_lpn_id, target_location_id,
-                product_id, batch_no, qty, status, created_by,
-                wave_id, outbound_order_id, outbound_line_no
-            ) VALUES (
-                $1, $2, $3, $4, $5, $6,
-                $7, $8, $9, $10,
-                $11, $12, $13, 'pending', $14,
-                $15, $16, $17
-            )
-            RETURNING id, owner_id, task_no, trigger_mode, priority, strategy_id,
-                      source_location_id, source_batch_id, source_lpn_id, target_location_id,
-                      product_id, batch_no, qty, picked_qty, done_qty, status,
-                      operator_id, created_by, version
-            "#,
-        )
-        .bind(id)
-        .bind(owner_id)
-        .bind(task_no)
-        .bind(trigger_mode)
-        .bind(priority)
-        .bind(strategy_id)
-        .bind(source.location_id)
-        .bind(source.id)
-        .bind(source_lpn_id)
-        .bind(target_location_id)
-        .bind(product_id)
-        .bind(&source.batch_no)
-        .bind(qty)
-        .bind(created_by)
-        .bind(wave_id)
-        .bind(outbound_order_id)
-        .bind(outbound_line_no)
-        .fetch_one(&mut **tx)
-        .await
-        .map(Into::into)
     }
 
     pub async fn find_wave_gap_strategy(
@@ -725,7 +682,7 @@ pub struct WaveGapLine {
     pub outbound_line_no: i32,
     pub product_id: Uuid,
     pub demand_qty: Quantity,
-    pub target_location_id: Uuid,
+    pub warehouse_id: Uuid,
 }
 
 #[derive(sqlx::FromRow)]
@@ -739,6 +696,8 @@ pub struct SourceBatchLock {
     pub location_type: String,
     pub lock_status: String,
     pub current_lock_category: Option<String>,
+    pub container_id: Option<Uuid>,
+    pub lpn_on_hand: Quantity,
 }
 
 #[derive(sqlx::FromRow)]
@@ -762,6 +721,13 @@ struct TaskRow {
     operator_id: Option<Uuid>,
     created_by: String,
     version: i64,
+    wave_id: Option<Uuid>,
+    outbound_order_id: Option<Uuid>,
+    outbound_line_no: Option<i32>,
+    claimed_at: Option<chrono::DateTime<chrono::Utc>>,
+    last_progress_at: Option<chrono::DateTime<chrono::Utc>>,
+    return_reason: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl From<TaskRow> for ReplenishmentTask {
@@ -786,6 +752,13 @@ impl From<TaskRow> for ReplenishmentTask {
             operator_id: row.operator_id,
             created_by: row.created_by,
             version: row.version,
+            wave_id: row.wave_id,
+            outbound_order_id: row.outbound_order_id,
+            outbound_line_no: row.outbound_line_no,
+            claimed_at: row.claimed_at,
+            last_progress_at: row.last_progress_at,
+            return_reason: row.return_reason,
+            created_at: row.created_at,
         }
     }
 }

@@ -1,12 +1,110 @@
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
-use wms_domain::{ReplenishmentStrategy, ReplenishmentTask};
+use wms_domain::{task_qty, Quantity, ReplenishmentStrategy, ReplenishmentTask};
 
-use super::{ReplenishmentError, ReplenishmentService, MANAGE};
+use super::{resolve_source_lpn, ReplenishmentError, ReplenishmentService, MANAGE};
 use crate::{auth::AuthContext, h2_lifecycle::publish_event_in_tx};
 
 impl ReplenishmentService {
+    pub async fn generate_task(
+        &self,
+        ctx: &AuthContext,
+        strategy_id: Uuid,
+        target_location_id: Uuid,
+        product_id: Uuid,
+    ) -> Result<Vec<ReplenishmentTask>, ReplenishmentError> {
+        ctx.require_permission(MANAGE)
+            .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        let strategy = self
+            .repo
+            .get_strategy(ctx.owner_id, strategy_id)
+            .await?
+            .ok_or(ReplenishmentError::TaskNotFound)?;
+        if !strategy.enabled || !strategy.trigger_modes.iter().any(|mode| mode == "min_max") {
+            return Ok(Vec::new());
+        }
+        let mut tx = self.repo.pool().begin().await?;
+        let target = self
+            .repo
+            .load_location_route(&mut tx, ctx.owner_id, target_location_id)
+            .await?
+            .ok_or(ReplenishmentError::ScopeNotFound)?;
+        if target.replenish_strategy_id != Some(strategy.id) {
+            return Ok(Vec::new());
+        }
+        let available = self
+            .repo
+            .pick_available_qty(&mut tx, ctx.owner_id, target_location_id, product_id)
+            .await?;
+        if available > strategy.min_safety_threshold {
+            return Ok(Vec::new());
+        }
+        let pack = self
+            .repo
+            .default_pack_ratio(&mut tx, ctx.owner_id, product_id)
+            .await?;
+        let mut remaining = strategy.max_replenish_target - available;
+        let mut created = Vec::new();
+        while remaining >= Quantity::from(pack) {
+            let Some(source) = self
+                .repo
+                .lock_fefo_source(
+                    &mut tx,
+                    ctx.owner_id,
+                    product_id,
+                    &strategy.source_type,
+                    Quantity::from(pack),
+                )
+                .await?
+            else {
+                if created.is_empty() {
+                    return Err(ReplenishmentError::SourceUnavailable);
+                }
+                break;
+            };
+            self.ensure_source_ok(&source, &strategy.source_type, None)?;
+            let qty = task_qty(remaining, source.available_qty, pack);
+            if qty <= Quantity::ZERO {
+                break;
+            }
+            match self
+                .ensure_target_putaway(
+                    ctx.owner_id,
+                    &target,
+                    &strategy.target_type,
+                    product_id,
+                    qty,
+                )
+                .await
+            {
+                Ok(()) => {}
+                Err(ReplenishmentError::PutawayBlocked) if !created.is_empty() => break,
+                Err(error) => return Err(error),
+            }
+            let source_lpn_id = resolve_source_lpn(&source, qty, &strategy.source_type);
+            let task = self
+                .persist_task(
+                    &mut tx,
+                    ctx,
+                    &source,
+                    target_location_id,
+                    qty,
+                    "min_max",
+                    "normal",
+                    Some(strategy.id),
+                    source_lpn_id,
+                    "system:min_max",
+                    None,
+                )
+                .await?;
+            remaining -= qty;
+            created.push(task);
+        }
+        tx.commit().await?;
+        Ok(created)
+    }
+
     pub async fn run_min_max_patrol(
         &self,
         now: DateTime<Utc>,
@@ -26,8 +124,7 @@ impl ReplenishmentService {
                         .generate_task(&ctx, strategy.id, location_id, product_id)
                         .await
                     {
-                        Ok(Some(task)) => created.push(task),
-                        Ok(None) => {}
+                        Ok(tasks) => created.extend(tasks),
                         Err(ReplenishmentError::SourceUnavailable)
                         | Err(ReplenishmentError::PutawayBlocked) => {
                             self.write_patrol_fail(

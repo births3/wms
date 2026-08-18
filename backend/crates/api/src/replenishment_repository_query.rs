@@ -64,27 +64,7 @@ impl PgReplenishmentRepository {
                    line.line_no,
                    product.id,
                    line.planned_qty,
-                   COALESCE(
-                        (
-                            SELECT location.id
-                              FROM warehouse_locations location
-                             WHERE location.owner_id = outbound.owner_id
-                               AND location.warehouse_id = outbound.warehouse_id
-                               AND location.location_type IN ('piece_pick', 'case_pick')
-                               AND location.replenish_strategy_id IS NOT NULL
-                             ORDER BY location.pick_sequence_no ASC NULLS LAST, location.location_code
-                             LIMIT 1
-                        ),
-                        (
-                            SELECT location.id
-                              FROM warehouse_locations location
-                             WHERE location.owner_id = outbound.owner_id
-                               AND location.warehouse_id = outbound.warehouse_id
-                               AND location.location_type IN ('piece_pick', 'case_pick')
-                             ORDER BY location.pick_sequence_no ASC NULLS LAST, location.location_code
-                             LIMIT 1
-                        )
-                   )
+                   outbound.warehouse_id
               FROM outbound_wave_orders wave_order
               JOIN outbound_orders outbound
                 ON outbound.id = wave_order.outbound_order_id
@@ -112,18 +92,96 @@ impl PgReplenishmentRepository {
                         outbound_line_no,
                         product_id,
                         demand_qty,
-                        target_location_id,
+                        warehouse_id,
                     )| WaveGapLine {
                         wave_id,
                         outbound_order_id,
                         outbound_line_no,
                         product_id,
                         demand_qty,
-                        target_location_id,
+                        warehouse_id,
                     },
                 )
                 .collect()
         })
+    }
+
+    pub async fn list_pick_target_candidates(
+        &self,
+        owner_id: Uuid,
+        warehouse_id: Uuid,
+        product_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT location.id
+              FROM warehouse_locations location
+             WHERE location.owner_id = $1
+               AND location.warehouse_id = $2
+               AND location.location_type IN ('piece_pick', 'case_pick')
+               AND location.status <> 'disabled'
+               AND (
+                    EXISTS (
+                        SELECT 1
+                          FROM inventory_batches batch
+                         WHERE batch.owner_id = location.owner_id
+                           AND batch.location_id = location.id
+                           AND batch.product_id = $3
+                    )
+                    OR location.replenish_strategy_id IS NOT NULL
+               )
+             ORDER BY
+               EXISTS (
+                    SELECT 1
+                      FROM inventory_batches batch
+                     WHERE batch.owner_id = location.owner_id
+                       AND batch.location_id = location.id
+                       AND batch.product_id = $3
+               ) DESC,
+               (location.replenish_strategy_id IS NOT NULL) DESC,
+               location.pick_sequence_no ASC NULLS LAST,
+               location.location_code
+            "#,
+        )
+        .bind(owner_id)
+        .bind(warehouse_id)
+        .bind(product_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn location_has_work_lock(
+        &self,
+        owner_id: Uuid,
+        location_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                  FROM inventory_count_lines line
+                  JOIN inventory_counts count_sheet
+                    ON count_sheet.id = line.count_id
+                   AND count_sheet.owner_id = line.owner_id
+                 WHERE line.owner_id = $1
+                   AND line.location_id = $2
+                   AND count_sheet.status IN ('in_progress', 'pending_approval')
+                UNION ALL
+                SELECT 1
+                  FROM inventory_maintenance_tasks task
+                  JOIN inventory_batches batch
+                    ON batch.id = task.inventory_batch_id
+                   AND batch.owner_id = task.owner_id
+                 WHERE task.owner_id = $1
+                   AND batch.location_id = $2
+                   AND task.status = 'pending'
+            )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .fetch_one(&self.pool)
+        .await
     }
 
     pub async fn recent_patrol_fail_times(

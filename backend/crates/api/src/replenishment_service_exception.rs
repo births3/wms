@@ -100,7 +100,13 @@ impl ReplenishmentService {
             ctx.owner_id,
             &saved,
             "replenishment.cancelled",
-            json!({ "task_id": saved.id, "reason": req.reason }),
+            json!({
+                "task_id": saved.id,
+                "reason": req.reason,
+                "wave_id": saved.wave_id,
+                "outbound_order_id": saved.outbound_order_id,
+                "outbound_line_no": saved.outbound_line_no
+            }),
         )
         .await?;
         store_job(&mut tx, ctx, idempotency_key, &hash, &path, &saved).await?;

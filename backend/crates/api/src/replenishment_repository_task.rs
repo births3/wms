@@ -3,7 +3,7 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{Quantity, ReplenishmentTask};
 
-use super::{PgReplenishmentRepository, TaskRow};
+use super::{PgReplenishmentRepository, SourceBatchLock, TaskRow};
 
 pub struct ExecuteListFilter {
     pub user_id: Uuid,
@@ -56,7 +56,9 @@ impl PgReplenishmentRepository {
             SELECT t.id, t.owner_id, t.task_no, t.trigger_mode, t.priority, t.strategy_id,
                    t.source_location_id, t.source_batch_id, t.source_lpn_id, t.target_location_id,
                    t.product_id, t.batch_no, t.qty, t.picked_qty, t.done_qty, t.status, t.operator_id,
-                   t.created_by, t.version
+                   t.created_by, t.version,
+                   t.wave_id, t.outbound_order_id, t.outbound_line_no,
+                   t.claimed_at, t.last_progress_at, t.return_reason, t.created_at
               FROM replenishment_tasks t
               JOIN warehouse_locations loc
                 ON loc.id = t.target_location_id
@@ -104,7 +106,9 @@ impl PgReplenishmentRepository {
             SELECT id, owner_id, task_no, trigger_mode, priority, strategy_id,
                    source_location_id, source_batch_id, source_lpn_id, target_location_id,
                    product_id, batch_no, qty, picked_qty, done_qty, status, operator_id,
-                   created_by, version
+                   created_by, version,
+                   wave_id, outbound_order_id, outbound_line_no,
+                   claimed_at, last_progress_at, return_reason, created_at
               FROM replenishment_tasks
              WHERE owner_id = $1 AND id = $2
             "#,
@@ -249,7 +253,9 @@ impl PgReplenishmentRepository {
             SELECT id, owner_id, task_no, trigger_mode, priority, strategy_id,
                    source_location_id, source_batch_id, source_lpn_id, target_location_id,
                    product_id, batch_no, qty, picked_qty, done_qty, status,
-                   operator_id, created_by, version
+                   operator_id, created_by, version,
+                   wave_id, outbound_order_id, outbound_line_no,
+                   claimed_at, last_progress_at, return_reason, created_at
               FROM replenishment_tasks
              WHERE owner_id = $1 AND id = $2
              FOR UPDATE
@@ -378,7 +384,9 @@ impl PgReplenishmentRepository {
             RETURNING id, owner_id, task_no, trigger_mode, priority, strategy_id,
                       source_location_id, source_batch_id, source_lpn_id, target_location_id,
                       product_id, batch_no, qty, picked_qty, done_qty, status,
-                      operator_id, created_by, version
+                      operator_id, created_by, version,
+                      wave_id, outbound_order_id, outbound_line_no,
+                      claimed_at, last_progress_at, return_reason, created_at
             "#,
         )
         .bind(task.owner_id)
@@ -442,7 +450,9 @@ impl PgReplenishmentRepository {
             RETURNING id, owner_id, task_no, trigger_mode, priority, strategy_id,
                       source_location_id, source_batch_id, source_lpn_id, target_location_id,
                       product_id, batch_no, qty, picked_qty, done_qty, status,
-                      operator_id, created_by, version
+                      operator_id, created_by, version,
+                      wave_id, outbound_order_id, outbound_line_no,
+                      claimed_at, last_progress_at, return_reason, created_at
             "#,
         )
         .bind(task.owner_id)
@@ -488,5 +498,68 @@ impl PgReplenishmentRepository {
         .execute(&mut **tx)
         .await?;
         Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_task(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        id: Uuid,
+        task_no: &str,
+        trigger_mode: &str,
+        priority: &str,
+        strategy_id: Option<Uuid>,
+        source: &SourceBatchLock,
+        source_lpn_id: Option<Uuid>,
+        target_location_id: Uuid,
+        product_id: Uuid,
+        qty: Quantity,
+        created_by: &str,
+        wave_id: Option<Uuid>,
+        outbound_order_id: Option<Uuid>,
+        outbound_line_no: Option<i32>,
+    ) -> Result<ReplenishmentTask, sqlx::Error> {
+        sqlx::query_as::<_, TaskRow>(
+            r#"
+            INSERT INTO replenishment_tasks (
+                id, owner_id, task_no, trigger_mode, priority, strategy_id,
+                source_location_id, source_batch_id, source_lpn_id, target_location_id,
+                product_id, batch_no, qty, status, created_by,
+                wave_id, outbound_order_id, outbound_line_no
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                $7, $8, $9, $10,
+                $11, $12, $13, 'pending', $14,
+                $15, $16, $17
+            )
+            RETURNING id, owner_id, task_no, trigger_mode, priority, strategy_id,
+                      source_location_id, source_batch_id, source_lpn_id, target_location_id,
+                      product_id, batch_no, qty, picked_qty, done_qty, status,
+                      operator_id, created_by, version,
+                      wave_id, outbound_order_id, outbound_line_no,
+                      claimed_at, last_progress_at, return_reason, created_at
+            "#,
+        )
+        .bind(id)
+        .bind(owner_id)
+        .bind(task_no)
+        .bind(trigger_mode)
+        .bind(priority)
+        .bind(strategy_id)
+        .bind(source.location_id)
+        .bind(source.id)
+        .bind(source_lpn_id)
+        .bind(target_location_id)
+        .bind(product_id)
+        .bind(&source.batch_no)
+        .bind(qty)
+        .bind(created_by)
+        .bind(wave_id)
+        .bind(outbound_order_id)
+        .bind(outbound_line_no)
+        .fetch_one(&mut **tx)
+        .await
+        .map(Into::into)
     }
 }

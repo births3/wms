@@ -1,5 +1,6 @@
 //! Phase 2 补货领域不变量（US-M3-012 / ADR-0048）。无 IO。
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -237,6 +238,13 @@ pub struct ReplenishmentTask {
     pub operator_id: Option<Uuid>,
     pub created_by: String,
     pub version: i64,
+    pub wave_id: Option<Uuid>,
+    pub outbound_order_id: Option<Uuid>,
+    pub outbound_line_no: Option<i32>,
+    pub claimed_at: Option<DateTime<Utc>>,
+    pub last_progress_at: Option<DateTime<Utc>>,
+    pub return_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
