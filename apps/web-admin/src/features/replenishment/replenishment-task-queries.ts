@@ -55,7 +55,6 @@ export function useReplenishmentTasksQuery() {
   return useQuery<ReplenishmentTaskListResponse, ApiError>({
     queryKey: replenishmentTasksQueryKey,
     queryFn: async () => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.GET("/api/v1/replenishment/tasks");
       return asData<ReplenishmentTaskListResponse>(result, "读取补货任务失败");
     },
@@ -67,7 +66,6 @@ export function useCreateReplenishmentTaskMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (body: CreateReplenishmentTaskRequest) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.POST("/api/v1/replenishment/tasks", {
         params: { header: { "Idempotency-Key": idempotencyKey() } },
         body,
@@ -82,7 +80,6 @@ export function useCancelReplenishmentTaskMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; version: number; reason: string }) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.POST("/api/v1/replenishment/tasks/{id}/cancel", {
         params: { path: { id: input.id }, header: { "Idempotency-Key": idempotencyKey() } },
         body: { version: input.version, reason: input.reason },
@@ -97,7 +94,6 @@ export function useReassignReplenishmentTaskMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; version: number }) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.POST("/api/v1/replenishment/tasks/{id}/reassign", {
         params: { path: { id: input.id }, header: { "Idempotency-Key": idempotencyKey() } },
         body: { version: input.version },

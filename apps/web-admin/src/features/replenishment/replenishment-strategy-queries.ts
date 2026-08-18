@@ -59,11 +59,6 @@ export type ReplenishmentLocationGroup = {
 export const replenishmentStrategiesQueryKey = ["replenishment", "strategies"] as const;
 export const replenishmentLocationGroupsQueryKey = ["replenishment", "location-groups"] as const;
 
-type UntypedCall = (
-  url: string,
-  init?: object,
-) => Promise<{ data?: unknown; error?: unknown; response: { status: number } }>;
-
 function idempotencyKey() {
   return `web-m3-replenishment-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
 }
@@ -79,7 +74,6 @@ export function useReplenishmentStrategiesQuery() {
   return useQuery<ReplenishmentStrategyListResponse, ApiError>({
     queryKey: replenishmentStrategiesQueryKey,
     queryFn: async () => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.GET("/api/v1/replenishment/strategies");
       return asData<ReplenishmentStrategyListResponse>(result, "读取补货策略失败");
     },
@@ -91,7 +85,6 @@ export function useCreateReplenishmentStrategyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (body: UpsertReplenishmentStrategyRequest) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.POST("/api/v1/replenishment/strategies", {
         params: { header: { "Idempotency-Key": idempotencyKey() } },
         body,
@@ -106,7 +99,6 @@ export function useUpdateReplenishmentStrategyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; body: UpsertReplenishmentStrategyRequest }) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.PUT("/api/v1/replenishment/strategies/{id}", {
         params: { path: { id: input.id }, header: { "Idempotency-Key": idempotencyKey() } },
         body: input.body,
@@ -121,9 +113,8 @@ export function useDisableReplenishmentStrategyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const post = api.POST as UntypedCall;
-      const result = await post(`/api/v1/replenishment/strategies/${id}/disable`, {
-        params: { header: { "Idempotency-Key": idempotencyKey() } },
+      const result = await api.POST("/api/v1/replenishment/strategies/{id}/disable", {
+        params: { path: { id }, header: { "Idempotency-Key": idempotencyKey() } },
       });
       return asData<ReplenishmentStrategy>(result, "停用补货策略失败");
     },
@@ -134,7 +125,6 @@ export function useDisableReplenishmentStrategyMutation() {
 export function usePreviewReplenishmentStrategyMutation() {
   return useMutation({
     mutationFn: async (id: string) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.GET("/api/v1/replenishment/strategies/{id}/preview", {
         params: { path: { id } },
       });
@@ -147,7 +137,6 @@ export function useBindReplenishmentLocationsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; location_ids: string[] }) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.PUT("/api/v1/replenishment/strategies/{id}/locations", {
         params: { path: { id: input.id }, header: { "Idempotency-Key": idempotencyKey() } },
         body: { location_ids: input.location_ids },
@@ -162,8 +151,7 @@ export function useReplenishmentLocationGroupsQuery() {
   return useQuery<ReplenishmentLocationGroup[], ApiError>({
     queryKey: replenishmentLocationGroupsQueryKey,
     queryFn: async () => {
-      const get = api.GET as UntypedCall;
-      const result = await get("/api/v1/replenishment/location-groups");
+      const result = await api.GET("/api/v1/replenishment/location-groups");
       if (!result.data) {
         return [];
       }
@@ -183,7 +171,6 @@ export function useUpsertReplenishmentLocationGroupMutation() {
       enabled: boolean;
       location_ids: string[];
     }) => {
-      // @ts-expect-error 补货路径由 T14 openapi-sync 收口
       const result = await api.POST("/api/v1/replenishment/location-groups", {
         params: { header: { "Idempotency-Key": idempotencyKey() } },
         body,
