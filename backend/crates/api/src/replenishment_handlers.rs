@@ -17,8 +17,9 @@ use wms_domain::{
     CreateReplenishmentTaskRequest, ErrorResponse, PickReplenishmentTaskRequest,
     ReassignReplenishmentTaskRequest, ReplenishmentLocationGroup,
     ReplenishmentLocationGroupListResponse, ReplenishmentPreviewResponse, ReplenishmentStrategy,
-    ReplenishmentStrategyListResponse, ReplenishmentTask, ReturnReplenishmentTaskRequest,
-    UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
+    ReplenishmentStrategyListResponse, ReplenishmentTask, ReplenishmentTaskListResponse,
+    ReturnReplenishmentTaskRequest, UpsertReplenishmentLocationGroupRequest,
+    UpsertReplenishmentStrategyRequest,
 };
 
 use crate::{
@@ -71,7 +72,10 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
             "/api/v1/replenishment/location-groups",
             get(list_location_groups_handler).post(create_location_group_handler),
         )
-        .route("/api/v1/replenishment/tasks", post(create_task_handler))
+        .route(
+            "/api/v1/replenishment/tasks",
+            get(list_tasks_handler).post(create_task_handler),
+        )
         .route(
             "/api/v1/replenishment/tasks/:id/claim",
             post(claim_task_handler),
@@ -273,6 +277,28 @@ async fn confirm_task_handler(
     require_execute(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok(Json(state.service.confirm_task(&ctx, id, req, &key).await?))
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+struct ListTasksQuery {
+    status: Option<String>,
+    trigger_mode: Option<String>,
+}
+
+async fn list_tasks_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Query(query): Query<ListTasksQuery>,
+) -> Result<Json<ReplenishmentTaskListResponse>, ReplenishmentHandlerError> {
+    if require_manage(&ctx).is_err() {
+        require_execute(&ctx)?;
+    }
+    Ok(Json(
+        state
+            .service
+            .list_tasks(&ctx, query.status.as_deref(), query.trigger_mode.as_deref())
+            .await?,
+    ))
 }
 
 async fn create_task_handler(

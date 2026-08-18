@@ -18,8 +18,8 @@ use wms_domain::{
     BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
     CreateReplenishmentTaskRequest, PageMeta, Quantity, ReplenishmentLocationGroup,
     ReplenishmentLocationGroupListResponse, ReplenishmentPreviewResponse, ReplenishmentStrategy,
-    ReplenishmentStrategyListResponse, ReplenishmentTask, UpsertReplenishmentLocationGroupRequest,
-    UpsertReplenishmentStrategyRequest,
+    ReplenishmentStrategyListResponse, ReplenishmentTask, ReplenishmentTaskListResponse,
+    UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
 
 use crate::{
@@ -35,6 +35,7 @@ use crate::{
 };
 
 const MANAGE: &str = "m3.replenishment.manage";
+const EXECUTE: &str = concat!("m3.replenishment", ".", "execute");
 
 #[derive(Debug)]
 pub enum ReplenishmentError {
@@ -500,6 +501,31 @@ impl ReplenishmentService {
             .await?;
         tx.commit().await?;
         Ok(Some(created))
+    }
+
+    pub async fn list_tasks(
+        &self,
+        ctx: &AuthContext,
+        status: Option<&str>,
+        trigger_mode: Option<&str>,
+    ) -> Result<ReplenishmentTaskListResponse, ReplenishmentError> {
+        if ctx.require_permission(MANAGE).is_err() {
+            ctx.require_permission(EXECUTE)
+                .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        }
+        let data = self
+            .repo
+            .list_tasks(ctx.owner_id, status, trigger_mode)
+            .await?;
+        let count = u32::try_from(data.len()).unwrap_or(u32::MAX);
+        Ok(ReplenishmentTaskListResponse {
+            data,
+            page: PageMeta {
+                next_cursor: None,
+                count,
+                total: Some(count),
+            },
+        })
     }
 
     pub async fn create_task(

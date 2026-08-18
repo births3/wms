@@ -125,6 +125,19 @@ pub(crate) fn preview_replenishment_strategy() {}
 pub(crate) fn create_replenishment_location_group() {}
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/replenishment/tasks",
+    tag = "replenishment",
+    params(
+        ("status" = Option<String>, Query, description = "任务状态"),
+        ("trigger_mode" = Option<String>, Query, description = "触发模式"),
+    ),
+    responses((status = 200, description = "补货任务列表", body = ReplenishmentTaskListResponse)),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_replenishment_tasks() {}
+
+#[utoipa::path(
     post,
     path = "/api/v1/replenishment/tasks",
     tag = "replenishment",

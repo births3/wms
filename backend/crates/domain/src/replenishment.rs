@@ -240,6 +240,12 @@ pub struct ReplenishmentTask {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReplenishmentTaskListResponse {
+    pub data: Vec<ReplenishmentTask>,
+    pub page: PageMeta,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ClaimReplenishmentTaskRequest {
     pub version: i64,
 }

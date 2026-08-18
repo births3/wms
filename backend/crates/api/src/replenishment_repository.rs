@@ -8,8 +8,7 @@ mod task;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
-    BindReplenishmentLocationsResponse, Quantity, ReplenishmentLocationGroup,
-    ReplenishmentPreviewItem, ReplenishmentStrategy, ReplenishmentTask,
+    Quantity, ReplenishmentLocationGroup, ReplenishmentStrategy, ReplenishmentTask,
     UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
 

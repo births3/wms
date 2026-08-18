@@ -6,6 +6,33 @@ use wms_domain::{Quantity, ReplenishmentTask};
 use super::{PgReplenishmentRepository, TaskRow};
 
 impl PgReplenishmentRepository {
+    pub async fn list_tasks(
+        &self,
+        owner_id: Uuid,
+        status: Option<&str>,
+        trigger_mode: Option<&str>,
+    ) -> Result<Vec<ReplenishmentTask>, sqlx::Error> {
+        sqlx::query_as::<_, TaskRow>(
+            r#"
+            SELECT id, owner_id, task_no, trigger_mode, priority, strategy_id,
+                   source_location_id, source_batch_id, source_lpn_id, target_location_id,
+                   product_id, batch_no, qty, picked_qty, done_qty, status, operator_id,
+                   created_by, version
+              FROM replenishment_tasks
+             WHERE owner_id = $1
+               AND ($2::text IS NULL OR status = $2)
+               AND ($3::text IS NULL OR trigger_mode = $3)
+             ORDER BY CASE WHEN priority = 'urgent' THEN 0 ELSE 1 END, created_at
+            "#,
+        )
+        .bind(owner_id)
+        .bind(status)
+        .bind(trigger_mode)
+        .fetch_all(&self.pool)
+        .await
+        .map(|rows| rows.into_iter().map(Into::into).collect())
+    }
+
     pub async fn list_task_owner_ids(&self) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
             r#"
