@@ -6021,25 +6021,42 @@ module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
 frontend_pages = ["m3-replenishment-strategies", "m3-replenishment-tasks"]
-navigation_checks = ["node apps/web-admin/self-checks/m3-replenishment-strategy-self-check.mjs"]
+navigation_checks = [
+  "node apps/web-admin/self-checks/m3-replenishment-strategy-self-check.mjs",
+  "node apps/web-admin/self-checks/m3-replenishment-task-self-check.mjs",
+]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
 e2e_screenshots = [
   { page = "m3-replenishment-strategies", spec = "prototypes/e2e/web-admin-m3-replenishment-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-replenishment-strategies/strategy-saved.png" },
   { page = "m3-replenishment-tasks", spec = "prototypes/e2e/web-admin-m3-replenishment-task-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-replenishment-tasks/task-board.png" },
 ]
 api_paths = [
+  "GET /api/v1/replenishment/strategies",
+  "GET /api/v1/replenishment/strategies/{id}",
+  "POST /api/v1/replenishment/strategies",
+  "PUT /api/v1/replenishment/strategies/{id}",
+  "POST /api/v1/replenishment/strategies/{id}/disable",
+  "PUT /api/v1/replenishment/strategies/{id}/locations",
+  "GET /api/v1/replenishment/strategies/{id}/preview",
+  "GET /api/v1/replenishment/location-groups",
+  "GET /api/v1/replenishment/location-groups/{id}",
+  "POST /api/v1/replenishment/location-groups",
+  "PUT /api/v1/replenishment/location-groups/{id}",
+  "POST /api/v1/replenishment/location-groups/{id}/disable",
   "GET /api/v1/replenishment/tasks",
+  "GET /api/v1/replenishment/tasks/{id}",
   "POST /api/v1/replenishment/tasks",
   "POST /api/v1/replenishment/tasks/{id}/claim",
+  "POST /api/v1/replenishment/tasks/{id}/pick",
   "POST /api/v1/replenishment/tasks/{id}/confirm",
   "POST /api/v1/replenishment/tasks/{id}/cancel",
-  "GET /api/v1/replenishment/strategies",
-  "PUT /api/v1/replenishment/strategies/{id}",
+  "POST /api/v1/replenishment/tasks/{id}/reassign",
+  "POST /api/v1/replenishment/tasks/{id}/return",
 ]
-database_objects = ["replenishment_tasks", "replenishment_strategies", "replenishment_location_groups", "replenishment_location_group_members", "inventory_batches"]
-reason = "Phase 2 策略配置页已落地；任务大盘、PDA 作业契约与质量矩阵全路径仍待 T12-T14 收口。"
+database_objects = ["replenishment_tasks", "replenishment_strategies", "replenishment_location_groups", "replenishment_location_group_members", "inventory_batches", "alert_definitions"]
+reason = "Phase 2 已实施：策略/任务 API、PC 页、execute 列表契约与 H4 种子已落地。PDA 生产 UI 受 ADR-0027 阻断，真实 E2E 截图仍待补齐。"
 owner = "M3 库内作业模块负责人"
-resume_when = "T12-T14 完成后迁出 deferred。"
+resume_when = "ADR-0027 Accepted 且真实 E2E 截图补齐后迁出 deferred。"
 evidence_refs = [
   "prototypes/e2e/web-admin-m3-replenishment-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m3-replenishment-strategies/strategy-saved.png",
