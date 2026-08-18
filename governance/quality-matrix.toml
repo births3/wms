@@ -6020,11 +6020,12 @@ title = "补货作业"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
-frontend_pages = ["m3-replenishment-strategies"]
+frontend_pages = ["m3-replenishment-strategies", "m3-replenishment-tasks"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-replenishment-strategy-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
 e2e_screenshots = [
   { page = "m3-replenishment-strategies", spec = "prototypes/e2e/web-admin-m3-replenishment-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-replenishment-strategies/strategy-saved.png" },
+  { page = "m3-replenishment-tasks", spec = "prototypes/e2e/web-admin-m3-replenishment-task-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-replenishment-tasks/task-board.png" },
 ]
 api_paths = [
   "GET /api/v1/replenishment/tasks",
@@ -6043,4 +6044,7 @@ evidence_refs = [
   "prototypes/e2e/web-admin-m3-replenishment-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m3-replenishment-strategies/strategy-saved.png",
   "apps/web-admin/self-checks/m3-replenishment-strategy-self-check.mjs",
+  "prototypes/e2e/web-admin-m3-replenishment-task-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m3-replenishment-tasks/task-board.png",
+  "apps/web-admin/self-checks/m3-replenishment-task-self-check.mjs",
 ]
