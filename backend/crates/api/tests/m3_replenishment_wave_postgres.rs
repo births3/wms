@@ -541,3 +541,71 @@ async fn fill_wave_pick_gaps_skips_putaway_blocked_without_failing(pool: PgPool)
         .expect("fill must not fail");
     assert!(created.is_empty());
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn fill_wave_pick_gaps_prefers_outbound_pick_task_location(pool: PgPool) {
+    let world = seed_world(&pool, 0, 30).await;
+    insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
+    let warehouse_id: Uuid = sqlx::query_scalar(
+        "SELECT warehouse_id FROM warehouse_locations WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.pick_id)
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("warehouse");
+    let zone_id: Uuid = sqlx::query_scalar(
+        "SELECT zone_id FROM warehouse_locations WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.pick_id)
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("zone");
+    let assigned = seed_loc(
+        &pool,
+        world.owner_id,
+        warehouse_id,
+        zone_id,
+        "PP-09",
+        "piece_pick",
+    )
+    .await;
+    let wave_id = Uuid::new_v4();
+    insert_wave_order(&pool, &world, wave_id, 8).await;
+    let order_id: Uuid = sqlx::query_scalar(
+        "SELECT outbound_order_id FROM outbound_wave_orders WHERE wave_id = $1 AND owner_id = $2",
+    )
+    .bind(wave_id)
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("order");
+    sqlx::query(
+        r#"
+        INSERT INTO outbound_pick_tasks (
+            id, owner_id, wave_id, outbound_order_id, line_no, batch_id,
+            product_code, batch_no, location_id, location_code, planned_qty, route_sequence
+        ) VALUES (
+            $1, $2, $3, $4, 1, $5, $6, 'B-SRC', $7, 'PP-09', 8, 1
+        )
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(world.owner_id)
+    .bind(wave_id)
+    .bind(order_id)
+    .bind(world.source_batch_id)
+    .bind(format!("P-{}", &world.product_id.simple().to_string()[..8]))
+    .bind(assigned)
+    .execute(&pool)
+    .await
+    .expect("pick task");
+    let created = service(pool)
+        .fill_wave_pick_gaps(world.owner_id, wave_id)
+        .await
+        .expect("fill");
+    assert_eq!(created.len(), 1);
+    assert_eq!(created[0].target_location_id, assigned);
+    assert_ne!(created[0].target_location_id, world.pick_id);
+}
