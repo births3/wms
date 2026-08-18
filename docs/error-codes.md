@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
 > 时间：2026-07-21
-> 版本：v3.11（当前 203 项）
+> 版本：v3.13（当前 224 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -76,10 +76,10 @@
 | 级别 | 数量 | 主要场景 |
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
-| warning | 64 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 131 | 业务异常（数据冲突 / 校验失败）|
+| warning | 80 | 业务规则拦截（库存不足 / 资质过期等）|
+| error | 133 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **206** | — |
+| **合计** | **224** | — |
 
 ---
 
@@ -97,7 +97,7 @@
 | H_AL | 28 | 告警引擎 |
 | M1 | 32 | 主数据校验 / 配置中心 |
 | M2 | 18 | 入库流程 |
-| M3 | 8 | 库存与状态 |
+| M3 | 26 | 库存与状态 / 补货 |
 | M4 | 10 | 出库与拣选 |
 | M_VR | 10 | 规则引擎与双人策略 |
 | M_QL | 1 | 质量联系单 |
@@ -1894,6 +1894,222 @@ error_codes:
     related_stories: [US-M3-002]
     introduced_in: v3.1
 
+  - code: M3_REPLENISH_PERMISSION_DENIED
+    module: M3
+    category: REPLENISH
+    detail: PERMISSION_DENIED
+    http_status: 403
+    severity: error
+    message_zh: '补货权限不足'
+    message_en: 'Replenishment permission denied'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_STRATEGY_INVALID
+    module: M3
+    category: REPLENISH
+    detail: STRATEGY_INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '补货策略动线、范围或水位非法'
+    message_en: 'Replenishment strategy route, scope or min-max is invalid'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_SCOPE_NOT_FOUND
+    module: M3
+    category: REPLENISH
+    detail: SCOPE_NOT_FOUND
+    http_status: 404
+    severity: warning
+    message_zh: '补货策略范围引用不存在或不属于本货主'
+    message_en: 'Replenishment strategy scope reference was not found for this owner'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_LOCATION_BOUND
+    module: M3
+    category: REPLENISH
+    detail: LOCATION_BOUND
+    http_status: 409
+    severity: warning
+    message_zh: '库位已挂其他补货策略'
+    message_en: 'Location is already bound to another replenishment strategy'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_TASK_NOT_FOUND
+    module: M3
+    category: REPLENISH
+    detail: TASK_NOT_FOUND
+    http_status: 404
+    severity: warning
+    message_zh: '补货任务不存在'
+    message_en: 'Replenishment task was not found'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_STATE_INVALID
+    module: M3
+    category: REPLENISH
+    detail: STATE_INVALID
+    http_status: 422
+    severity: warning
+    message_zh: '补货任务当前状态不允许该动作'
+    message_en: 'Replenishment task state does not allow this action'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_CLAIM_CONFLICT
+    module: M3
+    category: REPLENISH
+    detail: CLAIM_CONFLICT
+    http_status: 409
+    severity: warning
+    message_zh: '补货任务领取冲突'
+    message_en: 'Replenishment task claim conflicted'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_ZONE_DENIED
+    module: M3
+    category: REPLENISH
+    detail: ZONE_DENIED
+    http_status: 422
+    severity: warning
+    message_zh: '普通补货任务目标库区不在作业员班组'
+    message_en: 'Operator task group does not cover the replenishment target zone'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_QTY_EXCEEDED
+    module: M3
+    category: REPLENISH
+    detail: QTY_EXCEEDED
+    http_status: 422
+    severity: warning
+    message_zh: '补货下架或确认数量超过任务剩余量'
+    message_en: 'Replenishment pick or confirm quantity exceeds the remaining task qty'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_SOURCE_MISMATCH
+    module: M3
+    category: REPLENISH
+    detail: SOURCE_MISMATCH
+    http_status: 422
+    severity: warning
+    message_zh: '扫描来源库位或容器与任务不符'
+    message_en: 'Scanned source location or LPN does not match the task'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_TARGET_MISMATCH
+    module: M3
+    category: REPLENISH
+    detail: TARGET_MISMATCH
+    http_status: 422
+    severity: warning
+    message_zh: '扫描目标库位与任务不符'
+    message_en: 'Scanned target location does not match the task'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_SOURCE_UNAVAILABLE
+    module: M3
+    category: REPLENISH
+    detail: SOURCE_UNAVAILABLE
+    http_status: 422
+    severity: warning
+    message_zh: '补货来源可下架量不足'
+    message_en: 'Replenishment source available quantity is insufficient'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_CANCEL_BLOCKED
+    module: M3
+    category: REPLENISH
+    detail: CANCEL_BLOCKED
+    http_status: 422
+    severity: warning
+    message_zh: '已下架或已完成数量大于零，禁止取消补货任务'
+    message_en: 'Cannot cancel a replenishment task with picked or done quantity'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_RETURN_BLOCKED
+    module: M3
+    category: REPLENISH
+    detail: RETURN_BLOCKED
+    http_status: 422
+    severity: warning
+    message_zh: '已下架补货任务不可退回'
+    message_en: 'Cannot return a replenishment task after pick'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_IDEMPOTENCY_CONFLICT
+    module: M3
+    category: REPLENISH
+    detail: IDEMPOTENCY_CONFLICT
+    http_status: 409
+    severity: warning
+    message_zh: '补货写请求幂等键冲突'
+    message_en: 'Replenishment idempotency key conflicted'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_IDEMPOTENCY_REQUIRED
+    module: M3
+    category: REPLENISH
+    detail: IDEMPOTENCY_REQUIRED
+    http_status: 400
+    severity: warning
+    message_zh: '补货写请求缺少幂等键'
+    message_en: 'Replenishment write requires an idempotency key'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_PUTAWAY_BLOCKED
+    module: M3
+    category: REPLENISH
+    detail: PUTAWAY_BLOCKED
+    http_status: 422
+    severity: warning
+    message_zh: '补货送达被温区、质量或容量校验阻断'
+    message_en: 'Replenishment confirm blocked by putaway dimension checks'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_NUMBERING_UNAVAILABLE
+    module: M3
+    category: REPLENISH
+    detail: NUMBERING_UNAVAILABLE
+    http_status: 422
+    severity: error
+    message_zh: '缺少补货任务编号规则'
+    message_en: 'No numbering rule exists for replenishment_task'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
   # ========== M4 出库 ==========
   - code: M4_ORDER_BATCH_NOT_SPECIFIED
     module: M4
@@ -2663,3 +2879,4 @@ error_codes:
 | 2026-07-21 | v3.10 | 登记 US-H8-004 接口表探查凭据未配置错误码；脚本统计当前合计 175 项 |
 | 2026-08-17 | v3.11 | 登记 M1_QUALITY_LOCK_*（5 项）与 M2_PUTAWAY_*（7 项）容器质量锁/6 维校验错误码；脚本统计当前合计 203 项 |
 | 2026-08-18 | v3.12 | 补登记 M1_QUALITY_LOCK_REASON_INVALID / MQL_REQUIRED / NOT_LOCKED；脚本统计当前合计 206 项 |
+| 2026-08-19 | v3.13 | 登记 US-M3-012 补货 `M3_REPLENISH_*` 18 项；脚本统计当前合计 224 项 |
