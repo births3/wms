@@ -6020,6 +6020,12 @@ title = "补货作业"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
+frontend_pages = ["m3-replenishment-strategies"]
+navigation_checks = ["node apps/web-admin/self-checks/m3-replenishment-strategy-self-check.mjs"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
+e2e_screenshots = [
+  { page = "m3-replenishment-strategies", spec = "prototypes/e2e/web-admin-m3-replenishment-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m3-replenishment-strategies/strategy-saved.png" },
+]
 api_paths = [
   "GET /api/v1/replenishment/tasks",
   "POST /api/v1/replenishment/tasks",
@@ -6030,6 +6036,11 @@ api_paths = [
   "PUT /api/v1/replenishment/strategies/{id}",
 ]
 database_objects = ["replenishment_tasks", "replenishment_strategies", "replenishment_location_groups", "replenishment_location_group_members", "inventory_batches"]
-reason = "方案与验收标准已定稿（ADR-0048 决策 6/7、storage-location-model §5.1-§5.7）；未实施。待 Phase 2 实施：策略配置与任务大盘、双重补货引擎（Min-Max 巡检/波次缺口）、PDA 补货作业、任务状态机与在途双字段迁移。"
+reason = "Phase 2 策略配置页已落地；任务大盘、PDA 作业契约与质量矩阵全路径仍待 T12-T14 收口。"
 owner = "M3 库内作业模块负责人"
-resume_when = "Phase 2 启动后实施。"
+resume_when = "T12-T14 完成后迁出 deferred。"
+evidence_refs = [
+  "prototypes/e2e/web-admin-m3-replenishment-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m3-replenishment-strategies/strategy-saved.png",
+  "apps/web-admin/self-checks/m3-replenishment-strategy-self-check.mjs",
+]
