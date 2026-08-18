@@ -63,3 +63,19 @@ pub(crate) fn preview_replenishment_strategy() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn create_replenishment_location_group() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/tasks",
+    tag = "replenishment",
+    params(("Idempotency-Key" = String, Header, description = "手工发起幂等键")),
+    request_body = CreateReplenishmentTaskRequest,
+    responses(
+        (status = 200, description = "手工发起补货任务", body = ReplenishmentTask),
+        (status = 400, description = "缺少幂等键", body = ErrorResponse),
+        (status = 403, description = "权限不足", body = ErrorResponse),
+        (status = 422, description = "编号不可用、包装非整或来源不足", body = ErrorResponse),
+    ),
+)]
+#[allow(dead_code)]
+pub(crate) fn create_replenishment_task() {}

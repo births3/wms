@@ -11,8 +11,9 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_domain::{
-    BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse, ErrorResponse,
-    ReplenishmentLocationGroup, ReplenishmentPreviewResponse, ReplenishmentStrategy,
+    BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
+    CreateReplenishmentTaskRequest, ErrorResponse, ReplenishmentLocationGroup,
+    ReplenishmentPreviewResponse, ReplenishmentStrategy, ReplenishmentTask,
     UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
 
@@ -57,6 +58,7 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
             "/api/v1/replenishment/location-groups",
             post(create_location_group_handler),
         )
+        .route("/api/v1/replenishment/tasks", post(create_task_handler))
         .with_state(state)
 }
 
@@ -92,6 +94,17 @@ async fn preview_handler(
 ) -> Result<Json<ReplenishmentPreviewResponse>, ReplenishmentHandlerError> {
     require_manage(&ctx)?;
     Ok(Json(state.service.preview(&ctx, id).await?))
+}
+
+async fn create_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    headers: HeaderMap,
+    Json(req): Json<CreateReplenishmentTaskRequest>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.create_task(&ctx, req, &key).await?))
 }
 
 async fn create_location_group_handler(
@@ -164,6 +177,21 @@ impl IntoResponse for ReplenishmentHandlerError {
                 StatusCode::NOT_FOUND,
                 "M3_REPLENISH_TASK_NOT_FOUND",
                 "补货策略不存在",
+            ),
+            Self::Service(ReplenishmentError::SourceUnavailable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_SOURCE_UNAVAILABLE",
+                "补货来源可下架量不足",
+            ),
+            Self::Service(ReplenishmentError::NumberingUnavailable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_NUMBERING_UNAVAILABLE",
+                "补货任务编号规则不可用",
+            ),
+            Self::Service(ReplenishmentError::PutawayBlocked) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M3_REPLENISH_PUTAWAY_BLOCKED",
+                "补货目标上架校验未通过",
             ),
             Self::Service(ReplenishmentError::IdempotencyConflict) => (
                 StatusCode::CONFLICT,
