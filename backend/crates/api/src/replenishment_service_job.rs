@@ -2,9 +2,9 @@ use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 use wms_domain::{
-    can_confirm, can_pick, zone_treats_as_qualified, ClaimReplenishmentTaskRequest,
-    ConfirmReplenishmentTaskRequest, PickReplenishmentTaskRequest, Quantity, ReplenishmentTask,
-    REPLENISH_STATUS_DONE, REPLENISH_STATUS_IN_PROGRESS, REPLENISH_STATUS_PENDING,
+    can_confirm, can_pick, ClaimReplenishmentTaskRequest, ConfirmReplenishmentTaskRequest,
+    PickReplenishmentTaskRequest, Quantity, ReplenishmentTask, REPLENISH_STATUS_DONE,
+    REPLENISH_STATUS_IN_PROGRESS, REPLENISH_STATUS_PENDING,
 };
 
 use super::{ReplenishmentError, ReplenishmentService};
@@ -228,12 +228,14 @@ impl ReplenishmentService {
             .load_location_route(&mut tx, ctx.owner_id, task.target_location_id)
             .await?
             .ok_or(ReplenishmentError::TaskNotFound)?;
-        if !zone_treats_as_qualified(&target.quality_color)
-            || target.lock_status == "lock_in"
-            || target.lock_status == "lock_all"
-        {
-            return Err(ReplenishmentError::PutawayBlocked);
-        }
+        self.ensure_target_putaway(
+            ctx.owner_id,
+            &target,
+            &target.location_type,
+            task.product_id,
+            req.qty,
+        )
+        .await?;
         let target_batch_id = self
             .repo
             .target_batch_id(

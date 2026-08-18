@@ -67,6 +67,16 @@ impl ReplenishmentService {
         if strategy.scope_type == "product" {
             return Ok(vec![strategy.scope_ref]);
         }
+        if strategy.scope_type == "category" {
+            return Ok(self
+                .repo
+                .products_at_location_for_category(
+                    strategy.owner_id,
+                    location_id,
+                    strategy.scope_ref,
+                )
+                .await?);
+        }
         Ok(self
             .repo
             .products_at_location(strategy.owner_id, location_id)
@@ -120,46 +130,17 @@ impl ReplenishmentService {
         reason_code: &str,
         now: DateTime<Utc>,
     ) -> Result<(), ReplenishmentError> {
-        let fail_times: Vec<DateTime<Utc>> = sqlx::query_scalar(
-            r#"
-            SELECT created_at
-              FROM event_bus_event
-             WHERE owner_id = $1
-               AND event_type = 'replenishment.patrol_fail'
-               AND payload ->> 'target_location_id' = $2
-               AND payload ->> 'product_id' = $3
-               AND payload ->> 'reason_code' = $4
-             ORDER BY created_at DESC
-             LIMIT 3
-            "#,
-        )
-        .bind(owner_id)
-        .bind(location_id.to_string())
-        .bind(product_id.to_string())
-        .bind(reason_code)
-        .fetch_all(self.repo.pool())
-        .await?;
+        let fail_times = self
+            .repo
+            .recent_patrol_fail_times(owner_id, location_id, product_id, reason_code)
+            .await?;
         let Some(oldest) = fail_times.get(2).copied() else {
             return Ok(());
         };
-        let generated_after: bool = sqlx::query_scalar(
-            r#"
-            SELECT EXISTS(
-                SELECT 1
-                  FROM replenishment_tasks
-                 WHERE owner_id = $1
-                   AND target_location_id = $2
-                   AND product_id = $3
-                   AND created_at > $4
-            )
-            "#,
-        )
-        .bind(owner_id)
-        .bind(location_id)
-        .bind(product_id)
-        .bind(oldest)
-        .fetch_one(self.repo.pool())
-        .await?;
+        let generated_after = self
+            .repo
+            .has_generated_task_since(owner_id, location_id, product_id, oldest)
+            .await?;
         if generated_after {
             return Ok(());
         }

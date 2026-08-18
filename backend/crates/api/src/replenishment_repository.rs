@@ -1,5 +1,7 @@
 //! 补货策略与库位组存取。
 
+#[path = "replenishment_repository_query.rs"]
+mod query;
 #[path = "replenishment_repository_strategy.rs"]
 mod strategy;
 #[path = "replenishment_repository_task.rs"]
@@ -406,6 +408,8 @@ impl PgReplenishmentRepository {
                    location.location_type,
                    location.lock_status,
                    location.replenish_strategy_id,
+                   location.max_volume_cm3,
+                   location.used_volume_cm3,
                    zone.quality_color,
                    zone.temperature_zone,
                    zone.is_external_use_zone,
@@ -491,7 +495,7 @@ impl PgReplenishmentRepository {
                AND batch.product_id = $2
                AND batch.status = 'qualified'
                AND location.location_type = $3
-               AND location.lock_status IN ('normal', 'lock_in')
+               AND location.lock_status IN ('normal', 'lock_out')
                AND COALESCE(container.current_lock_category, 'qualified')
                    NOT IN ('quarantine', 'rejected')
                AND batch.qty_on_hand - batch.qty_allocated - batch.qty_frozen
@@ -699,10 +703,29 @@ pub struct LocationRouteRow {
     pub location_type: String,
     pub lock_status: String,
     pub replenish_strategy_id: Option<Uuid>,
+    pub max_volume_cm3: i64,
+    pub used_volume_cm3: i64,
     pub quality_color: String,
     pub temperature_zone: String,
     pub is_external_use_zone: bool,
     pub is_fragrant_zone: bool,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct ProductPutawayAttrs {
+    pub storage_condition: Option<String>,
+    pub is_external_use: bool,
+    pub is_fragrant: bool,
+    pub volume_cm3: Option<f64>,
+}
+
+pub struct WaveGapLine {
+    pub wave_id: Uuid,
+    pub outbound_order_id: Uuid,
+    pub outbound_line_no: i32,
+    pub product_id: Uuid,
+    pub demand_qty: Quantity,
+    pub target_location_id: Uuid,
 }
 
 #[derive(sqlx::FromRow)]

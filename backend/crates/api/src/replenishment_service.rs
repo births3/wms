@@ -18,12 +18,13 @@ mod wave;
 use chrono::Utc;
 use uuid::Uuid;
 use wms_domain::{
-    task_qty, validate_replenish_route, zone_treats_as_qualified,
-    BindReplenishmentLocationsRequest, BindReplenishmentLocationsResponse,
-    CreateReplenishmentTaskRequest, PageMeta, Quantity, ReplenishmentLocationGroup,
-    ReplenishmentLocationGroupListResponse, ReplenishmentPreviewResponse, ReplenishmentStrategy,
-    ReplenishmentStrategyListResponse, ReplenishmentTask, ReplenishmentTaskListResponse,
-    UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
+    is_temperature_zone_subset, task_qty, validate_external_fragrant, validate_replenish_route,
+    zone_treats_as_qualified, BindReplenishmentLocationsRequest,
+    BindReplenishmentLocationsResponse, CreateReplenishmentTaskRequest, PageMeta, Quantity,
+    ReplenishmentLocationGroup, ReplenishmentLocationGroupListResponse,
+    ReplenishmentPreviewResponse, ReplenishmentStrategy, ReplenishmentStrategyListResponse,
+    ReplenishmentTask, ReplenishmentTaskListResponse, UpsertReplenishmentLocationGroupRequest,
+    UpsertReplenishmentStrategyRequest,
 };
 
 use crate::{
@@ -350,7 +351,6 @@ impl ReplenishmentService {
         if target.replenish_strategy_id != Some(strategy.id) {
             return Ok(None);
         }
-        self.ensure_target_putaway(&target, &strategy.target_type)?;
         let available = self
             .repo
             .pick_available_qty(&mut tx, ctx.owner_id, target_location_id, product_id)
@@ -379,6 +379,14 @@ impl ReplenishmentService {
         if qty <= Quantity::ZERO {
             return Ok(None);
         }
+        self.ensure_target_putaway(
+            ctx.owner_id,
+            &target,
+            &strategy.target_type,
+            product_id,
+            qty,
+        )
+        .await?;
         let created = self
             .persist_task(
                 &mut tx,
@@ -478,7 +486,14 @@ impl ReplenishmentService {
         if validate_replenish_route(&source.location_type, &target.location_type).is_err() {
             return Err(ReplenishmentError::StrategyInvalid);
         }
-        self.ensure_target_putaway(&target, &target.location_type)?;
+        self.ensure_target_putaway(
+            ctx.owner_id,
+            &target,
+            &target.location_type,
+            product_id,
+            req.qty,
+        )
+        .await?;
         self.ensure_source_ok(&source, &source.location_type, req.source_lpn_id)?;
         if source.available_qty < req.qty {
             return Err(ReplenishmentError::SourceUnavailable);
@@ -516,10 +531,13 @@ impl ReplenishmentService {
         Ok(created)
     }
 
-    fn ensure_target_putaway(
+    pub(crate) async fn ensure_target_putaway(
         &self,
+        owner_id: Uuid,
         target: &crate::replenishment_repository::LocationRouteRow,
         expected_type: &str,
+        product_id: Uuid,
+        qty: Quantity,
     ) -> Result<(), ReplenishmentError> {
         if target.location_type != expected_type {
             return Err(ReplenishmentError::StrategyInvalid);
@@ -527,8 +545,36 @@ impl ReplenishmentService {
         if !zone_treats_as_qualified(&target.quality_color) {
             return Err(ReplenishmentError::PutawayBlocked);
         }
-        if target.lock_status == "lock_in" || target.lock_status == "lock_all" {
+        if target.lock_status == "lock_out" || target.lock_status == "lock_all" {
             return Err(ReplenishmentError::PutawayBlocked);
+        }
+        let Some(product) = self
+            .repo
+            .load_product_putaway_attrs(owner_id, product_id)
+            .await?
+        else {
+            return Err(ReplenishmentError::ScopeNotFound);
+        };
+        if let Some(product_temp) = product.storage_condition.as_deref() {
+            if !is_temperature_zone_subset(&target.temperature_zone, product_temp) {
+                return Err(ReplenishmentError::PutawayBlocked);
+            }
+        }
+        if !validate_external_fragrant(
+            product.is_external_use,
+            target.is_external_use_zone,
+            product.is_fragrant,
+            target.is_fragrant_zone,
+        ) {
+            return Err(ReplenishmentError::PutawayBlocked);
+        }
+        if let Some(unit_volume) = product.volume_cm3 {
+            let units = i64::try_from(qty).unwrap_or(i64::MAX);
+            let required = unit_volume * (units as f64);
+            let available = target.max_volume_cm3.saturating_sub(target.used_volume_cm3);
+            if required > available as f64 {
+                return Err(ReplenishmentError::PutawayBlocked);
+            }
         }
         Ok(())
     }
@@ -545,7 +591,7 @@ impl ReplenishmentService {
         if source.status != "qualified" {
             return Err(ReplenishmentError::SourceUnavailable);
         }
-        if source.lock_status == "lock_out" || source.lock_status == "lock_all" {
+        if source.lock_status == "lock_in" || source.lock_status == "lock_all" {
             return Err(ReplenishmentError::SourceUnavailable);
         }
         if matches!(

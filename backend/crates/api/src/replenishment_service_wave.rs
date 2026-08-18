@@ -1,4 +1,5 @@
 use serde_json::json;
+use uuid::Uuid;
 use wms_domain::{task_qty, Quantity, ReplenishmentTask};
 
 use super::{
@@ -36,7 +37,14 @@ impl ReplenishmentService {
             Some(found) => (found.source_type.as_str(), Some(found.id)),
             None => ("storage", None),
         };
-        self.ensure_target_putaway(&target, &target.location_type)?;
+        self.ensure_target_putaway(
+            ctx.owner_id,
+            &target,
+            &target.location_type,
+            req.product_id,
+            req.demand_qty,
+        )
+        .await?;
         let available = self
             .repo
             .pick_available_qty(
@@ -121,6 +129,40 @@ impl ReplenishmentService {
             created.push(task);
         }
         tx.commit().await?;
+        Ok(created)
+    }
+
+    pub async fn fill_wave_pick_gaps(
+        &self,
+        owner_id: Uuid,
+        wave_id: Uuid,
+    ) -> Result<Vec<ReplenishmentTask>, ReplenishmentError> {
+        let ctx = AuthContext {
+            user_id: Uuid::nil(),
+            owner_id,
+            actor_name: format!("system:wave:{wave_id}"),
+            permissions: vec![MANAGE.into()],
+            jti: Uuid::new_v4().to_string(),
+            warehouse_scope: None,
+        };
+        let lines = self.repo.list_wave_gap_lines(owner_id, wave_id).await?;
+        let mut created = Vec::new();
+        for line in lines {
+            let tasks = self
+                .create_wave_gap_tasks(
+                    &ctx,
+                    CreateWaveGapTasksRequest {
+                        wave_id: line.wave_id,
+                        outbound_order_id: line.outbound_order_id,
+                        outbound_line_no: line.outbound_line_no,
+                        product_id: line.product_id,
+                        demand_qty: line.demand_qty,
+                        target_location_id: line.target_location_id,
+                    },
+                )
+                .await?;
+            created.extend(tasks);
+        }
         Ok(created)
     }
 }
