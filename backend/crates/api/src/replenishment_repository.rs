@@ -61,6 +61,65 @@ impl PgReplenishmentRepository {
         .map(Into::into)
     }
 
+    pub async fn list_enabled_min_max_strategies(
+        &self,
+    ) -> Result<Vec<ReplenishmentStrategy>, sqlx::Error> {
+        sqlx::query_as::<_, StrategyRow>(
+            r#"
+            SELECT id, owner_id, strategy_code, strategy_name, scope_type, scope_ref,
+                   location_type, source_type, target_type,
+                   min_safety_threshold, max_replenish_target, trigger_modes, enabled
+              FROM replenishment_strategies
+             WHERE owner_id IS NOT NULL
+               AND enabled
+               AND 'min_max' = ANY(trigger_modes)
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map(|rows| rows.into_iter().map(Into::into).collect())
+    }
+
+    pub async fn list_bound_locations(
+        &self,
+        owner_id: Uuid,
+        strategy_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT id
+              FROM warehouse_locations
+             WHERE owner_id = $1
+               AND replenish_strategy_id = $2
+               AND status <> 'disabled'
+            "#,
+        )
+        .bind(owner_id)
+        .bind(strategy_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn products_at_location(
+        &self,
+        owner_id: Uuid,
+        location_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT DISTINCT product_id
+              FROM inventory_batches
+             WHERE owner_id = $1
+               AND location_id = $2
+               AND product_id IS NOT NULL
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     pub async fn get_strategy(
         &self,
         owner_id: Uuid,

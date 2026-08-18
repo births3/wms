@@ -4,6 +4,8 @@
 mod exception;
 #[path = "replenishment_service_job.rs"]
 mod job;
+#[path = "replenishment_service_patrol.rs"]
+mod patrol;
 
 use chrono::Utc;
 use uuid::Uuid;
