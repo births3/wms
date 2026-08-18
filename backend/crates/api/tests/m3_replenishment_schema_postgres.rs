@@ -153,3 +153,50 @@ async fn replenishment_permissions_and_document_type_exist(pool: PgPool) {
         "M-CG must have an enabled replenishment_task rule"
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn replenishment_h4_alert_definitions_are_seeded(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, '补货告警货主')",
+    )
+    .bind(owner_id)
+    .bind(format!("RA-{}", &owner_id.simple().to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("owner");
+    let event_types: Vec<String> = sqlx::query_scalar(
+        r#"
+        SELECT event_type
+          FROM alert_definitions
+         WHERE owner_id = $1
+           AND event_type = ANY($2)
+         ORDER BY event_type
+        "#,
+    )
+    .bind(owner_id)
+    .bind(
+        &[
+            "replenishment_patrol_fail_repeat",
+            "replenishment_urgent_unclaimed",
+            "replenishment_urgent_timeout",
+            "replenishment_no_progress",
+            "replenishment_source_frozen",
+            "replenishment_source_mismatch",
+        ][..],
+    )
+    .fetch_all(&pool)
+    .await
+    .expect("h4 seeds");
+    assert_eq!(
+        event_types,
+        vec![
+            "replenishment_no_progress",
+            "replenishment_patrol_fail_repeat",
+            "replenishment_source_frozen",
+            "replenishment_source_mismatch",
+            "replenishment_urgent_timeout",
+            "replenishment_urgent_unclaimed",
+        ]
+    );
+}

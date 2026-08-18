@@ -126,6 +126,43 @@ pub(crate) fn create_replenishment_location_group() {}
 
 #[utoipa::path(
     get,
+    path = "/api/v1/replenishment/location-groups/{id}",
+    tag = "replenishment",
+    params(("id" = Uuid, Path, description = "库位组 ID")),
+    responses((status = 200, description = "库位组详情", body = ReplenishmentLocationGroup)),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_replenishment_location_group() {}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/replenishment/location-groups/{id}",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "库位组 ID"),
+        ("Idempotency-Key" = String, Header, description = "更新幂等键"),
+    ),
+    request_body = UpsertReplenishmentLocationGroupRequest,
+    responses((status = 200, description = "更新库位组", body = ReplenishmentLocationGroup)),
+)]
+#[allow(dead_code)]
+pub(crate) fn update_replenishment_location_group() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/replenishment/location-groups/{id}/disable",
+    tag = "replenishment",
+    params(
+        ("id" = Uuid, Path, description = "库位组 ID"),
+        ("Idempotency-Key" = String, Header, description = "停用幂等键"),
+    ),
+    responses((status = 200, description = "停用库位组", body = ReplenishmentLocationGroup)),
+)]
+#[allow(dead_code)]
+pub(crate) fn disable_replenishment_location_group() {}
+
+#[utoipa::path(
+    get,
     path = "/api/v1/replenishment/tasks",
     tag = "replenishment",
     params(
@@ -154,6 +191,16 @@ pub(crate) fn list_replenishment_tasks() {}
 pub(crate) fn create_replenishment_task() {}
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/replenishment/tasks/{id}",
+    tag = "replenishment",
+    params(("id" = Uuid, Path, description = "任务 ID")),
+    responses((status = 200, description = "补货任务详情", body = ReplenishmentTask)),
+)]
+#[allow(dead_code)]
+pub(crate) fn get_replenishment_task() {}
+
+#[utoipa::path(
     post,
     path = "/api/v1/replenishment/tasks/{id}/claim",
     tag = "replenishment",
@@ -166,6 +213,7 @@ pub(crate) fn create_replenishment_task() {}
         (status = 200, description = "领取补货任务", body = ReplenishmentTask),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 409, description = "领取冲突", body = ErrorResponse),
+        (status = 422, description = "目标库区不在作业员班组", body = ErrorResponse),
     ),
 )]
 #[allow(dead_code)]

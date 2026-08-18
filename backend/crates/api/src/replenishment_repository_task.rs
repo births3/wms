@@ -94,6 +94,28 @@ impl PgReplenishmentRepository {
         .map(|rows| rows.into_iter().map(Into::into).collect())
     }
 
+    pub async fn get_task(
+        &self,
+        owner_id: Uuid,
+        task_id: Uuid,
+    ) -> Result<Option<ReplenishmentTask>, sqlx::Error> {
+        sqlx::query_as::<_, TaskRow>(
+            r#"
+            SELECT id, owner_id, task_no, trigger_mode, priority, strategy_id,
+                   source_location_id, source_batch_id, source_lpn_id, target_location_id,
+                   product_id, batch_no, qty, picked_qty, done_qty, status, operator_id,
+                   created_by, version
+              FROM replenishment_tasks
+             WHERE owner_id = $1 AND id = $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(task_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|row| row.map(Into::into))
+    }
+
     pub async fn operator_replenish_zone_scope(
         &self,
         owner_id: Uuid,

@@ -2,7 +2,8 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     BindReplenishmentLocationsResponse, ReplenishmentLocationGroup, ReplenishmentPreviewItem,
-    ReplenishmentStrategy, UpsertReplenishmentStrategyRequest,
+    ReplenishmentStrategy, UpsertReplenishmentLocationGroupRequest,
+    UpsertReplenishmentStrategyRequest,
 };
 
 use super::{GroupRow, PgReplenishmentRepository, PreviewRow, ReplenishmentRepoError, StrategyRow};
@@ -143,6 +144,165 @@ impl PgReplenishmentRepository {
             });
         }
         Ok(result)
+    }
+
+    pub async fn get_location_group(
+        &self,
+        owner_id: Uuid,
+        group_id: Uuid,
+    ) -> Result<Option<ReplenishmentLocationGroup>, sqlx::Error> {
+        let group = sqlx::query_as::<_, GroupRow>(
+            r#"
+            SELECT id, owner_id, group_code, group_name, enabled
+              FROM replenishment_location_groups
+             WHERE owner_id = $1 AND id = $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(group_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some(group) = group else {
+            return Ok(None);
+        };
+        let location_ids = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT location_id
+              FROM replenishment_location_group_members
+             WHERE group_id = $1
+            "#,
+        )
+        .bind(group.id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(Some(ReplenishmentLocationGroup {
+            id: group.id,
+            owner_id: group.owner_id,
+            group_code: group.group_code,
+            group_name: group.group_name,
+            enabled: group.enabled,
+            location_ids,
+        }))
+    }
+
+    pub async fn update_location_group(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        group_id: Uuid,
+        req: &UpsertReplenishmentLocationGroupRequest,
+    ) -> Result<Option<ReplenishmentLocationGroup>, sqlx::Error> {
+        let updated = sqlx::query_as::<_, GroupRow>(
+            r#"
+            UPDATE replenishment_location_groups
+               SET group_code = $3,
+                   group_name = $4,
+                   enabled = $5,
+                   updated_at = now()
+             WHERE owner_id = $1 AND id = $2
+         RETURNING id, owner_id, group_code, group_name, enabled
+            "#,
+        )
+        .bind(owner_id)
+        .bind(group_id)
+        .bind(&req.group_code)
+        .bind(&req.group_name)
+        .bind(req.enabled)
+        .fetch_optional(&mut **tx)
+        .await?;
+        let Some(group) = updated else {
+            return Ok(None);
+        };
+        sqlx::query("DELETE FROM replenishment_location_group_members WHERE group_id = $1")
+            .bind(group.id)
+            .execute(&mut **tx)
+            .await?;
+        for location_id in &req.location_ids {
+            sqlx::query(
+                r#"
+                INSERT INTO replenishment_location_group_members (group_id, location_id)
+                VALUES ($1, $2)
+                "#,
+            )
+            .bind(group.id)
+            .bind(location_id)
+            .execute(&mut **tx)
+            .await?;
+        }
+        Ok(Some(ReplenishmentLocationGroup {
+            id: group.id,
+            owner_id: group.owner_id,
+            group_code: group.group_code,
+            group_name: group.group_name,
+            enabled: group.enabled,
+            location_ids: req.location_ids.clone(),
+        }))
+    }
+
+    pub async fn disable_location_group(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        group_id: Uuid,
+    ) -> Result<Option<ReplenishmentLocationGroup>, sqlx::Error> {
+        let updated = sqlx::query_as::<_, GroupRow>(
+            r#"
+            UPDATE replenishment_location_groups
+               SET enabled = FALSE,
+                   updated_at = now()
+             WHERE owner_id = $1 AND id = $2
+         RETURNING id, owner_id, group_code, group_name, enabled
+            "#,
+        )
+        .bind(owner_id)
+        .bind(group_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+        let Some(group) = updated else {
+            return Ok(None);
+        };
+        sqlx::query(
+            r#"
+            UPDATE warehouse_locations loc
+               SET replenish_strategy_id = NULL,
+                   updated_at = now()
+             WHERE loc.owner_id = $1
+               AND loc.id IN (
+                    SELECT member.location_id
+                      FROM replenishment_location_group_members member
+                     WHERE member.group_id = $2
+               )
+               AND loc.replenish_strategy_id IN (
+                    SELECT strategy.id
+                      FROM replenishment_strategies strategy
+                     WHERE strategy.owner_id = $1
+                       AND strategy.scope_type = 'location_group'
+                       AND strategy.scope_ref = $2
+               )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(group_id)
+        .execute(&mut **tx)
+        .await?;
+        let location_ids = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT location_id
+              FROM replenishment_location_group_members
+             WHERE group_id = $1
+            "#,
+        )
+        .bind(group.id)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(Some(ReplenishmentLocationGroup {
+            id: group.id,
+            owner_id: group.owner_id,
+            group_code: group.group_code,
+            group_name: group.group_name,
+            enabled: group.enabled,
+            location_ids,
+        }))
     }
 
     pub async fn replace_strategy_locations(

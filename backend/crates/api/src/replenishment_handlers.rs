@@ -73,9 +73,18 @@ pub fn replenishment_router(state: ReplenishmentAppState) -> Router {
             get(list_location_groups_handler).post(create_location_group_handler),
         )
         .route(
+            "/api/v1/replenishment/location-groups/:id",
+            get(get_location_group_handler).put(update_location_group_handler),
+        )
+        .route(
+            "/api/v1/replenishment/location-groups/:id/disable",
+            post(disable_location_group_handler),
+        )
+        .route(
             "/api/v1/replenishment/tasks",
             get(list_tasks_handler).post(create_task_handler),
         )
+        .route("/api/v1/replenishment/tasks/:id", get(get_task_handler))
         .route(
             "/api/v1/replenishment/tasks/:id/claim",
             post(claim_task_handler),
@@ -169,6 +178,53 @@ async fn list_location_groups_handler(
 ) -> Result<Json<ReplenishmentLocationGroupListResponse>, ReplenishmentHandlerError> {
     require_manage(&ctx)?;
     Ok(Json(state.service.list_location_groups(&ctx).await?))
+}
+
+async fn get_location_group_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ReplenishmentLocationGroup>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    Ok(Json(state.service.get_location_group(&ctx, id).await?))
+}
+
+async fn update_location_group_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    Json(req): Json<UpsertReplenishmentLocationGroupRequest>,
+) -> Result<Json<ReplenishmentLocationGroup>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state
+            .service
+            .update_location_group(&ctx, id, req, &key)
+            .await?,
+    ))
+}
+
+async fn disable_location_group_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<ReplenishmentLocationGroup>, ReplenishmentHandlerError> {
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state.service.disable_location_group(&ctx, id, &key).await?,
+    ))
+}
+
+async fn get_task_handler(
+    ctx: AuthContext,
+    State(state): State<ReplenishmentAppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<ReplenishmentTask>, ReplenishmentHandlerError> {
+    Ok(Json(state.service.get_task(&ctx, id).await?))
 }
 
 async fn create_strategy_handler(

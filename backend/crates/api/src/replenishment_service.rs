@@ -2,6 +2,8 @@
 
 #[path = "replenishment_service_exception.rs"]
 mod exception;
+#[path = "replenishment_service_group.rs"]
+mod group;
 #[path = "replenishment_service_job.rs"]
 mod job;
 #[path = "replenishment_service_patrol.rs"]
