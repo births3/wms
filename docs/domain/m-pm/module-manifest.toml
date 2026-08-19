@@ -1,0 +1,40 @@
+# M-PM 参数对照 manifest
+# 29 个正式 manifest-bearing BC 清单中的 M-PM。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "M-PM"
+name = "参数对照"
+slug = "parameter-mapping"
+version = "v1.0"
+category = "horizontal-business"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3","H8","M1"]
+external = []
+
+[wave]
+target = "Wave 1"
+parallel_track = "m_pm"
+
+[stories]
+files = ["docs/domain/user-stories-mpm-parameter-mapping.md"]
+count = 1
+
+[bounded_context]
+code = "M-PM"
+name = "参数对照"
+language_model = ["ParameterMapping","MappingRule","PendingMapping"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H8" = "OHS"
+"M1" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]

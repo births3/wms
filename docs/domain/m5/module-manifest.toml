@@ -1,0 +1,42 @@
+# M5 冷链数据集成 manifest
+# 29 个正式 manifest-bearing BC 清单中的 M5。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "M5"
+name = "冷链数据集成"
+slug = "cold-chain"
+version = "v1.0"
+category = "business"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3","H8","H-AL","M3","M-VR"]
+external = []
+
+[wave]
+target = "Wave 3"
+parallel_track = "m5"
+
+[stories]
+files = ["docs/domain/user-stories-m5-cold-chain.md"]
+count = 1
+
+[bounded_context]
+code = "M5"
+name = "冷链数据集成"
+language_model = ["TemperatureEvent","ColdChainDevice","Excursion"]
+
+[integrations]
+"H-AL" = "OHS"
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H8" = "OHS"
+"M-VR" = "OHS"
+"M3" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]

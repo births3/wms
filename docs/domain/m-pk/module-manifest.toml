@@ -1,0 +1,43 @@
+# M-PK 包装站 manifest
+# 29 个正式 manifest-bearing BC 清单中的 M-PK。
+# 依赖来自 architecture-dependencies.md、对应用户故事和现有调用边；不代表拆分为独立服务。
+
+[module]
+code = "M-PK"
+name = "包装站"
+slug = "packing-station"
+version = "v1.0"
+category = "horizontal-business"
+owner = "架构/域模型负责人"
+
+[depends]
+business = []
+horizontal = ["H1","H2","H3","H5","H6","M1","M4","M-TE","M-TC"]
+external = []
+
+[wave]
+target = "Wave 4"
+parallel_track = "m_pk"
+
+[stories]
+files = ["docs/domain/user-stories-mpk-packing-station.md"]
+count = 1
+
+[bounded_context]
+code = "M-PK"
+name = "包装站"
+language_model = ["PackingStation","Package","Scale","PackingTask"]
+
+[integrations]
+"H1" = "OHS"
+"H2" = "OHS"
+"H3" = "OHS"
+"H5" = "OHS"
+"H6" = "OHS"
+"M-TE" = "OHS"
+"M1" = "OHS"
+"M4" = "OHS"
+
+[shared_kernel]
+provides = []
+consumes = ["OwnerId","TenantId","OperatorId","TraceId","ErrorCode"]
