@@ -1,6 +1,6 @@
 # Phase 2 补货技术规范（US-M3-012 / ADR-0048 Phase 2）
 
-- 状态：Frozen（阶段 B 三轮审查通过，2026-08-19）
+- 状态：Frozen（HEAD `8fee3ac3` 三轮独立 Standards+Spec：规格语义矛盾 0、标准硬违规 0，2026-08-19）
 - 日期：2026-08-19
 - 规格源：ADR-0048 决策 6–7、里程碑 Phase 2；`docs/domain/storage-location-model.md` §5.1–§5.7；US-M3-012 验收 1–10
 - 固定点：阶段 A 收口后工作区；实施起点 SHA 在阶段 D 第一票前钉死
