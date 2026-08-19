@@ -1,0 +1,471 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { components } from "@wms/api-client";
+
+import { ApiError } from "@/features/auth/auth-queries";
+import { api } from "@/lib/api";
+
+export type DeliveryNoteCandidate = components["schemas"]["DeliveryNoteCandidate"];
+export type DeliveryNoteGroup = components["schemas"]["DeliveryNoteGroup"];
+export type DeliveryNoteGroupListItem = components["schemas"]["DeliveryNoteGroupListItem"];
+export type ManualDeliveryNoteCutoffRequest =
+  components["schemas"]["ManualDeliveryNoteCutoffRequest"];
+export type RouteBinding = components["schemas"]["RouteBinding"];
+export type PublishRouteBindingRequest = components["schemas"]["PublishRouteBindingRequest"];
+export type CutoffPlan = components["schemas"]["CutoffPlan"];
+export type CreateCutoffPlanRequest = components["schemas"]["CreateCutoffPlanRequest"];
+export type AggregationFieldDefinition = components["schemas"]["AggregationFieldDefinition"];
+export type AggregationDimension = components["schemas"]["AggregationDimension"];
+export type AggregationRuleVersion = components["schemas"]["AggregationRuleVersion"];
+export type AggregationRuleTestResult = components["schemas"]["AggregationRuleTestResult"];
+export type CreateAggregationRuleDraftRequest =
+  components["schemas"]["CreateAggregationRuleDraftRequest"];
+export type PrintDocumentCategory = components["schemas"]["PrintDocumentCategory"];
+export type PrintSuiteVersion = components["schemas"]["PrintSuiteVersion"];
+export type PrintSuiteItemInput = components["schemas"]["PrintSuiteItemInput"];
+export type CreatePrintSuiteDraftRequest =
+  components["schemas"]["CreatePrintSuiteDraftRequest"];
+export type PrintSuiteTestResult = components["schemas"]["PrintSuiteTestResult"];
+export type PrintSuiteInstance = components["schemas"]["PrintSuiteInstance"];
+export type CategoryPdfOutput = components["schemas"]["CategoryPdfOutput"];
+export type CategoryPdfPreparation = components["schemas"]["CategoryPdfPreparation"];
+export type CategoryPdfOutputListResponse =
+  components["schemas"]["CategoryPdfOutputListResponse"];
+
+const printOrchestrationQueryKey = ["h9", "print-orchestration"] as const;
+
+export function useDeliveryNoteCandidatesQuery(warehouseId: string) {
+  return useQuery<DeliveryNoteCandidate[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "candidates", warehouseId],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/delivery-note-candidates", {
+        params: { query: { warehouse_id: warehouseId || undefined } },
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "读取待截单订单失败", result.response.status);
+      }
+      return result.data.data;
+    },
+    enabled: Boolean(warehouseId),
+  });
+}
+
+export function useDeliveryNoteGroupsQuery(warehouseId: string) {
+  return useQuery<DeliveryNoteGroupListItem[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "groups", warehouseId],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/delivery-note-groups", {
+        params: { query: { warehouse_id: warehouseId || undefined } },
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "读取随货同行单结果失败", result.response.status);
+      }
+      return result.data.data;
+    },
+    enabled: Boolean(warehouseId),
+  });
+}
+
+export function useRouteBindingsQuery(warehouseId: string) {
+  return useQuery<RouteBinding[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "route-bindings", warehouseId],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/route-bindings", {
+        params: { query: { warehouse_id: warehouseId || undefined } },
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "读取线路绑定失败", result.response.status);
+      }
+      return result.data.data;
+    },
+    enabled: Boolean(warehouseId),
+  });
+}
+
+export function useCutoffPlansQuery(warehouseId: string) {
+  return useQuery<CutoffPlan[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "cutoff-plans", warehouseId],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/cutoff-plans", {
+        params: { query: { warehouse_id: warehouseId || undefined } },
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "读取截单计划失败", result.response.status);
+      }
+      return result.data.data;
+    },
+    enabled: Boolean(warehouseId),
+  });
+}
+
+export function useManualDeliveryNoteCutoffMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryNoteGroup, ApiError, ManualDeliveryNoteCutoffRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST(
+        "/api/v1/print-orchestration/delivery-note-groups/manual-cutoff",
+        {
+          params: { header: { "Idempotency-Key": idempotencyKey("web-h9-manual-cutoff") } },
+          body,
+        },
+      );
+      if (!result.data) {
+        throw new ApiError(result.error, "人工截单失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+  });
+}
+
+export function usePublishRouteBindingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<RouteBinding, ApiError, PublishRouteBindingRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST("/api/v1/print-orchestration/route-bindings", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-h9-route-binding") } },
+        body,
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "发布线路绑定失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+  });
+}
+
+export function useCreateCutoffPlanMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<CutoffPlan, ApiError, CreateCutoffPlanRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST("/api/v1/print-orchestration/cutoff-plans", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-h9-cutoff-plan") } },
+        body,
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "新建截单计划失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+  });
+}
+
+export const usePublishCutoffPlanMutation = createVersionStateMutation<CutoffPlan>(
+  (planId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/cutoff-plans/{plan_id}/publish", {
+      params: {
+        path: { plan_id: planId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-cutoff-plan-publish",
+  "发布截单计划失败",
+);
+
+export function useAggregationFieldsQuery() {
+  return useQuery<AggregationFieldDefinition[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "aggregation-fields"],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/aggregation-fields");
+      if (!result.data) {
+        throw new ApiError(result.error, "读取归集字段目录失败", result.response.status);
+      }
+      return result.data.data;
+    },
+  });
+}
+
+export function useAggregationRulesQuery() {
+  return useQuery<AggregationRuleVersion[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "aggregation-rules"],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/aggregation-rules/versions");
+      if (!result.data) {
+        throw new ApiError(result.error, "读取归集规则版本失败", result.response.status);
+      }
+      return result.data.data;
+    },
+  });
+}
+
+export function useCreateAggregationRuleDraftMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<AggregationRuleVersion, ApiError, CreateAggregationRuleDraftRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST("/api/v1/print-orchestration/aggregation-rules/versions", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-h9-agg-rule-draft") } },
+        body,
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "创建归集规则草稿失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+  });
+}
+
+export function useTestAggregationRuleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<AggregationRuleTestResult, ApiError, { versionId: string; orderIds: string[] }>({
+    mutationFn: async ({ versionId, orderIds }) => {
+      const result = await api.POST(
+        "/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/test",
+        {
+          params: {
+            path: { version_id: versionId },
+            header: { "Idempotency-Key": idempotencyKey("web-h9-agg-rule-test") },
+          },
+          body: { order_ids: orderIds },
+        },
+      );
+      if (!result.data) {
+        throw new ApiError(result.error, "测试归集规则失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+  });
+}
+
+export const usePublishAggregationRuleMutation = createVersionStateMutation<AggregationRuleVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/publish", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-agg-rule-publish",
+  "发布归集规则失败",
+);
+
+export const useDisableAggregationRuleMutation = createVersionStateMutation<AggregationRuleVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/aggregation-rules/versions/{version_id}/disable", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-agg-rule-disable",
+  "停用归集规则失败",
+);
+
+export function usePrintDocumentCategoriesQuery() {
+  return useQuery<PrintDocumentCategory[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "print-document-categories"],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/print-document-categories");
+      if (!result.data) {
+        throw new ApiError(result.error, "读取打印单据分类字典失败", result.response.status);
+      }
+      return result.data.data;
+    },
+  });
+}
+
+export function usePrintSuitesQuery() {
+  return useQuery<PrintSuiteVersion[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "print-suites"],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/print-suites/versions");
+      if (!result.data) {
+        throw new ApiError(result.error, "读取打印组套版本失败", result.response.status);
+      }
+      return result.data.data;
+    },
+  });
+}
+
+export function usePrintSuiteInstancesQuery(groupId: string | null) {
+  return useQuery<PrintSuiteInstance[], ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "suite-instances", groupId ?? "all"],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/print-orchestration/suite-instances", {
+        params: { query: { group_id: groupId || undefined } },
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "读取组套实例失败", result.response.status);
+      }
+      return result.data.data;
+    },
+  });
+}
+
+export function useCategoryPdfsQuery(instanceId: string | null) {
+  return useQuery<CategoryPdfOutputListResponse, ApiError>({
+    queryKey: [...printOrchestrationQueryKey, "category-pdfs", instanceId ?? "none"],
+    queryFn: async () => {
+      if (!instanceId) {
+        return { data: [], preparation_status: null, retry_idempotency_key: null };
+      }
+      const result = await api.GET(
+        "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs",
+        { params: { path: { instance_id: instanceId } } },
+      );
+      if (!result.data) {
+        throw new ApiError(result.error, "读取分类 PDF 失败", result.response.status);
+      }
+      return result.data;
+    },
+    enabled: Boolean(instanceId),
+  });
+}
+
+export function usePrepareCategoryPdfsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    CategoryPdfPreparation,
+    ApiError,
+    { instanceId: string; idempotencyKey: string }
+  >({
+    mutationFn: async ({ instanceId, idempotencyKey: requestKey }) => {
+      const result = await api.POST(
+        "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/prepare",
+        {
+          params: {
+            path: { instance_id: instanceId },
+            header: { "Idempotency-Key": requestKey },
+          },
+        },
+      );
+      if (!result.data) {
+        throw new ApiError(result.error, "生成分类 PDF 失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: [...printOrchestrationQueryKey, "category-pdfs", variables.instanceId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...printOrchestrationQueryKey, "suite-instances"],
+      });
+    },
+  });
+}
+
+export function useDownloadCategoryPdfsMutation(emergencyPrint: boolean) {
+  return useMutation<
+    Blob,
+    ApiError,
+    { instanceId: string; categoryPdfIds: string[] }
+  >({
+    mutationFn: async ({ instanceId, categoryPdfIds }) => {
+      const path = emergencyPrint
+        ? "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/emergency-print"
+        : "/api/v1/print-orchestration/suite-instances/{instance_id}/category-pdfs/download";
+      const result = await api.POST(path, {
+        params: { path: { instance_id: instanceId } },
+        body: { category_pdf_ids: categoryPdfIds },
+        parseAs: "blob",
+      });
+      if (!result.data) {
+        throw new ApiError(
+          result.error,
+          emergencyPrint ? "打开应急打印 PDF 失败" : "下载分类 PDF 失败",
+          result.response.status,
+        );
+      }
+      return result.data;
+    },
+  });
+}
+
+export function useCreatePrintSuiteDraftMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<PrintSuiteVersion, ApiError, CreatePrintSuiteDraftRequest>({
+    mutationFn: async (body) => {
+      const result = await api.POST("/api/v1/print-orchestration/print-suites/versions", {
+        params: { header: { "Idempotency-Key": idempotencyKey("web-h9-print-suite-draft") } },
+        body,
+      });
+      if (!result.data) {
+        throw new ApiError(result.error, "创建打印组套草稿失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+  });
+}
+
+export function useTestPrintSuiteMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<PrintSuiteTestResult, ApiError, { versionId: string; groupIds: string[] }>({
+    mutationFn: async ({ versionId, groupIds }) => {
+      const result = await api.POST(
+        "/api/v1/print-orchestration/print-suites/versions/{version_id}/test",
+        {
+          params: {
+            path: { version_id: versionId },
+            header: { "Idempotency-Key": idempotencyKey("web-h9-print-suite-test") },
+          },
+          body: { group_ids: groupIds },
+        },
+      );
+      if (!result.data) {
+        throw new ApiError(result.error, "测试打印组套失败", result.response.status);
+      }
+      return result.data;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+  });
+}
+
+export const usePublishPrintSuiteMutation = createVersionStateMutation<PrintSuiteVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/print-suites/versions/{version_id}/publish", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-print-suite-publish",
+  "发布打印组套失败",
+);
+
+export const useDisablePrintSuiteMutation = createVersionStateMutation<PrintSuiteVersion>(
+  (versionId, requestKey) =>
+    api.POST("/api/v1/print-orchestration/print-suites/versions/{version_id}/disable", {
+      params: {
+        path: { version_id: versionId },
+        header: { "Idempotency-Key": requestKey },
+      },
+    }),
+  "web-h9-print-suite-disable",
+  "停用打印组套失败",
+);
+
+// 版本发布/停用类变更的通用工厂：统一负责 queryClient 失效、幂等键生成与错误包装，
+// 具体接口调用（字面量路径以保留 openapi-fetch 类型推导）由调用方以闭包形式提供。
+type VersionStateApiResult<TVersion> = {
+  data?: TVersion | undefined;
+  error?: components["schemas"]["ErrorResponse"] | undefined;
+  response: Response;
+};
+
+function createVersionStateMutation<TVersion>(
+  apiCall: (versionId: string, requestKey: string) => Promise<VersionStateApiResult<TVersion>>,
+  idempotencyPrefix: string,
+  failureMessage: string,
+) {
+  return function useVersionStateMutation() {
+    const queryClient = useQueryClient();
+    return useMutation<TVersion, ApiError, string>({
+      mutationFn: async (versionId) => {
+        const result = await apiCall(versionId, idempotencyKey(idempotencyPrefix));
+        if (!result.data) {
+          throw new ApiError(result.error, failureMessage, result.response.status);
+        }
+        return result.data;
+      },
+      onSuccess: () => void queryClient.invalidateQueries({ queryKey: printOrchestrationQueryKey }),
+    });
+  };
+}
+
+function idempotencyKey(prefix: string) {
+  return `${prefix}-${globalThis.crypto.randomUUID()}`;
+}
