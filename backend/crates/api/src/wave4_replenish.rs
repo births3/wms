@@ -14,12 +14,27 @@ use crate::{
 
 fn map_fill_error(error: ReplenishmentError) -> Wave4RepositoryError {
     match error {
-        ReplenishmentError::SourceUnavailable
+        ReplenishmentError::Database(error) => Wave4RepositoryError::Database(error.to_string()),
+        ReplenishmentError::PermissionDenied
         | ReplenishmentError::StrategyInvalid
         | ReplenishmentError::ScopeNotFound
+        | ReplenishmentError::LocationBound
+        | ReplenishmentError::TaskNotFound
+        | ReplenishmentError::StrategyNotFound
+        | ReplenishmentError::GroupNotFound
+        | ReplenishmentError::SourceUnavailable
+        | ReplenishmentError::NumberingUnavailable
         | ReplenishmentError::PutawayBlocked
-        | ReplenishmentError::NumberingUnavailable => Wave4RepositoryError::ReplenishmentGap,
-        other => Wave4RepositoryError::Database(format!("{other:?}")),
+        | ReplenishmentError::ClaimConflict
+        | ReplenishmentError::QtyExceeded
+        | ReplenishmentError::SourceMismatch
+        | ReplenishmentError::TargetMismatch
+        | ReplenishmentError::StateInvalid
+        | ReplenishmentError::CancelBlocked
+        | ReplenishmentError::ReturnBlocked
+        | ReplenishmentError::ZoneDenied
+        | ReplenishmentError::IdempotencyRequired
+        | ReplenishmentError::IdempotencyConflict => Wave4RepositoryError::ReplenishmentGap,
     }
 }
 
