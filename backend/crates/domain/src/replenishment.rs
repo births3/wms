@@ -249,6 +249,9 @@ pub struct ReplenishmentTask {
     pub last_progress_at: Option<DateTime<Utc>>,
     pub return_reason: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub confirmed_at: Option<DateTime<Utc>>,
+    pub cancel_reason: Option<String>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

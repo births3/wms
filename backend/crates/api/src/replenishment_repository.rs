@@ -719,6 +719,9 @@ struct TaskRow {
     last_progress_at: Option<chrono::DateTime<chrono::Utc>>,
     return_reason: Option<String>,
     created_at: chrono::DateTime<chrono::Utc>,
+    confirmed_at: Option<chrono::DateTime<chrono::Utc>>,
+    cancel_reason: Option<String>,
+    updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl From<TaskRow> for ReplenishmentTask {
@@ -750,6 +753,9 @@ impl From<TaskRow> for ReplenishmentTask {
             last_progress_at: row.last_progress_at,
             return_reason: row.return_reason,
             created_at: row.created_at,
+            confirmed_at: row.confirmed_at,
+            cancel_reason: row.cancel_reason,
+            updated_at: row.updated_at,
         }
     }
 }

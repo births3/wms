@@ -18,6 +18,8 @@ pub struct ListReplenishmentTasksFilter {
     pub keyword: Option<String>,
     pub created_from: Option<DateTime<Utc>>,
     pub created_to: Option<DateTime<Utc>>,
+    pub limit: Option<u32>,
+    pub cursor: Option<String>,
 }
 
 pub struct ExecuteListFilter {
@@ -86,6 +88,13 @@ impl PgReplenishmentRepository {
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty());
+        let limit = filter.limit.unwrap_or(100).clamp(1, 200);
+        let offset = filter
+            .cursor
+            .as_deref()
+            .and_then(|value| value.parse::<i64>().ok())
+            .filter(|value| *value >= 0)
+            .unwrap_or(0);
         sqlx::query_as::<_, TaskRow>(
             r#"
             SELECT t.id, t.owner_id, t.task_no, t.trigger_mode, t.priority, t.strategy_id,
@@ -93,7 +102,8 @@ impl PgReplenishmentRepository {
                    t.product_id, t.batch_no, t.qty, t.picked_qty, t.done_qty, t.status, t.operator_id,
                    t.created_by, t.version,
                    t.wave_id, t.outbound_order_id, t.outbound_line_no,
-                   t.claimed_at, t.last_progress_at, t.return_reason, t.created_at
+                   t.claimed_at, t.last_progress_at, t.return_reason, t.created_at,
+                   t.confirmed_at, t.cancel_reason, t.updated_at
               FROM replenishment_tasks t
               JOIN warehouse_locations loc
                 ON loc.id = t.target_location_id
@@ -127,6 +137,7 @@ impl PgReplenishmentRepository {
                CASE WHEN $4::uuid IS NOT NULL AND t.priority = 'urgent' THEN 0 ELSE 1 END,
                loc.pick_sequence_no ASC NULLS LAST,
                t.task_no
+             LIMIT $16 OFFSET $17
             "#,
         )
         .bind(owner_id)
@@ -144,6 +155,8 @@ impl PgReplenishmentRepository {
         .bind(keyword)
         .bind(filter.created_from)
         .bind(filter.created_to)
+        .bind(i64::from(limit) + 1)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map(|rows| rows.into_iter().map(Into::into).collect())
@@ -161,7 +174,8 @@ impl PgReplenishmentRepository {
                    product_id, batch_no, qty, picked_qty, done_qty, status, operator_id,
                    created_by, version,
                    wave_id, outbound_order_id, outbound_line_no,
-                   claimed_at, last_progress_at, return_reason, created_at
+                   claimed_at, last_progress_at, return_reason, created_at,
+                   confirmed_at, cancel_reason, updated_at
               FROM replenishment_tasks
              WHERE owner_id = $1 AND id = $2
             "#,
@@ -354,7 +368,8 @@ impl PgReplenishmentRepository {
                    product_id, batch_no, qty, picked_qty, done_qty, status,
                    operator_id, created_by, version,
                    wave_id, outbound_order_id, outbound_line_no,
-                   claimed_at, last_progress_at, return_reason, created_at
+                   claimed_at, last_progress_at, return_reason, created_at,
+                   confirmed_at, cancel_reason, updated_at
               FROM replenishment_tasks
              WHERE owner_id = $1 AND id = $2
              FOR UPDATE
@@ -485,7 +500,8 @@ impl PgReplenishmentRepository {
                       product_id, batch_no, qty, picked_qty, done_qty, status,
                       operator_id, created_by, version,
                       wave_id, outbound_order_id, outbound_line_no,
-                      claimed_at, last_progress_at, return_reason, created_at
+                      claimed_at, last_progress_at, return_reason, created_at,
+                      confirmed_at, cancel_reason, updated_at
             "#,
         )
         .bind(task.owner_id)
@@ -551,7 +567,8 @@ impl PgReplenishmentRepository {
                       product_id, batch_no, qty, picked_qty, done_qty, status,
                       operator_id, created_by, version,
                       wave_id, outbound_order_id, outbound_line_no,
-                      claimed_at, last_progress_at, return_reason, created_at
+                      claimed_at, last_progress_at, return_reason, created_at,
+                      confirmed_at, cancel_reason, updated_at
             "#,
         )
         .bind(task.owner_id)
@@ -637,7 +654,8 @@ impl PgReplenishmentRepository {
                       product_id, batch_no, qty, picked_qty, done_qty, status,
                       operator_id, created_by, version,
                       wave_id, outbound_order_id, outbound_line_no,
-                      claimed_at, last_progress_at, return_reason, created_at
+                      claimed_at, last_progress_at, return_reason, created_at,
+                      confirmed_at, cancel_reason, updated_at
             "#,
         )
         .bind(id)

@@ -352,6 +352,8 @@ struct ListTasksQuery {
     keyword: Option<String>,
     created_from: Option<chrono::DateTime<chrono::Utc>>,
     created_to: Option<chrono::DateTime<chrono::Utc>>,
+    limit: Option<u32>,
+    cursor: Option<String>,
 }
 
 async fn list_tasks_handler(
@@ -379,6 +381,8 @@ async fn list_tasks_handler(
                     keyword: query.keyword,
                     created_from: query.created_from,
                     created_to: query.created_to,
+                    limit: query.limit,
+                    cursor: query.cursor,
                 },
             )
             .await?,

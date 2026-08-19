@@ -168,6 +168,17 @@ pub(crate) fn disable_replenishment_location_group() {}
     params(
         ("status" = Option<String>, Query, description = "任务状态"),
         ("trigger_mode" = Option<String>, Query, description = "触发模式"),
+        ("priority" = Option<String>, Query, description = "优先级"),
+        ("source_location_id" = Option<Uuid>, Query, description = "来源库位"),
+        ("target_location_id" = Option<Uuid>, Query, description = "目标库位"),
+        ("location_id" = Option<Uuid>, Query, description = "来源或目标库位"),
+        ("operator_id" = Option<Uuid>, Query, description = "作业员"),
+        ("wave_id" = Option<Uuid>, Query, description = "波次"),
+        ("keyword" = Option<String>, Query, description = "任务号"),
+        ("created_from" = Option<String>, Query, description = "创建起始时间"),
+        ("created_to" = Option<String>, Query, description = "创建截止时间"),
+        ("limit" = Option<u32>, Query, description = "每页条数"),
+        ("cursor" = Option<String>, Query, description = "分页游标"),
     ),
     responses((status = 200, description = "补货任务列表", body = ReplenishmentTaskListResponse)),
 )]

@@ -371,17 +371,33 @@ impl ReplenishmentService {
                 .await?;
             Some(scope.to_list_filter(ctx.user_id))
         };
-        let data = self
+        let limit = filter.limit.unwrap_or(100).clamp(1, 200);
+        let offset = filter
+            .cursor
+            .as_deref()
+            .and_then(|value| value.parse::<u32>().ok())
+            .unwrap_or(0);
+        let mut data = self
             .repo
             .list_tasks(ctx.owner_id, filter, execute.as_ref())
             .await?;
+        let next_cursor = if u32::try_from(data.len()).unwrap_or(u32::MAX) > limit {
+            data.pop();
+            Some(
+                offset
+                    .saturating_add(u32::try_from(data.len()).unwrap_or(0))
+                    .to_string(),
+            )
+        } else {
+            None
+        };
         let count = u32::try_from(data.len()).unwrap_or(u32::MAX);
         Ok(ReplenishmentTaskListResponse {
             data,
             page: PageMeta {
-                next_cursor: None,
+                next_cursor,
                 count,
-                total: Some(count),
+                total: None,
             },
         })
     }
