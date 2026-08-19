@@ -463,10 +463,10 @@ async fn patrol_category_scope_skips_unrelated_product(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn patrol_skips_target_lock_out_and_source_lock_in(pool: PgPool) {
+async fn patrol_skips_target_lock_in_and_source_lock_out(pool: PgPool) {
     let world = seed_world(&pool, 2, 30).await;
     sqlx::query(
-        "UPDATE warehouse_locations SET lock_status = 'lock_out' WHERE id = $1 AND owner_id = $2",
+        "UPDATE warehouse_locations SET lock_status = 'lock_in' WHERE id = $1 AND owner_id = $2",
     )
     .bind(world.pick_id)
     .bind(world.owner_id)
@@ -487,7 +487,7 @@ async fn patrol_skips_target_lock_out_and_source_lock_in(pool: PgPool) {
     .await
     .expect("unlock target");
     sqlx::query(
-        "UPDATE warehouse_locations SET lock_status = 'lock_in' WHERE id = $1 AND owner_id = $2",
+        "UPDATE warehouse_locations SET lock_status = 'lock_out' WHERE id = $1 AND owner_id = $2",
     )
     .bind(world.storage_id)
     .bind(world.owner_id)

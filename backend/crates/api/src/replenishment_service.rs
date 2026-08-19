@@ -411,7 +411,7 @@ impl ReplenishmentService {
         if !zone_treats_as_qualified(&target.quality_color) {
             return Err(ReplenishmentError::PutawayBlocked);
         }
-        if target.lock_status == "lock_out" || target.lock_status == "lock_all" {
+        if !wms_domain::location_allows_inbound(&target.lock_status) {
             return Err(ReplenishmentError::PutawayBlocked);
         }
         if self
@@ -464,7 +464,7 @@ impl ReplenishmentService {
         if source.status != "qualified" {
             return Err(ReplenishmentError::SourceUnavailable);
         }
-        if source.lock_status == "lock_in" || source.lock_status == "lock_all" {
+        if !wms_domain::location_allows_outbound(&source.lock_status) {
             return Err(ReplenishmentError::SourceUnavailable);
         }
         if matches!(

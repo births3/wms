@@ -136,7 +136,7 @@ impl ReplenishmentService {
             .load_location_route(&mut tx, ctx.owner_id, task.source_location_id)
             .await?
             .ok_or(ReplenishmentError::TaskNotFound)?;
-        if source_route.lock_status == "lock_in" || source_route.lock_status == "lock_all" {
+        if !wms_domain::location_allows_outbound(&source_route.lock_status) {
             return Err(ReplenishmentError::SourceUnavailable);
         }
         if let Some(suspended) = self

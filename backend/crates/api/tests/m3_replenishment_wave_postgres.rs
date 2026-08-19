@@ -344,7 +344,7 @@ async fn fill_wave_pick_gaps_skips_putaway_blocked_without_failing(pool: PgPool)
     let world = seed_world(&pool, 0, 30).await;
     insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
     sqlx::query(
-        "UPDATE warehouse_locations SET lock_status = 'lock_out' WHERE id = $1 AND owner_id = $2",
+        "UPDATE warehouse_locations SET lock_status = 'lock_in' WHERE id = $1 AND owner_id = $2",
     )
     .bind(world.pick_id)
     .bind(world.owner_id)

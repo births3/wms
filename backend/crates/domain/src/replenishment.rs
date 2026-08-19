@@ -47,6 +47,16 @@ pub fn validate_replenish_route(
     }
 }
 
+/// P1 库位锁：`lock_in` 禁入、`lock_out` 禁出、`lock_all` 全锁。
+pub fn location_allows_inbound(lock_status: &str) -> bool {
+    matches!(lock_status, "normal" | "lock_out")
+}
+
+/// 来源下架走禁出方向：禁入位仍可出，禁出/全锁不可出。
+pub fn location_allows_outbound(lock_status: &str) -> bool {
+    matches!(lock_status, "normal" | "lock_in")
+}
+
 pub struct AvailableQtyInput {
     pub qty_on_hand: Quantity,
     pub qty_allocated: Quantity,
@@ -321,6 +331,18 @@ mod tests {
                 target_type: LOCATION_TYPE_STORAGE.to_string(),
             }
         );
+    }
+
+    #[test]
+    fn location_lock_polarity_matches_p1_inbound_outbound() {
+        assert!(location_allows_inbound("normal"));
+        assert!(location_allows_inbound("lock_out"));
+        assert!(!location_allows_inbound("lock_in"));
+        assert!(!location_allows_inbound("lock_all"));
+        assert!(location_allows_outbound("normal"));
+        assert!(location_allows_outbound("lock_in"));
+        assert!(!location_allows_outbound("lock_out"));
+        assert!(!location_allows_outbound("lock_all"));
     }
 
     #[test]

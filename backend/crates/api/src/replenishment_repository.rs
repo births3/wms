@@ -510,7 +510,7 @@ impl PgReplenishmentRepository {
                AND batch.product_id = $2
                AND batch.status = 'qualified'
                AND location.location_type = $3
-               AND location.lock_status IN ('normal', 'lock_out')
+               AND location.lock_status IN ('normal', 'lock_in')
                AND COALESCE(container.current_lock_category, 'qualified')
                    NOT IN ('quarantine', 'rejected')
                AND batch.qty_on_hand - batch.qty_allocated - batch.qty_frozen
