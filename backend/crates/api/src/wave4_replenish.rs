@@ -17,7 +17,8 @@ fn map_fill_error(error: ReplenishmentError) -> Wave4RepositoryError {
         ReplenishmentError::SourceUnavailable
         | ReplenishmentError::StrategyInvalid
         | ReplenishmentError::ScopeNotFound
-        | ReplenishmentError::PutawayBlocked => Wave4RepositoryError::ReplenishmentGap,
+        | ReplenishmentError::PutawayBlocked
+        | ReplenishmentError::NumberingUnavailable => Wave4RepositoryError::ReplenishmentGap,
         other => Wave4RepositoryError::Database(format!("{other:?}")),
     }
 }

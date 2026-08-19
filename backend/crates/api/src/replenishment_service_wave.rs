@@ -64,7 +64,7 @@ impl ReplenishmentService {
             .await?;
         let ratio_tenths = self
             .repo
-            .runtime_setting(Some(ctx.owner_id), "replenishment.full_lpn_ratio")
+            .runtime_setting_in_tx(tx, Some(ctx.owner_id), "replenishment.full_lpn_ratio")
             .await?
             .as_deref()
             .and_then(super::ratio_to_tenths)

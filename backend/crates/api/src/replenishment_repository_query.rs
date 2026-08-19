@@ -183,16 +183,6 @@ impl PgReplenishmentRepository {
                AND location.warehouse_id = $2
                AND location.location_type IN ('piece_pick', 'case_pick')
                AND location.status <> 'disabled'
-               AND (
-                    EXISTS (
-                        SELECT 1
-                          FROM inventory_batches batch
-                         WHERE batch.owner_id = location.owner_id
-                           AND batch.location_id = location.id
-                           AND batch.product_id = $3
-                    )
-                    OR location.replenish_strategy_id IS NOT NULL
-               )
              ORDER BY
                EXISTS (
                     SELECT 1
@@ -326,6 +316,33 @@ impl PgReplenishmentRepository {
         .bind(owner_id)
         .bind(key)
         .fetch_optional(&self.pool)
+        .await
+    }
+
+    pub async fn runtime_setting_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        owner_id: Option<Uuid>,
+        key: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(item.params ->> 'value', item.item_name)
+              FROM system_dictionary_items item
+             WHERE item.dict_code = 'replenishment_runtime'
+               AND item.item_code = $2
+               AND item.enabled
+               AND (
+                    item.owner_id IS NULL
+                    OR ($1::uuid IS NOT NULL AND item.owner_id = $1)
+               )
+             ORDER BY item.owner_id NULLS LAST
+             LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(key)
+        .fetch_optional(&mut **tx)
         .await
     }
 }

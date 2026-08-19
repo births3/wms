@@ -686,6 +686,21 @@ async fn fill_wave_pick_gaps_ignores_storage_allocation_location(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn fill_wave_pick_gaps_uses_default_route_when_pick_unbound(pool: PgPool) {
+    let world = seed_world(&pool, 0, 30).await;
+    let wave_id = Uuid::new_v4();
+    insert_wave_order(&pool, &world, wave_id, 8).await;
+    let created = service(pool)
+        .fill_wave_pick_gaps(world.owner_id, wave_id)
+        .await
+        .expect("fill");
+    assert_eq!(created.len(), 1);
+    assert_eq!(created[0].trigger_mode, "wave_gap");
+    assert_eq!(created[0].target_location_id, world.pick_id);
+    assert!(created[0].strategy_id.is_none());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn wave4_replenish_after_allocate_uses_pick_face_gap(pool: PgPool) {
     let world = seed_world(&pool, 3, 30).await;
     insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;

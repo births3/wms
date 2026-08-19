@@ -550,8 +550,8 @@ impl IntoResponse for ReplenishmentHandlerError {
             ),
             Self::Service(ReplenishmentError::Database(_)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "M3_REPLENISH_STATE_INVALID",
-                "补货策略处理失败",
+                "M3_REPLENISH_INTERNAL",
+                "补货持久化失败",
             ),
             Self::Auth(_) => unreachable!("auth error returned above"),
         };
