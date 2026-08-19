@@ -15,6 +15,7 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         id: Uuid,
     ) -> Result<Option<ReplenishmentStrategy>, sqlx::Error> {
+        super::set_lock_timeout(tx).await?;
         sqlx::query_as::<_, StrategyRow>(
             r#"
             SELECT id, owner_id, strategy_code, strategy_name, scope_type, scope_ref,

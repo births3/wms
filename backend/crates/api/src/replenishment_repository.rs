@@ -30,7 +30,18 @@ impl PgReplenishmentRepository {
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
+}
 
+pub(crate) async fn set_lock_timeout(
+    tx: &mut Transaction<'_, Postgres>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("SET LOCAL lock_timeout = '3s'")
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+impl PgReplenishmentRepository {
     pub async fn insert_strategy(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -418,6 +429,7 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         batch_id: Uuid,
     ) -> Result<Option<SourceBatchLock>, sqlx::Error> {
+        set_lock_timeout(tx).await?;
         sqlx::query_as::<_, SourceBatchLock>(
             r#"
             SELECT batch.id,
@@ -465,6 +477,7 @@ impl PgReplenishmentRepository {
         source_type: &str,
         min_qty: Quantity,
     ) -> Result<Option<SourceBatchLock>, sqlx::Error> {
+        set_lock_timeout(tx).await?;
         sqlx::query_as::<_, SourceBatchLock>(
             r#"
             SELECT batch.id,

@@ -361,6 +361,7 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         task_id: Uuid,
     ) -> Result<Option<ReplenishmentTask>, sqlx::Error> {
+        super::set_lock_timeout(tx).await?;
         sqlx::query_as::<_, TaskRow>(
             r#"
             SELECT id, owner_id, task_no, trigger_mode, priority, strategy_id,
@@ -454,6 +455,7 @@ impl PgReplenishmentRepository {
         product_id: Uuid,
         batch_no: &str,
     ) -> Result<Option<Uuid>, sqlx::Error> {
+        super::set_lock_timeout(tx).await?;
         sqlx::query_scalar(
             r#"
             SELECT id
@@ -522,6 +524,7 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         batch_id: Uuid,
     ) -> Result<Option<Quantity>, sqlx::Error> {
+        super::set_lock_timeout(tx).await?;
         sqlx::query_scalar(
             r#"
             SELECT qty_on_hand - qty_allocated - qty_frozen - qty_replenish_out_transit
