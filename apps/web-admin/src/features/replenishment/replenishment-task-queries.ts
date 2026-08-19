@@ -32,10 +32,13 @@ export type ReplenishmentTaskListQuery = {
   status?: string;
   trigger_mode?: string;
   priority?: string;
-  location_id?: string;
+  source_location_id?: string;
+  target_location_id?: string;
   operator_id?: string;
   wave_id?: string;
   keyword?: string;
+  created_from?: string;
+  created_to?: string;
 };
 
 export function useReplenishmentTasksQuery(filters?: ReplenishmentTaskListQuery) {
@@ -48,10 +51,13 @@ export function useReplenishmentTasksQuery(filters?: ReplenishmentTaskListQuery)
             status: emptyToUndefined(filters?.status),
             trigger_mode: emptyToUndefined(filters?.trigger_mode),
             priority: emptyToUndefined(filters?.priority),
-            location_id: emptyToUndefined(filters?.location_id),
+            source_location_id: emptyToUndefined(filters?.source_location_id),
+            target_location_id: emptyToUndefined(filters?.target_location_id),
             operator_id: emptyToUndefined(filters?.operator_id),
             wave_id: emptyToUndefined(filters?.wave_id),
             keyword: emptyToUndefined(filters?.keyword),
+            created_from: emptyToUndefined(filters?.created_from),
+            created_to: emptyToUndefined(filters?.created_to),
           },
         },
       });

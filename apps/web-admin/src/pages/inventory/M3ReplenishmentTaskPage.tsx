@@ -43,7 +43,11 @@ export const queryFields: QueryPanelField[] = [
   { key: "status", label: COLUMN_STATUS, type: "multiSelect", options: [{ label: FILTER_ALL, value: "" }, { label: "待领取", value: "pending" }, { label: "作业中", value: "in_progress" }, { label: "挂起", value: "suspended" }, { label: "完成", value: "done" }, { label: "取消", value: "cancelled" }] },
   { key: "trigger_mode", label: "触发模式", type: "multiSelect", options: [{ label: FILTER_ALL, value: "" }, { label: "Min-Max", value: "min_max" }, { label: "波次缺口", value: "wave_gap" }, { label: "手工", value: "manual" }] },
   { key: "priority", label: "优先级", type: "multiSelect", options: [{ label: FILTER_ALL, value: "" }, { label: "紧急", value: "urgent" }, { label: "普通", value: "normal" }] },
-  { key: "location", label: "库位", type: "text", placeholder: "来源/目标库位 ID" },
+  { key: "keyword", label: "任务号", type: "text", placeholder: "任务号" },
+  { key: "wave_id", label: "波次", type: "text", placeholder: "波次 ID" },
+  { key: "source_location_id", label: "来源位", type: "text", placeholder: "来源库位 ID" },
+  { key: "target_location_id", label: "目标位", type: "text", placeholder: "目标库位 ID" },
+  { key: "created_at", label: "创建时间", type: "dateRange" },
   { key: "operator", label: "作业员", type: "text", placeholder: "作业员 ID" },
   { key: "owner", label: "货主", type: "text", placeholder: "货主 ID" },
 ];
@@ -215,9 +219,18 @@ export function M3ReplenishmentTaskPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="grid gap-1 text-sm">{label}{children}</label>;
 }
-function defaultQuery(): QueryPanelValue { return { status: "", trigger_mode: "", priority: "", location: "", operator: "", owner: "" }; }
+function defaultQuery(): QueryPanelValue { return { status: "", trigger_mode: "", priority: "", keyword: "", wave_id: "", source_location_id: "", target_location_id: "", created_at: { from: "", to: "" }, operator: "", owner: "" }; }
 function normalizeQuery(value: QueryPanelValue): QueryPanelValue {
-  return { status: queryString(value.status), trigger_mode: queryString(value.trigger_mode), priority: queryString(value.priority), location: queryString(value.location), operator: queryString(value.operator), owner: queryString(value.owner) };
+  return { status: queryString(value.status), trigger_mode: queryString(value.trigger_mode), priority: queryString(value.priority), keyword: queryString(value.keyword), wave_id: queryString(value.wave_id), source_location_id: queryString(value.source_location_id), target_location_id: queryString(value.target_location_id), created_at: dateRangeValue(value.created_at), operator: queryString(value.operator), owner: queryString(value.owner) };
+}
+function dateRangeValue(value: QueryPanelValue[string]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { from: "", to: "" };
+  }
+  return {
+    from: typeof value.from === "string" ? value.from : "",
+    to: typeof value.to === "string" ? value.to : "",
+  };
 }
 function emptyForm(): CreateForm { return { sourceLocationId: "", sourceBatchId: "", targetLocationId: "", qty: "1" }; }
 function statusLabel(status: string) {
@@ -247,12 +260,28 @@ function isTimeoutRow(row: ReplenishmentTask) {
   return false;
 }
 function toTaskFilters(query: QueryPanelValue) {
+  const created = dateRangeOf(query.created_at);
   return {
     status: queryString(query.status),
     trigger_mode: queryString(query.trigger_mode),
     priority: queryString(query.priority),
-    location_id: queryString(query.location),
+    source_location_id: queryString(query.source_location_id),
+    target_location_id: queryString(query.target_location_id),
     operator_id: queryString(query.operator),
+    wave_id: queryString(query.wave_id),
     keyword: queryString(query.keyword),
+    created_from: created.from,
+    created_to: created.to,
+  };
+}
+function dateRangeOf(value: QueryPanelValue[string]) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { from: undefined, to: undefined };
+  }
+  const from = typeof value.from === "string" ? value.from : "";
+  const to = typeof value.to === "string" ? value.to : "";
+  return {
+    from: from ? `${from}T00:00:00Z` : undefined,
+    to: to ? `${to}T23:59:59Z` : undefined,
   };
 }
