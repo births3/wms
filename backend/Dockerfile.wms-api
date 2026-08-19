@@ -1,0 +1,39 @@
+FROM rust:1.91-bookworm AS builder
+WORKDIR /app
+
+COPY backend/Cargo.toml backend/Cargo.lock ./backend/
+COPY backend/crates ./backend/crates
+COPY backend/migrations ./backend/migrations
+
+WORKDIR /app/backend
+RUN cargo build --release --bin wms-api && \
+    cargo build --release --example wms_api_e2e && \
+    cargo build --release --bin wms-db-migrate && \
+    cargo build --release --bin wms-deploy-audit && \
+    cargo build --release --bin wms-audit-baseline-load && \
+    cargo build --release --bin audit-maintenance && \
+    cp /app/backend/target/release/wms-api /tmp/wms-api && \
+    cp /app/backend/target/release/examples/wms_api_e2e /tmp/wms-api-e2e && \
+    cp /app/backend/target/release/wms-db-migrate /tmp/wms-db-migrate && \
+    cp /app/backend/target/release/wms-deploy-audit /tmp/wms-deploy-audit && \
+    cp /app/backend/target/release/wms-audit-baseline-load /tmp/wms-audit-baseline-load && \
+    cp /app/backend/target/release/audit-maintenance /tmp/audit-maintenance
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --system wms && useradd --system --gid wms --home-dir /app wms
+WORKDIR /app
+
+COPY --from=builder /tmp/wms-api /app/wms-api
+COPY --from=builder /tmp/wms-api-e2e /app/wms-api-e2e
+COPY --from=builder /tmp/wms-db-migrate /app/wms-db-migrate
+COPY --from=builder /tmp/wms-deploy-audit /app/wms-deploy-audit
+COPY --from=builder /tmp/wms-audit-baseline-load /app/wms-audit-baseline-load
+COPY --from=builder /tmp/audit-maintenance /app/audit-maintenance
+COPY deploy/feature_flags.toml /app/deploy/feature_flags.toml
+
+USER wms:wms
+EXPOSE 8080
+ENTRYPOINT ["/app/wms-api"]
