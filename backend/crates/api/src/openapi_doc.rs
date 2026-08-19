@@ -59,6 +59,12 @@ use wms_domain::{
         description = "Wave 5 增值模块与横向能力契约",
     ),
     paths(
+        create_wcs_task,
+        list_wcs_tasks,
+        get_wcs_task,
+        resend_wcs_task,
+        void_wcs_task,
+        report_device_event,
         register_iot_device,
         list_iot_devices,
         get_iot_device,

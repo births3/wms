@@ -242,6 +242,41 @@ impl IntoResponse for DeviceHandlerError {
                     "M1_BIND_NOT_FOUND",
                     "绑定不存在或已解绑",
                 ),
+                DeviceError::TaskNotFound => (
+                    StatusCode::NOT_FOUND,
+                    "M1_WCS_TASK_NOT_FOUND",
+                    "指令任务不存在",
+                ),
+                DeviceError::TaskStateInvalid => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_WCS_TASK_STATE_INVALID",
+                    "指令任务状态迁移非法",
+                ),
+                DeviceError::TaskVoidBlocked => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_WCS_TASK_VOID_BLOCKED",
+                    "已落账指令任务不可作废",
+                ),
+                DeviceError::PtLightBusy => (
+                    StatusCode::CONFLICT,
+                    "M1_PTL_LIGHT_BUSY",
+                    "同一 PTL 已有未完成亮灯任务",
+                ),
+                DeviceError::PtQtyDiffExceeded => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_PTL_QTY_DIFF_EXCEEDED",
+                    "拍灯数量差异超阈值",
+                ),
+                DeviceError::PodMoveActive => (
+                    StatusCode::CONFLICT,
+                    "M1_POD_MOVE_ACTIVE",
+                    "同一货架已有未完成搬运任务",
+                ),
+                DeviceError::EventTaskMismatch => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_EVENT_TASK_MISMATCH",
+                    "设备事件与指令任务不匹配",
+                ),
                 DeviceError::Database(_) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "M1_DEVICE_INTERNAL",

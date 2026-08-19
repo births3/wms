@@ -66,6 +66,7 @@ use wms_api::{
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::{wave4_router, Wave4AppState},
     wave5_handlers::{wave5_router, Wave5AppState},
+    wcs_task_handlers::{wcs_task_router, WcsTaskAppState},
     wechat_notify::{wechat_notify_router, WechatNotifyAppState},
 };
 use wms_domain::HealthzResponse;
@@ -147,6 +148,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     wms_api::h8_erp_messages::spawn_maintenance_job(pool.clone()).await?;
     wms_api::task_release_job::spawn(pool.clone());
     wms_api::device_heartbeat_job::spawn(pool.clone());
+    wms_api::wcs_task_timeout_job::spawn(pool.clone());
     wms_api::replenishment_min_max_job::spawn(pool.clone());
     wms_api::replenishment_timeout_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
@@ -374,6 +376,9 @@ fn app(
             shared_pool.clone(),
         )))
         .merge(device_router(DeviceAppState::with_postgres(
+            shared_pool.clone(),
+        )))
+        .merge(wcs_task_router(WcsTaskAppState::with_postgres(
             shared_pool.clone(),
         )))
         .merge(reconciliation_router(

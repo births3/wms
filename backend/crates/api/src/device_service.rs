@@ -29,6 +29,13 @@ pub enum DeviceError {
     BindConflict,
     BindDeviceMismatch,
     BindNotFound,
+    TaskNotFound,
+    TaskStateInvalid,
+    TaskVoidBlocked,
+    PtLightBusy,
+    PtQtyDiffExceeded,
+    PodMoveActive,
+    EventTaskMismatch,
     Database(String),
 }
 

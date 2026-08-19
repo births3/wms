@@ -240,6 +240,7 @@ mod replenishment;
 mod stock_adjustment;
 mod task_engine;
 mod task_type;
+mod wcs_task;
 
 pub(crate) use alert_definition::*;
 pub(crate) use alert_runtime::*;
@@ -267,6 +268,7 @@ pub(crate) use replenishment::*;
 pub(crate) use stock_adjustment::*;
 pub(crate) use task_engine::*;
 pub(crate) use task_type::*;
+pub(crate) use wcs_task::*;
 
 pub use wms_domain::{
     ApproveDrugInspectionCopyOversizeRequest, ConfirmFileUploadRequest,
