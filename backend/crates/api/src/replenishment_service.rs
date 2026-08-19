@@ -40,7 +40,7 @@ use crate::{
 };
 
 const MANAGE: &str = "m3.replenishment.manage";
-const EXECUTE: &str = concat!("m3.replenishment", ".", "execute");
+const EXECUTE: &str = "m3.replenishment.execute";
 
 #[derive(Debug)]
 pub enum ReplenishmentError {

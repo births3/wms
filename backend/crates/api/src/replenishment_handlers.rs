@@ -447,10 +447,8 @@ impl From<ReplenishmentError> for ReplenishmentHandlerError {
 
 impl IntoResponse for ReplenishmentHandlerError {
     fn into_response(self) -> Response {
-        if let Self::Auth(error) = self {
-            return error.into_response();
-        }
         let (status, code, message) = match self {
+            Self::Auth(error) => return error.into_response(),
             Self::Service(ReplenishmentError::PermissionDenied) => (
                 StatusCode::FORBIDDEN,
                 "M3_REPLENISH_PERMISSION_DENIED",
@@ -557,7 +555,6 @@ impl IntoResponse for ReplenishmentHandlerError {
                 "M3_REPLENISH_INTERNAL",
                 "补货持久化失败",
             ),
-            Self::Auth(_) => unreachable!("auth error returned above"),
         };
         (
             status,

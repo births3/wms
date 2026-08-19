@@ -181,7 +181,6 @@ impl ReplenishmentService {
                 }
             }
         }
-        let _ = now;
         Ok(created)
     }
 
