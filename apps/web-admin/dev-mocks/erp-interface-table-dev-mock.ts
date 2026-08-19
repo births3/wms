@@ -1,0 +1,216 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+
+import { devOwnerId } from "./web-admin-dev-mock-model";
+import { sendError, sendJson } from "./web-admin-dev-mock-core-common";
+
+const connectorId = "00000000-0000-0000-0000-00000000e801";
+
+type DevInterfaceRow = {
+  row_id: string;
+  connector_id: string;
+  table_key: string;
+  owner_id: string;
+  warehouse_id: string | null;
+  business_key: string | null;
+  business_fields: Array<{ key: string; value: string | null }>;
+  event_type: string | null;
+  external_ref: string | null;
+  wms_resource_id: string | null;
+  sync_status: string;
+  retry_count: number;
+  last_error: string | null;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
+  payload_summary: string;
+};
+
+const rows: DevInterfaceRow[] = [
+  {
+    row_id: "1001",
+    connector_id: connectorId,
+    table_key: "x_wmsinter_InboundOrder",
+    owner_id: devOwnerId,
+    warehouse_id: null,
+    business_key: "RK20260805-001",
+    business_fields: [{ key: "owner_code", value: "ZBPF7" }],
+    event_type: null,
+    external_ref: null,
+    wms_resource_id: null,
+    sync_status: "acked",
+    retry_count: 0,
+    last_error: null,
+    idempotency_key: "h8-asn-001",
+    created_at: "2026-07-19T08:00:00.000Z",
+    updated_at: "2026-07-19T08:03:00.000Z",
+    payload_summary: '{"asn_no":"ASN-20260719-001","line_count":2}',
+  },
+  {
+    row_id: "1002",
+    connector_id: connectorId,
+    table_key: "x_wmsinter_InboundOrder",
+    owner_id: devOwnerId,
+    warehouse_id: null,
+    business_key: "RK20260805-002",
+    business_fields: [{ key: "owner_code", value: "ZBPF7" }],
+    event_type: null,
+    external_ref: null,
+    wms_resource_id: null,
+    sync_status: "failed",
+    retry_count: 2,
+    last_error: "商品编码不存在（已脱敏）",
+    idempotency_key: "h8-asn-002",
+    created_at: "2026-07-19T09:00:00.000Z",
+    updated_at: "2026-07-19T09:05:00.000Z",
+    payload_summary: '{"asn_no":"ASN-20260719-002","line_count":1}',
+  },
+  {
+    row_id: "2001",
+    connector_id: connectorId,
+    table_key: "x_wmsinter_WmsEvent",
+    owner_id: devOwnerId,
+    warehouse_id: null,
+    business_key: "evt-0801",
+    business_fields: [{ key: "owner_code", value: "ZBPF7" }],
+    event_type: "inventory_status",
+    external_ref: null,
+    wms_resource_id: null,
+    sync_status: "acked",
+    retry_count: 0,
+    last_error: null,
+    idempotency_key: "h8-out-001",
+    created_at: "2026-07-19T10:00:00.000Z",
+    updated_at: "2026-07-19T10:01:00.000Z",
+    payload_summary: '{"message_type":"shipment.confirmed","outbox_id":"OUT-20260719-001"}',
+  },
+  {
+    row_id: "3001",
+    connector_id: connectorId,
+    table_key: "x_wmsinter_GoodsInfo",
+    owner_id: devOwnerId,
+    warehouse_id: null,
+    business_key: "DEMO-PM-001",
+    business_fields: [
+      { key: "owner_code", value: "ZBPF7" },
+      { key: "product_code", value: "DEMO-P-001" },
+      { key: "product_name", value: "演示商品-对乙酰氨基酚片" },
+      { key: "spec", value: "0.5g*24片" },
+    ],
+    event_type: null,
+    external_ref: null,
+    wms_resource_id: null,
+    sync_status: "pending",
+    retry_count: 0,
+    last_error: null,
+    idempotency_key: "h8-demo-pm-001",
+    created_at: "2026-07-19T11:00:00.000Z",
+    updated_at: "2026-07-19T11:00:00.000Z",
+    payload_summary: "{}",
+  },
+];
+
+const productMasterDetailFields = [
+  { key: "approval_no", value: "国药准字H000000" },
+  { key: "manufacturer", value: "演示制药" },
+  { key: "special_drug_category", value: "普通药品" },
+  { key: "storage_condition", value: "常温保存" },
+  {
+    key: "packaging_levels",
+    value: '[{"unit":"片","ratio_to_base":1,"is_base":true,"is_default":false,"sort_order":1},{"unit":"盒","ratio_to_base":24,"is_base":false,"is_default":true,"sort_order":2}]',
+  },
+  { key: "schema_version", value: "1" },
+];
+
+function filteredRows(url: URL): DevInterfaceRow[] {
+  const connector = url.searchParams.get("connector_id");
+  const table = url.searchParams.get("table_key");
+  const statuses = new Set(
+    url.searchParams.get("sync_status")?.split(",").map((value) => value.trim()).filter(Boolean) ?? [],
+  );
+  const externalDoc = url.searchParams.get("external_doc_no");
+  const externalRef = url.searchParams.get("external_ref");
+  const warehouse = url.searchParams.get("warehouse_id");
+  const sourceOutbox = url.searchParams.get("source_outbox_id");
+  const eventType = url.searchParams.get("event_type");
+  const wmsResource = url.searchParams.get("wms_resource_id");
+  const idempotency = url.searchParams.get("idempotency_key");
+  return rows.filter((row) =>
+    (!connector || row.connector_id === connector) &&
+    (!table || row.table_key === table) &&
+    (statuses.size === 0 || statuses.has(row.sync_status)) &&
+    (!externalDoc || row.business_key === externalDoc) &&
+    (!externalRef || row.external_ref === externalRef) &&
+    (!warehouse || row.warehouse_id === warehouse) &&
+    (!sourceOutbox || row.business_key === sourceOutbox) &&
+    (!eventType || row.event_type === eventType) &&
+    (!wmsResource || row.wms_resource_id === wmsResource) &&
+    (!idempotency || row.idempotency_key === idempotency),
+  );
+}
+
+export async function handleH8ErpInterfaceTableDevMock(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string,
+): Promise<boolean> {
+  if (pathname === "/api/v1/h8/erp-interface-tables/connectors") {
+    if (req.method !== "GET") {
+      sendError(res, 405, "METHOD_NOT_ALLOWED", "接口表连接选择仅支持 GET");
+      return true;
+    }
+    sendJson(res, 200, [{
+      id: connectorId,
+      connector_code: "demo-rest-erp",
+      connector_name: "示例 REST ERP",
+      channel_mode: "interface_table",
+      status: "testing",
+      warehouse_ids: [],
+      probe_credentials_configured: true,
+    }]);
+    return true;
+  }
+  if (!pathname.startsWith("/api/v1/h8/erp-interface-tables/rows")) return false;
+
+  const detail = pathname.match(/^\/api\/v1\/h8\/erp-interface-tables\/rows\/([^/]+)$/);
+  if (req.method === "GET" && detail) {
+    const url = new URL(req.url ?? pathname, "http://wms.local");
+    const row = rows.find(
+      (item) =>
+        item.row_id === decodeURIComponent(detail[1]) &&
+        item.connector_id === url.searchParams.get("connector_id") &&
+        item.table_key === url.searchParams.get("table_key"),
+    );
+    if (!row) {
+      sendError(res, 404, "H8_INTERFACE_TABLE_ROW_NOT_FOUND", "接口表行不存在");
+      return true;
+    }
+    const fields = Object.entries(row)
+      .filter(([key]) => key !== "business_fields")
+      .map(([key, value]) => ({ key, value: value == null ? null : String(value) }));
+    fields.push(...row.business_fields);
+    if (row.table_key === "x_wmsinter_GoodsInfo") fields.push(...productMasterDetailFields);
+    sendJson(res, 200, {
+      row,
+      fields,
+    });
+    return true;
+  }
+
+  if (req.method === "GET" && pathname === "/api/v1/h8/erp-interface-tables/rows") {
+    const url = new URL(req.url ?? pathname, "http://wms.local");
+    const filtered = filteredRows(url);
+    const page = Math.max(Number(url.searchParams.get("page") ?? "1"), 1);
+    const pageSize = Math.min(Math.max(Number(url.searchParams.get("page_size") ?? "50"), 1), 100);
+    const start = (page - 1) * pageSize;
+    sendJson(res, 200, {
+      items: filtered.slice(start, start + pageSize),
+      total: filtered.length,
+      page,
+      page_size: pageSize,
+    });
+    return true;
+  }
+
+  sendError(res, 405, "METHOD_NOT_ALLOWED", "接口表探查仅支持 GET");
+  return true;
+}
