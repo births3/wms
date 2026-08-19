@@ -109,7 +109,7 @@ in_progress / suspended / pending ──cancel(picked_qty=0,done_qty=0)──►
 
 - `claim`：仅 `pending` 且无 `operator_id`；写作业员、`claimed_at`、`last_progress_at`。普通任务按作业员 M-TE 班组库区（§10.6）；`urgent` 可跨区。同一作业员同时只能有一条 `in_progress` 补货任务。
 - `pick`：仅 `in_progress`（`suspended` 禁止再下架）。扫描来源库位码或容器 LPN 必须与任务 `source_location_id`/`source_lpn_id` 一致；`picked_qty += Δ`；更新 `last_progress_at`；`picked_qty > qty` 拒绝。
-- `confirm`：状态为 `in_progress`，或（`suspended` 且 `picked_qty>0`，只送达已下架量、不再下架）。本次确认量必须 `> 0` 且 `<= picked_qty`（`picked_qty=0` → `M3_REPLENISH_STATE_INVALID`）；扫描目标位必须等于 `target_location_id`；账面转换后 `picked_qty −= Δ`、`done_qty += Δ`。`suspended` 确认后若 `done_qty=qty` 则 `done`，否则仍 `suspended`。
+- `confirm`：状态为 `in_progress`，或（`suspended` 且 `picked_qty>0`，只送达已下架量、不再下架）。来源冻结检测优先于数量守卫：`picked_qty=0` 且可下架量因 `qty_frozen` 不足时 **200 挂起**（GWT 17），不返回 `M3_REPLENISH_STATE_INVALID`。无冻结时本次确认量必须 `> 0` 且 `<= picked_qty`（`picked_qty=0` → `M3_REPLENISH_STATE_INVALID`，GWT 29）。扫描目标位必须等于 `target_location_id`；账面转换后 `picked_qty −= Δ`、`done_qty += Δ`。`suspended` 确认后若 `done_qty=qty` 则 `done`，否则仍 `suspended`。
 - `reassign`：**一律回 `pending` 并清空 `operator_id`、`claimed_at`**，记审计。`picked_qty > 0` 时仍回 `pending`，新作业员继续同一任务，不回冲在途、不丢 `picked_qty`。
 - `return`：作业员退回 `pending` + `return_reason`。`source_mismatch` 时另写事件总线 `replenishment.source_mismatch` 与 H4，不改库存。`picked_qty > 0` 时禁止退回（与取消同一门槛，已下架实物不能随任务退回）。
 - `cancel`：`done_qty = 0` 且 `picked_qty = 0`；已下架未送达禁止取消。
@@ -592,7 +592,7 @@ FEFO：`ORDER BY expiry_date ASC NULLS LAST, id`。一任务一批次。整托�
 | L1 | **必做** | `validate_replenish_route`、可用量公式、任务量取整、状态迁移、scope 优先级、容器质量锁跳过、命中集合 |
 | L2 | **必做** | OpenAPI 路径/请求体与本节 API 表一致；`just openapi-sync` |
 | L3 | **必做** | GWT 2、4、7、8、26 的 postgres 流程 |
-| L4 | **必做** | GWT 1、6、9、11、12、15、18、19、20、22、23、25、29、30、31 |
+| L4 | **必做** | GWT 1、6、9、11、12、15、17、18、19、20、22、23、25、29、30、31 |
 | L5 | **必做** | 生成/确认/取消后双字段+在手+流水+审计同行 |
 | L6 | **必做** | GWT 5 并领取；两任务抢同一来源批次 |
 | L7 | 本阶段不做 | 留给容量基线，不阻塞 P2 功能冻结 |
