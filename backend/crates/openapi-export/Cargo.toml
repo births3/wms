@@ -1,0 +1,13 @@
+[package]
+name = "openapi-export"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "openapi-export"
+path = "src/main.rs"
+
+[dependencies]
+utoipa.workspace = true
+wms-api.workspace = true
