@@ -79,7 +79,7 @@ impl ReplenishmentService {
                 Utc::now(),
             )
             .await
-            .map_err(|_| ReplenishmentError::SourceUnavailable)?;
+            .map_err(super::map_inventory_replenish_error)?;
         }
         task.status = REPLENISH_STATUS_CANCELLED.to_string();
         task.operator_id = None;

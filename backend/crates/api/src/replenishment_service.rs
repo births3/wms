@@ -633,12 +633,7 @@ impl ReplenishmentService {
             .await?;
         reserve_replenish_in_tx(tx, ctx.owner_id, source.id, target_location_id, qty, now)
             .await
-            .map_err(|error| match error {
-                crate::inventory::InventoryReplenishError::Insufficient => {
-                    ReplenishmentError::SourceUnavailable
-                }
-                _ => ReplenishmentError::PutawayBlocked,
-            })?;
+            .map_err(map_inventory_replenish_error)?;
         write_audit(
             tx,
             ctx,
@@ -698,6 +693,23 @@ impl ReplenishmentService {
             _ => return Err(ReplenishmentError::StrategyInvalid),
         }
         Ok(())
+    }
+}
+
+pub(crate) fn map_inventory_replenish_error(
+    error: crate::inventory::InventoryReplenishError,
+) -> ReplenishmentError {
+    match error {
+        crate::inventory::InventoryReplenishError::Insufficient => {
+            ReplenishmentError::SourceUnavailable
+        }
+        crate::inventory::InventoryReplenishError::Database(message) => {
+            ReplenishmentError::Database(sqlx::Error::Protocol(message))
+        }
+        crate::inventory::InventoryReplenishError::InvalidQuantity => {
+            ReplenishmentError::QtyExceeded
+        }
+        crate::inventory::InventoryReplenishError::NotFound => ReplenishmentError::PutawayBlocked,
     }
 }
 

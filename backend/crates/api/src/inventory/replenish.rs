@@ -10,6 +10,7 @@ pub enum InventoryReplenishError {
     Insufficient,
     NotFound,
     InvalidQuantity,
+    Database(String),
 }
 
 struct SourceBatchRow {
@@ -46,7 +47,7 @@ pub async fn reserve_replenish_in_tx(
     .bind(source_batch_id)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::NotFound)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     let Some((product_id, product_code, batch_no, production_date, expiry_date)) = source else {
         return Err(InventoryReplenishError::NotFound);
     };
@@ -76,7 +77,7 @@ pub async fn reserve_replenish_in_tx(
     .bind(now)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::Insufficient)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     if reserved.is_none() {
         return Err(InventoryReplenishError::Insufficient);
     }
@@ -103,7 +104,7 @@ pub async fn reserve_replenish_in_tx(
     .bind(source_row.product_code.as_deref())
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::NotFound)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
 
     let target_id = if let Some(id) = existing_target {
         id
@@ -138,7 +139,7 @@ pub async fn reserve_replenish_in_tx(
         .bind(now)
         .execute(&mut **tx)
         .await
-        .map_err(|_| InventoryReplenishError::NotFound)?;
+        .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
         id
     };
 
@@ -159,7 +160,7 @@ pub async fn reserve_replenish_in_tx(
     .bind(now)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::NotFound)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     if incremented.is_none() {
         return Err(InventoryReplenishError::NotFound);
     }
@@ -202,7 +203,7 @@ pub async fn confirm_replenish_in_tx(
     .bind(now)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::Insufficient)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     if source_ok.is_none() {
         return Err(InventoryReplenishError::Insufficient);
     }
@@ -226,7 +227,7 @@ pub async fn confirm_replenish_in_tx(
     .bind(now)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::Insufficient)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     if target_ok.is_none() {
         return Err(InventoryReplenishError::Insufficient);
     }
@@ -286,7 +287,7 @@ pub async fn release_replenish_in_tx(
     .bind(now)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::Insufficient)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     if source_ok.is_none() {
         return Err(InventoryReplenishError::Insufficient);
     }
@@ -309,7 +310,7 @@ pub async fn release_replenish_in_tx(
     .bind(now)
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::Insufficient)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     if target_ok.is_none() {
         return Err(InventoryReplenishError::Insufficient);
     }
@@ -346,6 +347,6 @@ async fn insert_replenish_movement(
     .bind(now)
     .execute(&mut **tx)
     .await
-    .map_err(|_| InventoryReplenishError::NotFound)?;
+    .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
     Ok(())
 }

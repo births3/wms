@@ -302,7 +302,7 @@ impl ReplenishmentService {
             now,
         )
         .await
-        .map_err(|_| ReplenishmentError::SourceUnavailable)?;
+        .map_err(super::map_inventory_replenish_error)?;
         task.picked_qty -= req.qty;
         task.done_qty += req.qty;
         if task.done_qty == task.qty {
