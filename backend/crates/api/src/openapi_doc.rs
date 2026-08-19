@@ -59,6 +59,13 @@ use wms_domain::{
         description = "Wave 5 增值模块与横向能力契约",
     ),
     paths(
+        register_iot_device,
+        list_iot_devices,
+        get_iot_device,
+        update_iot_device,
+        heartbeat_iot_device,
+        bind_location_device,
+        unbind_location_device,
         healthz,
         openapi_json,
         api_docs,

@@ -23,6 +23,7 @@ use wms_api::{
     auth::{auth_runtime_layer, AuthRuntimePolicy, RedisAuthRevocationStore, JWT_SECRET_ENV},
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
+    device_handlers::{device_router, DeviceAppState},
     dock_appointment_handlers::{dock_appointment_router, DockAppointmentAppState},
     dock_handlers::{dock_router, DockAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
@@ -145,6 +146,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     wms_api::print_orchestration_job::spawn(pool.clone());
     wms_api::h8_erp_messages::spawn_maintenance_job(pool.clone()).await?;
     wms_api::task_release_job::spawn(pool.clone());
+    wms_api::device_heartbeat_job::spawn(pool.clone());
     wms_api::replenishment_min_max_job::spawn(pool.clone());
     wms_api::replenishment_timeout_job::spawn(pool.clone());
     let config_center_state = ConfigCenterAppState::with_postgres(file_registry, pool.clone());
@@ -369,6 +371,9 @@ fn app(
             QualityLiaisonAppState::with_postgres(shared_pool.clone()),
         ))
         .merge(replenishment_router(ReplenishmentAppState::with_postgres(
+            shared_pool.clone(),
+        )))
+        .merge(device_router(DeviceAppState::with_postgres(
             shared_pool.clone(),
         )))
         .merge(reconciliation_router(
