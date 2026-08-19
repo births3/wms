@@ -277,6 +277,11 @@ impl IntoResponse for DeviceHandlerError {
                     "M1_EVENT_TASK_MISMATCH",
                     "设备事件与指令任务不匹配",
                 ),
+                DeviceError::LocationUnreachable => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_LOCATION_UNREACHABLE",
+                    "格口处于 AGV 搬运不可达期",
+                ),
                 DeviceError::Database(_) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "M1_DEVICE_INTERNAL",

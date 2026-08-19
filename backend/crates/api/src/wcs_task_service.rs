@@ -12,8 +12,8 @@ use crate::device_service::DeviceError;
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
 use crate::wcs_task_repository::{
-    find_active_task_by_device_location, find_task_by_idempotency, get_task, insert_task,
-    list_tasks, transition, WcsTaskRow,
+    clear_pod_unreachable, find_active_task_by_device_location, find_task_by_idempotency, get_task,
+    insert_task, list_tasks, location_is_unreachable, set_pod_unreachable, transition, WcsTaskRow,
 };
 use wms_domain::can_transition;
 
@@ -324,6 +324,16 @@ impl WcsTaskService {
                 if !can_transition(&task.status, "executing") {
                     return Err(DeviceError::TaskStateInvalid);
                 }
+                if task.task_type == "pod_move" {
+                    let pod_code = task
+                        .payload
+                        .get("pod_code")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if !pod_code.is_empty() {
+                        set_pod_unreachable(&self.pool, task.owner_id, pod_code, now).await?;
+                    }
+                }
                 let row = transition(
                     &self.pool,
                     task.owner_id,
@@ -347,6 +357,16 @@ impl WcsTaskService {
                 if !can_transition(&task.status, "succeeded") {
                     return Err(DeviceError::TaskStateInvalid);
                 }
+                if task.task_type == "pod_move" {
+                    let pod_code = task
+                        .payload
+                        .get("pod_code")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if !pod_code.is_empty() {
+                        clear_pod_unreachable(&self.pool, task.owner_id, pod_code, now).await?;
+                    }
+                }
                 let row = transition(
                     &self.pool,
                     task.owner_id,
@@ -368,6 +388,16 @@ impl WcsTaskService {
             }
             "fail" => {
                 let exhausted = task.retry_count >= task.max_retries;
+                if task.task_type == "pod_move" {
+                    let pod_code = task
+                        .payload
+                        .get("pod_code")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if !pod_code.is_empty() {
+                        clear_pod_unreachable(&self.pool, task.owner_id, pod_code, now).await?;
+                    }
+                }
                 let to = if exhausted { "failed" } else { "sent" };
                 let new_retry = if exhausted {
                     task.retry_count
@@ -398,6 +428,66 @@ impl WcsTaskService {
             }
             _ => Err(DeviceError::TaskStateInvalid),
         }
+    }
+
+    /// 标记一致性扫描：活跃 pod_move 无标记 / 有标记无活跃任务 → H4 agv_marker_inconsistent。
+    pub async fn run_marker_scan(&self) -> Result<usize, DeviceError> {
+        let now = Utc::now();
+        let active: Vec<WcsTaskRow> = sqlx::query_as(&format!(
+            r#"
+            SELECT {TASK_COLUMNS}
+              FROM wcs_tasks
+             WHERE task_type = 'pod_move'
+               AND status IN ('pending', 'sent', 'executing', 'timeout')
+               AND NOT EXISTS (
+                    SELECT 1 FROM warehouse_locations
+                     WHERE agv_pod_code = wcs_tasks.payload->>'pod_code'
+                       AND agv_unreachable_at IS NOT NULL
+               )
+            "#
+        ))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| DeviceError::Database(error.to_string()))?;
+        let marked_without_task: Vec<String> = sqlx::query_scalar(
+            r#"
+            SELECT DISTINCT agv_pod_code
+              FROM warehouse_locations
+             WHERE agv_unreachable_at IS NOT NULL
+               AND NOT EXISTS (
+                    SELECT 1 FROM wcs_tasks
+                     WHERE task_type = 'pod_move'
+                       AND status IN ('pending', 'sent', 'executing', 'timeout')
+                       AND payload->>'pod_code' = warehouse_locations.agv_pod_code
+               )
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| DeviceError::Database(error.to_string()))?;
+        let total = active.len() + marked_without_task.len();
+        if total == 0 {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        publish_event_in_tx(
+            &mut tx,
+            Uuid::nil(),
+            &format!("agv_marker_inconsistent:{}", now.timestamp()),
+            "business.agv_marker_inconsistent",
+            "M1",
+            "wcs_task",
+            "scan",
+            json!({
+                "active_without_marker": active.len(),
+                "marked_without_task": marked_without_task.len()
+            }),
+            now,
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+        tx.commit().await.map_err(db_err)?;
+        Ok(total)
     }
 
     /// 人工重发（仅 failed / timeout）：重置 retry_count 重新入队。

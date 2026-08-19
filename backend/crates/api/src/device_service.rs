@@ -36,6 +36,7 @@ pub enum DeviceError {
     PtQtyDiffExceeded,
     PodMoveActive,
     EventTaskMismatch,
+    LocationUnreachable,
     Database(String),
 }
 

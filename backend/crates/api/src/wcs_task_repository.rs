@@ -241,6 +241,74 @@ pub(crate) async fn list_orphan_press_events(
     Ok(rows)
 }
 
+/// AGV 格口不可达标记：按货架编码置位/清除（pod_move executing 置位，终态清除）。
+pub(crate) async fn set_pod_unreachable(
+    pool: &PgPool,
+    owner_id: Uuid,
+    pod_code: &str,
+    ts: DateTime<Utc>,
+) -> Result<u64, DeviceError> {
+    let affected = sqlx::query(
+        r#"
+        UPDATE warehouse_locations
+           SET agv_unreachable_at = $3, updated_at = $3
+         WHERE owner_id = $1 AND agv_pod_code = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(pod_code)
+    .bind(ts)
+    .execute(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?
+    .rows_affected();
+    Ok(affected)
+}
+
+pub(crate) async fn clear_pod_unreachable(
+    pool: &PgPool,
+    owner_id: Uuid,
+    pod_code: &str,
+    ts: DateTime<Utc>,
+) -> Result<u64, DeviceError> {
+    let affected = sqlx::query(
+        r#"
+        UPDATE warehouse_locations
+           SET agv_unreachable_at = NULL, updated_at = $3
+         WHERE owner_id = $1 AND agv_pod_code = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(pod_code)
+    .bind(ts)
+    .execute(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?
+    .rows_affected();
+    Ok(affected)
+}
+
+/// 格口不可达校验（I5）：库位存在且不可达标记非空 → 阻断。
+pub(crate) async fn location_is_unreachable(
+    pool: &PgPool,
+    owner_id: Uuid,
+    location_id: Uuid,
+) -> Result<bool, DeviceError> {
+    let unreachable: Option<bool> = sqlx::query_scalar(
+        r#"
+        SELECT (agv_unreachable_at IS NOT NULL)
+          FROM warehouse_locations
+         WHERE owner_id = $1 AND id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(location_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    Ok(unreachable.unwrap_or(false))
+}
+
 pub(crate) async fn link_event_to_task(
     pool: &PgPool,
     event_id: Uuid,

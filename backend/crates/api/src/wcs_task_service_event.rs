@@ -10,7 +10,7 @@ use crate::device_service::DeviceError;
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::wcs_task_repository::{
     find_active_task_by_device_location, get_task, link_event_to_task, list_orphan_press_events,
-    transition, WcsTaskRow,
+    location_is_unreachable, transition, WcsTaskRow,
 };
 use crate::wcs_task_service::{
     DeviceEventRequest, WcsTaskService, PTL_DIFF_MAX_ABS, PTL_DIFF_RATIO, RETRY_BACKOFF_SECS,
@@ -85,6 +85,27 @@ impl WcsTaskService {
                             .get("press_qty")
                             .and_then(|v| v.as_i64())
                             .unwrap_or(expected);
+                        if expected != pressed {
+                            let mut tx = self.pool.begin().await.map_err(db_err)?;
+                            publish_event_in_tx(
+                                &mut tx,
+                                ctx.owner_id,
+                                &format!("ptl_qty_diff:{}", task.id),
+                                "business.ptl_qty_diff",
+                                "M1",
+                                "wcs_task",
+                                &task.id.to_string(),
+                                json!({
+                                    "task_no": task.task_no,
+                                    "expected_qty": expected,
+                                    "pressed_qty": pressed
+                                }),
+                                now,
+                            )
+                            .await
+                            .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+                            tx.commit().await.map_err(db_err)?;
+                        }
                         if !ptl_qty_diff_within_threshold(
                             expected,
                             pressed,
@@ -237,6 +258,11 @@ impl WcsTaskService {
             .ok_or(DeviceError::TaskNotFound)?;
         if is_terminal(&task.status) {
             return Ok(()); // 重复事件幂等
+        }
+        if let Some(location_id) = task.location_id {
+            if location_is_unreachable(&self.pool, task.owner_id, location_id).await? {
+                return Err(DeviceError::LocationUnreachable);
+            }
         }
         let mut tx = self.pool.begin().await.map_err(db_err)?;
         let ref_type = task.business_ref_type.as_deref().unwrap_or("");
