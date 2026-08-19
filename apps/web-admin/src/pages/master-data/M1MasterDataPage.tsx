@@ -4,6 +4,7 @@ import {
   DataGrid,
   ListPageTemplate,
   buildLocationBatchPreview,
+  toLocationBatchGeneratePayload,
   type DataGridCreateAction,
   type DataGridDetailAction,
   type DataGridDisableAction,
@@ -21,7 +22,7 @@ import { Plus, Printer, Upload } from "lucide-react";
 import {
   batchCreateCustomers,
   batchCreateSuppliers,
-  batchCreateLocations,
+  batchGenerateLocations,
   createCustomer,
   createSupplier,
   productsPageQueryOptions,
@@ -367,20 +368,16 @@ function M1MasterDataGridPage({ currentUser, viewId }: Pick<M1MasterDataPageProp
     setLocationBatchSubmitting(true);
     setLocationBatchMessage(null);
     try {
-      const createdRows = await batchCreateLocations({
+      const generate = toLocationBatchGeneratePayload(locationBatchRange);
+      const createdRows = await batchGenerateLocations({
         warehouse_id: locationBatchScope.warehouseId,
         zone_id: locationBatchScope.zoneId,
-        area_code: locationBatchRange.areaCode.trim().toUpperCase(),
-        row_start: locationBatchRange.rowStart,
-        row_end: locationBatchRange.rowEnd,
-        column_start: locationBatchRange.columnStart,
-        column_end: locationBatchRange.columnEnd,
-        layer_start: locationBatchRange.layerStart,
-        layer_end: locationBatchRange.layerEnd,
+        ...generate,
         max_volume_cm3: 5_000_000,
         max_sku_count: 1,
         location_type: locationBatchType,
         current_owner_id: locationBatchScope.ownerId,
+        is_agv_managed: generate.rule_type === "agv",
       });
       await rowsQuery.refetch();
       setLocationBatchOpen(false);
