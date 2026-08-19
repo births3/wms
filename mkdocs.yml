@@ -198,6 +198,7 @@ nav:
     - 库位与补货领域模型: domain/storage-location-model.md
     - Phase 2 补货技术规范: domain/replenishment-phase2-spec.md
     - Phase 2 补货工单清单: domain/replenishment-phase2-tickets.md
+    - Phase 3 设备中台技术规范: domain/device-platform-phase3-spec.md
     - 波次与出库箱领域模型: domain/wave-model.md
     - 概念审计: concept-audit.md
     - 业务澄清记录: domain/clarifications.md
