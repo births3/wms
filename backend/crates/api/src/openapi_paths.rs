@@ -1,3 +1,7 @@
+pub use crate::device_service::{
+    BindDeviceRequest, DeviceBindingResponse, DeviceResponse, RegisterDeviceRequest, UnbindRequest,
+    UpdateDeviceRequest,
+};
 pub(crate) use crate::dock_appointment_handlers::DockAppointmentListResponse;
 pub use crate::document_numbering::{
     DocumentNumberRule, DocumentNumberRuleListResponse, SetDocumentNumberRuleEnabledRequest,
@@ -21,6 +25,10 @@ pub use crate::role_management::{
 };
 pub use crate::tms_plus::{
     ReceiveTmsRoutePlanRequest, TmsRoutePlan, TmsRouteStop, TmsRouteStopRequest,
+};
+pub use crate::wcs_task_service::{
+    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceEventRequest, ResendRequest, VoidRequest,
+    WcsTaskResponse,
 };
 #[allow(unused_imports)]
 pub use wms_domain::{

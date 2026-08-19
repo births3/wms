@@ -3,7 +3,8 @@ use super::*;
 
 #[allow(unused_imports)]
 use crate::wcs_task_service::{
-    CreateWcsTaskRequest, DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse,
+    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceEventRequest, ResendRequest, VoidRequest,
+    WcsTaskResponse,
 };
 
 #[utoipa::path(
@@ -63,6 +64,17 @@ pub(crate) fn resend_wcs_task() {}
 )]
 #[allow(dead_code)]
 pub(crate) fn void_wcs_task() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/wcs-tasks/{id}/confirm-skip",
+    tag = "wcs_task",
+    params(("id" = Uuid, Path, description = "任务 ID")),
+    request_body = ConfirmSkipRequest,
+    responses((status = 200, description = "跳过确认并补录账务", body = WcsTaskResponse)),
+)]
+#[allow(dead_code)]
+pub(crate) fn confirm_skip_wcs_task() {}
 
 #[utoipa::path(
     post,

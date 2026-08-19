@@ -11,6 +11,7 @@ use crate::device_service::{
     post,
     path = "/api/v1/iot-devices",
     tag = "device",
+    params(("Idempotency-Key" = String, Header, description = "注册幂等键")),
     request_body = RegisterDeviceRequest,
     responses(
         (status = 200, description = "设备注册成功", body = DeviceResponse),
@@ -70,6 +71,7 @@ pub(crate) fn heartbeat_iot_device() {}
     post,
     path = "/api/v1/location-device-bindings",
     tag = "device",
+    params(("Idempotency-Key" = String, Header, description = "绑定幂等键")),
     request_body = BindDeviceRequest,
     responses(
         (status = 200, description = "绑定成功", body = DeviceBindingResponse),

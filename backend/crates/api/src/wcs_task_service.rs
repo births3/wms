@@ -27,7 +27,7 @@ pub(crate) const TASK_COLUMNS: &str = "id, owner_id, task_no, task_type, device_
      error_message, retry_count, max_retries, idempotency_key, sent_at, finished_at, \
      created_by, version, updated_at";
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct WcsTaskResponse {
     pub id: Uuid,
     pub task_no: String,
@@ -70,7 +70,7 @@ impl From<WcsTaskRow> for WcsTaskResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CreateWcsTaskRequest {
     pub task_type: String,
     pub device_id: Uuid,
@@ -83,7 +83,7 @@ pub struct CreateWcsTaskRequest {
     pub payload: Value,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct DeviceEventRequest {
     pub event_type: String,
     #[serde(default)]
@@ -93,17 +93,17 @@ pub struct DeviceEventRequest {
     pub payload: Value,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct ResendRequest {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct VoidRequest {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct ConfirmSkipRequest {
     pub reason: String,
     pub qty: Option<i64>,

@@ -3028,6 +3028,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/iot-devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_iot_devices"];
+        put?: never;
+        post: operations["register_iot_device"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/iot-devices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_iot_device"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["update_iot_device"];
+        trace?: never;
+    };
+    "/api/v1/iot-devices/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_device_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/iot-devices/{id}/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["heartbeat_iot_device"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/location-device-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bind_location_device"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/location-device-bindings/{id}/unbind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["unbind_location_device"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/m-vr/dual-person-policy": {
         parameters: {
             query?: never;
@@ -5652,6 +5748,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/wcs-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_wcs_tasks"];
+        put?: never;
+        post: operations["create_wcs_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wcs-tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_wcs_task"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wcs-tasks/{id}/confirm-skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["confirm_skip_wcs_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wcs-tasks/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resend_wcs_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/wcs-tasks/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["void_wcs_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/wechat-notify/approvals": {
         parameters: {
             query?: never;
@@ -6563,6 +6739,14 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        BindDeviceRequest: {
+            binding_role: string;
+            /** Format: uuid */
+            device_id: string;
+            /** Format: uuid */
+            location_id: string;
+            point_address?: string | null;
+        };
         BindReplenishmentLocationsRequest: {
             location_ids: string[];
         };
@@ -6791,6 +6975,11 @@ export interface components {
             scanned_location_code: string;
             /** Format: int64 */
             version: number;
+        };
+        ConfirmSkipRequest: {
+            /** Format: int64 */
+            qty?: number | null;
+            reason: string;
         };
         ContainerQualityLockEvent: {
             /** Format: uuid */
@@ -7450,6 +7639,16 @@ export interface components {
             zone_code: string;
             zone_name: string;
         };
+        CreateWcsTaskRequest: {
+            business_ref_no?: string | null;
+            business_ref_type?: string | null;
+            /** Format: uuid */
+            device_id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            payload: unknown;
+            task_type: string;
+        };
         CrossdockPlan: {
             /** Format: uuid */
             asn_id: string;
@@ -7686,6 +7885,28 @@ export interface components {
         DeliveryNoteGroupListResponse: {
             data: components["schemas"]["DeliveryNoteGroupListItem"][];
         };
+        DeviceBindingResponse: {
+            binding_role: string;
+            /** Format: uuid */
+            device_id: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            location_id: string;
+            point_address?: string | null;
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to?: string | null;
+        };
+        DeviceEventRequest: {
+            event_type: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            payload: unknown;
+            /** Format: uuid */
+            task_id?: string | null;
+        };
         /**
          * @description H9 设备租约；`release_mode` 是租约创建时的策略快照；
          *     `busy_state` 真实来源在 US-H9-010/012，printing/result_unknown/reconciling 禁止释放。
@@ -7717,6 +7938,25 @@ export interface components {
         DeviceLeaseListResponse: {
             data: components["schemas"]["DeviceLease"][];
             page: components["schemas"]["PageMeta"];
+        };
+        DeviceResponse: {
+            device_code: string;
+            device_type: string;
+            enabled: boolean;
+            extra_config: unknown;
+            /** Format: uuid */
+            id: string;
+            ip_address?: string | null;
+            /** Format: date-time */
+            last_heartbeat_at?: string | null;
+            model?: string | null;
+            online_status: string;
+            /** Format: int32 */
+            port?: number | null;
+            protocol: string;
+            vendor?: string | null;
+            /** Format: uuid */
+            warehouse_id: string;
         };
         DisableSystemDictionaryItemRequest: {
             disabled_reason?: string | null;
@@ -10938,6 +11178,17 @@ export interface components {
             window_key: string;
             worker_id: string;
         };
+        RegisterDeviceRequest: {
+            device_code: string;
+            device_type: string;
+            extra_config?: unknown;
+            ip_address?: string | null;
+            model?: string | null;
+            /** Format: int32 */
+            port?: number | null;
+            protocol: string;
+            vendor?: string | null;
+        };
         RejectPurchaseReturnRequest: {
             /** @description 驳回原因（必填，不允许空白）。 */
             reason: string;
@@ -11123,6 +11374,9 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        ResendRequest: {
+            reason: string;
         };
         /** @description H3 API 韧性保护状态。 */
         ResilienceStatus: {
@@ -11963,6 +12217,9 @@ export interface components {
             exception_code?: string | null;
             exception_note?: string | null;
         };
+        UnbindRequest: {
+            reason: string;
+        };
         UnlockSkippedBatch: {
             /** Format: uuid */
             batch_id: string;
@@ -12001,6 +12258,15 @@ export interface components {
             customer_name?: string | null;
             license_no?: string | null;
             status?: string | null;
+        };
+        UpdateDeviceRequest: {
+            enabled?: boolean | null;
+            extra_config?: unknown;
+            ip_address?: string | null;
+            model?: string | null;
+            /** Format: int32 */
+            port?: number | null;
+            vendor?: string | null;
         };
         UpdateDockAppointmentRequest: {
             /** Format: uuid */
@@ -12475,6 +12741,9 @@ export interface components {
             /** Format: int32 */
             version_number: number;
         };
+        VoidRequest: {
+            reason: string;
+        };
         /** @description 仓库基础档案。 */
         Warehouse: {
             /** Format: date-time */
@@ -12593,6 +12862,30 @@ export interface components {
         WarehouseZoneListResponse: {
             data: components["schemas"]["WarehouseZone"][];
             page: components["schemas"]["PageMeta"];
+        };
+        WcsTaskResponse: {
+            ack_payload: unknown;
+            business_ref_no?: string | null;
+            business_ref_type?: string | null;
+            created_by: string;
+            /** Format: uuid */
+            device_id: string;
+            error_code?: string | null;
+            error_message?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            /** Format: int32 */
+            max_retries: number;
+            payload: unknown;
+            /** Format: int32 */
+            retry_count: number;
+            status: string;
+            task_no: string;
+            task_type: string;
+            /** Format: int64 */
+            version: number;
         };
         /** @description 截单计划的一条结构化周计划。 */
         WeeklyCutoffSlot: {
@@ -23777,6 +24070,231 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
+            };
+        };
+    };
+    list_iot_devices: {
+        parameters: {
+            query?: {
+                /** @description 设备类型 */
+                device_type?: string | null;
+                /** @description 在线状态 */
+                online_status?: string | null;
+                /** @description 启停 */
+                enabled?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 设备列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"][];
+                };
+            };
+        };
+    };
+    register_iot_device: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 注册幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description 设备注册成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+            /** @description 设备编码重复 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 设备类型非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_iot_device: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 设备 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 设备详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+        };
+    };
+    update_iot_device: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 设备 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description 设备维护/启停 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+        };
+    };
+    report_device_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 设备 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceEventRequest"];
+            };
+        };
+        responses: {
+            /** @description 事件已接收 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    heartbeat_iot_device: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 设备 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 心跳上报 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+        };
+    };
+    bind_location_device: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 绑定幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BindDeviceRequest"];
+            };
+        };
+        responses: {
+            /** @description 绑定成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceBindingResponse"];
+                };
+            };
+            /** @description 绑定冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    unbind_location_device: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 绑定 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnbindRequest"];
+            };
+        };
+        responses: {
+            /** @description 软解绑成功 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -35321,6 +35839,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_wcs_tasks: {
+        parameters: {
+            query?: {
+                /** @description 状态筛选 */
+                status?: string | null;
+                /** @description 指令类型筛选 */
+                task_type?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 指令任务列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WcsTaskResponse"][];
+                };
+            };
+        };
+    };
+    create_wcs_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWcsTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description 指令任务生成成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WcsTaskResponse"];
+                };
+            };
+            /** @description 亮灯互斥/搬运互斥 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_wcs_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 任务详情 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WcsTaskResponse"];
+                };
+            };
+        };
+    };
+    confirm_skip_wcs_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmSkipRequest"];
+            };
+        };
+        responses: {
+            /** @description 跳过确认并补录账务 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WcsTaskResponse"];
+                };
+            };
+        };
+    };
+    resend_wcs_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendRequest"];
+            };
+        };
+        responses: {
+            /** @description 人工重发 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WcsTaskResponse"];
+                };
+            };
+        };
+    };
+    void_wcs_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 任务 ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidRequest"];
+            };
+        };
+        responses: {
+            /** @description 人工作废 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WcsTaskResponse"];
                 };
             };
         };

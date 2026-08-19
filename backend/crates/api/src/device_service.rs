@@ -40,7 +40,7 @@ pub enum DeviceError {
     Database(String),
 }
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct DeviceResponse {
     pub id: Uuid,
     pub warehouse_id: Uuid,
@@ -77,7 +77,7 @@ impl From<DeviceRow> for DeviceResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct DeviceBindingResponse {
     pub id: Uuid,
     pub location_id: Uuid,
@@ -102,7 +102,7 @@ impl From<crate::device_repository::BindingRow> for DeviceBindingResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct RegisterDeviceRequest {
     pub device_code: String,
     pub device_type: String,
@@ -119,7 +119,7 @@ pub struct RegisterDeviceRequest {
     pub extra_config: serde_json::Value,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
 pub struct UpdateDeviceRequest {
     #[serde(default)]
     pub vendor: Option<String>,
@@ -135,7 +135,7 @@ pub struct UpdateDeviceRequest {
     pub enabled: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct BindDeviceRequest {
     pub location_id: Uuid,
     pub device_id: Uuid,
@@ -144,7 +144,7 @@ pub struct BindDeviceRequest {
     pub point_address: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct UnbindRequest {
     pub reason: String,
 }

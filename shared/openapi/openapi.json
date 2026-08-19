@@ -3032,8 +3032,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -15785,6 +15785,324 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/iot-devices": {
+      "get": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "list_iot_devices",
+        "parameters": [
+          {
+            "name": "device_type",
+            "in": "query",
+            "description": "设备类型",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "online_status",
+            "in": "query",
+            "description": "在线状态",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "description": "启停",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "设备列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "register_iot_device",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "注册幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "设备注册成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "设备编码重复"
+          },
+          "422": {
+            "description": "设备类型非法"
+          }
+        }
+      }
+    },
+    "/api/v1/iot-devices/{id}": {
+      "get": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "get_iot_device",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "设备详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "update_iot_device",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "设备维护/启停",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/iot-devices/{id}/events": {
+      "post": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "report_device_event",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "事件已接收"
+          }
+        }
+      }
+    },
+    "/api/v1/iot-devices/{id}/heartbeat": {
+      "post": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "heartbeat_iot_device",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "心跳上报",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/location-device-bindings": {
+      "post": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "bind_location_device",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "绑定幂等键",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "绑定成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceBindingResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "绑定冲突"
+          }
+        }
+      }
+    },
+    "/api/v1/location-device-bindings/{id}/unbind": {
+      "post": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "unbind_location_device",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "绑定 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnbindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "软解绑成功"
           }
         }
       }
@@ -31529,6 +31847,240 @@
         "x-idempotency-exempt-reason": "追溯码上报首批契约未接入 L11 幂等，本轮仅声明豁免并保留后续补齐路径。"
       }
     },
+    "/api/v1/wcs-tasks": {
+      "get": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "list_wcs_tasks",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "状态筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "task_type",
+            "in": "query",
+            "description": "指令类型筛选",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "指令任务列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WcsTaskResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "create_wcs_task",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWcsTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "指令任务生成成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WcsTaskResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "亮灯互斥/搬运互斥"
+          }
+        }
+      }
+    },
+    "/api/v1/wcs-tasks/{id}": {
+      "get": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "get_wcs_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "任务详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WcsTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wcs-tasks/{id}/confirm-skip": {
+      "post": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "confirm_skip_wcs_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmSkipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "跳过确认并补录账务",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WcsTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wcs-tasks/{id}/resend": {
+      "post": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "resend_wcs_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "人工重发",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WcsTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wcs-tasks/{id}/void": {
+      "post": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "void_wcs_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "任务 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "人工作废",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WcsTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/wechat-notify/approvals": {
       "post": {
         "tags": [
@@ -34713,6 +35265,31 @@
           }
         }
       },
+      "BindDeviceRequest": {
+        "type": "object",
+        "required": [
+          "location_id",
+          "device_id",
+          "binding_role"
+        ],
+        "properties": {
+          "binding_role": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "point_address": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "BindReplenishmentLocationsRequest": {
         "type": "object",
         "required": [
@@ -35432,6 +36009,22 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ConfirmSkipRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "qty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -37581,6 +38174,37 @@
           }
         }
       },
+      "CreateWcsTaskRequest": {
+        "type": "object",
+        "required": [
+          "task_type",
+          "device_id",
+          "payload"
+        ],
+        "properties": {
+          "business_ref_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "business_ref_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "payload": {},
+          "task_type": {
+            "type": "string"
+          }
+        }
+      },
       "CrossdockPlan": {
         "type": "object",
         "required": [
@@ -38307,6 +38931,69 @@
           }
         }
       },
+      "DeviceBindingResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "location_id",
+          "device_id",
+          "binding_role",
+          "valid_from"
+        ],
+        "properties": {
+          "binding_role": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "point_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_to": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "DeviceEventRequest": {
+        "type": "object",
+        "required": [
+          "event_type",
+          "payload"
+        ],
+        "properties": {
+          "event_type": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "payload": {},
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
       "DeviceLease": {
         "type": "object",
         "description": "H9 设备租约；`release_mode` 是租约创建时的策略快照；\n`busy_state` 真实来源在 US-H9-010/012，printing/result_unknown/reconciling 禁止释放。",
@@ -38394,6 +39081,67 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "DeviceResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "warehouse_id",
+          "device_code",
+          "device_type",
+          "protocol",
+          "extra_config",
+          "online_status",
+          "enabled"
+        ],
+        "properties": {
+          "device_code": {
+            "type": "string"
+          },
+          "device_type": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "extra_config": {},
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_heartbeat_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "online_status": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string",
+            "nullable": true
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -48468,6 +49216,43 @@
           }
         }
       },
+      "RegisterDeviceRequest": {
+        "type": "object",
+        "required": [
+          "device_code",
+          "device_type",
+          "protocol"
+        ],
+        "properties": {
+          "device_code": {
+            "type": "string"
+          },
+          "device_type": {
+            "type": "string"
+          },
+          "extra_config": {},
+          "ip_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "RejectPurchaseReturnRequest": {
         "type": "object",
         "required": [
@@ -49057,6 +49842,17 @@
             "type": "object",
             "description": "自由结构 JSON 对象。",
             "additionalProperties": true
+          }
+        }
+      },
+      "ResendRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -51763,6 +52559,17 @@
           }
         }
       },
+      "UnbindRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "UnlockSkippedBatch": {
         "type": "object",
         "required": [
@@ -51889,6 +52696,35 @@
             "nullable": true
           },
           "status": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UpdateDeviceRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "extra_config": {
+            "nullable": true
+          },
+          "ip_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "vendor": {
             "type": "string",
             "nullable": true
           }
@@ -53478,6 +54314,17 @@
           }
         }
       },
+      "VoidRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "Warehouse": {
         "type": "object",
         "description": "仓库基础档案。",
@@ -53836,6 +54683,79 @@
           },
           "page": {
             "$ref": "#/components/schemas/PageMeta"
+          }
+        }
+      },
+      "WcsTaskResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "task_no",
+          "task_type",
+          "device_id",
+          "payload",
+          "status",
+          "ack_payload",
+          "retry_count",
+          "max_retries",
+          "created_by",
+          "version"
+        ],
+        "properties": {
+          "ack_payload": {},
+          "business_ref_no": {
+            "type": "string",
+            "nullable": true
+          },
+          "business_ref_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "error_message": {
+            "type": "string",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "max_retries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "payload": {},
+          "retry_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "task_no": {
+            "type": "string"
+          },
+          "task_type": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
