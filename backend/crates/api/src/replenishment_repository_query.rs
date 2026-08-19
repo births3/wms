@@ -1,9 +1,69 @@
+use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::Quantity;
 
 use super::{PgReplenishmentRepository, ProductPutawayAttrs, WaveGapLine};
 
 impl PgReplenishmentRepository {
+    pub async fn pick_available_qty(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        location_id: Uuid,
+        product_id: Uuid,
+    ) -> Result<Quantity, sqlx::Error> {
+        self.pick_available_qty_excluding_wave(tx, owner_id, location_id, product_id, None)
+            .await
+    }
+
+    pub async fn pick_available_qty_excluding_wave(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        location_id: Uuid,
+        product_id: Uuid,
+        wave_id: Option<Uuid>,
+    ) -> Result<Quantity, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT COALESCE((
+                SELECT SUM(
+                    qty_on_hand - qty_allocated - qty_frozen + qty_replenish_in_transit
+                )
+                  FROM inventory_batches
+                 WHERE owner_id = $1
+                   AND location_id = $2
+                   AND product_id = $3
+                   AND status = 'qualified'
+            ), 0)
+            + CASE
+                WHEN $4::uuid IS NULL THEN 0
+                ELSE COALESCE((
+                    SELECT SUM(allocation.allocated_qty)::numeric
+                      FROM inventory_allocations allocation
+                      JOIN inventory_batches batch
+                        ON batch.id = allocation.batch_id
+                       AND batch.owner_id = allocation.owner_id
+                      JOIN outbound_wave_orders wave_order
+                        ON wave_order.owner_id = allocation.owner_id
+                       AND wave_order.outbound_order_id = allocation.outbound_order_id
+                     WHERE allocation.owner_id = $1
+                       AND batch.location_id = $2
+                       AND batch.product_id = $3
+                       AND allocation.status = 'locked'
+                       AND wave_order.wave_id = $4
+                ), 0)
+              END
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .bind(product_id)
+        .bind(wave_id)
+        .fetch_one(&mut **tx)
+        .await
+    }
+
     pub async fn products_at_location_for_category(
         &self,
         owner_id: Uuid,
@@ -59,24 +119,14 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         wave_id: Uuid,
     ) -> Result<Vec<WaveGapLine>, sqlx::Error> {
-        sqlx::query_as::<_, (Uuid, Uuid, i32, Uuid, Quantity, Uuid, Option<Uuid>)>(
+        sqlx::query_as::<_, (Uuid, Uuid, i32, Uuid, Quantity, Uuid)>(
             r#"
             SELECT wave_order.wave_id,
                    outbound.id,
                    line.line_no,
                    product.id,
                    line.planned_qty,
-                   outbound.warehouse_id,
-                   (
-                        SELECT pick.location_id
-                          FROM outbound_pick_tasks pick
-                         WHERE pick.owner_id = wave_order.owner_id
-                           AND pick.wave_id = wave_order.wave_id
-                           AND pick.outbound_order_id = outbound.id
-                           AND pick.line_no = line.line_no
-                         ORDER BY pick.route_sequence ASC, pick.id
-                         LIMIT 1
-                   )
+                   outbound.warehouse_id
               FROM outbound_wave_orders wave_order
               JOIN outbound_orders outbound
                 ON outbound.id = wave_order.outbound_order_id
@@ -105,7 +155,6 @@ impl PgReplenishmentRepository {
                         product_id,
                         demand_qty,
                         warehouse_id,
-                        pick_location_id,
                     )| WaveGapLine {
                         wave_id,
                         outbound_order_id,
@@ -113,7 +162,6 @@ impl PgReplenishmentRepository {
                         product_id,
                         demand_qty,
                         warehouse_id,
-                        pick_location_id,
                     },
                 )
                 .collect()
@@ -252,6 +300,32 @@ impl PgReplenishmentRepository {
         .bind(product_id)
         .bind(since)
         .fetch_one(&self.pool)
+        .await
+    }
+
+    pub async fn runtime_setting(
+        &self,
+        owner_id: Option<Uuid>,
+        key: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(item.params ->> 'value', item.item_name)
+              FROM system_dictionary_items item
+             WHERE item.dict_code = 'replenishment_runtime'
+               AND item.item_code = $2
+               AND item.enabled
+               AND (
+                    item.owner_id IS NULL
+                    OR ($1::uuid IS NOT NULL AND item.owner_id = $1)
+               )
+             ORDER BY item.owner_id NULLS LAST
+             LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(key)
+        .fetch_optional(&self.pool)
         .await
     }
 }

@@ -86,8 +86,12 @@ pub fn task_qty(target_need: Quantity, source_available: Quantity, pack_ratio: i
     (raw / ratio).trunc() * ratio
 }
 
-pub fn can_cancel(picked_qty: Quantity, done_qty: Quantity) -> bool {
-    picked_qty == Quantity::ZERO && done_qty == Quantity::ZERO
+pub fn can_cancel(status: &str, picked_qty: Quantity, done_qty: Quantity) -> bool {
+    matches!(
+        status,
+        REPLENISH_STATUS_PENDING | REPLENISH_STATUS_IN_PROGRESS | REPLENISH_STATUS_SUSPENDED
+    ) && picked_qty == Quantity::ZERO
+        && done_qty == Quantity::ZERO
 }
 
 pub fn can_pick(status: &str) -> bool {
@@ -358,9 +362,13 @@ mod tests {
 
     #[test]
     fn cancel_blocked_when_picked_qty_positive() {
-        assert!(!can_cancel(q(4), q(0)));
-        assert!(can_cancel(q(0), q(0)));
-        assert!(!can_cancel(q(0), q(1)));
+        assert!(!can_cancel(REPLENISH_STATUS_PENDING, q(4), q(0)));
+        assert!(can_cancel(REPLENISH_STATUS_PENDING, q(0), q(0)));
+        assert!(can_cancel(REPLENISH_STATUS_IN_PROGRESS, q(0), q(0)));
+        assert!(can_cancel(REPLENISH_STATUS_SUSPENDED, q(0), q(0)));
+        assert!(!can_cancel(REPLENISH_STATUS_CANCELLED, q(0), q(0)));
+        assert!(!can_cancel(REPLENISH_STATUS_DONE, q(0), q(0)));
+        assert!(!can_cancel(REPLENISH_STATUS_PENDING, q(0), q(1)));
     }
 
     #[test]

@@ -39,7 +39,6 @@ const M4_READ_PERMISSION: &str = "m4.read";
 pub struct Wave4AppState {
     pub wave4_repository: Arc<PgWave4Repository>,
     pub shipping_service: Arc<Wave4ShippingService<PgWave4Repository>>,
-    pub replenishment: Arc<ReplenishmentService>,
     pub wave_replenish: Arc<wave4_replenish::Wave4ReplenishService>,
 }
 
@@ -61,9 +60,8 @@ impl Wave4AppState {
             wave_replenish: Arc::new(wave4_replenish::Wave4ReplenishService::new(
                 pool,
                 Arc::clone(&wave4_repository),
-                Arc::clone(&replenishment),
+                replenishment,
             )),
-            replenishment,
             wave4_repository,
         }
     }
@@ -71,6 +69,7 @@ impl Wave4AppState {
 
 #[path = "wave4_replenish.rs"]
 mod wave4_replenish;
+pub use wave4_replenish::Wave4ReplenishService;
 
 #[path = "wave4_handler_error.rs"]
 mod wave4_handler_error;

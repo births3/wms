@@ -25,7 +25,9 @@ use wms_domain::{
 use crate::{
     auth::{AuthContext, AuthError},
     replenishment_repository::PgReplenishmentRepository,
-    replenishment_service::{ReplenishmentError, ReplenishmentService},
+    replenishment_service::{
+        ListReplenishmentTasksFilter, ReplenishmentError, ReplenishmentService,
+    },
 };
 
 const MANAGE: &str = "m3.replenishment.manage";
@@ -117,6 +119,7 @@ struct ListStrategiesQuery {
     keyword: Option<String>,
     enabled: Option<bool>,
     scope_type: Option<String>,
+    target_type: Option<String>,
 }
 
 async fn list_strategies_handler(
@@ -133,6 +136,7 @@ async fn list_strategies_handler(
                 query.keyword.as_deref(),
                 query.enabled,
                 query.scope_type.as_deref(),
+                query.target_type.as_deref(),
             )
             .await?,
     ))
@@ -339,6 +343,15 @@ async fn confirm_task_handler(
 struct ListTasksQuery {
     status: Option<String>,
     trigger_mode: Option<String>,
+    priority: Option<String>,
+    source_location_id: Option<Uuid>,
+    target_location_id: Option<Uuid>,
+    location_id: Option<Uuid>,
+    operator_id: Option<Uuid>,
+    wave_id: Option<Uuid>,
+    keyword: Option<String>,
+    created_from: Option<chrono::DateTime<chrono::Utc>>,
+    created_to: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 async fn list_tasks_handler(
@@ -352,7 +365,22 @@ async fn list_tasks_handler(
     Ok(Json(
         state
             .service
-            .list_tasks(&ctx, query.status.as_deref(), query.trigger_mode.as_deref())
+            .list_tasks(
+                &ctx,
+                &ListReplenishmentTasksFilter {
+                    status: query.status,
+                    trigger_mode: query.trigger_mode,
+                    priority: query.priority,
+                    source_location_id: query.source_location_id,
+                    target_location_id: query.target_location_id,
+                    location_id: query.location_id,
+                    operator_id: query.operator_id,
+                    wave_id: query.wave_id,
+                    keyword: query.keyword,
+                    created_from: query.created_from,
+                    created_to: query.created_to,
+                },
+            )
             .await?,
     ))
 }
@@ -442,7 +470,17 @@ impl IntoResponse for ReplenishmentHandlerError {
             Self::Service(ReplenishmentError::TaskNotFound) => (
                 StatusCode::NOT_FOUND,
                 "M3_REPLENISH_TASK_NOT_FOUND",
+                "补货任务不存在",
+            ),
+            Self::Service(ReplenishmentError::StrategyNotFound) => (
+                StatusCode::NOT_FOUND,
+                "M3_REPLENISH_STRATEGY_NOT_FOUND",
                 "补货策略不存在",
+            ),
+            Self::Service(ReplenishmentError::GroupNotFound) => (
+                StatusCode::NOT_FOUND,
+                "M3_REPLENISH_GROUP_NOT_FOUND",
+                "补货库位组不存在",
             ),
             Self::Service(ReplenishmentError::ClaimConflict) => (
                 StatusCode::CONFLICT,

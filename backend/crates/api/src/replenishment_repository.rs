@@ -7,7 +7,9 @@ mod strategy;
 #[path = "replenishment_repository_task.rs"]
 mod task;
 
-pub use task::{ExecuteListFilter, OperatorZoneScope, TargetLocationScope};
+pub use task::{
+    ExecuteListFilter, ListReplenishmentTasksFilter, OperatorZoneScope, TargetLocationScope,
+};
 
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -263,22 +265,8 @@ impl PgReplenishmentRepository {
         .bind(&req.group_code)
         .fetch_one(&mut **tx)
         .await?;
-        sqlx::query("DELETE FROM replenishment_location_group_members WHERE group_id = $1")
-            .bind(group_id)
-            .execute(&mut **tx)
+        self.replace_group_members(tx, owner_id, group_id, &req.location_ids)
             .await?;
-        for location_id in &req.location_ids {
-            sqlx::query(
-                r#"
-                INSERT INTO replenishment_location_group_members (group_id, location_id)
-                VALUES ($1, $2)
-                "#,
-            )
-            .bind(group_id)
-            .bind(location_id)
-            .execute(&mut **tx)
-            .await?;
-        }
         self.sync_group_strategy_locations(tx, owner_id, group_id, &req.location_ids)
             .await?;
         Ok(ReplenishmentLocationGroup {
@@ -365,32 +353,6 @@ impl PgReplenishmentRepository {
             .await?;
         }
         Ok(())
-    }
-
-    pub async fn pick_available_qty(
-        &self,
-        tx: &mut Transaction<'_, Postgres>,
-        owner_id: Uuid,
-        location_id: Uuid,
-        product_id: Uuid,
-    ) -> Result<Quantity, sqlx::Error> {
-        sqlx::query_scalar(
-            r#"
-            SELECT COALESCE(SUM(
-                qty_on_hand - qty_allocated - qty_frozen + qty_replenish_in_transit
-            ), 0)
-              FROM inventory_batches
-             WHERE owner_id = $1
-               AND location_id = $2
-               AND product_id = $3
-               AND status = 'qualified'
-            "#,
-        )
-        .bind(owner_id)
-        .bind(location_id)
-        .bind(product_id)
-        .fetch_one(&mut **tx)
-        .await
     }
 
     pub async fn default_pack_ratio(
@@ -616,6 +578,7 @@ impl PgReplenishmentRepository {
 pub enum ReplenishmentRepoError {
     LocationBound,
     LocationTypeMismatch,
+    ScopeNotFound,
     Database(sqlx::Error),
 }
 
@@ -711,7 +674,6 @@ pub struct WaveGapLine {
     pub product_id: Uuid,
     pub demand_qty: Quantity,
     pub warehouse_id: Uuid,
-    pub pick_location_id: Option<Uuid>,
 }
 
 #[derive(sqlx::FromRow)]

@@ -46,7 +46,13 @@ impl ReplenishmentService {
         };
         let available = self
             .repo
-            .pick_available_qty(tx, ctx.owner_id, req.target_location_id, req.product_id)
+            .pick_available_qty_excluding_wave(
+                tx,
+                ctx.owner_id,
+                req.target_location_id,
+                req.product_id,
+                Some(req.wave_id),
+            )
             .await?;
         let urgent = req.demand_qty - available;
         if urgent <= Quantity::ZERO {
@@ -56,6 +62,13 @@ impl ReplenishmentService {
             .repo
             .default_pack_ratio(tx, ctx.owner_id, req.product_id)
             .await?;
+        let ratio_tenths = self
+            .repo
+            .runtime_setting(Some(ctx.owner_id), "replenishment.full_lpn_ratio")
+            .await?
+            .as_deref()
+            .and_then(super::ratio_to_tenths)
+            .unwrap_or(8);
         let mut remaining = urgent;
         let mut created = Vec::new();
         let created_by = format!("system:wave:{}", req.wave_id);
@@ -98,7 +111,7 @@ impl ReplenishmentService {
                 Err(ReplenishmentError::PutawayBlocked) if !created.is_empty() => break,
                 Err(error) => return Err(error),
             }
-            let source_lpn_id = resolve_source_lpn(&source, qty, source_type);
+            let source_lpn_id = resolve_source_lpn(&source, qty, source_type, ratio_tenths);
             let task = self
                 .persist_task(
                     tx,
@@ -180,10 +193,7 @@ impl ReplenishmentService {
                 .repo
                 .list_pick_target_candidates(tx, owner_id, line.warehouse_id, line.product_id)
                 .await?;
-            let Some(target_location_id) = line
-                .pick_location_id
-                .or_else(|| candidates.into_iter().next())
-            else {
+            let Some(target_location_id) = candidates.into_iter().next() else {
                 continue;
             };
             match self

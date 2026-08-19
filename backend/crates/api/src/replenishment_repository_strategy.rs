@@ -9,12 +9,85 @@ use wms_domain::{
 use super::{GroupRow, PgReplenishmentRepository, PreviewRow, ReplenishmentRepoError, StrategyRow};
 
 impl PgReplenishmentRepository {
+    pub async fn get_strategy_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<ReplenishmentStrategy>, sqlx::Error> {
+        sqlx::query_as::<_, StrategyRow>(
+            r#"
+            SELECT id, owner_id, strategy_code, strategy_name, scope_type, scope_ref,
+                   location_type, source_type, target_type,
+                   min_safety_threshold, max_replenish_target, trigger_modes, enabled
+              FROM replenishment_strategies
+             WHERE owner_id = $1 AND id = $2
+             FOR UPDATE
+            "#,
+        )
+        .bind(owner_id)
+        .bind(id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map(|row| row.map(Into::into))
+    }
+
+    pub async fn replace_group_members(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        group_id: Uuid,
+        location_ids: &[Uuid],
+    ) -> Result<(), ReplenishmentRepoError> {
+        sqlx::query(
+            r#"
+            DELETE FROM replenishment_location_group_members member
+             USING replenishment_location_groups grp
+             WHERE member.group_id = grp.id
+               AND grp.id = $1
+               AND grp.owner_id = $2
+            "#,
+        )
+        .bind(group_id)
+        .bind(owner_id)
+        .execute(&mut **tx)
+        .await?;
+        for location_id in location_ids {
+            let inserted = sqlx::query(
+                r#"
+                INSERT INTO replenishment_location_group_members (group_id, location_id)
+                SELECT $1, $2
+                 WHERE EXISTS (
+                    SELECT 1
+                      FROM replenishment_location_groups
+                     WHERE id = $1 AND owner_id = $3
+                 )
+                 AND EXISTS (
+                    SELECT 1
+                      FROM warehouse_locations
+                     WHERE id = $2 AND owner_id = $3
+                 )
+                "#,
+            )
+            .bind(group_id)
+            .bind(location_id)
+            .bind(owner_id)
+            .execute(&mut **tx)
+            .await?;
+            if inserted.rows_affected() != 1 {
+                return Err(ReplenishmentRepoError::ScopeNotFound);
+            }
+        }
+        Ok(())
+    }
+
     pub async fn list_strategies(
         &self,
         owner_id: Uuid,
         keyword: Option<&str>,
         enabled: Option<bool>,
         scope_type: Option<&str>,
+        target_type: Option<&str>,
     ) -> Result<Vec<ReplenishmentStrategy>, sqlx::Error> {
         sqlx::query_as::<_, StrategyRow>(
             r#"
@@ -27,6 +100,7 @@ impl PgReplenishmentRepository {
                     OR strategy_name ILIKE '%' || $2 || '%')
                AND ($3::bool IS NULL OR enabled = $3)
                AND ($4::text IS NULL OR scope_type = $4)
+               AND ($5::text IS NULL OR target_type = $5)
              ORDER BY strategy_code
             "#,
         )
@@ -34,6 +108,7 @@ impl PgReplenishmentRepository {
         .bind(keyword)
         .bind(enabled)
         .bind(scope_type)
+        .bind(target_type)
         .fetch_all(&self.pool)
         .await
         .map(|rows| rows.into_iter().map(Into::into).collect())
@@ -126,12 +201,19 @@ impl PgReplenishmentRepository {
         for group in groups {
             let location_ids = sqlx::query_scalar::<_, Uuid>(
                 r#"
-                SELECT location_id
-                  FROM replenishment_location_group_members
-                 WHERE group_id = $1
+                SELECT member.location_id
+                  FROM replenishment_location_group_members member
+                  JOIN replenishment_location_groups grp
+                    ON grp.id = member.group_id
+                  JOIN warehouse_locations loc
+                    ON loc.id = member.location_id
+                   AND loc.owner_id = grp.owner_id
+                 WHERE member.group_id = $1
+                   AND grp.owner_id = $2
                 "#,
             )
             .bind(group.id)
+            .bind(owner_id)
             .fetch_all(&self.pool)
             .await?;
             result.push(ReplenishmentLocationGroup {
@@ -167,12 +249,19 @@ impl PgReplenishmentRepository {
         };
         let location_ids = sqlx::query_scalar::<_, Uuid>(
             r#"
-            SELECT location_id
-              FROM replenishment_location_group_members
-             WHERE group_id = $1
+            SELECT member.location_id
+              FROM replenishment_location_group_members member
+              JOIN replenishment_location_groups grp
+                ON grp.id = member.group_id
+              JOIN warehouse_locations loc
+                ON loc.id = member.location_id
+               AND loc.owner_id = grp.owner_id
+             WHERE member.group_id = $1
+               AND grp.owner_id = $2
             "#,
         )
         .bind(group.id)
+        .bind(owner_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(Some(ReplenishmentLocationGroup {
@@ -213,22 +302,8 @@ impl PgReplenishmentRepository {
         let Some(group) = updated else {
             return Ok(None);
         };
-        sqlx::query("DELETE FROM replenishment_location_group_members WHERE group_id = $1")
-            .bind(group.id)
-            .execute(&mut **tx)
+        self.replace_group_members(tx, owner_id, group.id, &req.location_ids)
             .await?;
-        for location_id in &req.location_ids {
-            sqlx::query(
-                r#"
-                INSERT INTO replenishment_location_group_members (group_id, location_id)
-                VALUES ($1, $2)
-                "#,
-            )
-            .bind(group.id)
-            .bind(location_id)
-            .execute(&mut **tx)
-            .await?;
-        }
         self.sync_group_strategy_locations(tx, owner_id, group.id, &req.location_ids)
             .await?;
         Ok(Some(ReplenishmentLocationGroup {
@@ -289,12 +364,19 @@ impl PgReplenishmentRepository {
         .await?;
         let location_ids = sqlx::query_scalar::<_, Uuid>(
             r#"
-            SELECT location_id
-              FROM replenishment_location_group_members
-             WHERE group_id = $1
+            SELECT member.location_id
+              FROM replenishment_location_group_members member
+              JOIN replenishment_location_groups grp
+                ON grp.id = member.group_id
+              JOIN warehouse_locations loc
+                ON loc.id = member.location_id
+               AND loc.owner_id = grp.owner_id
+             WHERE member.group_id = $1
+               AND grp.owner_id = $2
             "#,
         )
         .bind(group.id)
+        .bind(owner_id)
         .fetch_all(&mut **tx)
         .await?;
         Ok(Some(ReplenishmentLocationGroup {

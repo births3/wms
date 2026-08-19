@@ -16,15 +16,15 @@ impl ReplenishmentService {
     ) -> Result<Vec<ReplenishmentTask>, ReplenishmentError> {
         ctx.require_permission(MANAGE)
             .map_err(|_| ReplenishmentError::PermissionDenied)?;
+        let mut tx = self.repo.pool().begin().await?;
         let strategy = self
             .repo
-            .get_strategy(ctx.owner_id, strategy_id)
+            .get_strategy_in_tx(&mut tx, ctx.owner_id, strategy_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::StrategyNotFound)?;
         if !strategy.enabled || !strategy.trigger_modes.iter().any(|mode| mode == "min_max") {
             return Ok(Vec::new());
         }
-        let mut tx = self.repo.pool().begin().await?;
         let target = self
             .repo
             .load_location_route(&mut tx, ctx.owner_id, target_location_id)
@@ -46,6 +46,13 @@ impl ReplenishmentService {
             .await?;
         let mut remaining = strategy.max_replenish_target - available;
         let mut created = Vec::new();
+        let ratio_tenths = self
+            .repo
+            .runtime_setting(Some(ctx.owner_id), "replenishment.full_lpn_ratio")
+            .await?
+            .as_deref()
+            .and_then(super::ratio_to_tenths)
+            .unwrap_or(8);
         while remaining >= Quantity::from(pack) {
             let Some(source) = self
                 .repo
@@ -83,7 +90,8 @@ impl ReplenishmentService {
                 Err(ReplenishmentError::PutawayBlocked) if !created.is_empty() => break,
                 Err(error) => return Err(error),
             }
-            let source_lpn_id = resolve_source_lpn(&source, qty, &strategy.source_type);
+            let source_lpn_id =
+                resolve_source_lpn(&source, qty, &strategy.source_type, ratio_tenths);
             let task = self
                 .persist_task(
                     &mut tx,

@@ -56,7 +56,7 @@ impl ReplenishmentService {
         self.repo
             .get_location_group(ctx.owner_id, group_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)
+            .ok_or(ReplenishmentError::GroupNotFound)
     }
 
     pub async fn update_location_group(
@@ -95,7 +95,7 @@ impl ReplenishmentService {
             .repo
             .update_location_group(&mut tx, ctx.owner_id, group_id, &req)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::GroupNotFound)?;
         idempotency::store_success_with_status(
             &mut tx,
             ctx.owner_id,
@@ -157,7 +157,7 @@ impl ReplenishmentService {
             .repo
             .disable_location_group(&mut tx, ctx.owner_id, group_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::GroupNotFound)?;
         idempotency::store_success_with_status(
             &mut tx,
             ctx.owner_id,

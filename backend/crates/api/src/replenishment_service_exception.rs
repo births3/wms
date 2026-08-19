@@ -54,7 +54,7 @@ impl ReplenishmentService {
         if task.version != req.version {
             return Err(ReplenishmentError::StateInvalid);
         }
-        if !can_cancel(task.picked_qty, task.done_qty) {
+        if !can_cancel(&task.status, task.picked_qty, task.done_qty) {
             return Err(ReplenishmentError::CancelBlocked);
         }
         let remaining = task.qty - task.done_qty;

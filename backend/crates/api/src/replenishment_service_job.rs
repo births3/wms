@@ -53,12 +53,12 @@ impl ReplenishmentService {
         if task.priority != "urgent" {
             let location = self
                 .repo
-                .target_location_scope(ctx.owner_id, task.target_location_id)
+                .target_location_scope_in_tx(&mut tx, ctx.owner_id, task.target_location_id)
                 .await?
                 .ok_or(ReplenishmentError::TaskNotFound)?;
             let scope = self
                 .repo
-                .operator_replenish_zone_scope(ctx.owner_id, ctx.user_id)
+                .operator_replenish_zone_scope_in_tx(&mut tx, ctx.owner_id, ctx.user_id)
                 .await?;
             if !scope.allows(&location) {
                 return Err(ReplenishmentError::ZoneDenied);
@@ -139,13 +139,21 @@ impl ReplenishmentService {
         if source_route.lock_status == "lock_in" || source_route.lock_status == "lock_all" {
             return Err(ReplenishmentError::SourceUnavailable);
         }
-        if self
+        if let Some(suspended) = self
             .suspend_if_source_short(&mut tx, ctx, &mut task, req.version)
             .await?
-            .is_some()
         {
+            super::write_audit(
+                &mut tx,
+                ctx,
+                "suspend_replenishment_task",
+                "replenishment_task",
+                &suspended.id.to_string(),
+            )
+            .await?;
+            store_job(&mut tx, ctx, idempotency_key, &hash, &path, &suspended).await?;
             tx.commit().await?;
-            return Err(ReplenishmentError::SourceUnavailable);
+            return Ok(suspended);
         }
         let source_code = self
             .repo
@@ -224,14 +232,23 @@ impl ReplenishmentService {
         if task.version != req.version {
             return Err(ReplenishmentError::StateInvalid);
         }
-        if task.picked_qty <= Quantity::ZERO
-            && self
+        if task.picked_qty <= Quantity::ZERO {
+            if let Some(suspended) = self
                 .suspend_if_source_short(&mut tx, ctx, &mut task, req.version)
                 .await?
-                .is_some()
-        {
-            tx.commit().await?;
-            return Err(ReplenishmentError::SourceUnavailable);
+            {
+                super::write_audit(
+                    &mut tx,
+                    ctx,
+                    "suspend_replenishment_task",
+                    "replenishment_task",
+                    &suspended.id.to_string(),
+                )
+                .await?;
+                store_job(&mut tx, ctx, idempotency_key, &hash, &path, &suspended).await?;
+                tx.commit().await?;
+                return Ok(suspended);
+            }
         }
         if !can_confirm(&task.status, task.picked_qty) || task.operator_id != Some(ctx.user_id) {
             return Err(ReplenishmentError::StateInvalid);

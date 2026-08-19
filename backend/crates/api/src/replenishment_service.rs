@@ -50,6 +50,8 @@ pub enum ReplenishmentError {
     ScopeNotFound,
     LocationBound,
     TaskNotFound,
+    StrategyNotFound,
+    GroupNotFound,
     SourceUnavailable,
     NumberingUnavailable,
     PutawayBlocked,
@@ -72,6 +74,8 @@ pub(crate) struct WaveLink {
     pub outbound_order_id: Uuid,
     pub outbound_line_no: i32,
 }
+
+pub use crate::replenishment_repository::ListReplenishmentTasksFilter;
 
 pub struct CreateWaveGapTasksRequest {
     pub wave_id: Uuid,
@@ -158,12 +162,13 @@ impl ReplenishmentService {
         keyword: Option<&str>,
         enabled: Option<bool>,
         scope_type: Option<&str>,
+        target_type: Option<&str>,
     ) -> Result<ReplenishmentStrategyListResponse, ReplenishmentError> {
         ctx.require_permission(MANAGE)
             .map_err(|_| ReplenishmentError::PermissionDenied)?;
         let data = self
             .repo
-            .list_strategies(ctx.owner_id, keyword, enabled, scope_type)
+            .list_strategies(ctx.owner_id, keyword, enabled, scope_type, target_type)
             .await?;
         let count = u32::try_from(data.len()).unwrap_or(u32::MAX);
         Ok(ReplenishmentStrategyListResponse {
@@ -186,7 +191,7 @@ impl ReplenishmentService {
         self.repo
             .get_strategy(ctx.owner_id, strategy_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)
+            .ok_or(ReplenishmentError::StrategyNotFound)
     }
 
     pub async fn list_location_groups(
@@ -220,7 +225,7 @@ impl ReplenishmentService {
             .repo
             .get_strategy(ctx.owner_id, strategy_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::StrategyNotFound)?;
         let hash = idempotency::request_hash(&req)?;
         let path = format!("/api/v1/replenishment/strategies/{strategy_id}/locations");
         let mut tx = self.repo.pool().begin().await?;
@@ -285,7 +290,7 @@ impl ReplenishmentService {
             .repo
             .get_strategy(ctx.owner_id, strategy_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::StrategyNotFound)?;
         let data = self.repo.preview_strategy(ctx.owner_id, &strategy).await?;
         Ok(ReplenishmentPreviewResponse { data })
     }
@@ -353,8 +358,7 @@ impl ReplenishmentService {
     pub async fn list_tasks(
         &self,
         ctx: &AuthContext,
-        status: Option<&str>,
-        trigger_mode: Option<&str>,
+        filter: &ListReplenishmentTasksFilter,
     ) -> Result<ReplenishmentTaskListResponse, ReplenishmentError> {
         let execute = if ctx.require_permission(MANAGE).is_ok() {
             None
@@ -369,7 +373,7 @@ impl ReplenishmentService {
         };
         let data = self
             .repo
-            .list_tasks(ctx.owner_id, status, trigger_mode, execute.as_ref())
+            .list_tasks(ctx.owner_id, filter, execute.as_ref())
             .await?;
         let count = u32::try_from(data.len()).unwrap_or(u32::MAX);
         Ok(ReplenishmentTaskListResponse {
@@ -681,10 +685,19 @@ impl ReplenishmentService {
     }
 }
 
+pub(crate) fn ratio_to_tenths(raw: &str) -> Option<i64> {
+    let value: f64 = raw.parse().ok()?;
+    if !value.is_finite() || value <= 0.0 {
+        return None;
+    }
+    Some((value * 10.0).round() as i64)
+}
+
 pub(crate) fn resolve_source_lpn(
     source: &SourceBatchLock,
     qty: Quantity,
     source_type: &str,
+    full_lpn_ratio_tenths: i64,
 ) -> Option<Uuid> {
     if source_type == "case_pick" {
         return None;
@@ -693,7 +706,12 @@ pub(crate) fn resolve_source_lpn(
     if source.lpn_on_hand <= Quantity::ZERO {
         return None;
     }
-    if qty * Quantity::from(10) >= source.lpn_on_hand * Quantity::from(8) {
+    let tenths = if full_lpn_ratio_tenths <= 0 {
+        8
+    } else {
+        full_lpn_ratio_tenths
+    };
+    if qty * Quantity::from(10) >= source.lpn_on_hand * Quantity::from(tenths) {
         Some(lpn_id)
     } else {
         None
@@ -737,6 +755,7 @@ impl From<ReplenishmentRepoError> for ReplenishmentError {
         match value {
             ReplenishmentRepoError::LocationBound => Self::LocationBound,
             ReplenishmentRepoError::LocationTypeMismatch => Self::StrategyInvalid,
+            ReplenishmentRepoError::ScopeNotFound => Self::ScopeNotFound,
             ReplenishmentRepoError::Database(error) => Self::Database(error),
         }
     }

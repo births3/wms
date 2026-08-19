@@ -89,7 +89,7 @@ impl ReplenishmentService {
         let Some(mut task) = self.repo.lock_task(&mut tx, owner_id, task_id).await? else {
             return Ok(false);
         };
-        if task.version != version || !can_cancel(task.picked_qty, task.done_qty) {
+        if task.version != version || !can_cancel(&task.status, task.picked_qty, task.done_qty) {
             return Ok(false);
         }
         let remaining = task.qty - task.done_qty;

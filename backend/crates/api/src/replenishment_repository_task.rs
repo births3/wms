@@ -5,6 +5,21 @@ use wms_domain::{Quantity, ReplenishmentTask};
 
 use super::{PgReplenishmentRepository, SourceBatchLock, TaskRow};
 
+#[derive(Clone, Debug, Default)]
+pub struct ListReplenishmentTasksFilter {
+    pub status: Option<String>,
+    pub trigger_mode: Option<String>,
+    pub priority: Option<String>,
+    pub source_location_id: Option<Uuid>,
+    pub target_location_id: Option<Uuid>,
+    pub location_id: Option<Uuid>,
+    pub operator_id: Option<Uuid>,
+    pub wave_id: Option<Uuid>,
+    pub keyword: Option<String>,
+    pub created_from: Option<DateTime<Utc>>,
+    pub created_to: Option<DateTime<Utc>>,
+}
+
 pub struct ExecuteListFilter {
     pub user_id: Uuid,
     pub allowed_zone_ids: Vec<Uuid>,
@@ -19,6 +34,22 @@ pub struct OperatorZoneScope {
 pub struct TargetLocationScope {
     pub zone_id: Uuid,
     pub warehouse_id: Uuid,
+}
+
+fn scope_from_rows(rows: Vec<(Vec<Uuid>, Uuid)>) -> OperatorZoneScope {
+    let mut allowed_zone_ids = Vec::new();
+    let mut open_warehouse_ids = Vec::new();
+    for (zone_ids, warehouse_id) in rows {
+        if zone_ids.is_empty() {
+            open_warehouse_ids.push(warehouse_id);
+        } else {
+            allowed_zone_ids.extend(zone_ids);
+        }
+    }
+    OperatorZoneScope {
+        allowed_zone_ids,
+        open_warehouse_ids,
+    }
 }
 
 impl OperatorZoneScope {
@@ -40,8 +71,7 @@ impl PgReplenishmentRepository {
     pub async fn list_tasks(
         &self,
         owner_id: Uuid,
-        status: Option<&str>,
-        trigger_mode: Option<&str>,
+        filter: &ListReplenishmentTasksFilter,
         execute: Option<&ExecuteListFilter>,
     ) -> Result<Vec<ReplenishmentTask>, sqlx::Error> {
         let execute_user = execute.map(|item| item.user_id);
@@ -51,6 +81,11 @@ impl PgReplenishmentRepository {
         let open_warehouses = execute
             .map(|item| item.open_warehouse_ids.as_slice())
             .unwrap_or(&[]);
+        let keyword = filter
+            .keyword
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
         sqlx::query_as::<_, TaskRow>(
             r#"
             SELECT t.id, t.owner_id, t.task_no, t.trigger_mode, t.priority, t.strategy_id,
@@ -66,6 +101,15 @@ impl PgReplenishmentRepository {
              WHERE t.owner_id = $1
                AND ($2::text IS NULL OR t.status = $2)
                AND ($3::text IS NULL OR t.trigger_mode = $3)
+               AND ($7::text IS NULL OR t.priority = $7)
+               AND ($8::uuid IS NULL OR t.source_location_id = $8)
+               AND ($9::uuid IS NULL OR t.target_location_id = $9)
+               AND ($10::uuid IS NULL OR t.source_location_id = $10 OR t.target_location_id = $10)
+               AND ($11::uuid IS NULL OR t.operator_id = $11)
+               AND ($12::uuid IS NULL OR t.wave_id = $12)
+               AND ($13::text IS NULL OR t.task_no ILIKE '%' || $13 || '%')
+               AND ($14::timestamptz IS NULL OR t.created_at >= $14)
+               AND ($15::timestamptz IS NULL OR t.created_at <= $15)
                AND (
                     $4::uuid IS NULL
                     OR t.operator_id = $4
@@ -86,11 +130,20 @@ impl PgReplenishmentRepository {
             "#,
         )
         .bind(owner_id)
-        .bind(status)
-        .bind(trigger_mode)
+        .bind(filter.status.as_deref())
+        .bind(filter.trigger_mode.as_deref())
         .bind(execute_user)
         .bind(allowed_zones)
         .bind(open_warehouses)
+        .bind(filter.priority.as_deref())
+        .bind(filter.source_location_id)
+        .bind(filter.target_location_id)
+        .bind(filter.location_id)
+        .bind(filter.operator_id)
+        .bind(filter.wave_id)
+        .bind(keyword)
+        .bind(filter.created_from)
+        .bind(filter.created_to)
         .fetch_all(&self.pool)
         .await
         .map(|rows| rows.into_iter().map(Into::into).collect())
@@ -149,19 +202,40 @@ impl PgReplenishmentRepository {
         .bind(user_id)
         .fetch_all(&self.pool)
         .await?;
-        let mut allowed_zone_ids = Vec::new();
-        let mut open_warehouse_ids = Vec::new();
-        for (zone_ids, warehouse_id) in rows {
-            if zone_ids.is_empty() {
-                open_warehouse_ids.push(warehouse_id);
-            } else {
-                allowed_zone_ids.extend(zone_ids);
-            }
-        }
-        Ok(OperatorZoneScope {
-            allowed_zone_ids,
-            open_warehouse_ids,
-        })
+        Ok(scope_from_rows(rows))
+    }
+
+    pub async fn operator_replenish_zone_scope_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<OperatorZoneScope, sqlx::Error> {
+        let rows: Vec<(Vec<Uuid>, Uuid)> = sqlx::query_as(
+            r#"
+            SELECT task_group.zone_ids, task_group.warehouse_id
+              FROM task_groups task_group
+             WHERE task_group.owner_id = $1
+               AND task_group.enabled
+               AND 'replenish' = ANY(task_group.task_type_codes)
+               AND EXISTS (
+                    SELECT 1
+                      FROM task_group_memberships membership
+                     WHERE membership.task_group_id = task_group.id
+                       AND membership.owner_id = $1
+                       AND membership.user_id = $2
+                       AND (
+                            membership.qualification_valid_until IS NULL
+                            OR membership.qualification_valid_until > now()
+                       )
+               )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(user_id)
+        .fetch_all(&mut **tx)
+        .await?;
+        Ok(scope_from_rows(rows))
     }
 
     pub async fn target_location_scope(
@@ -179,6 +253,31 @@ impl PgReplenishmentRepository {
         .bind(owner_id)
         .bind(location_id)
         .fetch_optional(&self.pool)
+        .await
+        .map(|row| {
+            row.map(|(zone_id, warehouse_id)| TargetLocationScope {
+                zone_id,
+                warehouse_id,
+            })
+        })
+    }
+
+    pub async fn target_location_scope_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        owner_id: Uuid,
+        location_id: Uuid,
+    ) -> Result<Option<TargetLocationScope>, sqlx::Error> {
+        sqlx::query_as(
+            r#"
+            SELECT zone_id, warehouse_id
+              FROM warehouse_locations
+             WHERE owner_id = $1 AND id = $2
+            "#,
+        )
+        .bind(owner_id)
+        .bind(location_id)
+        .fetch_optional(&mut **tx)
         .await
         .map(|row| {
             row.map(|(zone_id, warehouse_id)| TargetLocationScope {

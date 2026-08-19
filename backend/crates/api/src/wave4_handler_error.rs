@@ -39,7 +39,8 @@ impl IntoResponse for Wave4HandlerError {
                 "W4-400",
                 "缺少或非法 Idempotency-Key",
             ),
-            Wave4HandlerError::ReplenishmentGap => (
+            Wave4HandlerError::ReplenishmentGap
+            | Wave4HandlerError::Repository(Wave4RepositoryError::ReplenishmentGap) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M3_REPLENISH_WAVE_GAP",
                 "波次补货缺口生成失败",

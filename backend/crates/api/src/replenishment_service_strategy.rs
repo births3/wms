@@ -20,7 +20,7 @@ impl ReplenishmentService {
             .repo
             .get_strategy(ctx.owner_id, strategy_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::StrategyNotFound)?;
         let route_changed = current.scope_type != req.scope_type
             || current.scope_ref != req.scope_ref
             || current.source_type != req.source_type
@@ -60,7 +60,7 @@ impl ReplenishmentService {
             .repo
             .update_strategy(&mut tx, ctx.owner_id, strategy_id, &req)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::StrategyNotFound)?;
         idempotency::store_success_with_status(
             &mut tx,
             ctx.owner_id,
@@ -122,7 +122,7 @@ impl ReplenishmentService {
             .repo
             .disable_strategy(&mut tx, ctx.owner_id, strategy_id)
             .await?
-            .ok_or(ReplenishmentError::TaskNotFound)?;
+            .ok_or(ReplenishmentError::StrategyNotFound)?;
         idempotency::store_success_with_status(
             &mut tx,
             ctx.owner_id,

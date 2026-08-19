@@ -8,9 +8,19 @@ use wms_domain::{CreateOutboundWaveRequest, OutboundWave};
 use crate::{
     audit::AuditWriteRequest,
     auth::AuthContext,
-    replenishment_service::ReplenishmentService,
+    replenishment_service::{ReplenishmentError, ReplenishmentService},
     wave4_repository::{IdempotentMutation, PgWave4Repository, Wave4RepositoryError},
 };
+
+fn map_fill_error(error: ReplenishmentError) -> Wave4RepositoryError {
+    match error {
+        ReplenishmentError::SourceUnavailable
+        | ReplenishmentError::StrategyInvalid
+        | ReplenishmentError::ScopeNotFound
+        | ReplenishmentError::PutawayBlocked => Wave4RepositoryError::ReplenishmentGap,
+        other => Wave4RepositoryError::Database(format!("{other:?}")),
+    }
+}
 
 pub struct Wave4ReplenishService {
     pool: PgPool,
@@ -52,7 +62,7 @@ impl Wave4ReplenishService {
             self.replenishment
                 .fill_wave_pick_gaps_in_tx(&mut tx, ctx.owner_id, outcome.value.id)
                 .await
-                .map_err(|error| Wave4RepositoryError::Database(format!("{error:?}")))?;
+                .map_err(map_fill_error)?;
         }
         tx.commit()
             .await
@@ -81,7 +91,7 @@ impl Wave4ReplenishService {
             self.replenishment
                 .fill_wave_pick_gaps_in_tx(&mut tx, ctx.owner_id, wave_id)
                 .await
-                .map_err(|error| Wave4RepositoryError::Database(format!("{error:?}")))?;
+                .map_err(map_fill_error)?;
         }
         tx.commit()
             .await
