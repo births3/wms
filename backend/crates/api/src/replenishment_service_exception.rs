@@ -265,8 +265,12 @@ impl ReplenishmentService {
                 &mut tx,
                 ctx.owner_id,
                 &saved,
-                "replenishment_source_mismatch",
-                json!({ "task_id": saved.id }),
+                "business.replenishment_source_mismatch",
+                json!({
+                    "task_id": saved.id,
+                    "return_reason": "source_mismatch",
+                    "task_no": saved.task_no
+                }),
             )
             .await?;
         }
@@ -306,8 +310,13 @@ impl ReplenishmentService {
             tx,
             ctx.owner_id,
             &saved,
-            "replenishment_source_frozen",
-            json!({ "task_id": saved.id, "source_batch_id": saved.source_batch_id }),
+            "business.replenishment_source_frozen",
+            json!({
+                "task_id": saved.id,
+                "source_batch_id": saved.source_batch_id,
+                "task_status": "suspended",
+                "task_no": saved.task_no
+            }),
         )
         .await?;
         Ok(Some(saved))

@@ -40,6 +40,7 @@ pub struct Wave4AppState {
     pub wave4_repository: Arc<PgWave4Repository>,
     pub shipping_service: Arc<Wave4ShippingService<PgWave4Repository>>,
     pub replenishment: Arc<ReplenishmentService>,
+    pub wave_replenish: Arc<wave4_replenish::Wave4ReplenishService>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -52,15 +53,24 @@ struct ListOutboundOrdersQuery {
 impl Wave4AppState {
     pub fn with_postgres(pool: PgPool) -> Self {
         let wave4_repository = Arc::new(PgWave4Repository::new(pool.clone()));
+        let replenishment = Arc::new(ReplenishmentService::new(PgReplenishmentRepository::new(
+            pool.clone(),
+        )));
         Self {
             shipping_service: Arc::new(Wave4ShippingService::new(Arc::clone(&wave4_repository))),
-            replenishment: Arc::new(ReplenishmentService::new(PgReplenishmentRepository::new(
+            wave_replenish: Arc::new(wave4_replenish::Wave4ReplenishService::new(
                 pool,
-            ))),
+                Arc::clone(&wave4_repository),
+                Arc::clone(&replenishment),
+            )),
+            replenishment,
             wave4_repository,
         }
     }
 }
+
+#[path = "wave4_replenish.rs"]
+mod wave4_replenish;
 
 #[path = "wave4_handler_error.rs"]
 mod wave4_handler_error;

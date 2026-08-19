@@ -253,6 +253,7 @@ impl ReplenishmentService {
             .await?
             .ok_or(ReplenishmentError::TaskNotFound)?;
         self.ensure_target_putaway(
+            &mut tx,
             ctx.owner_id,
             &target,
             &target.location_type,

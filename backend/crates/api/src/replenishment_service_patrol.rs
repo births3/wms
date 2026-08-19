@@ -70,6 +70,7 @@ impl ReplenishmentService {
             }
             match self
                 .ensure_target_putaway(
+                    &mut tx,
                     ctx.owner_id,
                     &target,
                     &strategy.target_type,
@@ -125,11 +126,10 @@ impl ReplenishmentService {
                         .await
                     {
                         Ok(tasks) => created.extend(tasks),
-                        Err(ReplenishmentError::SourceUnavailable)
-                        | Err(ReplenishmentError::PutawayBlocked) => {
+                        Err(ReplenishmentError::SourceUnavailable) => {
                             self.write_patrol_fail(
                                 strategy.owner_id,
-                                strategy.id,
+                                Some(strategy.id),
                                 location_id,
                                 product_id,
                                 "source_unavailable",
@@ -143,6 +143,27 @@ impl ReplenishmentService {
                                 location_id,
                                 product_id,
                                 "source_unavailable",
+                                now,
+                            )
+                            .await?;
+                        }
+                        Err(ReplenishmentError::PutawayBlocked) => {
+                            self.write_patrol_fail(
+                                strategy.owner_id,
+                                Some(strategy.id),
+                                location_id,
+                                product_id,
+                                "putaway_blocked",
+                                patrol_run_id,
+                                now,
+                            )
+                            .await?;
+                            self.maybe_alert_patrol_fail_repeat(
+                                strategy.owner_id,
+                                strategy.id,
+                                location_id,
+                                product_id,
+                                "putaway_blocked",
                                 now,
                             )
                             .await?;
@@ -181,10 +202,10 @@ impl ReplenishmentService {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn write_patrol_fail(
+    pub(crate) async fn write_patrol_fail(
         &self,
         owner_id: Uuid,
-        strategy_id: Uuid,
+        strategy_id: Option<Uuid>,
         location_id: Uuid,
         product_id: Uuid,
         reason_code: &str,
@@ -192,16 +213,46 @@ impl ReplenishmentService {
         now: DateTime<Utc>,
     ) -> Result<(), ReplenishmentError> {
         let mut tx = self.repo.pool().begin().await?;
-        publish_event_in_tx(
+        self.write_patrol_fail_in_tx(
             &mut tx,
             owner_id,
+            strategy_id,
+            location_id,
+            product_id,
+            reason_code,
+            patrol_run_id,
+            now,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn write_patrol_fail_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        owner_id: Uuid,
+        strategy_id: Option<Uuid>,
+        location_id: Uuid,
+        product_id: Uuid,
+        reason_code: &str,
+        patrol_run_id: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<(), ReplenishmentError> {
+        let strategy_key = strategy_id
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| "none".into());
+        publish_event_in_tx(
+            tx,
+            owner_id,
             &format!(
-                "patrol_fail:{strategy_id}:{location_id}:{product_id}:{reason_code}:{patrol_run_id}"
+                "patrol_fail:{strategy_key}:{location_id}:{product_id}:{reason_code}:{patrol_run_id}"
             ),
             "replenishment.patrol_fail",
             "M3",
             "replenishment_task",
-            &strategy_id.to_string(),
+            &strategy_key,
             json!({
                 "target_location_id": location_id,
                 "product_id": product_id,
@@ -214,7 +265,6 @@ impl ReplenishmentService {
         .map_err(|error| {
             ReplenishmentError::Database(sqlx::Error::Protocol(format!("{error:?}")))
         })?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -246,7 +296,7 @@ impl ReplenishmentService {
             &mut tx,
             owner_id,
             &format!("replenishment.patrol_fail_repeat:{strategy_id}:{location_id}:{product_id}:{reason_code}"),
-            "replenishment_patrol_fail_repeat",
+            "business.replenishment_patrol_fail_repeat",
             "M3",
             "replenishment_task",
             &strategy_id.to_string(),

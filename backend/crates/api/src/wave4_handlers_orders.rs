@@ -40,21 +40,9 @@ async fn create_outbound_wave_handler(
         None,
     );
     let outcome = state
-        .wave4_repository
+        .wave_replenish
         .create_outbound_wave(&ctx, req, now, &idempotency_key, Some(audit))
         .await?;
-    state
-        .replenishment
-        .fill_wave_pick_gaps(ctx.owner_id, outcome.value.id)
-        .await
-        .map_err(|error| {
-            tracing::error!(
-                error = ?error,
-                wave_id = %outcome.value.id,
-                "fill_wave_pick_gaps after create failed"
-            );
-            Wave4HandlerError::ReplenishmentGap
-        })?;
     Ok(Json(outcome.value))
 }
 

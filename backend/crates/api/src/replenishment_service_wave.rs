@@ -14,12 +14,23 @@ impl ReplenishmentService {
         ctx: &AuthContext,
         req: CreateWaveGapTasksRequest,
     ) -> Result<Vec<ReplenishmentTask>, ReplenishmentError> {
+        let mut tx = self.repo.pool().begin().await?;
+        let created = self.create_wave_gap_tasks_in_tx(&mut tx, ctx, req).await?;
+        tx.commit().await?;
+        Ok(created)
+    }
+
+    pub async fn create_wave_gap_tasks_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        ctx: &AuthContext,
+        req: CreateWaveGapTasksRequest,
+    ) -> Result<Vec<ReplenishmentTask>, ReplenishmentError> {
         ctx.require_permission(MANAGE)
             .map_err(|_| ReplenishmentError::PermissionDenied)?;
-        let mut tx = self.repo.pool().begin().await?;
         let target = self
             .repo
-            .load_location_route(&mut tx, ctx.owner_id, req.target_location_id)
+            .load_location_route(tx, ctx.owner_id, req.target_location_id)
             .await?
             .ok_or(ReplenishmentError::ScopeNotFound)?;
         if target.location_type != "case_pick" && target.location_type != "piece_pick" {
@@ -27,12 +38,7 @@ impl ReplenishmentService {
         }
         let strategy = self
             .repo
-            .find_wave_gap_strategy(
-                &mut tx,
-                ctx.owner_id,
-                req.product_id,
-                req.target_location_id,
-            )
+            .find_wave_gap_strategy(tx, ctx.owner_id, req.product_id, req.target_location_id)
             .await?;
         let (source_type, strategy_id) = match &strategy {
             Some(found) => (found.source_type.as_str(), Some(found.id)),
@@ -40,12 +46,7 @@ impl ReplenishmentService {
         };
         let available = self
             .repo
-            .pick_available_qty(
-                &mut tx,
-                ctx.owner_id,
-                req.target_location_id,
-                req.product_id,
-            )
+            .pick_available_qty(tx, ctx.owner_id, req.target_location_id, req.product_id)
             .await?;
         let urgent = req.demand_qty - available;
         if urgent <= Quantity::ZERO {
@@ -53,7 +54,7 @@ impl ReplenishmentService {
         }
         let pack = self
             .repo
-            .default_pack_ratio(&mut tx, ctx.owner_id, req.product_id)
+            .default_pack_ratio(tx, ctx.owner_id, req.product_id)
             .await?;
         let mut remaining = urgent;
         let mut created = Vec::new();
@@ -67,7 +68,7 @@ impl ReplenishmentService {
             let Some(source) = self
                 .repo
                 .lock_fefo_source(
-                    &mut tx,
+                    tx,
                     ctx.owner_id,
                     req.product_id,
                     source_type,
@@ -84,6 +85,7 @@ impl ReplenishmentService {
             }
             match self
                 .ensure_target_putaway(
+                    tx,
                     ctx.owner_id,
                     &target,
                     &target.location_type,
@@ -99,7 +101,7 @@ impl ReplenishmentService {
             let source_lpn_id = resolve_source_lpn(&source, qty, source_type);
             let task = self
                 .persist_task(
-                    &mut tx,
+                    tx,
                     ctx,
                     &source,
                     req.target_location_id,
@@ -113,7 +115,7 @@ impl ReplenishmentService {
                 )
                 .await?;
             publish_event_in_tx(
-                &mut tx,
+                tx,
                 ctx.owner_id,
                 &format!("replenishment.waiting:{}", task.id),
                 "replenishment.waiting",
@@ -136,12 +138,28 @@ impl ReplenishmentService {
             remaining -= qty;
             created.push(task);
         }
-        tx.commit().await?;
+        if created.is_empty() && remaining >= Quantity::from(pack) {
+            return Err(ReplenishmentError::SourceUnavailable);
+        }
         Ok(created)
     }
 
     pub async fn fill_wave_pick_gaps(
         &self,
+        owner_id: Uuid,
+        wave_id: Uuid,
+    ) -> Result<Vec<ReplenishmentTask>, ReplenishmentError> {
+        let mut tx = self.repo.pool().begin().await?;
+        let created = self
+            .fill_wave_pick_gaps_in_tx(&mut tx, owner_id, wave_id)
+            .await?;
+        tx.commit().await?;
+        Ok(created)
+    }
+
+    pub async fn fill_wave_pick_gaps_in_tx(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         owner_id: Uuid,
         wave_id: Uuid,
     ) -> Result<Vec<ReplenishmentTask>, ReplenishmentError> {
@@ -153,12 +171,14 @@ impl ReplenishmentService {
             jti: Uuid::new_v4().to_string(),
             warehouse_scope: None,
         };
-        let lines = self.repo.list_wave_gap_lines(owner_id, wave_id).await?;
+        let lines = self.repo.list_wave_gap_lines(tx, owner_id, wave_id).await?;
         let mut created = Vec::new();
+        let patrol_run_id = Uuid::new_v4();
+        let now = chrono::Utc::now();
         for line in lines {
             let candidates = self
                 .repo
-                .list_pick_target_candidates(owner_id, line.warehouse_id, line.product_id)
+                .list_pick_target_candidates(tx, owner_id, line.warehouse_id, line.product_id)
                 .await?;
             let Some(target_location_id) = line
                 .pick_location_id
@@ -167,7 +187,8 @@ impl ReplenishmentService {
                 continue;
             };
             match self
-                .create_wave_gap_tasks(
+                .create_wave_gap_tasks_in_tx(
+                    tx,
                     &ctx,
                     CreateWaveGapTasksRequest {
                         wave_id: line.wave_id,
@@ -181,10 +202,34 @@ impl ReplenishmentService {
                 .await
             {
                 Ok(tasks) => created.extend(tasks),
-                Err(ReplenishmentError::PutawayBlocked)
-                | Err(ReplenishmentError::SourceUnavailable)
+                Err(ReplenishmentError::PutawayBlocked) => {
+                    self.write_patrol_fail_in_tx(
+                        tx,
+                        owner_id,
+                        None,
+                        target_location_id,
+                        line.product_id,
+                        "putaway_blocked",
+                        patrol_run_id,
+                        now,
+                    )
+                    .await?;
+                }
+                Err(ReplenishmentError::SourceUnavailable)
                 | Err(ReplenishmentError::StrategyInvalid)
-                | Err(ReplenishmentError::ScopeNotFound) => {}
+                | Err(ReplenishmentError::ScopeNotFound) => {
+                    self.write_patrol_fail_in_tx(
+                        tx,
+                        owner_id,
+                        None,
+                        target_location_id,
+                        line.product_id,
+                        "source_unavailable",
+                        patrol_run_id,
+                        now,
+                    )
+                    .await?;
+                }
                 Err(error) => return Err(error),
             }
         }

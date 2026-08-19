@@ -36,6 +36,7 @@ impl PgReplenishmentRepository {
 
     pub async fn load_product_putaway_attrs(
         &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         owner_id: Uuid,
         product_id: Uuid,
     ) -> Result<Option<ProductPutawayAttrs>, sqlx::Error> {
@@ -48,12 +49,13 @@ impl PgReplenishmentRepository {
         )
         .bind(owner_id)
         .bind(product_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut **tx)
         .await
     }
 
     pub async fn list_wave_gap_lines(
         &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         owner_id: Uuid,
         wave_id: Uuid,
     ) -> Result<Vec<WaveGapLine>, sqlx::Error> {
@@ -91,7 +93,7 @@ impl PgReplenishmentRepository {
         )
         .bind(owner_id)
         .bind(wave_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut **tx)
         .await
         .map(|rows| {
             rows.into_iter()
@@ -120,6 +122,7 @@ impl PgReplenishmentRepository {
 
     pub async fn list_pick_target_candidates(
         &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         owner_id: Uuid,
         warehouse_id: Uuid,
         product_id: Uuid,
@@ -158,12 +161,13 @@ impl PgReplenishmentRepository {
         .bind(owner_id)
         .bind(warehouse_id)
         .bind(product_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut **tx)
         .await
     }
 
     pub async fn location_has_work_lock(
         &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         owner_id: Uuid,
         location_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
@@ -192,7 +196,7 @@ impl PgReplenishmentRepository {
         )
         .bind(owner_id)
         .bind(location_id)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut **tx)
         .await
     }
 

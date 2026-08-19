@@ -235,7 +235,7 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         id: Uuid,
         req: &UpsertReplenishmentLocationGroupRequest,
-    ) -> Result<ReplenishmentLocationGroup, sqlx::Error> {
+    ) -> Result<ReplenishmentLocationGroup, ReplenishmentRepoError> {
         sqlx::query(
             r#"
             INSERT INTO replenishment_location_groups (
@@ -297,7 +297,7 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         group_id: Uuid,
         location_ids: &[Uuid],
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), ReplenishmentRepoError> {
         let strategies: Vec<(Uuid, String)> = sqlx::query_as(
             r#"
             SELECT id, target_type
@@ -313,6 +313,25 @@ impl PgReplenishmentRepository {
         .fetch_all(&mut **tx)
         .await?;
         for (strategy_id, target_type) in strategies {
+            let conflicting: Option<Uuid> = sqlx::query_scalar(
+                r#"
+                SELECT id
+                  FROM warehouse_locations
+                 WHERE owner_id = $1
+                   AND id = ANY($2)
+                   AND replenish_strategy_id IS NOT NULL
+                   AND replenish_strategy_id <> $3
+                 LIMIT 1
+                "#,
+            )
+            .bind(owner_id)
+            .bind(location_ids)
+            .bind(strategy_id)
+            .fetch_optional(&mut **tx)
+            .await?;
+            if conflicting.is_some() {
+                return Err(ReplenishmentRepoError::LocationBound);
+            }
             sqlx::query(
                 r#"
                 UPDATE warehouse_locations
@@ -598,6 +617,15 @@ pub enum ReplenishmentRepoError {
     LocationBound,
     LocationTypeMismatch,
     Database(sqlx::Error),
+}
+
+impl From<sqlx::Error> for ReplenishmentRepoError {
+    fn from(value: sqlx::Error) -> Self {
+        if matches!(&value, sqlx::Error::Protocol(code) if code == "M3_REPLENISH_LOCATION_BOUND") {
+            return Self::LocationBound;
+        }
+        Self::Database(value)
+    }
 }
 
 #[derive(sqlx::FromRow)]

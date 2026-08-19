@@ -14,7 +14,7 @@ BEGIN
         (
             'replenishment_patrol_fail_repeat',
             '补货巡检连续失败',
-            'replenishment_patrol_fail_repeat',
+            'business.replenishment_patrol_fail_repeat',
             '{"field":"consecutive_fail_count","op":"gte","value":3}',
             'warning',
             ARRAY['warehouse_manager']::TEXT[],
@@ -27,7 +27,7 @@ BEGIN
         (
             'replenishment_urgent_unclaimed',
             '紧急补货超时未领',
-            'replenishment_urgent_unclaimed',
+            'business.replenishment_urgent_unclaimed',
             '{"field":"unclaimed_minutes","op":"gte","value":10}',
             'warning',
             ARRAY['warehouse_manager']::TEXT[],
@@ -40,7 +40,7 @@ BEGIN
         (
             'replenishment_urgent_timeout',
             '紧急补货超时取消',
-            'replenishment_urgent_timeout',
+            'business.replenishment_urgent_timeout',
             '{"field":"unclaimed_minutes","op":"gte","value":20}',
             'critical',
             ARRAY['warehouse_manager']::TEXT[],
@@ -53,7 +53,7 @@ BEGIN
         (
             'replenishment_no_progress',
             '补货任务一小时无进展',
-            'replenishment_no_progress',
+            'business.replenishment_no_progress',
             '{"field":"stale_minutes","op":"gte","value":60}',
             'warning',
             ARRAY['warehouse_manager']::TEXT[],
@@ -66,7 +66,7 @@ BEGIN
         (
             'replenishment_source_frozen',
             '补货来源被冻结',
-            'replenishment_source_frozen',
+            'business.replenishment_source_frozen',
             '{"field":"task_status","op":"eq","value":"suspended"}',
             'critical',
             ARRAY['warehouse_manager']::TEXT[],
@@ -79,7 +79,7 @@ BEGIN
         (
             'replenishment_source_mismatch',
             '补货来源扫码不符',
-            'replenishment_source_mismatch',
+            'business.replenishment_source_mismatch',
             '{"field":"return_reason","op":"eq","value":"source_mismatch"}',
             'warning',
             ARRAY['warehouse_manager']::TEXT[],

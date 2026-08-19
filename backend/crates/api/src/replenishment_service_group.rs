@@ -110,6 +110,14 @@ impl ReplenishmentService {
             Utc::now(),
         )
         .await?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "update_replenishment_location_group",
+            "replenishment_location_group",
+            &updated.id.to_string(),
+        )
+        .await?;
         tx.commit().await?;
         Ok(updated)
     }
@@ -162,6 +170,14 @@ impl ReplenishmentService {
             &updated.id.to_string(),
             &updated,
             Utc::now(),
+        )
+        .await?;
+        super::write_audit(
+            &mut tx,
+            ctx,
+            "disable_replenishment_location_group",
+            "replenishment_location_group",
+            &updated.id.to_string(),
         )
         .await?;
         tx.commit().await?;

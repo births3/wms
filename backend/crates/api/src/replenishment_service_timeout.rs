@@ -3,7 +3,7 @@ use serde_json::json;
 use uuid::Uuid;
 use wms_domain::{can_cancel, Quantity, REPLENISH_STATUS_CANCELLED};
 
-use super::{ReplenishmentError, ReplenishmentService};
+use super::{write_audit, ReplenishmentError, ReplenishmentService};
 use crate::{h2_lifecycle::publish_event_in_tx, inventory::release_replenish_in_tx};
 
 impl ReplenishmentService {
@@ -40,8 +40,12 @@ impl ReplenishmentService {
                 owner_id,
                 task_id,
                 &format!("replenishment.urgent_unclaimed:{task_id}"),
-                "replenishment_urgent_unclaimed",
-                json!({ "task_id": task_id }),
+                "business.replenishment_urgent_unclaimed",
+                json!({
+                    "task_id": task_id,
+                    "unclaimed_minutes": 10,
+                    "task_status": "pending"
+                }),
                 now,
             )
             .await?;
@@ -59,10 +63,12 @@ impl ReplenishmentService {
                     "replenishment.no_progress:{task_id}:{}",
                     last_progress_at.timestamp_millis()
                 ),
-                "replenishment_no_progress",
+                "business.replenishment_no_progress",
                 json!({
                     "task_id": task_id,
-                    "last_progress_at": last_progress_at
+                    "last_progress_at": last_progress_at,
+                    "stale_minutes": 60,
+                    "task_status": "in_progress"
                 }),
                 now,
             )
@@ -142,17 +148,38 @@ impl ReplenishmentService {
             &mut tx,
             owner_id,
             &format!("replenishment.urgent_timeout:{}", saved.id),
-            "replenishment_urgent_timeout",
+            "business.replenishment_urgent_timeout",
             "M3",
             "replenishment_task",
             &saved.id.to_string(),
-            json!({ "task_id": saved.id }),
+            json!({
+                "task_id": saved.id,
+                "unclaimed_minutes": 20,
+                "task_status": "cancelled",
+                "task_no": saved.task_no
+            }),
             now,
         )
         .await
         .map_err(|error| {
             ReplenishmentError::Database(sqlx::Error::Protocol(format!("{error:?}")))
         })?;
+        let system = crate::auth::AuthContext {
+            user_id: Uuid::nil(),
+            owner_id,
+            actor_name: "system:timeout".into(),
+            permissions: vec!["m3.replenishment.manage".into()],
+            jti: Uuid::new_v4().to_string(),
+            warehouse_scope: None,
+        };
+        write_audit(
+            &mut tx,
+            &system,
+            "timeout_cancel_replenishment_task",
+            "replenishment_task",
+            &saved.id.to_string(),
+        )
+        .await?;
         tx.commit().await?;
         Ok(true)
     }

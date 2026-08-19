@@ -191,7 +191,7 @@ impl PgReplenishmentRepository {
         owner_id: Uuid,
         group_id: Uuid,
         req: &UpsertReplenishmentLocationGroupRequest,
-    ) -> Result<Option<ReplenishmentLocationGroup>, sqlx::Error> {
+    ) -> Result<Option<ReplenishmentLocationGroup>, super::ReplenishmentRepoError> {
         let updated = sqlx::query_as::<_, GroupRow>(
             r#"
             UPDATE replenishment_location_groups

@@ -431,6 +431,7 @@ impl ReplenishmentService {
             return Err(ReplenishmentError::StrategyInvalid);
         }
         self.ensure_target_putaway(
+            &mut tx,
             ctx.owner_id,
             &target,
             &target.location_type,
@@ -477,6 +478,7 @@ impl ReplenishmentService {
 
     pub(crate) async fn ensure_target_putaway(
         &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         owner_id: Uuid,
         target: &crate::replenishment_repository::LocationRouteRow,
         expected_type: &str,
@@ -494,14 +496,14 @@ impl ReplenishmentService {
         }
         if self
             .repo
-            .location_has_work_lock(owner_id, target.id)
+            .location_has_work_lock(tx, owner_id, target.id)
             .await?
         {
             return Err(ReplenishmentError::PutawayBlocked);
         }
         let Some(product) = self
             .repo
-            .load_product_putaway_attrs(owner_id, product_id)
+            .load_product_putaway_attrs(tx, owner_id, product_id)
             .await?
         else {
             return Err(ReplenishmentError::ScopeNotFound);
