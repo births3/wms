@@ -54,7 +54,7 @@ US-M3-012 取代仓内补货的实施口径：水位只读策略表 Min-Max，�
 | ADR-0048 决策 7 状态机 | 未写 `suspended` | 同 US-M3-012#8，增加 `suspended` |
 | US-M3-012#2「订单行标记等待补货」 | 像是补货事务内改出库行 | 补货事务只写 `event_bus_event`（`replenishment.waiting`）；波次模块消费后打等待态。本切片 GWT 验收停在事件已落库 |
 | §4.2 字面扣减全部 `qty_allocated` | 波次算单后拣选面占用再减一次，`urgent_qty` 放大 | **明确不做字面二次扣减**。波次缺口可用量 = §4.2 + 加回本波次 `inventory_allocations.status=locked`（`pick_available_qty_excluding_wave`）。本波次冻结不算缺口洞；GWT 4 / `wave4_replenish_after_allocate_uses_pick_face_gap` 期望 `qty=7`。不回退。 |
-| §6.2 `M3_REPLENISH_SOURCE_UNAVAILABLE` 422 | 冻结上升也返回 422 | **作业冻结挂起明确不走 422**。生成/库存命令仍 422。`pick`/`confirm` 发现来源冻结：200 + `status=suspended` + H4（GWT 17/31）。不把挂起路径改回 422。挂起谓词见 §5：加回本任务剩余预留后再比未下架剩余；**禁止**用字面 §4.2 可下架量 < 剩余任务量（生成后该式恒成立，会吃掉 GWT 29）。 |
+| §6.2 `M3_REPLENISH_SOURCE_UNAVAILABLE` 422 | 冻结上升也返回 422 | **作业冻结挂起明确不走 422**。生成/库存命令仍 422。`pick`，以及 `confirm` 且 `picked_qty=0`：来源冻结 → 200 + `suspended` + H4（GWT 17）。`confirm` 且 `picked_qty>0`：只送达已下架量，不因冻结再挂起（GWT 31）。不把挂起路径改回 422。挂起谓词见 §5；**禁止**用字面 §4.2 可下架量 < 剩余任务量（生成后该式恒成立，会吃掉 GWT 29）。 |
 
 ## 3. 领域对象
 
@@ -108,8 +108,8 @@ in_progress / suspended / pending ──cancel(picked_qty=0,done_qty=0)──►
 ```
 
 - `claim`：仅 `pending` 且无 `operator_id`；写作业员、`claimed_at`、`last_progress_at`。普通任务按作业员 M-TE 班组库区（§10.6）；`urgent` 可跨区。同一作业员同时只能有一条 `in_progress` 补货任务。
-- `pick`：仅 `in_progress`（`suspended` 禁止再下架）。扫描来源库位码或容器 LPN 必须与任务 `source_location_id`/`source_lpn_id` 一致；`picked_qty += Δ`；更新 `last_progress_at`；`picked_qty > qty` 拒绝。
-- `confirm`：状态为 `in_progress`，或（`suspended` 且 `picked_qty>0`，只送达已下架量、不再下架）。来源冻结检测优先于数量守卫。挂起谓词（`pick`/`confirm` 共用）：`available_for_task = §4.2 可下架量 + (qty − done_qty)`（加回本任务仍占的 `qty_replenish_out_transit`），`remaining_unpicked = qty − done_qty − picked_qty`；仅当 `available_for_task < remaining_unpicked` 才 200 挂起。`picked_qty=0` 时该式等价于 §4.2 可下架量 **< 0**（GWT 17）。**禁止**用「字面 §4.2 < 剩余任务量」——生成后 `out_transit` 已含本任务量，该式恒真，GWT 29 会成死路径。无冻结（`available_for_task >= remaining_unpicked`）且 `picked_qty=0` → `M3_REPLENISH_STATE_INVALID`（GWT 29）。无冻结时本次确认量必须 `> 0` 且 `<= picked_qty`。扫描目标位必须等于 `target_location_id`；账面转换后 `picked_qty −= Δ`、`done_qty += Δ`。`suspended` 确认后若 `done_qty=qty` 则 `done`，否则仍 `suspended`。
+- `pick`：仅 `in_progress`（`suspended` 禁止再下架）。下架前跑挂起谓词（见下）。扫描来源库位码或容器 LPN 必须与任务 `source_location_id`/`source_lpn_id` 一致；`picked_qty += Δ`；更新 `last_progress_at`；`picked_qty > qty` 拒绝。
+- `confirm`：状态为 `in_progress`，或（`suspended` 且 `picked_qty>0`，只送达已下架量、不再下架）。挂起谓词：`available_for_task = §4.2 可下架量 + (qty − done_qty)`（加回本任务仍占的 `qty_replenish_out_transit`），`remaining_unpicked = qty − done_qty − picked_qty`；仅当 `available_for_task < remaining_unpicked` 才 200 挂起。`picked_qty=0` 时该式等价于 §4.2 可下架量 **< 0**（GWT 17）。**禁止**用「字面 §4.2 < 剩余任务量」。`confirm` **仅** `picked_qty=0` 时跑挂起谓词（优先于数量守卫）；`picked_qty>0` 不再因来源冻结拦截，只送达已下架量（GWT 31，冻结未解除也送达）。无冻结（`available_for_task >= remaining_unpicked`）且 `picked_qty=0` → `M3_REPLENISH_STATE_INVALID`（GWT 29）。无冻结时本次确认量必须 `> 0` 且 `<= picked_qty`。扫描目标位必须等于 `target_location_id`；账面转换后 `picked_qty −= Δ`、`done_qty += Δ`。`suspended` 确认后若 `done_qty=qty` 则 `done`，否则仍 `suspended`。
 - `reassign`：**一律回 `pending` 并清空 `operator_id`、`claimed_at`**，记审计。`picked_qty > 0` 时仍回 `pending`，新作业员继续同一任务，不回冲在途、不丢 `picked_qty`。
 - `return`：作业员退回 `pending` + `return_reason`。`source_mismatch` 时另写事件总线 `replenishment.source_mismatch` 与 H4，不改库存。`picked_qty > 0` 时禁止退回（与取消同一门槛，已下架实物不能随任务退回）。
 - `cancel`：`done_qty = 0` 且 `picked_qty = 0`；已下架未送达禁止取消。
@@ -581,9 +581,9 @@ FEFO：`ORDER BY expiry_date ASC NULLS LAST, id`。一任务一批次。整托�
     Then 404 `M3_REPLENISH_SCOPE_NOT_FOUND`。
 
 31. **挂起后可送达已下架量**
-    Given 任务 `suspended`、`picked_qty=4`、`qty=10`
+    Given 任务 `suspended`、`picked_qty=4`、`qty=10`，来源 `qty_frozen` 仍使 §4.2 可下架量 < 0
     When confirm 4 且目标位 6 维通过
-    Then `done_qty=4`、`picked_qty=0`、`status=suspended`；禁止再 pick。
+    Then `done_qty=4`、`picked_qty=0`、`status=suspended`；禁止再 pick。不因冻结再次挂起或 422。
 
 ## 12. 测试层级（本阶段必做）
 
