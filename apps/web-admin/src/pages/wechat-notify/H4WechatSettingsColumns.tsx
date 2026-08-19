@@ -1,0 +1,122 @@
+import { StatusBadge, type DataGridColumn } from "@wms/ui";
+
+import type { H4WechatSettings } from "@/features/wechat-notify/wechat-notify-queries";
+import { formatDateTime } from "@/lib/format";
+
+export const settingsColumns: DataGridColumn<H4WechatSettings>[] = [
+  {
+    key: "corp_id",
+    header: "企业 ID",
+    width: 180,
+    minWidth: 140,
+    mono: true,
+    sortable: true,
+    sortValue: (row) => row.corp_id,
+    filterValue: (row) => row.corp_id,
+    copyValue: (row) => row.corp_id,
+    filter: { type: "text" },
+  },
+  {
+    key: "agent_id",
+    header: "Agent ID",
+    width: 140,
+    minWidth: 120,
+    mono: true,
+    sortable: true,
+    sortValue: (row) => row.agent_id,
+    filterValue: (row) => row.agent_id,
+    copyValue: (row) => row.agent_id,
+    filter: { type: "text" },
+  },
+  {
+    key: "enabled",
+    header: "状态",
+    width: 120,
+    minWidth: 100,
+    sortable: true,
+    sortValue: (row) => row.enabled ? 1 : 0,
+    filterValue: (row) => row.enabled ? "true" : "false",
+    copyValue: (row) => row.enabled ? "启用" : "停用",
+    filter: { type: "multiSelect", options: [{ label: "启用", value: "true" }, { label: "停用", value: "false" }] },
+    render: (row) => <StatusBadge status={row.enabled ? "completed" : "isolated"} label={row.enabled ? "启用" : "停用"} size="sm" />,
+  },
+  {
+    key: "secret_alias",
+    header: "Secret 别名",
+    width: 240,
+    minWidth: 180,
+    mono: true,
+    filterValue: (row) => row.secret_alias,
+    copyValue: (row) => row.secret_alias,
+    filter: { type: "text" },
+  },
+  {
+    key: "callback_token_alias",
+    header: "Token 别名",
+    width: 240,
+    minWidth: 180,
+    mono: true,
+    filterValue: (row) => row.callback_token_alias,
+    copyValue: (row) => row.callback_token_alias,
+    filter: { type: "text" },
+  },
+  {
+    key: "aes_key_alias",
+    header: "AES Key 别名",
+    width: 240,
+    minWidth: 180,
+    mono: true,
+    filterValue: (row) => row.aes_key_alias,
+    copyValue: (row) => row.aes_key_alias,
+    filter: { type: "text" },
+  },
+  {
+    key: "callback_url",
+    header: "回调地址",
+    width: 380,
+    minWidth: 240,
+    filterValue: (row) => row.callback_url,
+    copyValue: (row) => row.callback_url,
+    filter: { type: "text" },
+    render: (row) => (
+      <span className="block truncate" title={row.callback_url}>
+        {row.callback_url || "-"}
+      </span>
+    ),
+  },
+  {
+    key: "approval_callback_path",
+    header: "审批回调路径",
+    width: 300,
+    minWidth: 220,
+    mono: true,
+    filterValue: (row) => row.approval_callback_path,
+    copyValue: (row) => row.approval_callback_path,
+    filter: { type: "text" },
+    render: (row) => (
+      <span className="block truncate" title={row.approval_callback_path}>
+        {row.approval_callback_path || "-"}
+      </span>
+    ),
+  },
+  {
+    key: "retry",
+    header: "重试策略",
+    width: 150,
+    minWidth: 120,
+    copyValue: (row) => `${row.retry_max_attempts} 次 / ${row.retry_interval_seconds} 秒`,
+    render: (row) => `${row.retry_max_attempts} 次 / ${row.retry_interval_seconds} 秒`,
+  },
+  {
+    key: "updated_at",
+    header: "更新时间",
+    width: 190,
+    minWidth: 160,
+    sortable: true,
+    sortValue: (row) => row.updated_at,
+    filterValue: (row) => row.updated_at,
+    copyValue: (row) => formatDateTime(row.updated_at),
+    filter: { type: "dateRange" },
+    render: (row) => formatDateTime(row.updated_at),
+  },
+];

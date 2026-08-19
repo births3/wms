@@ -1,0 +1,541 @@
+{
+  "version": 1,
+  "pages": [
+    {
+      "id": "dashboard",
+      "title": "运营总览",
+      "required": false,
+      "reason": "工作台总览页不承担列表查询"
+    },
+    {
+      "id": "m1-products",
+      "title": "M1 商品档案",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["createdAt"]
+    },
+    {
+      "id": "m1-business-partners",
+      "title": "M1 客商档案",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["createdAt"]
+    },
+    {
+      "id": "m1-warehouses",
+      "title": "M1 仓库管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["createdAt"]
+    },
+    {
+      "id": "m1-zones",
+      "title": "M1 库区管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["createdAt"]
+    },
+    {
+      "id": "m1-locations",
+      "title": "M1 库位管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
+      "fieldConstant": "m1QueryFields",
+      "coreConstant": "m1CoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": ["createdAt"]
+    },
+    {
+      "id": "m1-lpn-containers",
+      "title": "M1 容器管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master-data/M1LpnContainerPage.tsx",
+      "fieldConstant": "lpnQueryFields",
+      "coreConstant": "lpnCoreQueryFieldKeys",
+      "core": ["keyword", "containerType"],
+      "more": ["status", "lockCategory"]
+    },
+    {
+      "id": "dock-management",
+      "title": "M1 月台管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/dock/DockManagementPage.tsx",
+      "fieldConstant": "dockQueryFields",
+      "coreConstant": "dockCoreQueryFieldKeys",
+      "core": ["warehouseId", "keyword"],
+      "more": ["status"]
+    },
+    {
+      "id": "m1-system-dictionary",
+      "title": "M1 系统字典",
+      "required": false,
+      "reason": "系统字典使用双栏目录内部搜索，不使用页面上方 QueryPanel"
+    },
+    {
+      "id": "m1-feature-flags",
+      "title": "M1 功能开关",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/FeatureFlagConfigCenterPage.tsx",
+      "fieldConstant": "featureFlagQueryFields",
+      "coreConstant": "featureFlagCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "h8-erp-connectors",
+      "title": "H8 ERP 连接",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/ErpConnectorConfigPage.tsx",
+      "fieldConstant": "h8ErpConnectorQueryFields",
+      "coreConstant": "h8ErpConnectorCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "h8-erp-messages",
+      "title": "H8 ERP 消息",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/ErpMessageLogPage.tsx",
+      "fieldConstant": "h8ErpMessageQueryFields",
+      "coreConstant": "h8ErpMessageCoreQueryFieldKeys",
+      "core": ["direction", "message_type", "status"],
+      "more": ["connector_code", "external_ref", "idempotency_key", "correlation_id"]
+    },
+    {
+      "id": "h8-erp-interface-tables",
+      "title": "H8 接口表探查",
+      "required": true,
+      "source": "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx",
+      "fieldConstant": "h8ErpInterfaceTableQueryFields",
+      "coreConstant": "h8ErpInterfaceTableCoreQueryFieldKeys",
+      "core": ["connector_id", "table_key", "sync_status", "updated_at"],
+      "more": ["external_doc_no", "event_type", "idempotency_key"]
+    },
+    {
+      "id": "h1-menu-management",
+      "title": "H1 菜单管理",
+      "required": false,
+      "reason": "菜单管理是三层树和配置编辑页，不使用页面上方 QueryPanel"
+    },
+    {
+      "id": "h1-role-permission",
+      "title": "H1 角色权限",
+      "required": true,
+      "source": "apps/web-admin/src/pages/auth/H1RolePermissionPage.tsx",
+      "fieldConstant": "h1RoleQueryFields",
+      "coreConstant": "h1RoleCoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": ["dataScope"]
+    },
+    {
+      "id": "h1-session-management",
+      "title": "H1 登录会话",
+      "required": true,
+      "source": "apps/web-admin/src/pages/auth/H1SessionPage.tsx",
+      "fieldConstant": "sessionQueryFields",
+      "coreConstant": "sessionCoreQueryFieldKeys",
+      "core": ["targetUserId"],
+      "more": []
+    },
+    {
+      "id": "h1-api-keys",
+      "title": "H1 API Key 管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/api-key/H1ApiKeyPage.tsx",
+      "fieldConstant": "apiKeyQueryFields",
+      "coreConstant": "apiKeyCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "h2-audit-trail",
+      "title": "H2 审计追踪",
+      "required": true,
+      "source": "apps/web-admin/src/pages/platform/HorizontalCapabilityPages.tsx",
+      "fieldConstant": "h2AuditQueryFields",
+      "coreConstant": "h2AuditCoreQueryFieldKeys",
+      "core": ["resourceType", "occurredAt"],
+      "more": []
+    },
+    {
+      "id": "h3-api-contract",
+      "title": "H3 OpenAPI",
+      "required": false,
+      "reason": "横向能力入口页只展示契约与文档入口，不承担列表查询"
+    },
+    {
+      "id": "h4-wechat-settings",
+      "title": "H4 参数设置",
+      "required": true,
+      "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
+      "fieldConstant": "h4WechatSettingsQueryFields",
+      "coreConstant": "h4WechatSettingsCoreQueryFieldKeys",
+      "core": ["keyword", "enabled"],
+      "more": []
+    },
+    {
+      "id": "h4-notify-configs",
+      "title": "H4 通知配置",
+      "required": true,
+      "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
+      "fieldConstant": "h4NotificationConfigQueryFields",
+      "coreConstant": "h4NotificationConfigCoreQueryFieldKeys",
+      "core": ["eventType", "enabled"],
+      "more": []
+    },
+    {
+      "id": "h4-notify-records",
+      "title": "H4 发送记录",
+      "required": true,
+      "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
+      "fieldConstant": "h4NotificationRecordQueryFields",
+      "coreConstant": "h4NotificationRecordCoreQueryFieldKeys",
+      "core": ["eventType", "recipient", "status"],
+      "more": ["createdAt"]
+    },
+    {
+      "id": "hal-alert-definitions",
+      "title": "H-AL 告警定义",
+      "required": true,
+      "source": "apps/web-admin/src/pages/alert-engine/AlertDefinitionPage.tsx",
+      "fieldConstant": "alertDefinitionQueryFields",
+      "coreConstant": "alertDefinitionCoreQueryFieldKeys",
+      "core": ["keyword", "enabled"],
+      "more": ["severity"]
+    },
+    {
+      "id": "hal-alert-dashboard",
+      "title": "H-AL 告警看板",
+      "required": true,
+      "source": "apps/web-admin/src/pages/alert-engine/AlertDashboardPage.tsx",
+      "fieldConstant": "alertDashboardQueryFields",
+      "coreConstant": "alertDashboardCoreQueryFieldKeys",
+      "core": ["alertCode", "severity", "status"],
+      "more": ["warehouseId", "triggeredAt"]
+    },
+    {
+      "id": "hal-alert-escalations",
+      "title": "H-AL 告警升级规则",
+      "required": true,
+      "source": "apps/web-admin/src/pages/alert-engine/AlertEscalationPage.tsx",
+      "fieldConstant": "alertEscalationQueryFields",
+      "coreConstant": "alertEscalationCoreQueryFieldKeys",
+      "core": ["keyword", "enabled"],
+      "more": ["handlerRole"]
+    },
+    {
+      "id": "h5-express",
+      "title": "H5 快递对接",
+      "required": true,
+      "source": "apps/web-admin/src/pages/express/H5ExpressPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "h5ExpressCoreQueryFieldKeys",
+      "core": ["q", "enabled"],
+      "more": []
+    },
+    {
+      "id": "h9-delivery-note-aggregation",
+      "title": "作业·随货同行单归集",
+      "required": true,
+      "source": "apps/web-admin/src/pages/print-orchestration/H9DeliveryNoteAggregationPage.tsx",
+      "fieldConstant": "h9DeliveryNoteQueryFields",
+      "coreConstant": "h9DeliveryNoteCoreQueryFieldKeys",
+      "core": ["warehouseId", "keyword"],
+      "more": ["customerId", "routeCode", "deliveryAddressId"]
+    },
+    {
+      "id": "h9-print-devices",
+      "title": "设备·Print Agent 管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/print-orchestration/H9PrintDevicePage.tsx",
+      "fieldConstant": "h9PrintDeviceQueryFields",
+      "coreConstant": "h9PrintDeviceCoreQueryFieldKeys",
+      "core": ["keyword", "siteId"],
+      "more": ["connectionType"]
+    },
+    {
+      "id": "h9-print-templates",
+      "title": "H9 打印模板",
+      "required": true,
+      "source": "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx",
+      "fieldConstant": "h9PrintTemplateQueryFields",
+      "coreConstant": "h9PrintTemplateCoreQueryFieldKeys",
+      "core": ["keyword", "templateType"],
+      "more": []
+    },
+    {
+      "id": "mcg-numbering",
+      "title": "M-CG 单据号规则",
+      "required": true,
+      "source": "apps/web-admin/src/pages/document-numbering/MCGDocumentNumberingPage.tsx",
+      "fieldConstant": "mcgDocumentNumberQueryFields",
+      "coreConstant": "mcgDocumentNumberCoreQueryFieldKeys",
+      "core": ["documentType"],
+      "more": []
+    },
+    {
+      "id": "m2-receiving",
+      "title": "M2 收货管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+      "fieldConstant": "m2InboundQueryFields",
+      "coreConstant": "m2InboundCoreQueryFieldKeys",
+      "core": ["keyword", "ownerKeyword", "statusFilter"],
+      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+    },
+    {
+      "id": "m2-inbound-documents",
+      "title": "入库资料录入",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundDocumentsPage.tsx",
+      "fieldConstant": "m2InboundDocumentsQueryFields",
+      "coreConstant": "m2InboundDocumentsCoreQueryFieldKeys",
+      "core": ["keyword", "actualReceivedAt"],
+      "more": ["supplierKeyword"]
+    },
+    {
+      "id": "m-di-review",
+      "title": "药检单审核",
+      "required": true,
+      "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionReviewPage.tsx",
+      "fieldConstant": "drugInspectionReviewQueryFields",
+      "coreConstant": "drugInspectionReviewCoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "m-di-stamp",
+      "title": "药检图章配置",
+      "required": true,
+      "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionStampPage.tsx",
+      "fieldConstant": "drugInspectionStampQueryFields",
+      "coreConstant": "drugInspectionStampCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "m-di-platforms",
+      "title": "M-DI 药检平台",
+      "required": true,
+      "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionPlatformPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "mDiPlatformCoreQueryFieldKeys",
+      "core": ["status"],
+      "more": []
+    },
+    {
+      "id": "m2-inspecting",
+      "title": "M2 验收管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+      "fieldConstant": "m2InboundQueryFields",
+      "coreConstant": "m2InboundCoreQueryFieldKeys",
+      "core": ["keyword", "ownerKeyword", "statusFilter"],
+      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+    },
+    {
+      "id": "m2-putaway",
+      "title": "M2 上架管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
+      "fieldConstant": "m2InboundQueryFields",
+      "coreConstant": "m2InboundCoreQueryFieldKeys",
+      "core": ["keyword", "ownerKeyword", "statusFilter"],
+      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+    },
+    {
+      "id": "m2-putaway-strategy",
+      "title": "M2 上架策略",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inbound/M2PutawayStrategyPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": ["keyword", "status", "isDefault"],
+      "more": []
+    },
+    {
+      "id": "m3-batches",
+      "title": "M3 批号管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
+      "fieldConstant": "m3BatchQueryFields",
+      "coreConstant": "m3BatchCoreQueryFieldKeys",
+      "core": ["keyword", "qualityStatus"],
+      "more": ["recallFlag", "productionDate", "expiryDate", "createdAt"]
+    },
+    {
+      "id": "m3-location-history",
+      "title": "M3 库位历史",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3LocationHistoryPage.tsx",
+      "fieldConstant": "m3LocationHistoryQueryFields",
+      "coreConstant": "m3LocationHistoryCoreQueryFieldKeys",
+      "core": ["locationCode", "days"],
+      "more": ["movementType", "productCode", "batchNo"]
+    },
+    {
+      "id": "m3-status-config",
+      "title": "M3 状态规则",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3InventoryStatusConfigPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": ["keyword", "scope", "status"],
+      "more": []
+    },
+    {
+      "id": "m3-replenishment-strategies",
+      "title": "M3 补货策略",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3ReplenishmentStrategyPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": ["keyword", "enabled"],
+      "more": ["scope_type", "target_type"]
+    },
+    {
+      "id": "m3-replenishment-tasks",
+      "title": "M3 补货任务",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3ReplenishmentTaskPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": ["status", "trigger_mode"],
+      "more": ["priority", "keyword", "wave_id", "source_location_id", "target_location_id", "created_at", "operator"]
+    },
+    {
+      "id": "m3-counts",
+      "title": "M3 库存盘点",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3InventoryCountPage.tsx",
+      "fieldConstant": "m3CountQueryFields",
+      "coreConstant": "m3CountCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "m3-maintenance",
+      "title": "M3 在库养护",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3MaintenancePage.tsx",
+      "fieldConstant": "m3MaintenanceQueryFields",
+      "coreConstant": "m3MaintenanceCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "m3-relocations",
+      "title": "M3 库内移库",
+      "required": true,
+      "source": "apps/web-admin/src/pages/inventory/M3RelocationPage.tsx",
+      "fieldConstant": "m3RelocationQueryFields",
+      "coreConstant": "m3RelocationCoreQueryFieldKeys",
+      "core": ["keyword"],
+      "more": []
+    },
+    {
+      "id": "mrc-reconciliation",
+      "title": "M-RC 库存对账",
+      "required": true,
+      "source": "apps/web-admin/src/pages/reconciliation/MrcReconciliationPage.tsx",
+      "fieldConstant": "mRcReconciliationQueryFields",
+      "coreConstant": "mRcReconciliationCoreQueryFieldKeys",
+      "core": ["productCode", "differenceType", "resolutionStatus"],
+      "more": ["batchNo"]
+    },
+    {
+      "id": "mte-task-types",
+      "title": "M-TE 任务类型配置",
+      "required": true,
+      "source": "apps/web-admin/src/pages/task-engine/TaskTypeConfigPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "mteTaskTypeCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": []
+    },
+    {
+      "id": "mte-task-groups",
+      "title": "M-TE 任务组资格",
+      "required": true,
+      "source": "apps/web-admin/src/pages/task-engine/TaskGroupConfigPage.tsx",
+      "fieldConstant": "mteTaskGroupQueryFields",
+      "coreConstant": "mteTaskGroupCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": ["warehouseId"]
+    },
+    {
+      "id": "mte-task-dispatch",
+      "title": "M-TE 任务调度",
+      "required": true,
+      "source": "apps/web-admin/src/pages/task-engine/TaskDispatchPage.tsx",
+      "fieldConstant": "mteTaskDispatchQueryFields",
+      "coreConstant": "mteTaskDispatchCoreQueryFieldKeys",
+      "core": ["keyword", "status"],
+      "more": ["taskTypeCode", "warehouseId"]
+    },
+    {
+      "id": "m9-billing-rules",
+      "title": "M9 计费规则",
+      "required": false,
+      "reason": "当前页面是新增计费规则配置表单，仅展示本次创建结果；真实历史查询接口完成后再升级为页面级 QueryPanel"
+    },
+    {
+      "id": "m10-route-plans",
+      "title": "M10 路径规划接收",
+      "required": false,
+      "reason": "当前页面是接收外部 TMS 路径规划结果的写入表单，不承担历史列表查询"
+    },
+    {
+      "id": "m4-orders",
+      "title": "M4 出库订单管理",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": []
+    },
+    {
+      "id": "m4-waves",
+      "title": "M4 波次规划",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": []
+    },
+    {
+      "id": "m4-review",
+      "title": "M4 复核发货",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": []
+    },
+    {
+      "id": "m4-returns",
+      "title": "M4 采购退货出库",
+      "required": true,
+      "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
+      "fieldConstant": "m4OutboundQueryFields",
+      "coreConstant": "m4OutboundCoreQueryFieldKeys",
+      "core": ["keyword", "statusFilter"],
+      "more": []
+    }
+  ]
+}
