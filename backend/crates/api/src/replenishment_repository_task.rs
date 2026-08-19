@@ -594,6 +594,7 @@ impl PgReplenishmentRepository {
         tx: &mut Transaction<'_, Postgres>,
         owner_id: Uuid,
         lpn_id: Uuid,
+        source_location_id: Uuid,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
@@ -608,12 +609,14 @@ impl PgReplenishmentRepository {
                       FROM inventory_batches batch
                      WHERE batch.owner_id = container.owner_id
                        AND batch.container_lpn = container.lpn_code
+                       AND batch.location_id = $3
                        AND batch.qty_on_hand > 0
                )
             "#,
         )
         .bind(owner_id)
         .bind(lpn_id)
+        .bind(source_location_id)
         .execute(&mut **tx)
         .await?;
         Ok(())

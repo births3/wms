@@ -350,7 +350,7 @@ impl ReplenishmentService {
             })?;
             if let Some(lpn_id) = saved.source_lpn_id {
                 self.repo
-                    .release_idle_container(&mut tx, ctx.owner_id, lpn_id)
+                    .release_idle_container(&mut tx, ctx.owner_id, lpn_id, saved.source_location_id)
                     .await?;
             }
         }

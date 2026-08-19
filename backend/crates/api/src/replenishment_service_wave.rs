@@ -109,6 +109,20 @@ impl ReplenishmentService {
             {
                 Ok(()) => {}
                 Err(ReplenishmentError::PutawayBlocked) if !created.is_empty() => break,
+                Err(ReplenishmentError::PutawayBlocked) => {
+                    self.write_patrol_fail_in_tx(
+                        tx,
+                        ctx.owner_id,
+                        strategy_id,
+                        req.target_location_id,
+                        req.product_id,
+                        "putaway_blocked",
+                        Uuid::new_v4(),
+                        chrono::Utc::now(),
+                    )
+                    .await?;
+                    return Ok(Vec::new());
+                }
                 Err(error) => return Err(error),
             }
             let source_lpn_id = resolve_source_lpn(&source, qty, source_type, ratio_tenths);
