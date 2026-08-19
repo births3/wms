@@ -1,0 +1,514 @@
+use chrono::{DateTime, Utc};
+use serde_json::Value;
+use sqlx::{PgPool, Postgres, Transaction};
+use uuid::Uuid;
+
+use super::support::{append_system_audit_in_tx, db_error, matches_event_pattern};
+use super::types::{
+    EventDelivery, EventDeliveryRow, EventEnvelope, EventReplayResult, EventSubscription,
+    EventSubscriptionRow, H2LifecycleError,
+};
+use super::DEFAULT_EVENT_MAX_ATTEMPTS;
+
+pub async fn upsert_event_subscription(
+    pool: &PgPool,
+    owner_id: Uuid,
+    subscriber_key: &str,
+    event_pattern: &str,
+    active: bool,
+    now: DateTime<Utc>,
+) -> Result<EventSubscription, H2LifecycleError> {
+    if subscriber_key.trim().is_empty() || event_pattern.trim().is_empty() {
+        return Err(H2LifecycleError::InvalidInput(
+            "subscriber_key and event_pattern are required".to_string(),
+        ));
+    }
+    let mut tx = pool.begin().await.map_err(db_error)?;
+    let row = sqlx::query_as::<_, EventSubscriptionRow>(
+        r#"
+        INSERT INTO event_bus_subscription (
+            id, owner_id, subscriber_key, event_pattern, active, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $6)
+        ON CONFLICT (owner_id, subscriber_key)
+        DO UPDATE SET
+            event_pattern = EXCLUDED.event_pattern,
+            active = EXCLUDED.active,
+            updated_at = EXCLUDED.updated_at
+        RETURNING id, owner_id, subscriber_key, event_pattern, active
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(subscriber_key)
+    .bind(event_pattern)
+    .bind(active)
+    .bind(now)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(db_error)?;
+
+    let subscription = EventSubscription::from(row);
+    append_system_audit_in_tx(
+        &mut tx,
+        owner_id,
+        "event_bus.subscription.upsert",
+        "event_bus_subscription",
+        &subscription.id.to_string(),
+        serde_json::json!({
+            "subscriber_key": subscriber_key,
+            "event_pattern": event_pattern,
+            "active": active,
+        }),
+        now,
+        "system-event-bus",
+    )
+    .await?;
+    tx.commit().await.map_err(db_error)?;
+    Ok(subscription)
+}
+
+pub async fn publish_event(
+    pool: &PgPool,
+    owner_id: Uuid,
+    idempotency_key: &str,
+    event_type: &str,
+    source_module: &str,
+    resource_type: &str,
+    resource_id: &str,
+    payload: Value,
+    now: DateTime<Utc>,
+) -> Result<EventEnvelope, H2LifecycleError> {
+    if let Some(existing) = load_event_by_idempotency(pool, owner_id, idempotency_key).await? {
+        return Ok(existing);
+    }
+
+    let mut tx = pool.begin().await.map_err(db_error)?;
+    let envelope = publish_event_in_tx(
+        &mut tx,
+        owner_id,
+        idempotency_key,
+        event_type,
+        source_module,
+        resource_type,
+        resource_id,
+        payload,
+        now,
+    )
+    .await?;
+    tx.commit().await.map_err(db_error)?;
+    Ok(envelope)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn publish_event_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    idempotency_key: &str,
+    event_type: &str,
+    source_module: &str,
+    resource_type: &str,
+    resource_id: &str,
+    payload: Value,
+    now: DateTime<Utc>,
+) -> Result<EventEnvelope, H2LifecycleError> {
+    if idempotency_key.trim().is_empty() || event_type.trim().is_empty() {
+        return Err(H2LifecycleError::InvalidInput(
+            "idempotency_key and event_type are required".to_string(),
+        ));
+    }
+    let existing: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id
+         FROM event_bus_event
+         WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind(idempotency_key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(db_error)?;
+    if let Some(event_id) = existing {
+        let delivery_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*)::BIGINT FROM event_bus_delivery WHERE event_id = $1",
+        )
+        .bind(event_id)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(db_error)?;
+        return Ok(EventEnvelope {
+            id: event_id,
+            owner_id,
+            event_type: event_type.to_string(),
+            delivery_count,
+        });
+    }
+    let event_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO event_bus_event (
+            id, owner_id, idempotency_key, event_type, source_module,
+            resource_type, resource_id, payload, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        "#,
+    )
+    .bind(event_id)
+    .bind(owner_id)
+    .bind(idempotency_key)
+    .bind(event_type)
+    .bind(source_module)
+    .bind(resource_type)
+    .bind(resource_id)
+    .bind(payload)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(db_error)?;
+
+    let subscriptions: Vec<EventSubscriptionRow> = sqlx::query_as(
+        r#"
+        SELECT id, owner_id, subscriber_key, event_pattern, active
+          FROM event_bus_subscription
+         WHERE owner_id = $1 AND active = TRUE
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(db_error)?;
+
+    let mut delivery_count = 0_i64;
+    for subscription in subscriptions {
+        if !matches_event_pattern(&subscription.event_pattern, event_type) {
+            continue;
+        }
+        sqlx::query(
+            r#"
+            INSERT INTO event_bus_delivery (
+                id, owner_id, event_id, subscription_id, status, attempt_count, next_attempt_at
+            )
+            VALUES ($1, $2, $3, $4, 'pending', 0, $5)
+            ON CONFLICT (event_id, subscription_id) DO NOTHING
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(event_id)
+        .bind(subscription.id)
+        .bind(now)
+        .execute(&mut **tx)
+        .await
+        .map_err(db_error)?;
+        delivery_count += 1;
+    }
+
+    Ok(EventEnvelope {
+        id: event_id,
+        owner_id,
+        event_type: event_type.to_string(),
+        delivery_count,
+    })
+}
+
+pub async fn pending_event_deliveries(
+    pool: &PgPool,
+    owner_id: Uuid,
+    limit: i64,
+) -> Result<Vec<EventDelivery>, H2LifecycleError> {
+    let rows: Vec<EventDeliveryRow> = sqlx::query_as(
+        r#"
+        SELECT id, event_id, status, attempt_count
+          FROM event_bus_delivery
+         WHERE owner_id = $1 AND status = 'pending'
+         ORDER BY created_at ASC
+         LIMIT $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(limit.clamp(1, 1000))
+    .fetch_all(pool)
+    .await
+    .map_err(db_error)?;
+
+    rows.into_iter().map(EventDelivery::try_from).collect()
+}
+
+pub async fn acknowledge_event_delivery(
+    pool: &PgPool,
+    owner_id: Uuid,
+    delivery_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<EventDelivery, H2LifecycleError> {
+    let mut tx = pool.begin().await.map_err(db_error)?;
+    let row = sqlx::query_as::<_, EventDeliveryRow>(
+        r#"
+        UPDATE event_bus_delivery
+           SET status = 'delivered',
+               last_error = NULL,
+               updated_at = $3,
+               next_attempt_at = NULL
+         WHERE owner_id = $1 AND id = $2
+        RETURNING id, event_id, status, attempt_count
+        "#,
+    )
+    .bind(owner_id)
+    .bind(delivery_id)
+    .bind(now)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(db_error)?
+    .ok_or(H2LifecycleError::NotFound)?;
+
+    let status = row.status.clone();
+    let delivery = EventDelivery::try_from(row)?;
+    append_system_audit_in_tx(
+        &mut tx,
+        owner_id,
+        "event_bus.delivery.ack",
+        "event_bus_delivery",
+        &delivery.id.to_string(),
+        serde_json::json!({"status": status}),
+        now,
+        "system-event-bus",
+    )
+    .await?;
+    tx.commit().await.map_err(db_error)?;
+    Ok(delivery)
+}
+
+pub async fn record_delivery_failure(
+    pool: &PgPool,
+    owner_id: Uuid,
+    delivery_id: Uuid,
+    error: &str,
+    now: DateTime<Utc>,
+) -> Result<EventDelivery, H2LifecycleError> {
+    let mut tx = pool.begin().await.map_err(db_error)?;
+    let row = sqlx::query_as::<_, EventDeliveryRow>(
+        r#"
+        UPDATE event_bus_delivery
+           SET attempt_count = attempt_count + 1,
+               status = CASE
+                   WHEN attempt_count + 1 >= $3 THEN 'dead_letter'
+                   ELSE 'pending'
+               END,
+               last_error = $4,
+               updated_at = $5,
+               next_attempt_at = CASE
+                   WHEN attempt_count + 1 >= $3 THEN NULL
+                   ELSE $5 + make_interval(secs => LEAST(30, (2 ^ attempt_count)::INT))
+               END
+         WHERE owner_id = $1 AND id = $2
+        RETURNING id, event_id, status, attempt_count
+        "#,
+    )
+    .bind(owner_id)
+    .bind(delivery_id)
+    .bind(DEFAULT_EVENT_MAX_ATTEMPTS)
+    .bind(error)
+    .bind(now)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(db_error)?
+    .ok_or(H2LifecycleError::NotFound)?;
+
+    if row.status == "dead_letter" {
+        sqlx::query(
+            r#"
+            INSERT INTO event_bus_dead_letter (id, owner_id, delivery_id, event_id, reason, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (delivery_id) DO NOTHING
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(delivery_id)
+        .bind(row.event_id)
+        .bind(error)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_error)?;
+    }
+
+    append_system_audit_in_tx(
+        &mut tx,
+        owner_id,
+        "event_bus.delivery.nack",
+        "event_bus_delivery",
+        &row.id.to_string(),
+        serde_json::json!({
+            "status": row.status,
+            "attempt_count": row.attempt_count,
+            "error": error,
+        }),
+        now,
+        "system-event-bus",
+    )
+    .await?;
+
+    tx.commit().await.map_err(db_error)?;
+    EventDelivery::try_from(row)
+}
+
+pub async fn replay_events(
+    pool: &PgPool,
+    owner_id: Uuid,
+    event_type: Option<&str>,
+    from: Option<DateTime<Utc>>,
+    to: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> Result<EventReplayResult, H2LifecycleError> {
+    if let (Some(from), Some(to)) = (from, to) {
+        if from > to {
+            return Err(H2LifecycleError::InvalidInput(
+                "from must be before or equal to to".to_string(),
+            ));
+        }
+    }
+
+    let mut tx = pool.begin().await.map_err(db_error)?;
+    let events: Vec<(Uuid, String)> = sqlx::query_as(
+        r#"
+        SELECT id, event_type
+          FROM event_bus_event
+         WHERE owner_id = $1
+           AND ($2::TEXT IS NULL OR event_type = $2)
+           AND ($3::TIMESTAMPTZ IS NULL OR created_at >= $3)
+           AND ($4::TIMESTAMPTZ IS NULL OR created_at <= $4)
+         ORDER BY created_at ASC
+         LIMIT 10000
+        "#,
+    )
+    .bind(owner_id)
+    .bind(event_type)
+    .bind(from)
+    .bind(to)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(db_error)?;
+
+    let subscriptions: Vec<EventSubscriptionRow> = sqlx::query_as(
+        r#"
+        SELECT id, owner_id, subscriber_key, event_pattern, active
+          FROM event_bus_subscription
+         WHERE owner_id = $1 AND active = TRUE
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(db_error)?;
+
+    let mut deliveries_created = 0_i64;
+    let mut deliveries_requeued = 0_i64;
+    for (event_id, current_event_type) in &events {
+        for subscription in &subscriptions {
+            if !matches_event_pattern(&subscription.event_pattern, current_event_type) {
+                continue;
+            }
+
+            deliveries_requeued += sqlx::query(
+                r#"
+                UPDATE event_bus_delivery
+                   SET status = 'pending',
+                       last_error = NULL,
+                       updated_at = $4,
+                       next_attempt_at = $4
+                 WHERE owner_id = $1
+                   AND event_id = $2
+                   AND subscription_id = $3
+                   AND status <> 'pending'
+                "#,
+            )
+            .bind(owner_id)
+            .bind(event_id)
+            .bind(subscription.id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?
+            .rows_affected() as i64;
+
+            deliveries_created += sqlx::query(
+                r#"
+                INSERT INTO event_bus_delivery (
+                    id, owner_id, event_id, subscription_id, status, attempt_count, next_attempt_at
+                )
+                VALUES ($1, $2, $3, $4, 'pending', 0, $5)
+                ON CONFLICT (event_id, subscription_id) DO NOTHING
+                "#,
+            )
+            .bind(Uuid::new_v4())
+            .bind(owner_id)
+            .bind(event_id)
+            .bind(subscription.id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_error)?
+            .rows_affected() as i64;
+        }
+    }
+
+    append_system_audit_in_tx(
+        &mut tx,
+        owner_id,
+        "event_bus.replay",
+        "event_bus_event",
+        event_type.unwrap_or("*"),
+        serde_json::json!({
+            "event_type": event_type,
+            "from": from,
+            "to": to,
+            "matched_events": events.len(),
+            "deliveries_created": deliveries_created,
+            "deliveries_requeued": deliveries_requeued,
+        }),
+        now,
+        "system-event-bus",
+    )
+    .await?;
+
+    tx.commit().await.map_err(db_error)?;
+
+    Ok(EventReplayResult {
+        matched_events: events.len() as i64,
+        deliveries_created,
+        deliveries_requeued,
+    })
+}
+
+async fn load_event_by_idempotency(
+    pool: &PgPool,
+    owner_id: Uuid,
+    idempotency_key: &str,
+) -> Result<Option<EventEnvelope>, H2LifecycleError> {
+    let row: Option<(Uuid, String)> = sqlx::query_as(
+        r#"
+        SELECT id, event_type
+          FROM event_bus_event
+         WHERE owner_id = $1 AND idempotency_key = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(idempotency_key)
+    .fetch_optional(pool)
+    .await
+    .map_err(db_error)?;
+    let Some((id, event_type)) = row else {
+        return Ok(None);
+    };
+    let delivery_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*)::BIGINT FROM event_bus_delivery WHERE event_id = $1")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .map_err(db_error)?;
+    Ok(Some(EventEnvelope {
+        id,
+        owner_id,
+        event_type,
+        delivery_count,
+    }))
+}
