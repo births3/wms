@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+"""check_admin_navigation.py — 管理端核心模块导航可见性检查
+
+类别：6. 前端治理
+Tier：T1（< 10s，纯静态扫描）
+输入：apps/web-admin/src/App.tsx
+输出：人类可读 + --json
+退出码：
+  0  管理端核心模块在左侧导航中可见
+  1  导航入口缺失
+  2  脚本自身错误
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from collections import defaultdict
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+_THIS = Path(__file__).resolve()
+REPO_ROOT = _THIS.parent.parent.parent
+APP_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "App.tsx"
+ADMIN_VIEW_TS = REPO_ROOT / "apps" / "web-admin" / "src" / "app-shell" / "admin-view.ts"
+MASTER_DATA_TYPES_TS = (
+    REPO_ROOT
+    / "apps"
+    / "web-admin"
+    / "src"
+    / "features"
+    / "master-data"
+    / "master-data-queries"
+    / "types.ts"
+)
+ADMIN_VIEW_RENDERER_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "app-shell" / "AdminViewRenderer.tsx"
+ADMIN_MENU_DEV_MOCK_TS = REPO_ROOT / "apps" / "web-admin" / "dev-mocks" / "admin-menu-dev-mock.ts"
+PAGE_TSX = REPO_ROOT / "apps" / "web-admin" / "src" / "pages" / "master-data" / "M1MasterDataPage.tsx"
+QUERY_TS = (
+    REPO_ROOT
+    / "apps"
+    / "web-admin"
+    / "src"
+    / "features"
+    / "master-data"
+    / "master-data-queries.ts"
+)
+MIGRATIONS_DIR = REPO_ROOT / "backend" / "migrations"
+MENU_ID_COLLISION_REPAIR = MIGRATIONS_DIR / "202607150015_admin_menu_id_collision_repair.sql"
+
+LITERAL_MENU_NODE_PATTERN = re.compile(
+    r"\(\s*'([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})'(?:\s*::uuid)?"
+    r"\s*,\s*'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}'(?:\s*::uuid)?"
+    r"\s*,\s*[123]\s*,\s*'([^']+)'",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# 历史冲突不能改写已执行迁移；这里只豁免已由向前迁移改为确定性 ID 的精确集合。
+REPAIRED_MENU_ID_COLLISIONS = {
+    "00000000-0000-0000-0000-000000130024": (
+        {"platform.h4.wechat_settings", "platform.h1.sessions", "platform.mcg.numbering"},
+        {"platform.h1.sessions", "platform.mcg.numbering"},
+    ),
+    "00000000-0000-0000-0000-000000130025": (
+        {"platform.h1.api_keys", "master_data.docks"},
+        {"master_data.docks"},
+    ),
+}
+
+REQUIRED_SECTION_LABEL = 'label: "基础档案"'
+REQUIRED_ROUTE_MARKERS = (
+    "M1MasterDataPage",
+    "M3BatchManagementPage",
+    "masterDataViewToId(view)",
+)
+REQUIRED_DASHBOARD_BACK_MARKERS = (
+    'onBack={() => setView("dashboard")}',
+    'onBack={() => navigateTo("dashboard")}',
+)
+
+TYPE_UNION_RE = re.compile(r"(?:export\s+)?type\s+([A-Za-z0-9_]+)\s*=\s*(.*?);", re.DOTALL)
+VIEW_CONDITION_RE = re.compile(r'\bview\s*===\s*"([^"]+)"')
+DEV_MENU_PAGE_RE = re.compile(r'\["([^"]+)",\s*"[^"]+",\s*"[^"]+"\]')
+
+REQUIRED_NAV_ITEMS = (
+    ("m1-products", "M1 商品档案"),
+    ("m1-business-partners", "M1 客商档案"),
+    ("m1-warehouses", "M1 仓库管理"),
+    ("m1-zones", "M1 库区管理"),
+    ("m1-locations", "M1 库位管理"),
+    ("m1-system-dictionary", "M1 系统字典"),
+    ("m3-batches", "M3 批号管理"),
+    ("mcg-numbering", "M-CG 单据号规则"),
+)
+
+
+@dataclass
+class Issue:
+    file: str
+    message: str
+
+
+def rel(path: Path) -> str:
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
+def read_source(path: Path) -> str:
+    """读取治理约定中的源码文件，缺失时返回空串让门禁给出业务缺口。"""
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def type_union_literals(source: str, type_name: str) -> set[str]:
+    match = next((match for match in TYPE_UNION_RE.finditer(source) if match.group(1) == type_name), None)
+    return set(re.findall(r'"([^"]+)"', match.group(2))) if match else set()
+
+
+def scan_view_contract(
+    app_text: str,
+    admin_view_text: str,
+    master_data_types_text: str,
+    renderer_text: str,
+    dev_mock_text: str,
+) -> list[Issue]:
+    """校验本地 view、菜单、开发种子和 renderer 的集合一致性，不复制服务端权限表。"""
+    expected = type_union_literals(admin_view_text, "AdminView") | type_union_literals(
+        master_data_types_text, "MasterDataViewId"
+    )
+    menu_start = app_text.find("const menuSections")
+    menu_end = app_text.find("const MENU_EXPANDED_STORAGE_KEY", menu_start)
+    menu_source = app_text[menu_start:menu_end] if menu_start >= 0 and menu_end > menu_start else ""
+    menu_views = [match.group(1) for match in re.finditer(r'\{\s*id:\s*"([^"]+)"', menu_source)]
+
+    tree_start = app_text.find("const dashboardMenuTree")
+    tree_end = app_text.find("const adminMenuIconByKey", tree_start)
+    tree_source = app_text[tree_start:tree_end] if tree_start >= 0 and tree_end > tree_start else ""
+    tree_views = re.findall(r'menuItem\("([^"]+)"\)', tree_source)
+
+    renderer_views = set(VIEW_CONDITION_RE.findall(renderer_text))
+    # dashboard is intentionally rendered by App.tsx's explicit fallback, not renderAdminView.
+    if "dashboard" in expected:
+        renderer_views.add("dashboard")
+
+    seed_start = dev_mock_text.find("function devAdminMenuSeed")
+    seed_end = dev_mock_text.find("function devStandardAdminMenuButtons", seed_start)
+    seed_source = dev_mock_text[seed_start:seed_end] if seed_start >= 0 and seed_end > seed_start else ""
+    dev_views = DEV_MENU_PAGE_RE.findall(seed_source)
+
+    actual_sources = {
+        "menuSections": set(menu_views),
+        "dashboardMenuTree": set(tree_views),
+        "renderer": renderer_views,
+        "dev menu seed": set(dev_views),
+    }
+    source_files = {
+        "menuSections": APP_TSX,
+        "dashboardMenuTree": APP_TSX,
+        "renderer": ADMIN_VIEW_RENDERER_TSX,
+        "dev menu seed": ADMIN_MENU_DEV_MOCK_TS,
+    }
+    issues: list[Issue] = []
+    for source_name, actual in actual_sources.items():
+        expected_views = {"dashboard"} if source_name == "dashboardMenuTree" else expected
+        missing = sorted(expected_views - actual)
+        extra = sorted(actual - expected_views)
+        if missing:
+            issues.append(Issue(rel(source_files[source_name]), f"{source_name} 缺少 AdminView: {', '.join(missing)}"))
+        if extra:
+            issues.append(Issue(rel(source_files[source_name]), f"{source_name} 包含未登记 AdminView: {', '.join(extra)}"))
+
+    for source_name, values in (("menuSections", menu_views), ("defaultMenuTree", tree_views), ("dev menu seed", dev_views)):
+        duplicates = sorted({value for value in values if values.count(value) > 1})
+        if duplicates:
+            issues.append(Issue(rel(source_files[source_name]), f"{source_name} 重复登记 AdminView: {', '.join(duplicates)}"))
+    return issues
+
+
+def scan_menu_id_collisions(migrations_dir: Path, repair_file: Path) -> list[Issue]:
+    assignments: dict[str, dict[str, set[Path]]] = defaultdict(lambda: defaultdict(set))
+    for migration in sorted(migrations_dir.glob("*.sql")):
+        for node_id, code in LITERAL_MENU_NODE_PATTERN.findall(read_source(migration)):
+            assignments[node_id.lower()][code].add(migration)
+
+    repair_text = read_source(repair_file)
+    issues: list[Issue] = []
+    for node_id, code_files in assignments.items():
+        codes = set(code_files)
+        if len(codes) < 2:
+            continue
+        expected = REPAIRED_MENU_ID_COLLISIONS.get(node_id)
+        if expected and codes == expected[0] and all(
+            f"admin_menu_node:{code}" in repair_text for code in expected[1]
+        ):
+            continue
+        locations = sorted({
+            rel(path) if path.is_relative_to(REPO_ROOT) else path.as_posix()
+            for paths in code_files.values()
+            for path in paths
+        })
+        issues.append(Issue(
+            ", ".join(locations),
+            f"菜单固定 UUID {node_id} 被多个 code 复用: {', '.join(sorted(codes))}",
+        ))
+    return issues
+
+
+def scan() -> list[Issue]:
+    if not APP_TSX.exists():
+        return [Issue(rel(APP_TSX), "Web Admin 入口文件不存在")]
+
+    text = read_source(APP_TSX)
+    route_text = read_source(ADMIN_VIEW_RENDERER_TSX)
+    issues: list[Issue] = []
+    if REQUIRED_SECTION_LABEL not in text:
+        issues.append(Issue(rel(APP_TSX), "缺少基础档案左侧导航分组"))
+    for view_id, title in REQUIRED_NAV_ITEMS:
+        if f'id: "{view_id}"' not in text or f'title: "{title}"' not in text:
+            issues.append(Issue(rel(APP_TSX), f"缺少基础档案菜单项: {view_id} / {title}"))
+    for marker in REQUIRED_ROUTE_MARKERS:
+        if marker not in route_text:
+            issues.append(Issue(rel(ADMIN_VIEW_RENDERER_TSX), f"缺少基础档案页面渲染入口标记: {marker}"))
+    if not any(marker in route_text for marker in REQUIRED_DASHBOARD_BACK_MARKERS):
+        issues.append(Issue(rel(ADMIN_VIEW_RENDERER_TSX), "缺少基础档案页面回工作台入口标记"))
+    for path in (PAGE_TSX, QUERY_TS):
+        if not path.exists():
+            issues.append(Issue(rel(path), "缺少基础档案管理端页面或查询层文件"))
+    for path in (ADMIN_VIEW_TS, MASTER_DATA_TYPES_TS, ADMIN_MENU_DEV_MOCK_TS):
+        if not path.exists():
+            issues.append(Issue(rel(path), "缺少管理端 view、主数据类型或开发菜单种子文件"))
+    issues.extend(
+        scan_view_contract(
+            text,
+            read_source(ADMIN_VIEW_TS),
+            read_source(MASTER_DATA_TYPES_TS),
+            route_text,
+            read_source(ADMIN_MENU_DEV_MOCK_TS),
+        )
+    )
+    issues.extend(scan_menu_id_collisions(MIGRATIONS_DIR, MENU_ID_COLLISION_REPAIR))
+    return issues
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+
+    issues = scan()
+    payload = {
+        "check": "check_admin_navigation",
+        "tier": "T1",
+        "category": "前端治理",
+        "file": rel(APP_TSX),
+        "route_file": rel(ADMIN_VIEW_RENDERER_TSX),
+        "page": rel(PAGE_TSX),
+        "query": rel(QUERY_TS),
+        "required_section_label": REQUIRED_SECTION_LABEL,
+        "required_nav_items": REQUIRED_NAV_ITEMS,
+        "required_route_markers": REQUIRED_ROUTE_MARKERS,
+        "required_dashboard_back_markers": REQUIRED_DASHBOARD_BACK_MARKERS,
+        "issues": [asdict(issue) for issue in issues],
+        "ok": not issues,
+    }
+
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print("check_admin_navigation (T1, 前端治理)")
+        print(f"  · 检查文件: {payload['file']}")
+        if issues:
+            print(f"  ✘ {len(issues)} 处管理端导航缺口:")
+            for issue in issues:
+                print(f"    - {issue.file}: {issue.message}")
+        else:
+            print("  ✓ 管理端核心模块导航入口已登记")
+
+    return 0 if not issues else 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception as e:  # noqa: BLE001
+        print(f"script error: {e}", file=sys.stderr)
+        sys.exit(2)
