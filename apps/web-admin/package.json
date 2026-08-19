@@ -1,0 +1,50 @@
+{
+  "name": "@wms/web-admin",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 9002 --strictPort",
+    "build": "pnpm run test:self-checks && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test:self-checks": "node self-checks/app-shell-layout-self-check.mjs && node self-checks/page-query-panel-self-check.mjs && node self-checks/h1-role-permission-slice-self-check.mjs && node self-checks/h1-session-page-self-check.mjs && node self-checks/h1-api-key-slice-self-check.mjs && node self-checks/m2-inbound-page-helpers-self-check.mjs && node self-checks/m2-inbound-detail-view-model-self-check.mjs && node self-checks/m2-inbound-documents-page-self-check.mjs && node self-checks/m1-feature-flag-import-self-check.mjs && node self-checks/m1-special-drug-system-dictionary-self-check.mjs && node self-checks/mvr-dual-person-matrix-self-check.mjs && node self-checks/m1-product-batch-import-self-check.mjs && node self-checks/h9-print-template-tree-self-check.mjs && node self-checks/h9-delivery-note-aggregation-self-check.mjs && node self-checks/h9-print-device-slice-self-check.mjs && node self-checks/m1-location-contract-self-check.mjs && node self-checks/m1-zone-real-api-self-check.mjs && node self-checks/m1-dock-management-navigation-self-check.mjs && node self-checks/m2-asn-product-lookup-self-check.mjs && node self-checks/m4-outbound-datagrid-actions-self-check.mjs && node self-checks/m4-outbound-create-api-self-check.mjs && node self-checks/m4-outbound-model-boundary-self-check.mjs && node self-checks/m3-batch-management-slice-self-check.mjs && node self-checks/m3-ops-pages-self-check.mjs && node self-checks/h4-wechat-notify-slice-self-check.mjs && node self-checks/h5-express-slice-self-check.mjs && node self-checks/mcg-document-numbering-slice-self-check.mjs && node self-checks/dock-occupancy-board-self-check.mjs && node self-checks/di-drug-inspection-slice-self-check.mjs && node self-checks/mdi-document-workflow-self-check.mjs && node self-checks/h1-dock-appointment-change-self-check.mjs && node self-checks/m10-tms-route-plan-page-self-check.mjs && node self-checks/m3-inventory-status-config-self-check.mjs && node self-checks/m9-billing-rule-page-self-check.mjs && node self-checks/te-task-type-slice-self-check.mjs && node self-checks/mte-task-execution-slice-self-check.mjs && node self-checks/hal-alert-definition-slice-self-check.mjs && node self-checks/hal-alert-runtime-slice-self-check.mjs && node self-checks/h8-erp-interface-table-slice-self-check.mjs",
+    "test:e2e:shell-dev": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-dev-config.ts",
+    "test:e2e:m1-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts",
+    "test:e2e:mvr-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-m1-real-config.ts --grep 'M-VR 双人策略矩阵真实保存'",
+    "test:e2e:m2-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-m2-real-config.ts",
+    "test:e2e:m3-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-m3-real-config.ts",
+    "test:e2e:m4-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-m4-real-config.ts",
+    "test:e2e:h5-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h5-real-config.ts",
+    "test:e2e:mdi-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts",
+    "test:e2e:h4-dev": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h4-dev-config.ts",
+    "test:e2e:h9-dev": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h9-dev-config.ts",
+    "test:e2e:h1-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h1-real-config.ts",
+    "test:e2e:mte-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-mte-real-config.ts",
+    "test:e2e:hal-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-hal-real-config.ts",
+    "test:e2e:h8-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h8-real-config.ts",
+    "test:e2e:h8-interface-dev": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h8-interface-dev-config.ts",
+    "test:e2e:h8-interface-real": "pnpm --dir ../../prototypes exec playwright test --config=playwright-web-admin-h8-interface-real-config.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
+    "@wms/api-client": "workspace:*",
+    "@wms/ui": "workspace:*",
+    "hiprint": "0.4.0",
+    "jquery": "3.6.0",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}
