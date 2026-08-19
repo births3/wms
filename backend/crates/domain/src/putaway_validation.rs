@@ -201,8 +201,12 @@ pub fn recommend_candidate_passes_6d(
     is_container: bool,
     lock_category: Option<&str>,
 ) -> bool {
+    let quality_status = match lock_category {
+        Some(category @ ("quarantine" | "rejected")) => category,
+        _ => batch_or_lock_status,
+    };
     is_temperature_zone_subset(zone_temp, product_temp)
-        && validate_quality_match(zone_quality, batch_or_lock_status)
+        && validate_quality_match(zone_quality, quality_status)
         && validate_category_zone(allowed_categories, product_category)
         && validate_pack_granularity(location_type, allows_container, is_container, lock_category)
         && validate_external_fragrant(
@@ -390,6 +394,46 @@ mod tests {
             true,
             false,
             None,
+        ));
+    }
+
+    #[test]
+    fn recommend_quality_prefers_container_lock_over_query_status() {
+        let empty = serde_json::json!([]);
+        assert!(
+            !recommend_candidate_passes_6d(
+                "normal_10_30",
+                "normal_10_30",
+                "qualified_green",
+                "qualified",
+                &empty,
+                "drug",
+                false,
+                false,
+                false,
+                false,
+                "storage",
+                true,
+                true,
+                Some("quarantine"),
+            ),
+            "隔离锁容器不得推荐合格区"
+        );
+        assert!(recommend_candidate_passes_6d(
+            "normal_10_30",
+            "normal_10_30",
+            "quarantine_yellow",
+            "qualified",
+            &empty,
+            "drug",
+            false,
+            false,
+            false,
+            false,
+            "storage",
+            true,
+            true,
+            Some("quarantine"),
         ));
     }
 }
