@@ -1,0 +1,12 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Understand graph API-key test node ID false positive"
+condition = "AND"
+regexTarget = "line"
+paths = ['''^\.ua/knowledge-graph\.json$''']
+regexes = ['''api_key_postgres\.rs:api_key_expiry_reminder_is_deduplicated_through_h4''']

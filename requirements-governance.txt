@@ -1,0 +1,9 @@
+# 治理脚本外部依赖（Python）
+# 安装：pip install -r requirements-governance.txt
+# 约束：最小化依赖；每个新增必须在 PR 中说明理由
+
+pathspec==0.12.1    # gitignore-style glob 匹配（替代自实现）
+tomli==2.2.1        # TOML 解析（Python 3.10 无内置 tomllib）
+Markdown==3.10.2    # 文档链接与锚点校验
+ruff==0.5.6         # Python 治理脚本静态检查
+pytest==9.0.2       # 治理契约测试（T3 / CI）

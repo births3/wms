@@ -1,0 +1,15 @@
+packages:
+  - "packages/*"
+  - "prototypes"
+  - "apps/*"
+
+allowBuilds:
+  core-js: false
+  esbuild: true
+
+# Wave 0.5 起 prototypes 进入 root workspace，与 packages/ui 共享代码。
+# apps/* 在 Wave 1 启动后陆续填充（web-admin / pda-mobile）。
+# 见 ADR-0002 §pnpm Workspace。
+
+onlyBuiltDependencies:
+  - esbuild
