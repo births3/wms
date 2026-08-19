@@ -67,6 +67,19 @@ pub struct LpnContainerListResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct UnlockSkippedBatch {
+    pub batch_id: Uuid,
+    pub status: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ReleaseContainerQualityLockResponse {
+    pub container: LpnContainer,
+    pub skipped_batches: Vec<UnlockSkippedBatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateLpnContainerRequest {
     pub container_type: String,
     pub capacity_cm3: Option<i64>,

@@ -170,6 +170,49 @@ pub fn validate_external_fragrant(
     is_external_product == is_external_zone && is_fragrant_product == is_fragrant_zone
 }
 
+/// M-VR 双人策略：Single 不强制见证人；其余策略沿用双人核验。
+pub fn special_dual_passes(
+    is_special: bool,
+    policy_is_single: bool,
+    operator_id: Uuid,
+    witness_id: Option<Uuid>,
+) -> bool {
+    if !is_special || policy_is_single {
+        return true;
+    }
+    validate_special_drug_dual(true, operator_id, witness_id)
+}
+
+/// 推荐位可离线判定的 6 维：① 品类 ② 温区 ③ 质量 ⑤ 包装粒度 ⑥ 外用/串味。
+/// ④ 特药双人依赖操作人/见证人，在上架事务执行，不作为库位候选过滤。
+pub fn recommend_candidate_passes_6d(
+    zone_temp: &str,
+    product_temp: &str,
+    zone_quality: &str,
+    batch_or_lock_status: &str,
+    allowed_categories: &serde_json::Value,
+    product_category: &str,
+    product_external: bool,
+    zone_external: bool,
+    product_fragrant: bool,
+    zone_fragrant: bool,
+    location_type: &str,
+    allows_container: bool,
+    is_container: bool,
+    lock_category: Option<&str>,
+) -> bool {
+    is_temperature_zone_subset(zone_temp, product_temp)
+        && validate_quality_match(zone_quality, batch_or_lock_status)
+        && validate_category_zone(allowed_categories, product_category)
+        && validate_pack_granularity(location_type, allows_container, is_container, lock_category)
+        && validate_external_fragrant(
+            product_external,
+            zone_external,
+            product_fragrant,
+            zone_fragrant,
+        )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,6 +275,121 @@ mod tests {
             true,
             operator,
             Some(Uuid::new_v4())
+        ));
+    }
+
+    #[test]
+    fn special_dual_mvr_single_skips_witness() {
+        let operator = Uuid::new_v4();
+        assert!(special_dual_passes(true, true, operator, None));
+        assert!(!special_dual_passes(true, false, operator, None));
+        assert!(special_dual_passes(
+            true,
+            false,
+            operator,
+            Some(Uuid::new_v4())
+        ));
+        assert!(special_dual_passes(false, false, operator, None));
+    }
+
+    #[test]
+    fn recommend_candidate_runs_temperature_quality_category_and_fragrant() {
+        let empty = serde_json::json!([]);
+        assert!(recommend_candidate_passes_6d(
+            "cold_2_8",
+            "cold_2_8",
+            "qualified_green",
+            "qualified",
+            &empty,
+            "drug",
+            false,
+            false,
+            false,
+            false,
+            "storage",
+            true,
+            true,
+            None,
+        ));
+        assert!(!recommend_candidate_passes_6d(
+            "normal_10_30",
+            "cold_2_8",
+            "qualified_green",
+            "qualified",
+            &empty,
+            "drug",
+            false,
+            false,
+            false,
+            false,
+            "storage",
+            true,
+            true,
+            None,
+        ));
+        assert!(!recommend_candidate_passes_6d(
+            "cold_2_8",
+            "cold_2_8",
+            "qualified_green",
+            "quarantine",
+            &empty,
+            "drug",
+            false,
+            false,
+            false,
+            false,
+            "storage",
+            true,
+            true,
+            None,
+        ));
+        assert!(!recommend_candidate_passes_6d(
+            "cold_2_8",
+            "cold_2_8",
+            "qualified_green",
+            "qualified",
+            &serde_json::json!(["device"]),
+            "drug",
+            false,
+            false,
+            false,
+            false,
+            "storage",
+            true,
+            true,
+            None,
+        ));
+        assert!(!recommend_candidate_passes_6d(
+            "cold_2_8",
+            "cold_2_8",
+            "qualified_green",
+            "qualified",
+            &empty,
+            "drug",
+            true,
+            false,
+            false,
+            false,
+            "storage",
+            true,
+            true,
+            None,
+        ));
+        assert!(!recommend_candidate_passes_6d(
+            "cold_2_8",
+            "cold_2_8",
+            "qualified_green",
+            "qualified",
+            &empty,
+            "drug",
+            false,
+            false,
+            false,
+            false,
+            "storage",
+            true,
+            false,
+            None,
         ));
     }
 }

@@ -21,6 +21,22 @@ pub const VALID_LOCK_CATEGORIES: &[&str] = &[
     LPN_LOCK_CATEGORY_REJECTED,
 ];
 
+pub fn quality_color_for_lock_category(category: &str) -> &'static str {
+    if category == LPN_LOCK_CATEGORY_QUARANTINE {
+        "quarantine_yellow"
+    } else {
+        "unqualified_red"
+    }
+}
+
+pub fn batch_status_for_lock_category(category: &str) -> &'static str {
+    if category == LPN_LOCK_CATEGORY_QUARANTINE {
+        "quarantined"
+    } else {
+        "unqualified"
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ApplyContainerQualityLockRequest {
     pub lock_category: String,
@@ -34,6 +50,9 @@ pub struct ApplyContainerQualityLockRequest {
     pub witness_id: Uuid,
     #[serde(default)]
     pub note: Option<String>,
+    /// 为 true 时由加锁事务内创建 M-QL，调用方只需 m1.quality-lock.manage。
+    #[serde(default)]
+    pub create_liaison: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -45,6 +64,8 @@ pub struct ChangeContainerQualityLockReasonRequest {
     pub reason_desc: Option<String>,
     #[serde(default)]
     pub evidence_urls: Vec<String>,
+    #[serde(default)]
+    pub quality_liaison_id: Option<Uuid>,
     pub witness_id: Uuid,
     #[serde(default)]
     pub note: Option<String>,
@@ -59,6 +80,14 @@ pub struct ReleaseContainerQualityLockRequest {
     pub quality_liaison_id: Option<Uuid>,
     #[serde(default)]
     pub note: Option<String>,
+}
+
+pub fn unlock_should_rewrite_batch(
+    current_status: &str,
+    lock_linked_status: &str,
+    last_change_is_this_lock: bool,
+) -> bool {
+    current_status == lock_linked_status && last_change_is_this_lock
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -133,7 +162,10 @@ pub fn validate_apply_lock(
     validate_witness(operator_id, req.witness_id)?;
     validate_lock_category_value(&req.lock_category)?;
     validate_reason_required(&req.reason_dict_item_code)?;
-    if req.lock_category == LPN_LOCK_CATEGORY_REJECTED && req.quality_liaison_id.is_none() {
+    if req.lock_category == LPN_LOCK_CATEGORY_REJECTED
+        && req.quality_liaison_id.is_none()
+        && !req.create_liaison
+    {
         return Err(ContainerQualityLockValidationError::MqlRequired);
     }
     Ok(())
@@ -153,6 +185,9 @@ pub fn validate_change_reason(
     validate_reason_required(&req.reason_dict_item_code)?;
     // 换原因同样强制双人见证（GSP 双人作业），缺见证人或与操作人相同均拒绝。
     validate_witness(operator_id, req.witness_id)?;
+    if target == LPN_LOCK_CATEGORY_REJECTED && req.quality_liaison_id.is_none() {
+        return Err(ContainerQualityLockValidationError::MqlRequired);
+    }
     Ok(())
 }
 
@@ -180,6 +215,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn lock_category_maps_zone_color_and_batch_status() {
+        assert_eq!(
+            quality_color_for_lock_category(LPN_LOCK_CATEGORY_QUARANTINE),
+            "quarantine_yellow"
+        );
+        assert_eq!(
+            quality_color_for_lock_category(LPN_LOCK_CATEGORY_REJECTED),
+            "unqualified_red"
+        );
+        assert_eq!(
+            batch_status_for_lock_category(LPN_LOCK_CATEGORY_QUARANTINE),
+            "quarantined"
+        );
+        assert_eq!(
+            batch_status_for_lock_category(LPN_LOCK_CATEGORY_REJECTED),
+            "unqualified"
+        );
+    }
+
+    #[test]
     fn test_witness_defense() {
         let user = Uuid::new_v4();
         assert_eq!(
@@ -202,6 +257,7 @@ mod tests {
             quality_liaison_id: None,
             witness_id: wit,
             note: None,
+            create_liaison: false,
         };
         assert_eq!(
             validate_apply_lock("idle", &req, op),
@@ -222,11 +278,17 @@ mod tests {
             quality_liaison_id: None,
             witness_id: wit,
             note: None,
+            create_liaison: false,
         };
         assert_eq!(
             validate_apply_lock("in_use", &req, op),
             Err(ContainerQualityLockValidationError::MqlRequired)
         );
+        let with_flag = ApplyContainerQualityLockRequest {
+            create_liaison: true,
+            ..req
+        };
+        assert!(validate_apply_lock("in_use", &with_flag, op).is_ok());
     }
 
     #[test]
@@ -238,6 +300,7 @@ mod tests {
             reason_dict_item_code: "temp_anomaly".to_string(),
             reason_desc: None,
             evidence_urls: vec![],
+            quality_liaison_id: None,
             witness_id: wit,
             note: None,
         };
@@ -274,6 +337,20 @@ mod tests {
         assert!(validate_change_reason(Some("rejected"), &empty, op).is_err());
         // Distinct witness passes
         assert!(validate_change_reason(Some("rejected"), &req, op).is_ok());
+        let to_rejected = ChangeContainerQualityLockReasonRequest {
+            lock_category: Some("rejected".to_string()),
+            quality_liaison_id: None,
+            ..req.clone()
+        };
+        assert_eq!(
+            validate_change_reason(Some("quarantine"), &to_rejected, op),
+            Err(ContainerQualityLockValidationError::MqlRequired)
+        );
+        let to_rejected_with_mql = ChangeContainerQualityLockReasonRequest {
+            quality_liaison_id: Some(Uuid::new_v4()),
+            ..to_rejected
+        };
+        assert!(validate_change_reason(Some("quarantine"), &to_rejected_with_mql, op).is_ok());
     }
 
     #[test]
@@ -305,5 +382,24 @@ mod tests {
         assert!(validate_release_lock(Some("rejected"), &req, op, Some("closed")).is_ok());
         // Rejected M-QL allows release (fallback)
         assert!(validate_release_lock(Some("rejected"), &req, op, Some("rejected")).is_ok());
+    }
+
+    #[test]
+    fn unlock_rewrites_only_batches_still_set_by_this_lock() {
+        assert!(unlock_should_rewrite_batch(
+            "quarantined",
+            "quarantined",
+            true
+        ));
+        assert!(!unlock_should_rewrite_batch(
+            "unqualified",
+            "quarantined",
+            true
+        ));
+        assert!(!unlock_should_rewrite_batch(
+            "quarantined",
+            "quarantined",
+            false
+        ));
     }
 }
