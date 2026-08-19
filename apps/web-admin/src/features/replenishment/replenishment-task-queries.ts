@@ -39,6 +39,7 @@ export type ReplenishmentTaskListQuery = {
   keyword?: string;
   created_from?: string;
   created_to?: string;
+  limit?: number;
 };
 
 export function useReplenishmentTasksQuery(filters?: ReplenishmentTaskListQuery) {
@@ -58,6 +59,7 @@ export function useReplenishmentTasksQuery(filters?: ReplenishmentTaskListQuery)
             keyword: emptyToUndefined(filters?.keyword),
             created_from: emptyToUndefined(filters?.created_from),
             created_to: emptyToUndefined(filters?.created_to),
+            limit: filters?.limit,
           },
         },
       });

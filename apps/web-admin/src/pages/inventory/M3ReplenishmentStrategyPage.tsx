@@ -33,7 +33,7 @@ import {
   type UpsertReplenishmentStrategyRequest,
 } from "@/features/replenishment/replenishment-strategy-queries";
 import { errorText } from "@/lib/error-text";
-import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { queryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
 import {
   BUTTON_ADD,
   BUTTON_REFRESH,
@@ -404,9 +404,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="grid gap-1 text-sm">{label}{children}</label>;
 }
-function defaultQuery(): QueryPanelValue { return { keyword: "", enabled: "", scope_type: "", target_type: "" }; }
+function defaultQuery(): QueryPanelValue { return { keyword: "", enabled: [], scope_type: [], target_type: [] }; }
 function normalizeQuery(value: QueryPanelValue): QueryPanelValue {
-  return { keyword: queryString(value.keyword), enabled: queryString(value.enabled), scope_type: queryString(value.scope_type), target_type: queryString(value.target_type) };
+  return { keyword: queryString(value.keyword), enabled: queryStringArray(value.enabled), scope_type: queryStringArray(value.scope_type), target_type: queryStringArray(value.target_type) };
 }
 function emptyForm(): Form {
   return { strategyCode: "", strategyName: "", scopeType: "product", scopeRef: "", sourceType: "storage", targetType: "case_pick", minSafety: "10", maxTarget: "50", triggerMinMax: true, triggerWaveGap: false, enabled: true, locationIds: "" };
@@ -423,12 +423,12 @@ function parseIds(value: string): string[] {
   return value.split(/[,，\s]+/).map((item) => item.trim()).filter(Boolean);
 }
 function toStrategyFilters(query: QueryPanelValue) {
-  const enabled = queryString(query.enabled);
+  const enabled = queryStringArray(query.enabled).find(Boolean);
   return {
     keyword: queryString(query.keyword),
-    enabled: enabled === "" ? undefined : enabled === "true",
-    scope_type: queryString(query.scope_type),
-    target_type: queryString(query.target_type),
+    enabled: enabled === "true" ? true : enabled === "false" ? false : undefined,
+    scope_type: queryStringArray(query.scope_type).find(Boolean) ?? "",
+    target_type: queryStringArray(query.target_type).find(Boolean) ?? "",
   };
 }
 function validate(form: Form) {

@@ -36,4 +36,13 @@ assert.match(queries, /api\.POST\("\/api\/v1\/replenishment\/tasks"/, "手工发
 assert.match(queries, /api\.POST\("\/api\/v1\/replenishment\/tasks\/\{id\}\/cancel"/, "取消必须使用取消 API");
 assert.match(queries, /api\.POST\("\/api\/v1\/replenishment\/tasks\/\{id\}\/reassign"/, "重派必须使用改派 API");
 assert.match(queries, /Idempotency-Key/, "写入必须携带幂等键");
+assert.match(page, /queryStringArray/, "multiSelect 必须用 queryStringArray 下推");
+assert.match(page, /status:\s*queryStringArray\(query\.status\)/, "status 多选必须下推");
+assert.match(page, /trigger_mode:\s*queryStringArray\(query\.trigger_mode\)/, "trigger_mode 多选必须下推");
+assert.match(page, /priority:\s*queryStringArray\(query\.priority\)/, "priority 多选必须下推");
+assert.doesNotMatch(page, /status:\s*queryString\(query\.status\)/, "status 不得被 queryString 吞成空串");
+assert.doesNotMatch(page, /key:\s*"owner"/, "租户任务大盘不得手填货主");
+assert.match(page, /header:\s*"创建时间"/, "网格应展示创建时间");
+assert.match(page, /header:\s*"更新时间"/, "网格应展示更新时间");
+assert.match(queries, /limit:\s*emptyToUndefined|limit:\s*filters\?\.limit/, "任务列表必须下传 limit");
 console.log("m3 replenishment task self-check passed");

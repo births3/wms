@@ -25,7 +25,8 @@ import {
   type ReplenishmentTask,
 } from "@/features/replenishment/replenishment-task-queries";
 import { errorText } from "@/lib/error-text";
-import { queryString, queryValueFromUnknown } from "@/lib/query-value";
+import { formatDateTime } from "@/lib/format";
+import { queryString, queryStringArray, queryValueFromUnknown } from "@/lib/query-value";
 import {
   BUTTON_REFRESH,
   BUTTON_SAVE,
@@ -49,7 +50,6 @@ export const queryFields: QueryPanelField[] = [
   { key: "target_location_id", label: "目标位", type: "text", placeholder: "目标库位 ID" },
   { key: "created_at", label: "创建时间", type: "dateRange" },
   { key: "operator", label: "作业员", type: "text", placeholder: "作业员 ID" },
-  { key: "owner", label: "货主", type: "text", placeholder: "货主 ID" },
 ];
 export const defaultVisibleFieldKeys = ["status", "trigger_mode"];
 
@@ -65,7 +65,8 @@ const columns: DataGridColumn<ReplenishmentTask>[] = [
   { key: "qty", header: "数量/已送达", width: 130, mono: true, render: (row) => `${row.done_qty} / ${row.qty}`, copyValue: (row) => `${row.done_qty}/${row.qty}` },
   { key: "status", header: COLUMN_STATUS, width: 100, render: (row) => <StatusBadge status={statusTone(row)} label={statusLabel(row.status)} size="sm" />, filterValue: (row) => row.status },
   { key: "operator_id", header: "作业员", width: 140, mono: true, render: (row) => row.operator_id ?? "—", filterValue: (row) => row.operator_id ?? "" },
-  { key: "created_by", header: "创建/更新", width: 160, filterValue: (row) => row.created_by, copyValue: (row) => row.created_by },
+  { key: "created_at", header: "创建时间", width: 160, render: (row) => formatDateTime(row.created_at), filterValue: (row) => row.created_at ?? "", copyValue: (row) => row.created_at ?? "" },
+  { key: "updated_at", header: "更新时间", width: 160, render: (row) => formatDateTime(row.updated_at), filterValue: (row) => row.updated_at ?? "", copyValue: (row) => row.updated_at ?? "" },
 ];
 
 export function M3ReplenishmentTaskPage() {
@@ -219,9 +220,9 @@ export function M3ReplenishmentTaskPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="grid gap-1 text-sm">{label}{children}</label>;
 }
-function defaultQuery(): QueryPanelValue { return { status: "", trigger_mode: "", priority: "", keyword: "", wave_id: "", source_location_id: "", target_location_id: "", created_at: { from: "", to: "" }, operator: "", owner: "" }; }
+function defaultQuery(): QueryPanelValue { return { status: [], trigger_mode: [], priority: [], keyword: "", wave_id: "", source_location_id: "", target_location_id: "", created_at: { from: "", to: "" }, operator: "" }; }
 function normalizeQuery(value: QueryPanelValue): QueryPanelValue {
-  return { status: queryString(value.status), trigger_mode: queryString(value.trigger_mode), priority: queryString(value.priority), keyword: queryString(value.keyword), wave_id: queryString(value.wave_id), source_location_id: queryString(value.source_location_id), target_location_id: queryString(value.target_location_id), created_at: dateRangeValue(value.created_at), operator: queryString(value.operator), owner: queryString(value.owner) };
+  return { status: queryStringArray(value.status), trigger_mode: queryStringArray(value.trigger_mode), priority: queryStringArray(value.priority), keyword: queryString(value.keyword), wave_id: queryString(value.wave_id), source_location_id: queryString(value.source_location_id), target_location_id: queryString(value.target_location_id), created_at: dateRangeValue(value.created_at), operator: queryString(value.operator) };
 }
 function dateRangeValue(value: QueryPanelValue[string]) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -262,9 +263,9 @@ function isTimeoutRow(row: ReplenishmentTask) {
 function toTaskFilters(query: QueryPanelValue) {
   const created = dateRangeOf(query.created_at);
   return {
-    status: queryString(query.status),
-    trigger_mode: queryString(query.trigger_mode),
-    priority: queryString(query.priority),
+    status: queryStringArray(query.status).find(Boolean) ?? "",
+    trigger_mode: queryStringArray(query.trigger_mode).find(Boolean) ?? "",
+    priority: queryStringArray(query.priority).find(Boolean) ?? "",
     source_location_id: queryString(query.source_location_id),
     target_location_id: queryString(query.target_location_id),
     operator_id: queryString(query.operator),
@@ -272,6 +273,7 @@ function toTaskFilters(query: QueryPanelValue) {
     keyword: queryString(query.keyword),
     created_from: created.from,
     created_to: created.to,
+    limit: 100,
   };
 }
 function dateRangeOf(value: QueryPanelValue[string]) {

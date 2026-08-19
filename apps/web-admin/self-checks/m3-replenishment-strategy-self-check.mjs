@@ -36,4 +36,9 @@ assert.match(queries, /api\.GET\("\/api\/v1\/replenishment\/strategies\/\{id\}\/
 assert.match(queries, /api\.PUT\("\/api\/v1\/replenishment\/strategies\/\{id\}\/locations"/, "挂接必须使用库位绑定 API");
 assert.match(queries, /api\.POST\("\/api\/v1\/replenishment\/location-groups"/, "库位组必须使用组维护 API");
 assert.match(queries, /Idempotency-Key/, "写入必须携带幂等键");
+assert.match(page, /queryStringArray/, "multiSelect 必须用 queryStringArray 下推");
+assert.match(page, /queryStringArray\(query\.enabled\)/, "enabled 多选必须下推");
+assert.match(page, /queryStringArray\(query\.scope_type\)/, "scope_type 多选必须下推");
+assert.match(page, /queryStringArray\(query\.target_type\)/, "target_type 多选必须下推");
+assert.doesNotMatch(page, /enabled:\s*queryString\(query\.enabled\)/, "enabled 不得被 queryString 吞成空串");
 console.log("m3 replenishment strategy self-check passed");
