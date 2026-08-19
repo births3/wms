@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --primary: 217 84% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 217 84% 53%;
+    --radius: 0.5rem;
+
+    --wms-warning: 32 95% 44%;
+    --wms-success: 142 71% 45%;
+    --wms-cold: 189 94% 43%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+[data-device="pda"] {
+  font-size: 16pt;
+}
+
+/*
+ * [data-icon] 图标内联约定
+ *
+ * 用于把 lucide-react 等 SVG 图标设为跟随字号的 inline 装饰，避免在每处 <Icon /> 都重复
+ * 写 className="size-4 mr-1" 之类的尺寸/间距类。
+ *
+ * inline-start：图标位于文字前（按钮、标签、面包屑里最常见），尺寸跟随当前字号，向后留半字距。
+ *   <Button><Plus data-icon="inline-start" /> 新增</Button>
+ *
+ * 选择器作用在 SVG 元素本身。CSS width/height 会覆盖 lucide-react 注入的 width="24" height="24"。
+ */
+[data-icon="inline-start"] {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  margin-inline-end: 0.375em;
+  vertical-align: -0.125em;
+}
