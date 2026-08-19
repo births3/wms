@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
-> 时间：2026-07-21
-> 版本：v3.13（当前 224 项）
+> 时间：2026-08-20
+> 版本：v3.14（当前 249 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 83 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 134 | 业务异常（数据冲突 / 校验失败）|
+| error | 155 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **228** | — |
+| **合计** | **249** | — |
 
 ---
 
@@ -95,7 +95,7 @@
 | H8 | 1 | ERP 接口表探查 |
 | H_DOCK | 11 | 月台预约 |
 | H_AL | 28 | 告警引擎 |
-| M1 | 32 | 主数据校验 / 配置中心 |
+| M1 | 53 | 主数据校验 / 配置中心 / 设备中台 |
 | M2 | 18 | 入库流程 |
 | M3 | 30 | 库存与状态 / 补货 |
 | M4 | 10 | 出库与拣选 |
@@ -1599,6 +1599,258 @@ error_codes:
     related_stories: [US-M1-004b]
     introduced_in: v26
 
+  - code: M1_DEVICE_DUPLICATE_CODE
+    module: M1
+    category: DEVICE
+    detail: DUPLICATE_CODE
+    http_status: 409
+    severity: error
+    message_zh: '设备编码在仓库内已存在'
+    message_en: 'Device code already exists in warehouse'
+    related_fields: [device_code]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_DEVICE_TYPE_INVALID
+    module: M1
+    category: DEVICE
+    detail: TYPE_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '设备类型非法'
+    message_en: 'Invalid device type'
+    related_fields: [device_type]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_DEVICE_NOT_FOUND
+    module: M1
+    category: DEVICE
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '设备不存在'
+    message_en: 'Device not found'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_DEVICE_DISABLED
+    module: M1
+    category: DEVICE
+    detail: DISABLED
+    http_status: 422
+    severity: error
+    message_zh: '设备已停用，禁止下发新指令或重试'
+    message_en: 'Device disabled, no new dispatch or retry'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_DEVICE_OFFLINE
+    module: M1
+    category: DEVICE
+    detail: OFFLINE
+    http_status: 422
+    severity: error
+    message_zh: '设备离线，禁止绑定新点位或下发指令'
+    message_en: 'Device offline, binding and dispatch blocked'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_BIND_CONFLICT
+    module: M1
+    category: DEVICE_BIND
+    detail: CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '同一库位同一角色已有生效绑定'
+    message_en: 'Active binding already exists for location and role'
+    related_fields: [location_id, binding_role]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_BIND_DEVICE_MISMATCH
+    module: M1
+    category: DEVICE_BIND
+    detail: DEVICE_MISMATCH
+    http_status: 422
+    severity: error
+    message_zh: '绑定角色与设备类型不匹配'
+    message_en: 'Binding role does not match device type'
+    related_fields: [binding_role, device_type]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_BIND_NOT_FOUND
+    module: M1
+    category: DEVICE_BIND
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '绑定不存在或已解绑'
+    message_en: 'Binding not found or already unbound'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_WCS_TASK_NOT_FOUND
+    module: M1
+    category: WCS_TASK
+    detail: NOT_FOUND
+    http_status: 404
+    severity: error
+    message_zh: '设备指令任务不存在'
+    message_en: 'WCS task not found'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_WCS_TASK_STATE_INVALID
+    module: M1
+    category: WCS_TASK
+    detail: STATE_INVALID
+    http_status: 422
+    severity: error
+    message_zh: '指令任务状态迁移非法'
+    message_en: 'Invalid WCS task state transition'
+    related_fields: [status]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_WCS_TASK_IDEMPOTENCY_CONFLICT
+    module: M1
+    category: WCS_TASK
+    detail: IDEMPOTENCY_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '指令幂等键冲突且业务动作不一致'
+    message_en: 'Idempotency key conflict with mismatched business action'
+    related_fields: [idempotency_key]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_WCS_TASK_RETRY_EXHAUSTED
+    module: M1
+    category: WCS_TASK
+    detail: RETRY_EXHAUSTED
+    http_status: 422
+    severity: error
+    message_zh: '指令重试耗尽，任务进入失败终态'
+    message_en: 'WCS task retry exhausted, task failed'
+    related_fields: [retry_count]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_WCS_TASK_VOID_BLOCKED
+    module: M1
+    category: WCS_TASK
+    detail: VOID_BLOCKED
+    http_status: 422
+    severity: error
+    message_zh: '已落账指令任务不可作废'
+    message_en: 'Settled WCS task cannot be voided'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_PTL_LIGHT_BUSY
+    module: M1
+    category: PTL
+    detail: LIGHT_BUSY
+    http_status: 409
+    severity: error
+    message_zh: '同一 PTL 设备已有未完成亮灯任务'
+    message_en: 'PTL already has an active light task'
+    related_fields: [device_id]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_PTL_QTY_DIFF_EXCEEDED
+    module: M1
+    category: PTL
+    detail: QTY_DIFF_EXCEEDED
+    http_status: 422
+    severity: error
+    message_zh: '拍灯数量与提示数量差异超阈值，任务转人工处理'
+    message_en: 'PTL press qty difference exceeds threshold'
+    related_fields: [expected_qty, pressed_qty]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_POD_MOVE_ACTIVE
+    module: M1
+    category: AGV
+    detail: POD_MOVE_ACTIVE
+    http_status: 409
+    severity: error
+    message_zh: '同一货架已有未完成搬运任务'
+    message_en: 'POD already has an active move task'
+    related_fields: [pod_code]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_LOCATION_UNREACHABLE
+    module: M1
+    category: AGV
+    detail: LOCATION_UNREACHABLE
+    http_status: 422
+    severity: error
+    message_zh: '格口处于 AGV 搬运不可达期，账务动作被阻断'
+    message_en: 'Location unreachable during AGV pod move'
+    related_fields: [location_id]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_AGV_MARKER_INCONSISTENT
+    module: M1
+    category: AGV
+    detail: MARKER_INCONSISTENT
+    http_status: 409
+    severity: error
+    message_zh: 'AGV 不可达标记与活跃搬运任务不一致'
+    message_en: 'AGV unreachable marker inconsistent with active tasks'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_EVENT_TASK_MISMATCH
+    module: M1
+    category: EVENT
+    detail: TASK_MISMATCH
+    http_status: 422
+    severity: error
+    message_zh: '设备事件与指令任务不匹配'
+    message_en: 'Device event does not match task'
+    related_fields: [event_type, task_id]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_EVENT_ORPHAN
+    module: M1
+    category: EVENT
+    detail: ORPHAN
+    http_status: 422
+    severity: error
+    message_zh: '设备事件无匹配指令任务且超窗'
+    message_en: 'Orphan device event without matching task'
+    related_fields: [event_type]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_NUMBERING_UNAVAILABLE
+    module: M1
+    category: WCS_TASK
+    detail: NUMBERING_UNAVAILABLE
+    http_status: 422
+    severity: error
+    message_zh: 'wcs_task 无可用编号规则'
+    message_en: 'No numbering rule available for wcs_task'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
 
   - code: M2_PUTAWAY_ZONE_CATEGORY_DENIED
     module: M2
@@ -2928,3 +3180,4 @@ error_codes:
 | 2026-08-17 | v3.11 | 登记 M1_QUALITY_LOCK_*（5 项）与 M2_PUTAWAY_*（7 项）容器质量锁/6 维校验错误码；脚本统计当前合计 203 项 |
 | 2026-08-18 | v3.12 | 补登记 M1_QUALITY_LOCK_REASON_INVALID / MQL_REQUIRED / NOT_LOCKED；脚本统计当前合计 206 项 |
 | 2026-08-19 | v3.13 | 登记 US-M3-012 补货 `M3_REPLENISH_*` 22 项；脚本统计当前合计 228 项 |
+| 2026-08-20 | v3.14 | 登记 Phase 3 设备中台 `M1_DEVICE_*` / `M1_BIND_*` / `M1_WCS_TASK_*` / `M1_PTL_*` / `M1_POD_*` / `M1_LOCATION_UNREACHABLE` / `M1_AGV_*` / `M1_EVENT_*` / `M1_NUMBERING_UNAVAILABLE` 22 项；脚本统计当前合计 250 项 |
