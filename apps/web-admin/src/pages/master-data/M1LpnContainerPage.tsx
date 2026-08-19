@@ -82,6 +82,16 @@ export const lpnQueryFields: QueryPanelField[] = [
       { label: "已停用", value: "disabled" },
     ],
   },
+  {
+    key: "lockCategory",
+    label: "质量锁",
+    type: "select",
+    options: [
+      { label: "合格", value: "qualified" },
+      { label: "隔离", value: "quarantine" },
+      { label: "不合格", value: "rejected" },
+    ],
+  },
 ];
 export const lpnCoreQueryFieldKeys = ["keyword", "containerType"];
 const LPN_BATCH_CREATE_MAX_COUNT = 100;
@@ -102,12 +112,13 @@ function parseBatchCount(raw: string): number | null {
 
 export function M1LpnContainerPage() {
   const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } = usePageQueryState<QueryPanelValue>(
-    () => ({ keyword: "", containerType: "", status: "" }),
+    () => ({ keyword: "", containerType: "", status: "", lockCategory: "" }),
   );
   const listQuery = useLpnContainersQuery({
     keyword: queryString(appliedQuery.keyword),
     containerType: queryString(appliedQuery.containerType),
     status: queryString(appliedQuery.status),
+    lockCategory: queryString(appliedQuery.lockCategory),
   });
   const createMutation = useCreateLpnContainerMutation();
   const batchCreateMutation = useBatchCreateLpnContainersMutation();

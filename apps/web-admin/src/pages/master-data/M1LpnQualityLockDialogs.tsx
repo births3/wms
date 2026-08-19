@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FormDialogTemplate, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@wms/ui";
+import { FormDialogTemplate } from "@wms/ui";
 
 import {
   useApplyLpnQualityLockMutation,
@@ -8,11 +8,17 @@ import {
   type LpnContainer,
 } from "@/features/master-data/lpn-container-queries";
 import { BUTTON_SAVE } from "@/lib/ui-strings";
+import { LockFields } from "./M1LpnQualityLockFields";
 
-const LOCK_OPTIONS = [
-  { label: "隔离", value: "quarantine" },
-  { label: "不合格", value: "rejected" },
-];
+export interface LpnQualityLockDialogsProps {
+  selected: LpnContainer | null;
+  lockOpen: boolean;
+  changeOpen: boolean;
+  releaseOpen: boolean;
+  onLockOpenChange: (open: boolean) => void;
+  onChangeOpenChange: (open: boolean) => void;
+  onReleaseOpenChange: (open: boolean) => void;
+}
 
 export function LpnQualityLockDialogs({
   selected,
@@ -22,15 +28,7 @@ export function LpnQualityLockDialogs({
   onLockOpenChange,
   onChangeOpenChange,
   onReleaseOpenChange,
-}: {
-  selected: LpnContainer | null;
-  lockOpen: boolean;
-  changeOpen: boolean;
-  releaseOpen: boolean;
-  onLockOpenChange: (open: boolean) => void;
-  onChangeOpenChange: (open: boolean) => void;
-  onReleaseOpenChange: (open: boolean) => void;
-}) {
+}: LpnQualityLockDialogsProps) {
   const applyLock = useApplyLpnQualityLockMutation();
   const changeLock = useChangeLpnQualityLockMutation();
   const releaseLock = useReleaseLpnQualityLockMutation();
@@ -38,12 +36,16 @@ export function LpnQualityLockDialogs({
   const [reasonCode, setReasonCode] = React.useState("");
   const [witnessId, setWitnessId] = React.useState("");
   const [mqlId, setMqlId] = React.useState("");
+  const [createLiaison, setCreateLiaison] = React.useState(false);
+  const [reviewMessage, setReviewMessage] = React.useState<string | null>(null);
 
   function resetForm() {
     setLockCategory("quarantine");
     setReasonCode("");
     setWitnessId("");
     setMqlId("");
+    setCreateLiaison(false);
+    setReviewMessage(null);
   }
 
   return (
@@ -62,6 +64,7 @@ export function LpnQualityLockDialogs({
         onSubmit={(event) => {
           event.preventDefault();
           if (!selected) return;
+          const liaisonId = mqlId.trim() || null;
           void applyLock
             .mutateAsync({
               id: selected.id,
@@ -69,7 +72,8 @@ export function LpnQualityLockDialogs({
                 lock_category: lockCategory,
                 reason_dict_item_code: reasonCode.trim(),
                 witness_id: witnessId.trim(),
-                quality_liaison_id: mqlId.trim() || null,
+                quality_liaison_id: liaisonId,
+                create_liaison: createLiaison && !liaisonId,
               },
             })
             .then(() => onLockOpenChange(false));
@@ -86,12 +90,19 @@ export function LpnQualityLockDialogs({
           onMqlIdChange={setMqlId}
           showCategory
           showMql
+          createLiaison={createLiaison}
+          onCreateLiaisonChange={setCreateLiaison}
         />
       </FormDialogTemplate>
       <FormDialogTemplate
         open={changeOpen}
         onOpenChange={(open) => {
-          if (open) resetForm();
+          if (open) {
+            resetForm();
+            if (selected?.current_lock_category === "rejected") {
+              setLockCategory("rejected");
+            }
+          }
           onChangeOpenChange(open);
         }}
         title="换原因"
@@ -109,6 +120,7 @@ export function LpnQualityLockDialogs({
                 lock_category: lockCategory,
                 reason_dict_item_code: reasonCode.trim(),
                 witness_id: witnessId.trim(),
+                quality_liaison_id: mqlId.trim() || null,
               },
             })
             .then(() => onChangeOpenChange(false));
@@ -124,7 +136,7 @@ export function LpnQualityLockDialogs({
           mqlId={mqlId}
           onMqlIdChange={setMqlId}
           showCategory
-          showMql={false}
+          showMql
         />
       </FormDialogTemplate>
       <FormDialogTemplate
@@ -137,7 +149,7 @@ export function LpnQualityLockDialogs({
         description={selected ? `LPN ${selected.lpn_code}，解锁需双人见证，且 M-QL 须已办结。` : "请先选择容器。"}
         submitLabel={BUTTON_SAVE}
         loading={releaseLock.isPending}
-        errorMessage={releaseLock.error?.message}
+        errorMessage={releaseLock.error?.message ?? reviewMessage}
         onSubmit={(event) => {
           event.preventDefault();
           if (!selected) return;
@@ -149,7 +161,16 @@ export function LpnQualityLockDialogs({
                 quality_liaison_id: mqlId.trim() || null,
               },
             })
-            .then(() => onReleaseOpenChange(false));
+            .then((result) => {
+              const skipped = result.skipped_batches ?? [];
+              if (skipped.length > 0) {
+                setReviewMessage(
+                  `已解锁。${skipped.length} 条批次未回写（他流程已改状态），请人工复核。`,
+                );
+                return;
+              }
+              onReleaseOpenChange(false);
+            });
         }}
       >
         <LockFields
@@ -166,83 +187,5 @@ export function LpnQualityLockDialogs({
         />
       </FormDialogTemplate>
     </>
-  );
-}
-
-function LockFields({
-  lockCategory,
-  onLockCategoryChange,
-  reasonCode,
-  onReasonCodeChange,
-  witnessId,
-  onWitnessIdChange,
-  mqlId,
-  onMqlIdChange,
-  showCategory,
-  showMql,
-}: {
-  lockCategory: string;
-  onLockCategoryChange: (value: string) => void;
-  reasonCode: string;
-  onReasonCodeChange: (value: string) => void;
-  witnessId: string;
-  onWitnessIdChange: (value: string) => void;
-  mqlId: string;
-  onMqlIdChange: (value: string) => void;
-  showCategory: boolean;
-  showMql: boolean;
-}) {
-  return (
-    <div className="space-y-4">
-      {showCategory ? (
-        <div className="space-y-2">
-          <Label htmlFor="lpn-lock-category">锁类别</Label>
-          <Select value={lockCategory} onValueChange={onLockCategoryChange}>
-            <SelectTrigger id="lpn-lock-category" aria-label="锁类别">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LOCK_OPTIONS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-      {showCategory ? (
-        <div className="space-y-2">
-          <Label htmlFor="lpn-lock-reason">原因字典码</Label>
-          <Input
-            id="lpn-lock-reason"
-            value={reasonCode}
-            onChange={(event) => onReasonCodeChange(event.target.value)}
-            aria-label="原因字典码"
-          />
-        </div>
-      ) : null}
-      <div className="space-y-2">
-        <Label htmlFor="lpn-lock-witness">见证人用户 ID</Label>
-        <Input
-          id="lpn-lock-witness"
-          value={witnessId}
-          onChange={(event) => onWitnessIdChange(event.target.value)}
-          aria-label="见证人用户 ID"
-        />
-      </div>
-      {showMql ? (
-        <div className="space-y-2">
-          <Label htmlFor="lpn-lock-mql">M-QL 单 ID</Label>
-          <Input
-            id="lpn-lock-mql"
-            value={mqlId}
-            onChange={(event) => onMqlIdChange(event.target.value)}
-            placeholder={showCategory ? "不合格必填" : "可选"}
-            aria-label="M-QL 单 ID"
-          />
-        </div>
-      ) : null}
-    </div>
   );
 }

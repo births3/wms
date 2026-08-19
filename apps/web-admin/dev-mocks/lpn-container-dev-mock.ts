@@ -32,6 +32,27 @@ export async function handleLpnContainerDevMock(
   res: ServerResponse,
   pathname: string,
 ): Promise<boolean> {
+  if (pathname === "/api/v1/quality-liaisons" && req.method === "POST") {
+    const now = new Date().toISOString();
+    sendJson(res, 200, {
+      id: crypto.randomUUID(),
+      owner_id: devOwnerId,
+      liaison_no: `MQL-DEV-${Date.now()}`,
+      type_code: "container_quality_lock",
+      related_document_type: "container_quality_lock",
+      related_document_no: "dev",
+      problem_description: "dev",
+      disposition_suggestion: "dev",
+      trigger_source: "container_quality_lock",
+      business_payload: {},
+      status: "draft",
+      created_by: devOwnerId,
+      created_at: now,
+      updated_at: now,
+      version: 1,
+    });
+    return true;
+  }
   if (
     pathname !== "/api/v1/master-data/lpn-containers"
     && pathname !== "/api/v1/master-data/lpn-container-type-policies"
@@ -41,10 +62,16 @@ export async function handleLpnContainerDevMock(
   }
 
   if (pathname === "/api/v1/master-data/lpn-containers" && req.method === "GET") {
-    const status = new URL(req.url ?? pathname, "http://wms.local").searchParams.get("status");
-    const data = devLpnContainers.filter((item) =>
-      status ? item.status === status : item.status !== "disabled",
-    );
+    const params = new URL(req.url ?? pathname, "http://wms.local").searchParams;
+    const status = params.get("status");
+    const lockCategory = params.get("lock_category");
+    const data = devLpnContainers.filter((item) => {
+      const statusOk = status ? item.status === status : item.status !== "disabled";
+      const lockOk = lockCategory
+        ? (item.current_lock_category ?? "qualified") === lockCategory
+        : true;
+      return statusOk && lockOk;
+    });
     sendJson(res, 200, { data });
     return true;
   }
@@ -84,6 +111,8 @@ export async function handleLpnContainerDevMock(
       lock_category?: string;
       witness_id?: string;
       reason_dict_item_code?: string;
+      quality_liaison_id?: string | null;
+      create_liaison?: boolean;
     };
     if (!body.witness_id) {
       sendError(res, 422, "M1_QUALITY_LOCK_WITNESS_INVALID", "见证人缺失或与操作人相同");
@@ -91,9 +120,19 @@ export async function handleLpnContainerDevMock(
     }
     if (qualityLock[2] === "/release") {
       found.current_lock_category = "qualified";
-    } else {
-      found.current_lock_category = body.lock_category ?? found.current_lock_category ?? "quarantine";
+      found.updated_at = new Date().toISOString();
+      sendJson(res, 200, { container: found, skipped_batches: [] });
+      return true;
     }
+    if (
+      (body.lock_category ?? found.current_lock_category) === "rejected"
+      && !body.quality_liaison_id
+      && !body.create_liaison
+    ) {
+      sendError(res, 422, "M1_QUALITY_LOCK_MQL_REQUIRED", "不合格质量锁必须关联 M-QL 质量联系单");
+      return true;
+    }
+    found.current_lock_category = body.lock_category ?? found.current_lock_category ?? "quarantine";
     found.updated_at = new Date().toISOString();
     sendJson(res, 200, found);
     return true;

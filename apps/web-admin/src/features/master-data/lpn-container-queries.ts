@@ -14,6 +14,8 @@ export type ApplyContainerQualityLockRequest = components["schemas"]["ApplyConta
 export type ChangeContainerQualityLockReasonRequest =
   components["schemas"]["ChangeContainerQualityLockReasonRequest"];
 export type ReleaseContainerQualityLockRequest = components["schemas"]["ReleaseContainerQualityLockRequest"];
+export type ReleaseContainerQualityLockResponse =
+  components["schemas"]["ReleaseContainerQualityLockResponse"];
 
 const listKey = ["master-data", "lpn-containers"] as const;
 const policyKey = ["master-data", "lpn-container-type-policies"] as const;
@@ -26,12 +28,14 @@ export function useLpnContainersQuery(filters?: {
   keyword?: string;
   containerType?: string;
   status?: string;
+  lockCategory?: string;
 }) {
   const keyword = filters?.keyword?.trim() || undefined;
   const containerType = filters?.containerType?.trim() || undefined;
   const status = filters?.status?.trim() || undefined;
+  const lockCategory = filters?.lockCategory?.trim() || undefined;
   return useQuery<LpnContainer[], ApiError>({
-    queryKey: [...listKey, keyword ?? "", containerType ?? "", status ?? ""],
+    queryKey: [...listKey, keyword ?? "", containerType ?? "", status ?? "", lockCategory ?? ""],
     queryFn: async () => {
       const result = await api.GET("/api/v1/master-data/lpn-containers", {
         params: {
@@ -39,6 +43,7 @@ export function useLpnContainersQuery(filters?: {
             keyword,
             type: containerType,
             status,
+            lock_category: lockCategory,
           },
         },
       });
