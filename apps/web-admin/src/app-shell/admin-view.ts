@@ -17,6 +17,8 @@ export type AdminView =
   | "m3-batches"
   | "m3-location-history"
   | "m3-status-config"
+  | "m1-devices"
+  | "m1-device-dashboard"
   | "m3-replenishment-strategies"
   | "m3-replenishment-tasks"
   | "m3-counts"

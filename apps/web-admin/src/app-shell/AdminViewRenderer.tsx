@@ -26,6 +26,8 @@ const M2PutawayStrategyPage = React.lazy(() => import("@/pages/inbound/M2Putaway
 const M3BatchManagementPage = React.lazy(() => import("@/pages/inventory/M3BatchManagementPage").then((m) => ({ default: m.M3BatchManagementPage })));
 const M3InventoryStatusConfigPage = React.lazy(() => import("@/pages/inventory/M3InventoryStatusConfigPage").then((m) => ({ default: m.M3InventoryStatusConfigPage })));
 const M3ReplenishmentStrategyPage = React.lazy(() => import("@/pages/inventory/M3ReplenishmentStrategyPage").then((m) => ({ default: m.M3ReplenishmentStrategyPage })));
+const M1DevicePage = React.lazy(() => import("@/pages/master/M1DevicePage").then((m) => ({ default: m.M1DevicePage })));
+const M1DeviceDashboardPage = React.lazy(() => import("@/pages/master/M1DeviceDashboardPage").then((m) => ({ default: m.M1DeviceDashboardPage })));
 const M3ReplenishmentTaskPage = React.lazy(() => import("@/pages/inventory/M3ReplenishmentTaskPage").then((m) => ({ default: m.M3ReplenishmentTaskPage })));
 const M3LocationHistoryPage = React.lazy(() => import("@/pages/inventory/M3LocationHistoryPage").then((m) => ({ default: m.M3LocationHistoryPage })));
 const M3InventoryCountPage = React.lazy(() => import("@/pages/inventory/M3InventoryCountPage").then((m) => ({ default: m.M3InventoryCountPage })));
@@ -113,6 +115,8 @@ export function renderAdminView(
     return <M3LocationHistoryPage onBack={() => navigateTo("m3-batches")} />;
   }
   if (view === "m3-status-config") return <M3InventoryStatusConfigPage currentUser={currentUser} />;
+  if (view === "m1-devices") return <M1DevicePage />;
+  if (view === "m1-device-dashboard") return <M1DeviceDashboardPage />;
   if (view === "m3-replenishment-strategies") return <M3ReplenishmentStrategyPage />;
   if (view === "m3-replenishment-tasks") return <M3ReplenishmentTaskPage />;
   if (view === "m3-counts") return <M3InventoryCountPage />;

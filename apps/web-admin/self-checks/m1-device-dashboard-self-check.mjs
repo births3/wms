@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = resolve(new URL("..", import.meta.url).pathname);
+const appShell = readFileSync(resolve(root, "src/App.tsx"), "utf8");
+const viewRenderer = readFileSync(resolve(root, "src/app-shell/AdminViewRenderer.tsx"), "utf8");
+const adminView = readFileSync(resolve(root, "src/app-shell/admin-view.ts"), "utf8");
+const page = readFileSync(resolve(root, "src/pages/master/M1DeviceDashboardPage.tsx"), "utf8");
+const queries = readFileSync(resolve(root, "src/features/device/device-queries.ts"), "utf8");
+const devMock = readFileSync(resolve(root, "dev-mocks/admin-menu-dev-mock.ts"), "utf8");
+const pageQuery = readFileSync(resolve(root, "src/pages/page-query-core-fields.json"), "utf8");
+
+assert.match(adminView, /"m1-device-dashboard"/, "AdminView 应包含 m1-device-dashboard");
+assert.match(appShell, /id:\s*"m1-device-dashboard"/, "菜单应登记 m1-device-dashboard");
+assert.match(viewRenderer, /m1-device-dashboard/, "视图渲染器应覆盖 m1-device-dashboard");
+assert.match(viewRenderer, /M1DeviceDashboardPage/, "视图渲染器应挂载 M1DeviceDashboardPage");
+assert.match(devMock, /m1-device-dashboard/, "dev mock 菜单应包含 m1-device-dashboard");
+assert.match(pageQuery, /"id":\s*"m1-device-dashboard"/, "查询面板配置应登记 m1-device-dashboard");
+assert.match(pageQuery, /"core":\s*\[[^\]]*status[^\]]*task_type/, "核心查询应含 status、task_type");
+assert.match(page, /(?:<DataGrid\b|<ListPageTemplate\b)/, "指令大盘必须使用公共 DataGrid 或 ListPageTemplate");
+assert.match(page, /<Dialog\b/, "私有动作必须使用 Dialog");
+assert.match(page, /任务号/, "固定列应含任务号");
+assert.match(page, /指令类型/, "固定列应含指令类型");
+assert.match(page, /重试次数/, "固定列应含重试次数");
+assert.match(page, /重发/, "私有动作应含重发");
+assert.match(page, /作废/, "私有动作应含作废");
+assert.doesNotMatch(queries, /\bfetch\s*\(/, "指令查询必须统一使用生成的 api-client");
+assert.match(queries, /api\.GET\("\/api\/v1\/wcs-tasks"/, "列表必须使用指令任务列表 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/wcs-tasks\/\{id\}\/resend"/, "重发必须使用重发 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/wcs-tasks\/\{id\}\/void"/, "作废必须使用作废 API");
+
+console.log("m1 device dashboard self-check passed");

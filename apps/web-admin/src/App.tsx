@@ -2,6 +2,7 @@ import * as React from "react";
 import { Button, Card, CardContent, Input, WorkspaceTabs, cn } from "@wms/ui";
 import {
   Activity,
+  Cpu,
   ArrowUpCircle,
   Bell,
   BellRing,
@@ -94,6 +95,8 @@ const menuSections: Array<{ label: string; items: SidebarMenuItem<AdminView>[] }
       { id: "m3-batches", title: "M3 批号管理", subtitle: "批号 / 效期 / 库位", icon: Layers },
       { id: "m3-location-history", title: "M3 库位历史", subtitle: "库位流水 / 风险追踪", icon: Layers },
       { id: "m3-status-config", title: "M3 状态规则", subtitle: "状态转换 / 货主覆盖", icon: ClipboardList },
+      { id: "m1-devices", title: "M1 设备档案", subtitle: "注册 / 绑定 / 启停", icon: Cpu },
+      { id: "m1-device-dashboard", title: "M1 设备指令大盘", subtitle: "派发 / 重发 / 作废", icon: Activity },
       { id: "m3-replenishment-strategies", title: "M3 补货策略", subtitle: "Min-Max / 动线 / 挂接", icon: ClipboardList },
       { id: "m3-replenishment-tasks", title: "M3 补货任务", subtitle: "大盘 / 重派 / 取消", icon: ClipboardList },
       { id: "m3-counts", title: "M3 库存盘点", subtitle: "盘点单 / 差异审批", icon: ClipboardList },
@@ -151,6 +154,7 @@ const dashboardMenuTree: SidebarMenuTreeSection<AdminView>[] = [
 
 const adminMenuIconByKey: Record<string, LucideIcon> = {
   Activity,
+  Cpu,
   ArrowUpCircle,
   Bell,
   BellRing,

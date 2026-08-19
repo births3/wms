@@ -239,6 +239,8 @@ function devAdminMenuSeed(): DevAdminMenuNode[] {
       group(parent, "inventory-work", "库存管理", "Layers", 10, [
         ["m3-batches", "M3 批号管理", "Layers"],
         ["m3-location-history", "M3 库位历史", "Layers"],
+        ["m1-devices", "M1 设备档案", "Cpu"],
+        ["m1-device-dashboard", "M1 设备指令大盘", "Activity"],
         ["m3-status-config", "M3 状态规则", "ClipboardList"],
         ["m3-replenishment-strategies", "M3 补货策略", "ClipboardList"],
         ["m3-replenishment-tasks", "M3 补货任务", "ClipboardList"],

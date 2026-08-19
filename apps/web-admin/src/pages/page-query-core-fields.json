@@ -2,6 +2,34 @@
   "version": 1,
   "pages": [
     {
+      "id": "m1-devices",
+      "title": "M1 设备档案",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master/M1DevicePage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": [
+        "status"
+      ],
+      "more": [
+        "device_type",
+        "online_status"
+      ]
+    },
+    {
+      "id": "m1-device-dashboard",
+      "title": "M1 设备指令大盘",
+      "required": true,
+      "source": "apps/web-admin/src/pages/master/M1DeviceDashboardPage.tsx",
+      "fieldConstant": "queryFields",
+      "coreConstant": "defaultVisibleFieldKeys",
+      "core": [
+        "status",
+        "task_type"
+      ],
+      "more": []
+    },
+    {
       "id": "dashboard",
       "title": "运营总览",
       "required": false,
@@ -14,8 +42,13 @@
       "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
       "fieldConstant": "m1QueryFields",
       "coreConstant": "m1CoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
-      "more": ["createdAt"]
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
+      "more": [
+        "createdAt"
+      ]
     },
     {
       "id": "m1-business-partners",
@@ -24,8 +57,13 @@
       "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
       "fieldConstant": "m1QueryFields",
       "coreConstant": "m1CoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
-      "more": ["createdAt"]
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
+      "more": [
+        "createdAt"
+      ]
     },
     {
       "id": "m1-warehouses",
@@ -34,8 +72,13 @@
       "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
       "fieldConstant": "m1QueryFields",
       "coreConstant": "m1CoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
-      "more": ["createdAt"]
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
+      "more": [
+        "createdAt"
+      ]
     },
     {
       "id": "m1-zones",
@@ -44,8 +87,13 @@
       "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
       "fieldConstant": "m1QueryFields",
       "coreConstant": "m1CoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
-      "more": ["createdAt"]
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
+      "more": [
+        "createdAt"
+      ]
     },
     {
       "id": "m1-locations",
@@ -54,8 +102,13 @@
       "source": "apps/web-admin/src/pages/master-data/M1MasterDataPage.tsx",
       "fieldConstant": "m1QueryFields",
       "coreConstant": "m1CoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
-      "more": ["createdAt"]
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
+      "more": [
+        "createdAt"
+      ]
     },
     {
       "id": "m1-lpn-containers",
@@ -64,8 +117,14 @@
       "source": "apps/web-admin/src/pages/master-data/M1LpnContainerPage.tsx",
       "fieldConstant": "lpnQueryFields",
       "coreConstant": "lpnCoreQueryFieldKeys",
-      "core": ["keyword", "containerType"],
-      "more": ["status", "lockCategory"]
+      "core": [
+        "keyword",
+        "containerType"
+      ],
+      "more": [
+        "status",
+        "lockCategory"
+      ]
     },
     {
       "id": "dock-management",
@@ -74,8 +133,13 @@
       "source": "apps/web-admin/src/pages/dock/DockManagementPage.tsx",
       "fieldConstant": "dockQueryFields",
       "coreConstant": "dockCoreQueryFieldKeys",
-      "core": ["warehouseId", "keyword"],
-      "more": ["status"]
+      "core": [
+        "warehouseId",
+        "keyword"
+      ],
+      "more": [
+        "status"
+      ]
     },
     {
       "id": "m1-system-dictionary",
@@ -90,7 +154,10 @@
       "source": "apps/web-admin/src/pages/config-center/FeatureFlagConfigCenterPage.tsx",
       "fieldConstant": "featureFlagQueryFields",
       "coreConstant": "featureFlagCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
+      "core": [
+        "keyword",
+        "status"
+      ],
       "more": []
     },
     {
@@ -100,7 +167,10 @@
       "source": "apps/web-admin/src/pages/config-center/ErpConnectorConfigPage.tsx",
       "fieldConstant": "h8ErpConnectorQueryFields",
       "coreConstant": "h8ErpConnectorCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
+      "core": [
+        "keyword",
+        "status"
+      ],
       "more": []
     },
     {
@@ -110,8 +180,17 @@
       "source": "apps/web-admin/src/pages/config-center/ErpMessageLogPage.tsx",
       "fieldConstant": "h8ErpMessageQueryFields",
       "coreConstant": "h8ErpMessageCoreQueryFieldKeys",
-      "core": ["direction", "message_type", "status"],
-      "more": ["connector_code", "external_ref", "idempotency_key", "correlation_id"]
+      "core": [
+        "direction",
+        "message_type",
+        "status"
+      ],
+      "more": [
+        "connector_code",
+        "external_ref",
+        "idempotency_key",
+        "correlation_id"
+      ]
     },
     {
       "id": "h8-erp-interface-tables",
@@ -120,8 +199,17 @@
       "source": "apps/web-admin/src/pages/config-center/ErpInterfaceTablePage.tsx",
       "fieldConstant": "h8ErpInterfaceTableQueryFields",
       "coreConstant": "h8ErpInterfaceTableCoreQueryFieldKeys",
-      "core": ["connector_id", "table_key", "sync_status", "updated_at"],
-      "more": ["external_doc_no", "event_type", "idempotency_key"]
+      "core": [
+        "connector_id",
+        "table_key",
+        "sync_status",
+        "updated_at"
+      ],
+      "more": [
+        "external_doc_no",
+        "event_type",
+        "idempotency_key"
+      ]
     },
     {
       "id": "h1-menu-management",
@@ -136,8 +224,12 @@
       "source": "apps/web-admin/src/pages/auth/H1RolePermissionPage.tsx",
       "fieldConstant": "h1RoleQueryFields",
       "coreConstant": "h1RoleCoreQueryFieldKeys",
-      "core": ["keyword"],
-      "more": ["dataScope"]
+      "core": [
+        "keyword"
+      ],
+      "more": [
+        "dataScope"
+      ]
     },
     {
       "id": "h1-session-management",
@@ -146,7 +238,9 @@
       "source": "apps/web-admin/src/pages/auth/H1SessionPage.tsx",
       "fieldConstant": "sessionQueryFields",
       "coreConstant": "sessionCoreQueryFieldKeys",
-      "core": ["targetUserId"],
+      "core": [
+        "targetUserId"
+      ],
       "more": []
     },
     {
@@ -156,7 +250,10 @@
       "source": "apps/web-admin/src/pages/api-key/H1ApiKeyPage.tsx",
       "fieldConstant": "apiKeyQueryFields",
       "coreConstant": "apiKeyCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
+      "core": [
+        "keyword",
+        "status"
+      ],
       "more": []
     },
     {
@@ -166,7 +263,10 @@
       "source": "apps/web-admin/src/pages/platform/HorizontalCapabilityPages.tsx",
       "fieldConstant": "h2AuditQueryFields",
       "coreConstant": "h2AuditCoreQueryFieldKeys",
-      "core": ["resourceType", "occurredAt"],
+      "core": [
+        "resourceType",
+        "occurredAt"
+      ],
       "more": []
     },
     {
@@ -182,7 +282,10 @@
       "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
       "fieldConstant": "h4WechatSettingsQueryFields",
       "coreConstant": "h4WechatSettingsCoreQueryFieldKeys",
-      "core": ["keyword", "enabled"],
+      "core": [
+        "keyword",
+        "enabled"
+      ],
       "more": []
     },
     {
@@ -192,7 +295,10 @@
       "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
       "fieldConstant": "h4NotificationConfigQueryFields",
       "coreConstant": "h4NotificationConfigCoreQueryFieldKeys",
-      "core": ["eventType", "enabled"],
+      "core": [
+        "eventType",
+        "enabled"
+      ],
       "more": []
     },
     {
@@ -202,8 +308,14 @@
       "source": "apps/web-admin/src/pages/wechat-notify/H4WechatNotifyPage.tsx",
       "fieldConstant": "h4NotificationRecordQueryFields",
       "coreConstant": "h4NotificationRecordCoreQueryFieldKeys",
-      "core": ["eventType", "recipient", "status"],
-      "more": ["createdAt"]
+      "core": [
+        "eventType",
+        "recipient",
+        "status"
+      ],
+      "more": [
+        "createdAt"
+      ]
     },
     {
       "id": "hal-alert-definitions",
@@ -212,8 +324,13 @@
       "source": "apps/web-admin/src/pages/alert-engine/AlertDefinitionPage.tsx",
       "fieldConstant": "alertDefinitionQueryFields",
       "coreConstant": "alertDefinitionCoreQueryFieldKeys",
-      "core": ["keyword", "enabled"],
-      "more": ["severity"]
+      "core": [
+        "keyword",
+        "enabled"
+      ],
+      "more": [
+        "severity"
+      ]
     },
     {
       "id": "hal-alert-dashboard",
@@ -222,8 +339,15 @@
       "source": "apps/web-admin/src/pages/alert-engine/AlertDashboardPage.tsx",
       "fieldConstant": "alertDashboardQueryFields",
       "coreConstant": "alertDashboardCoreQueryFieldKeys",
-      "core": ["alertCode", "severity", "status"],
-      "more": ["warehouseId", "triggeredAt"]
+      "core": [
+        "alertCode",
+        "severity",
+        "status"
+      ],
+      "more": [
+        "warehouseId",
+        "triggeredAt"
+      ]
     },
     {
       "id": "hal-alert-escalations",
@@ -232,8 +356,13 @@
       "source": "apps/web-admin/src/pages/alert-engine/AlertEscalationPage.tsx",
       "fieldConstant": "alertEscalationQueryFields",
       "coreConstant": "alertEscalationCoreQueryFieldKeys",
-      "core": ["keyword", "enabled"],
-      "more": ["handlerRole"]
+      "core": [
+        "keyword",
+        "enabled"
+      ],
+      "more": [
+        "handlerRole"
+      ]
     },
     {
       "id": "h5-express",
@@ -242,7 +371,10 @@
       "source": "apps/web-admin/src/pages/express/H5ExpressPage.tsx",
       "fieldConstant": "queryFields",
       "coreConstant": "h5ExpressCoreQueryFieldKeys",
-      "core": ["q", "enabled"],
+      "core": [
+        "q",
+        "enabled"
+      ],
       "more": []
     },
     {
@@ -252,8 +384,15 @@
       "source": "apps/web-admin/src/pages/print-orchestration/H9DeliveryNoteAggregationPage.tsx",
       "fieldConstant": "h9DeliveryNoteQueryFields",
       "coreConstant": "h9DeliveryNoteCoreQueryFieldKeys",
-      "core": ["warehouseId", "keyword"],
-      "more": ["customerId", "routeCode", "deliveryAddressId"]
+      "core": [
+        "warehouseId",
+        "keyword"
+      ],
+      "more": [
+        "customerId",
+        "routeCode",
+        "deliveryAddressId"
+      ]
     },
     {
       "id": "h9-print-devices",
@@ -262,8 +401,13 @@
       "source": "apps/web-admin/src/pages/print-orchestration/H9PrintDevicePage.tsx",
       "fieldConstant": "h9PrintDeviceQueryFields",
       "coreConstant": "h9PrintDeviceCoreQueryFieldKeys",
-      "core": ["keyword", "siteId"],
-      "more": ["connectionType"]
+      "core": [
+        "keyword",
+        "siteId"
+      ],
+      "more": [
+        "connectionType"
+      ]
     },
     {
       "id": "h9-print-templates",
@@ -272,7 +416,10 @@
       "source": "apps/web-admin/src/pages/print-template/H9PrintTemplatePage.tsx",
       "fieldConstant": "h9PrintTemplateQueryFields",
       "coreConstant": "h9PrintTemplateCoreQueryFieldKeys",
-      "core": ["keyword", "templateType"],
+      "core": [
+        "keyword",
+        "templateType"
+      ],
       "more": []
     },
     {
@@ -282,7 +429,9 @@
       "source": "apps/web-admin/src/pages/document-numbering/MCGDocumentNumberingPage.tsx",
       "fieldConstant": "mcgDocumentNumberQueryFields",
       "coreConstant": "mcgDocumentNumberCoreQueryFieldKeys",
-      "core": ["documentType"],
+      "core": [
+        "documentType"
+      ],
       "more": []
     },
     {
@@ -292,8 +441,16 @@
       "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
       "fieldConstant": "m2InboundQueryFields",
       "coreConstant": "m2InboundCoreQueryFieldKeys",
-      "core": ["keyword", "ownerKeyword", "statusFilter"],
-      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+      "core": [
+        "keyword",
+        "ownerKeyword",
+        "statusFilter"
+      ],
+      "more": [
+        "documentTypeFilter",
+        "arrivalDate",
+        "createdAt"
+      ]
     },
     {
       "id": "m2-inbound-documents",
@@ -302,8 +459,13 @@
       "source": "apps/web-admin/src/pages/inbound/M2InboundDocumentsPage.tsx",
       "fieldConstant": "m2InboundDocumentsQueryFields",
       "coreConstant": "m2InboundDocumentsCoreQueryFieldKeys",
-      "core": ["keyword", "actualReceivedAt"],
-      "more": ["supplierKeyword"]
+      "core": [
+        "keyword",
+        "actualReceivedAt"
+      ],
+      "more": [
+        "supplierKeyword"
+      ]
     },
     {
       "id": "m-di-review",
@@ -312,7 +474,9 @@
       "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionReviewPage.tsx",
       "fieldConstant": "drugInspectionReviewQueryFields",
       "coreConstant": "drugInspectionReviewCoreQueryFieldKeys",
-      "core": ["keyword"],
+      "core": [
+        "keyword"
+      ],
       "more": []
     },
     {
@@ -322,7 +486,10 @@
       "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionStampPage.tsx",
       "fieldConstant": "drugInspectionStampQueryFields",
       "coreConstant": "drugInspectionStampCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
+      "core": [
+        "keyword",
+        "status"
+      ],
       "more": []
     },
     {
@@ -332,7 +499,9 @@
       "source": "apps/web-admin/src/pages/drug-inspection/DrugInspectionPlatformPage.tsx",
       "fieldConstant": "queryFields",
       "coreConstant": "mDiPlatformCoreQueryFieldKeys",
-      "core": ["status"],
+      "core": [
+        "status"
+      ],
       "more": []
     },
     {
@@ -342,8 +511,16 @@
       "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
       "fieldConstant": "m2InboundQueryFields",
       "coreConstant": "m2InboundCoreQueryFieldKeys",
-      "core": ["keyword", "ownerKeyword", "statusFilter"],
-      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+      "core": [
+        "keyword",
+        "ownerKeyword",
+        "statusFilter"
+      ],
+      "more": [
+        "documentTypeFilter",
+        "arrivalDate",
+        "createdAt"
+      ]
     },
     {
       "id": "m2-putaway",
@@ -352,8 +529,16 @@
       "source": "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
       "fieldConstant": "m2InboundQueryFields",
       "coreConstant": "m2InboundCoreQueryFieldKeys",
-      "core": ["keyword", "ownerKeyword", "statusFilter"],
-      "more": ["documentTypeFilter", "arrivalDate", "createdAt"]
+      "core": [
+        "keyword",
+        "ownerKeyword",
+        "statusFilter"
+      ],
+      "more": [
+        "documentTypeFilter",
+        "arrivalDate",
+        "createdAt"
+      ]
     },
     {
       "id": "m2-putaway-strategy",
@@ -362,7 +547,11 @@
       "source": "apps/web-admin/src/pages/inbound/M2PutawayStrategyPage.tsx",
       "fieldConstant": "queryFields",
       "coreConstant": "defaultVisibleFieldKeys",
-      "core": ["keyword", "status", "isDefault"],
+      "core": [
+        "keyword",
+        "status",
+        "isDefault"
+      ],
       "more": []
     },
     {
@@ -372,8 +561,16 @@
       "source": "apps/web-admin/src/pages/inventory/M3BatchManagementPage.tsx",
       "fieldConstant": "m3BatchQueryFields",
       "coreConstant": "m3BatchCoreQueryFieldKeys",
-      "core": ["keyword", "qualityStatus"],
-      "more": ["recallFlag", "productionDate", "expiryDate", "createdAt"]
+      "core": [
+        "keyword",
+        "qualityStatus"
+      ],
+      "more": [
+        "recallFlag",
+        "productionDate",
+        "expiryDate",
+        "createdAt"
+      ]
     },
     {
       "id": "m3-location-history",
@@ -382,8 +579,15 @@
       "source": "apps/web-admin/src/pages/inventory/M3LocationHistoryPage.tsx",
       "fieldConstant": "m3LocationHistoryQueryFields",
       "coreConstant": "m3LocationHistoryCoreQueryFieldKeys",
-      "core": ["locationCode", "days"],
-      "more": ["movementType", "productCode", "batchNo"]
+      "core": [
+        "locationCode",
+        "days"
+      ],
+      "more": [
+        "movementType",
+        "productCode",
+        "batchNo"
+      ]
     },
     {
       "id": "m3-status-config",
@@ -392,7 +596,11 @@
       "source": "apps/web-admin/src/pages/inventory/M3InventoryStatusConfigPage.tsx",
       "fieldConstant": "queryFields",
       "coreConstant": "defaultVisibleFieldKeys",
-      "core": ["keyword", "scope", "status"],
+      "core": [
+        "keyword",
+        "scope",
+        "status"
+      ],
       "more": []
     },
     {
@@ -402,8 +610,14 @@
       "source": "apps/web-admin/src/pages/inventory/M3ReplenishmentStrategyPage.tsx",
       "fieldConstant": "queryFields",
       "coreConstant": "defaultVisibleFieldKeys",
-      "core": ["keyword", "enabled"],
-      "more": ["scope_type", "target_type"]
+      "core": [
+        "keyword",
+        "enabled"
+      ],
+      "more": [
+        "scope_type",
+        "target_type"
+      ]
     },
     {
       "id": "m3-replenishment-tasks",
@@ -412,8 +626,19 @@
       "source": "apps/web-admin/src/pages/inventory/M3ReplenishmentTaskPage.tsx",
       "fieldConstant": "queryFields",
       "coreConstant": "defaultVisibleFieldKeys",
-      "core": ["status", "trigger_mode"],
-      "more": ["priority", "keyword", "wave_id", "source_location_id", "target_location_id", "created_at", "operator"]
+      "core": [
+        "status",
+        "trigger_mode"
+      ],
+      "more": [
+        "priority",
+        "keyword",
+        "wave_id",
+        "source_location_id",
+        "target_location_id",
+        "created_at",
+        "operator"
+      ]
     },
     {
       "id": "m3-counts",
@@ -422,7 +647,10 @@
       "source": "apps/web-admin/src/pages/inventory/M3InventoryCountPage.tsx",
       "fieldConstant": "m3CountQueryFields",
       "coreConstant": "m3CountCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
+      "core": [
+        "keyword",
+        "status"
+      ],
       "more": []
     },
     {
@@ -432,7 +660,10 @@
       "source": "apps/web-admin/src/pages/inventory/M3MaintenancePage.tsx",
       "fieldConstant": "m3MaintenanceQueryFields",
       "coreConstant": "m3MaintenanceCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
+      "core": [
+        "keyword",
+        "status"
+      ],
       "more": []
     },
     {
@@ -442,7 +673,9 @@
       "source": "apps/web-admin/src/pages/inventory/M3RelocationPage.tsx",
       "fieldConstant": "m3RelocationQueryFields",
       "coreConstant": "m3RelocationCoreQueryFieldKeys",
-      "core": ["keyword"],
+      "core": [
+        "keyword"
+      ],
       "more": []
     },
     {
@@ -452,8 +685,14 @@
       "source": "apps/web-admin/src/pages/reconciliation/MrcReconciliationPage.tsx",
       "fieldConstant": "mRcReconciliationQueryFields",
       "coreConstant": "mRcReconciliationCoreQueryFieldKeys",
-      "core": ["productCode", "differenceType", "resolutionStatus"],
-      "more": ["batchNo"]
+      "core": [
+        "productCode",
+        "differenceType",
+        "resolutionStatus"
+      ],
+      "more": [
+        "batchNo"
+      ]
     },
     {
       "id": "mte-task-types",
@@ -462,7 +701,10 @@
       "source": "apps/web-admin/src/pages/task-engine/TaskTypeConfigPage.tsx",
       "fieldConstant": "queryFields",
       "coreConstant": "mteTaskTypeCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
+      "core": [
+        "keyword",
+        "status"
+      ],
       "more": []
     },
     {
@@ -472,8 +714,13 @@
       "source": "apps/web-admin/src/pages/task-engine/TaskGroupConfigPage.tsx",
       "fieldConstant": "mteTaskGroupQueryFields",
       "coreConstant": "mteTaskGroupCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
-      "more": ["warehouseId"]
+      "core": [
+        "keyword",
+        "status"
+      ],
+      "more": [
+        "warehouseId"
+      ]
     },
     {
       "id": "mte-task-dispatch",
@@ -482,8 +729,14 @@
       "source": "apps/web-admin/src/pages/task-engine/TaskDispatchPage.tsx",
       "fieldConstant": "mteTaskDispatchQueryFields",
       "coreConstant": "mteTaskDispatchCoreQueryFieldKeys",
-      "core": ["keyword", "status"],
-      "more": ["taskTypeCode", "warehouseId"]
+      "core": [
+        "keyword",
+        "status"
+      ],
+      "more": [
+        "taskTypeCode",
+        "warehouseId"
+      ]
     },
     {
       "id": "m9-billing-rules",
@@ -504,7 +757,10 @@
       "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
       "more": []
     },
     {
@@ -514,7 +770,10 @@
       "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
       "more": []
     },
     {
@@ -524,7 +783,10 @@
       "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
       "more": []
     },
     {
@@ -534,7 +796,10 @@
       "source": "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
       "fieldConstant": "m4OutboundQueryFields",
       "coreConstant": "m4OutboundCoreQueryFieldKeys",
-      "core": ["keyword", "statusFilter"],
+      "core": [
+        "keyword",
+        "statusFilter"
+      ],
       "more": []
     }
   ]
