@@ -183,6 +183,20 @@ pub fn special_dual_passes(
     validate_special_drug_dual(true, operator_id, witness_id)
 }
 
+/// 推荐位 ③ 质量口径：隔离/不合格锁覆盖查询质量状态，并映射为库存质量状态字典值，
+/// 供 SQL 预筛 `quality_color` 与后置 6 维过滤共用。
+pub fn recommend_quality_status<'a>(
+    lock_category: Option<&str>,
+    query_or_batch_status: &'a str,
+) -> &'a str {
+    match lock_category {
+        Some(category) if lock_category_is_active(Some(category)) => {
+            crate::batch_status_for_lock_category(category)
+        }
+        _ => query_or_batch_status,
+    }
+}
+
 /// 推荐位可离线判定的 6 维：① 品类 ② 温区 ③ 质量 ⑤ 包装粒度 ⑥ 外用/串味。
 /// ④ 特药双人依赖操作人/见证人，在上架事务执行，不作为库位候选过滤。
 pub fn recommend_candidate_passes_6d(
@@ -201,10 +215,7 @@ pub fn recommend_candidate_passes_6d(
     is_container: bool,
     lock_category: Option<&str>,
 ) -> bool {
-    let quality_status = match lock_category {
-        Some(category @ ("quarantine" | "rejected")) => category,
-        _ => batch_or_lock_status,
-    };
+    let quality_status = recommend_quality_status(lock_category, batch_or_lock_status);
     is_temperature_zone_subset(zone_temp, product_temp)
         && validate_quality_match(zone_quality, quality_status)
         && validate_category_zone(allowed_categories, product_category)
@@ -395,6 +406,24 @@ mod tests {
             false,
             None,
         ));
+    }
+
+    #[test]
+    fn recommend_quality_status_maps_lock_to_inventory_quality_status() {
+        assert_eq!(
+            recommend_quality_status(Some("quarantine"), "qualified"),
+            "quarantined"
+        );
+        assert_eq!(
+            recommend_quality_status(Some("rejected"), "qualified"),
+            "unqualified"
+        );
+        assert_eq!(
+            recommend_quality_status(Some("qualified"), "qualified"),
+            "qualified"
+        );
+        assert_eq!(recommend_quality_status(None, "qualified"), "qualified");
+        assert_eq!(recommend_quality_status(None, "quarantined"), "quarantined");
     }
 
     #[test]
