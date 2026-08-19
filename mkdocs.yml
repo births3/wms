@@ -200,6 +200,7 @@ nav:
     - Phase 2 补货工单清单: domain/replenishment-phase2-tickets.md
     - Phase 3 设备中台技术规范: domain/device-platform-phase3-spec.md
     - Phase 3 设备中台工单清单: domain/device-platform-phase3-tickets.md
+    - M1 设备中台用户故事: domain/user-stories-m1-device-platform.md
     - 波次与出库箱领域模型: domain/wave-model.md
     - 概念审计: concept-audit.md
     - 业务澄清记录: domain/clarifications.md

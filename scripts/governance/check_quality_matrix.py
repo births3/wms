@@ -57,6 +57,10 @@ NAVIGATION_CHECK_SOURCES = {
     / "apps/web-admin/self-checks/m1-dock-management-navigation-self-check.mjs",
     "node apps/web-admin/self-checks/m1-lpn-container-navigation-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/m1-lpn-container-navigation-self-check.mjs",
+    "node apps/web-admin/self-checks/m1-device-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m1-device-self-check.mjs",
+    "node apps/web-admin/self-checks/m1-device-dashboard-self-check.mjs": REPO_ROOT
+    / "apps/web-admin/self-checks/m1-device-dashboard-self-check.mjs",
     "node apps/web-admin/self-checks/te-task-type-slice-self-check.mjs": REPO_ROOT
     / "apps/web-admin/self-checks/te-task-type-slice-self-check.mjs",
     "node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs": REPO_ROOT

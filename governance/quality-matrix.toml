@@ -942,6 +942,55 @@ governance = "verified"
 required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 
+[[stories]]
+id = "US-M1-010"
+title = "设备中台（AGV/PTL/DWS/RFID）"
+module = "M1"
+story_file = "docs/domain/user-stories-m1-device-platform.md"
+types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
+dimensions = { requirement = "verified", fields = "verified", frontend = "verified", api = "verified", backend = "verified", database = "verified", security = "verified", audit = "verified", tests = "verified", evidence = "verified", docs = "verified", governance = "verified" }
+tests = { required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"] }
+test_checks = [
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-domain -- wcs_task -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml --test m1_device_platform_schema_postgres --test m1_device_lifecycle_postgres --test m1_wcs_task_engine_postgres --test m1_ptl_agv_postgres -- --test-threads=1",
+]
+frontend_pages = ["m1-devices", "m1-device-dashboard"]
+navigation_checks = [
+  "node apps/web-admin/self-checks/m1-device-self-check.mjs",
+  "node apps/web-admin/self-checks/m1-device-dashboard-self-check.mjs",
+]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
+e2e_screenshots = [
+  { page = "m1-devices", spec = "prototypes/e2e/web-admin-m1-device-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-devices/device-list.png" },
+  { page = "m1-device-dashboard", spec = "prototypes/e2e/web-admin-m1-device-dashboard-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-device-dashboard/dashboard.png" },
+]
+evidence_refs = [
+  "backend/crates/api/tests/m1_device_platform_schema_postgres.rs",
+  "backend/crates/api/tests/m1_device_lifecycle_postgres.rs",
+  "backend/crates/api/tests/m1_wcs_task_engine_postgres.rs",
+  "backend/crates/api/tests/m1_ptl_agv_postgres.rs",
+  "prototypes/e2e/web-admin-m1-device-real.spec.ts",
+  "prototypes/e2e/web-admin-m1-device-dashboard-real.spec.ts",
+  "artifacts/screenshot-portal/real-web/m1-devices/device-list.png",
+  "artifacts/screenshot-portal/real-web/m1-device-dashboard/dashboard.png",
+]
+api_paths = [
+  "GET /api/v1/iot-devices",
+  "POST /api/v1/iot-devices",
+  "GET /api/v1/iot-devices/{id}",
+  "PATCH /api/v1/iot-devices/{id}",
+  "POST /api/v1/iot-devices/{id}/heartbeat",
+  "POST /api/v1/iot-devices/{id}/events",
+  "POST /api/v1/location-device-bindings",
+  "POST /api/v1/location-device-bindings/{id}/unbind",
+  "GET /api/v1/wcs-tasks",
+  "GET /api/v1/wcs-tasks/{id}",
+  "POST /api/v1/wcs-tasks",
+  "POST /api/v1/wcs-tasks/{id}/resend",
+  "POST /api/v1/wcs-tasks/{id}/void",
+  "POST /api/v1/wcs-tasks/{id}/confirm-skip",
+]
+
 [[deferred_stories]]
 id = "US-H4-002"
 title = "企业微信消息发送"
@@ -3600,53 +3649,6 @@ owner = "M1 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
 
 [[deferred_stories]]
-id = "US-M1-010"
-title = "特殊药品分类字典管理"
-module = "M1"
-story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
-types = ["write", "config_rule", "frontend_interaction", "integration"]
-frontend_pages = ["m1-system-dictionary", "m1-products"]
-navigation_checks = [
-  "node apps/web-admin/self-checks/m1-special-drug-system-dictionary-self-check.mjs",
-  "pnpm --dir apps/web-admin run test:e2e:shell-dev",
-]
-e2e_checks = ["just web-admin-m1-real-e2e"]
-e2e_screenshots = [
-  { page = "m1-system-dictionary", spec = "prototypes/e2e/web-admin-m1-real.spec.ts", screenshot = "artifacts/screenshot-portal/real-web/m1-system-dictionary/special-drug-category.png" },
-]
-api_paths = [
-  "GET /api/v1/system-dictionaries/{dict_code}/items",
-  "PUT /api/v1/system-dictionaries/{dict_code}/items/{item_code}",
-  "PATCH /api/v1/system-dictionaries/{dict_code}/items/{item_code}/disable",
-  "POST /api/v1/master-data/products",
-  "PATCH /api/v1/master-data/products/{id}",
-]
-database_objects = ["system_dictionary_categories", "system_dictionary_items", "products", "audit_event"]
-test_checks = [
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test system_dictionary_postgres special_drug_category",
-  "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres product_routes_accept_custom_enabled_special_drug_category",
-  "pnpm --dir apps/web-admin exec tsc --noEmit",
-  "just web-admin-m1-real-e2e",
-]
-evidence_refs = [
-  "backend/migrations/202606290001_special_drug_category_dictionary.sql",
-  "backend/migrations/202607120006_m1_special_drug_compliance_defaults.sql",
-  "backend/crates/api/src/system_dictionary.rs",
-  "backend/crates/api/src/master_data_postgres_part1.rs",
-  "backend/crates/api/src/master_data_postgres_part3.rs",
-  "backend/crates/api/tests/system_dictionary_postgres.rs",
-  "backend/crates/api/tests/master_data_postgres/master_data_postgres_part1.rs",
-  "apps/web-admin/src/pages/master-data/SystemDictionaryPage.tsx",
-  "apps/web-admin/self-checks/m1-special-drug-system-dictionary-self-check.mjs",
-  "prototypes/e2e/web-admin-m1-real.spec.ts",
-  "artifacts/screenshot-portal/real-web/m1-system-dictionary/special-drug-category.png",
-  "docs/compliance/gsp-special-drugs.md",
-]
-reason = "已补齐特殊药品字典 8 类预置、合规属性矩阵、通用字典维护、自定义分类消费，并由数据库触发器与 M-VR 双人策略规则双向同步，矩阵 UI 已通过真实浏览器 E2E；仍缺分类字段/合规属性修改的仓库主管+质量负责人审批、M-PM 枚举同步、专用台账与专柜专库运行联动及完整 GSP 回查证据，禁止标记完成。"
-owner = "M1 模块负责人"
-resume_when = "补齐审批生效回调、M-PM 联动、专用台账与专柜专库运行联动，并通过审计和 GSP 回查证据后复核。"
-
-[[deferred_stories]]
 id = "US-M10-001"
 title = "接收 TMS 路径规划结果"
 module = "M10"
@@ -3962,7 +3964,7 @@ id = "US-M4-012"
 title = "采购退货出库"
 module = "M4"
 frontend_pages = ["m4-returns"]
-e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
+e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m1-real"]
 reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
 owner = "M4 模块负责人"
 resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"

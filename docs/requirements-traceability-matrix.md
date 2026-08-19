@@ -54,7 +54,8 @@
 | H8 ERP 防腐层 | [user-stories-h8-erp-integration.md](domain/user-stories-h8-erp-integration.md) | 4 | 前端体验 RTM / 后端实现 RTM / 测试证据 RTM / 合规风险 RTM |
 | H9 打印模板与组套执行 | [user-stories-h9-print-template.md](domain/user-stories-h9-print-template.md)、[user-stories-h9-print-orchestration.md](domain/user-stories-h9-print-orchestration.md) | 15 | 前端体验 RTM / 后端实现 RTM / 测试证据 RTM / 合规风险 RTM |
 | M1 主数据商品/供应商/客户 | [user-stories-m1-master-data-product.md](domain/user-stories-m1-master-data-product.md) | 9 | 后端实现 RTM / 合规风险 RTM |
-| M1 主数据仓库/库位/配置 | [user-stories-m1-master-data-warehouse.md](domain/user-stories-m1-master-data-warehouse.md) | 13 | 后端实现 RTM / 合规风险 RTM |
+| M1 主数据仓库/库位/配置 |
+| M1 设备中台 | [user-stories-m1-device-platform.md](domain/user-stories-m1-device-platform.md) | 1 | 后端实现 RTM / 前端体验 RTM | [user-stories-m1-master-data-warehouse.md](domain/user-stories-m1-master-data-warehouse.md) | 13 | 后端实现 RTM / 合规风险 RTM |
 | M10 运输协同 | [user-stories-m10-tms-plus.md](domain/user-stories-m10-tms-plus.md) | 4 | 后端实现 RTM / 测试证据 RTM |
 | M11 监管 EDI 边界 | [user-stories-m11-regulatory-edi.md](domain/user-stories-m11-regulatory-edi.md) | 2 | 合规风险 RTM |
 | M2 ASN 与收货 | [user-stories-m2-inbound-asn.md](domain/user-stories-m2-inbound-asn.md) | 6 | 前端体验 RTM / 后端实现 RTM |

@@ -14,9 +14,9 @@
 | 指标 | 数量 |
 |---|---:|
 | 故事总数 | 193 |
-| 已完成（已验证） | 52 |
-| 未完成 / 延期 | 141 |
-| 完成率 | 26.9% |
+| 已完成（已验证） | 53 |
+| 未完成 / 延期 | 140 |
+| 完成率 | 27.5% |
 
 > “已完成”表示故事已进入 `stories` 并通过矩阵维度门禁；延期故事中的局部代码、页面或测试切片不计入完成。
 
@@ -38,7 +38,7 @@
 | H6 | 2 | 0 | 2 |
 | H8 | 1 | 3 | 4 |
 | H9 | 9 | 6 | 15 |
-| M1 | 3 | 10 | 13 |
+| M1 | 4 | 9 | 13 |
 | M10 | 0 | 4 | 4 |
 | M2 | 0 | 9 | 9 |
 | M3 | 9 | 1 | 10 |
@@ -76,6 +76,7 @@
 | US-M3-004 在库养护 | M3 | S3 |
 | US-M3-005 库存盘点 | M3 | S3 |
 | US-M3-006 库内移库 | M3 | S3 |
+| US-M1-010 设备中台（AGV/PTL/DWS/RFID） | M1 | S3 |
 | US-H1-001 用户登录与 token 签发（PC 密码登录切片） | H1 | S2 |
 | US-H1-002 角色与权限管理 | H1 | S2 |
 | US-H1-003 API 鉴权中间件 | H1 | S1 |
@@ -174,7 +175,6 @@
 | US-M1-007 多货主架构 | M1 | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-M1-008 系统配置中心 | M1 | S2 | L1、L2、L3、L4、L5、L7、L8、L9、L11 | 已补 Feature Flag 配置中心 PostgreSQL 导入/导出、货主隔离、事务内审计和真实数据库重载验证，并将配置中心源文件拆分至 539 行；真实 PostgreSQL 浏览器 E2E 已验证迁移操作、页面回显和本地门户截图，截图需由 PR 附件或 CI artifact 长期归档。仍缺完整配置项分组/校验/变更历史、前端所有操作真实 API 接线、审批/回滚和发布证据，不能标记完成。 |
 | US-M1-009 多仓管理 | M1 | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
-| US-M1-010 特殊药品分类字典管理 | M1 | S2 | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | 已补齐特殊药品字典 8 类预置、合规属性矩阵、通用字典维护、自定义分类消费，并由数据库触发器与 M-VR 双人策略规则双向同步，矩阵 UI 已通过真实浏览器 E2E；仍缺分类字段/合规属性修改的仓库主管+质量负责人审批、M-PM 枚举同步、专用台账与专柜专库运行联动及完整 GSP 回查证据，禁止标记完成。 |
 | US-M10-001 接收 TMS 路径规划结果 | M10 | S2 | L1、L2、L3、L4、L5、L8、L9、L10、L11 | 已补 TMS 路径规划结果接收后端切片、正式数据库菜单发布迁移、E2E 运行入口的 Wave 5 路由、PC 接收页面和页面级 self-check；路线/站点/ETA/订单完整性校验、货主与司机隔离、幂等冲突、审计、PostgreSQL 证据和真实浏览器 E2E/截图已有。仍缺 H8 外部 TMS 真实联调、仓库主管查询界面、版本递增覆盖、TMS 不可用时人工录入与审批和正式发布证据，不能标记完成。 |
 | US-M10-002 在途温控数据接入 | M10 | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
 | US-M10-003 容器回收追踪 | M10 | - | - | 当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。 |
@@ -279,6 +279,7 @@
 | US-M3-004 在库养护 | M3 | S3 | read_only、write、api_change、integration、audit_compliance、runtime_guard、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L10、L11 | m3-maintenance | GET /api/v1/inventory/maintenance/tasks<br>POST /api/v1/inventory/maintenance/tasks/generate<br>GET /api/v1/inventory/maintenance/records<br>POST /api/v1/inventory/maintenance/records | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M3-005 库存盘点 | M3 | S3 | write、api_change、inventory_change、concurrent_resource、audit_compliance、frontend_interaction | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m3-counts | GET /api/v1/inventory/counts<br>POST /api/v1/inventory/counts<br>GET /api/v1/inventory/counts/{id}<br>POST /api/v1/inventory/counts/{id}/lines/{line_id}/submit<br>POST /api/v1/inventory/counts/{id}/approve | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-M3-006 库内移库 | M3 | S3 | write、inventory_change、concurrent_resource、audit_compliance、integration、frontend_interaction | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m3-relocations | GET /api/v1/inventory/relocations<br>POST /api/v1/inventory/relocations | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
+| US-M1-010 设备中台（AGV/PTL/DWS/RFID） | M1 | S3 | write、api_change、frontend_interaction、concurrent_resource、audit_compliance | L1、L2、L3、L4、L5、L6、L7、L8、L9、L10、L11 | m1-devices、m1-device-dashboard | GET /api/v1/iot-devices<br>POST /api/v1/iot-devices<br>GET /api/v1/iot-devices/{id}<br>PATCH /api/v1/iot-devices/{id}<br>POST /api/v1/iot-devices/{id}/heartbeat<br>POST /api/v1/iot-devices/{id}/events<br>POST /api/v1/location-device-bindings<br>POST /api/v1/location-device-bindings/{id}/unbind<br>GET /api/v1/wcs-tasks<br>GET /api/v1/wcs-tasks/{id}<br>POST /api/v1/wcs-tasks<br>POST /api/v1/wcs-tasks/{id}/resend<br>POST /api/v1/wcs-tasks/{id}/void<br>POST /api/v1/wcs-tasks/{id}/confirm-skip | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-001 用户登录与 token 签发（PC 密码登录切片） | H1 | S2 | write、api_change、frontend_interaction | L1、L2、L3、L4、L5、L7、L8、L9、L11 | - | POST /api/v1/auth/login<br>GET /api/v1/auth/me | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-002 角色与权限管理 | H1 | S2 | write、api_change、frontend_interaction、config_rule | L1、L2、L3、L4、L5、L7、L8、L9、L11 | h1-role-permission | GET /api/v1/auth/roles<br>POST /api/v1/auth/roles<br>PUT /api/v1/auth/roles/{role_id}<br>DELETE /api/v1/auth/roles/{role_id}<br>PUT /api/v1/auth/roles/{role_id}/permissions<br>GET /api/v1/auth/permissions<br>GET /api/v1/auth/users<br>PUT /api/v1/auth/user-roles/batch | requirement:verified<br>fields:verified<br>frontend:verified<br>api:verified<br>backend:verified<br>database:verified<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
 | US-H1-003 API 鉴权中间件 | H1 | S1 | read_only、api_change | L1、L2、L3、L8、L9 | - | - | requirement:verified<br>fields:verified<br>frontend:not_applicable<br>api:verified<br>backend:verified<br>database:not_applicable<br>security:verified<br>audit:verified<br>tests:verified<br>evidence:verified<br>docs:verified<br>governance:verified |
