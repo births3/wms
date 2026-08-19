@@ -392,7 +392,7 @@ async fn confirm_when_source_frozen_suspends_task(pool: PgPool) {
         "SELECT COUNT(*) FROM event_bus_event WHERE owner_id = $1 AND event_type = $2",
     )
     .bind(world.owner_id)
-    .bind("replenishment_source_frozen")
+    .bind("business.replenishment_source_frozen")
     .fetch_one(&pool)
     .await
     .expect("h4");

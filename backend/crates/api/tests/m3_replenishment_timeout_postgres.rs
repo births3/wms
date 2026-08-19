@@ -237,9 +237,25 @@ async fn urgent_pending_20_minutes_is_cancelled_and_released(pool: PgPool) {
         1
     );
     assert_eq!(
-        event_count(&pool, world.owner_id, "replenishment_urgent_timeout").await,
+        event_count(
+            &pool,
+            world.owner_id,
+            "business.replenishment_urgent_timeout"
+        )
+        .await,
         1
     );
+    let audits: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM audit_event
+         WHERE owner_id = $1 AND action = 'timeout_cancel_replenishment_task'
+        "#,
+    )
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("audit");
+    assert_eq!(audits, 1);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -266,9 +282,27 @@ async fn urgent_pending_10_minutes_alerts_once_and_stays_pending(pool: PgPool) {
     .expect("status");
     assert_eq!(status, "pending");
     assert_eq!(
-        event_count(&pool, world.owner_id, "replenishment_urgent_unclaimed").await,
+        event_count(
+            &pool,
+            world.owner_id,
+            "business.replenishment_urgent_unclaimed"
+        )
+        .await,
         1
     );
+    let minutes: Option<i64> = sqlx::query_scalar(
+        r#"
+        SELECT (payload ->> 'unclaimed_minutes')::BIGINT
+          FROM event_bus_event
+         WHERE owner_id = $1 AND event_type = 'business.replenishment_urgent_unclaimed'
+         LIMIT 1
+        "#,
+    )
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("payload");
+    assert!(minutes.unwrap_or(0) >= 10);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -307,9 +341,22 @@ async fn in_progress_one_hour_alerts_without_cancel(pool: PgPool) {
     assert_eq!(status, "in_progress");
     assert!(transit_out(&pool, world.source_batch_id).await > Quantity::ZERO);
     assert_eq!(
-        event_count(&pool, world.owner_id, "replenishment_no_progress").await,
+        event_count(&pool, world.owner_id, "business.replenishment_no_progress").await,
         1
     );
+    let stale: Option<i64> = sqlx::query_scalar(
+        r#"
+        SELECT (payload ->> 'stale_minutes')::BIGINT
+          FROM event_bus_event
+         WHERE owner_id = $1 AND event_type = 'business.replenishment_no_progress'
+         LIMIT 1
+        "#,
+    )
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("stale payload");
+    assert!(stale.unwrap_or(0) >= 60);
 }
 
 #[test]

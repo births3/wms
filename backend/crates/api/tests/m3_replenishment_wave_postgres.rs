@@ -535,11 +535,24 @@ async fn fill_wave_pick_gaps_skips_putaway_blocked_without_failing(pool: PgPool)
     .expect("lock");
     let wave_id = Uuid::new_v4();
     insert_wave_order(&pool, &world, wave_id, 8).await;
-    let created = service(pool)
+    let created = service(pool.clone())
         .fill_wave_pick_gaps(world.owner_id, wave_id)
         .await
         .expect("fill must not fail");
     assert!(created.is_empty());
+    let reason: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT payload ->> 'reason_code'
+          FROM event_bus_event
+         WHERE owner_id = $1 AND event_type = 'replenishment.patrol_fail'
+         LIMIT 1
+        "#,
+    )
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("patrol fail");
+    assert_eq!(reason.as_deref(), Some("putaway_blocked"));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
