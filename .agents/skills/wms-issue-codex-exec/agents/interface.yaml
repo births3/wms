@@ -1,0 +1,19 @@
+interface:
+  display_name: WMS Issue Codex Exec
+  short_description: Gitea issue 两段式确认后用 codex exec 执行，并回写测试、截图和风险。
+  default_prompt: 先发方案提案，等“确认方案”后用独立 worktree 直接 codex exec，并回写测试、截图和风险。
+compatibility:
+  canonical_format: codex-skill
+  adapter_targets:
+    - codex
+  activation:
+    mode: description
+  execution:
+    context: inline
+    shell: bash
+  trust:
+    source_tier: local
+    remote_inline_execution: forbid
+    remote_metadata_policy: ignore
+  degradation:
+    codex: codex exec 不可用时只能评论阻塞，不能退回 tmux 或 TUI。

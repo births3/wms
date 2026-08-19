@@ -1,0 +1,4 @@
+interface:
+  display_name: "WMS 会话收尾复盘"
+  short_description: "在停止前复盘错误经验并沉淀为后续任务可复用的执行规则和触发语"
+  default_prompt: "Use $wms-session-closeout to summarize the latest WMS session mistakes, lessons, reusable rules, and next trigger prompt."

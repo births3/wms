@@ -1,0 +1,20 @@
+{
+  "name": "wms-issue-codex-exec",
+  "version": "0.1.0",
+  "owner": "WMS 项目维护者",
+  "updated_at": "2026-07-02",
+  "review_cadence": "monthly",
+  "status": "active",
+  "maturity_tier": "scaffold",
+  "lifecycle_stage": "scaffold",
+  "context_budget_tier": "scaffold",
+  "target_platforms": ["codex"],
+  "input_files": [
+    "SKILL.md",
+    "agents/interface.yaml",
+    "evals/trigger_cases.json",
+    "evals/semantic_config.json"
+  ],
+  "output_contract": "WMS Gitea issue 两段式闭环：proposal -> 确认方案 -> codex exec -> delivery；验收反馈走 revision-proposal。",
+  "rollback_boundary": "删除本技能目录，并还原 AGENTS.md、docs/runbooks/gitea-issue-agent.md、docs/agent-document-index.md 的引用。"
+}

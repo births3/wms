@@ -1,0 +1,19 @@
+interface:
+  display_name: WMS Quality Matrix
+  short_description: 维护 WMS 全链路质量矩阵，并发现故事、页面、API 和治理缺口。
+  default_prompt: 缺口闭环 <模块/页面/issue>
+compatibility:
+  canonical_format: codex-skill
+  adapter_targets:
+    - codex
+  activation:
+    mode: description
+  execution:
+    context: inline
+    shell: bash
+  trust:
+    source_tier: local
+    remote_inline_execution: forbid
+    remote_metadata_policy: ignore
+  degradation:
+    codex: 无法运行脚本时必须说明矩阵和范围缺口检查未完成，不能声明模块闭环。

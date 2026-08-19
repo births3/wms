@@ -1,0 +1,38 @@
+---
+name: wms-loop-engineering
+description: 用 Loop Engineering 方式执行 WMS 仓库任务，先定义目标、输入、检查、反馈和停止条件，再小步修改、验证、修复。
+---
+
+# WMS Loop Engineering
+
+当用户要求“用这个方案跑”“跑闭环”“Loop Engineering”，或任务需要多轮检查反馈时使用本技能；明确要求 review、修复、复审或分组提交时，转用 `wms-review-fix-commit`。
+
+## 先读
+
+- `AGENTS.md`
+- `docs/agent-loop-engineering.md`
+- 当前任务相关的模块 `AGENTS.override.md`
+- 当前任务相关的用户故事、ADR、runbook 或代码文件
+
+## 闭环步骤
+
+1. 定义本轮目标：写清楚交付物和完成标准。
+2. 列输入边界：用户确认、相关文档、相关代码、可运行脚本。
+3. 小步执行：一次只处理一个主题，不扩范围。
+4. 检查结果：先跑脚本，再做人工语义自查。
+5. 反馈修复：只修检查失败项；同类问题跨 3 个以上文件时优先考虑脚本化。
+6. 判断停止：
+   - 检查通过则停止。
+   - 触发新增模块、故事、字段、状态、角色、业务默认值时停止并问用户。
+   - 同类失败连续 3 轮仍无法推进时停止并说明阻塞。
+7. 最终报告：列修改主题、验证命令退出码、剩余风险。
+
+## 默认检查
+
+- 文档必须中文。
+- 文件位置必须符合 `AGENTS.md` 文件分工。
+- 不复制长篇外部文章原文，只写摘要、规则和链接。
+- 前端页面或 `apps/web-admin/src/features/**` API 调用变更时，必须检查运行时数据入口：真实后端路由或 `apps/web-admin/vite.config.ts` dev mock 路由至少一边可达；开发 mock 模式下还要用 self-check 或 `curl 9002` 证明不会出现 `Dev mock route not found`。
+- 涉及模块验收、补齐缺失功能、用户故事、菜单页或质量矩阵时，先运行 `python3 scripts/governance/check_scope_gap_discovery.py --json`；若用户要求“全部/闭环/补齐/验收”，按模块追加 `--strict --module <模块>`。
+- 修改后至少运行 `git diff --check` 和 `just gov-t1`。
+- 不主动提交或推送，除非用户明确要求。
