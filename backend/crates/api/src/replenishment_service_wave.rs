@@ -152,7 +152,18 @@ impl ReplenishmentService {
             created.push(task);
         }
         if created.is_empty() && remaining >= Quantity::from(pack) {
-            return Err(ReplenishmentError::SourceUnavailable);
+            self.write_patrol_fail_in_tx(
+                tx,
+                ctx.owner_id,
+                strategy_id,
+                req.target_location_id,
+                req.product_id,
+                "source_unavailable",
+                Uuid::new_v4(),
+                chrono::Utc::now(),
+            )
+            .await?;
+            return Ok(Vec::new());
         }
         Ok(created)
     }

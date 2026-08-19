@@ -91,6 +91,7 @@ impl PgReplenishmentRepository {
         &self,
         owner_id: Uuid,
         strategy_id: Uuid,
+        target_type: &str,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
             r#"
@@ -98,11 +99,13 @@ impl PgReplenishmentRepository {
               FROM warehouse_locations
              WHERE owner_id = $1
                AND replenish_strategy_id = $2
+               AND location_type = $3
                AND status <> 'disabled'
             "#,
         )
         .bind(owner_id)
         .bind(strategy_id)
+        .bind(target_type)
         .fetch_all(&self.pool)
         .await
     }

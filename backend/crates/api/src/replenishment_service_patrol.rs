@@ -124,7 +124,7 @@ impl ReplenishmentService {
         for strategy in strategies {
             let locations = self
                 .repo
-                .list_bound_locations(strategy.owner_id, strategy.id)
+                .list_bound_locations(strategy.owner_id, strategy.id, &strategy.target_type)
                 .await?;
             let ctx = system_ctx(strategy.owner_id);
             for location_id in locations {
