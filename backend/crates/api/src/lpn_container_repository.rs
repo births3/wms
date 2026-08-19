@@ -5,12 +5,10 @@ use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use wms_domain::{
     decide_lpn_mix, decide_lpn_putaway_bind, lpn_inventory_identity_allows,
-    lpn_numbering_document_type, lpn_status_allows_soft_delete, validate_apply_lock,
-    validate_change_reason, validate_release_lock, ApplyContainerQualityLockRequest,
-    BatchCreateLpnContainerRequest, ChangeContainerQualityLockReasonRequest,
-    ContainerQualityLockValidationError, CreateLpnContainerRequest, LpnContainer,
-    LpnContainerListResponse, LpnContainerTypePolicy, LpnContainerValidationError, LpnMixDenied,
-    LpnPutawayBindDecision, ReleaseContainerQualityLockRequest, UpdateLpnContainerRequest,
+    lpn_numbering_document_type, lpn_status_allows_soft_delete, unlock_should_rewrite_batch,
+    BatchCreateLpnContainerRequest, ContainerQualityLockValidationError, CreateLpnContainerRequest,
+    LpnContainer, LpnContainerListResponse, LpnContainerTypePolicy, LpnContainerValidationError,
+    LpnMixDenied, LpnPutawayBindDecision, UnlockSkippedBatch, UpdateLpnContainerRequest,
     UpsertLpnContainerTypePolicyRequest, LPN_CONTAINER_STATUS_DISABLED,
     LPN_LOCK_CATEGORY_QUALIFIED, LPN_LOCK_CATEGORY_QUARANTINE, LPN_LOCK_CATEGORY_REJECTED,
 };
@@ -18,9 +16,8 @@ use wms_domain::{
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
     idempotency,
-    inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED, STATUS_UNQUALIFIED},
+    inventory::STATUS_QUALIFIED,
     operation_context::OperationContext as AuthContext,
-    system_dictionary::validate_container_quality_lock_reason_in_tx,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -150,6 +147,18 @@ impl PgLpnContainerRepository {
         Self { pool }
     }
 
+    pub(crate) fn pool(&self) -> PgPool {
+        self.pool.clone()
+    }
+
+    pub fn quality_lock(
+        &self,
+    ) -> crate::lpn_container_quality_lock_service::LpnContainerQualityLockService {
+        crate::lpn_container_quality_lock_service::LpnContainerQualityLockService::new(
+            self.pool.clone(),
+        )
+    }
+
     pub async fn create(
         &self,
         ctx: &AuthContext,
@@ -203,8 +212,12 @@ impl PgLpnContainerRepository {
         keyword: Option<&str>,
         container_type: Option<&str>,
         status: Option<&str>,
+        lock_category: Option<&str>,
     ) -> Result<Vec<LpnContainer>, LpnContainerRepositoryError> {
         let keyword = keyword.map(str::trim).filter(|value| !value.is_empty());
+        let lock_category = lock_category
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
         let rows = sqlx::query_as::<_, LpnContainerRow>(
             r#"
             SELECT id, owner_id, lpn_code, container_type, capacity_cm3, status, location_id,
@@ -217,6 +230,7 @@ impl PgLpnContainerRepository {
                      WHEN $4::text IS NULL THEN status <> 'disabled'
                      ELSE status = $4
                    END
+               AND ($5::text IS NULL OR COALESCE(current_lock_category, 'qualified') = $5)
              ORDER BY lpn_code
             "#,
         )
@@ -224,6 +238,7 @@ impl PgLpnContainerRepository {
         .bind(keyword)
         .bind(container_type)
         .bind(status)
+        .bind(lock_category)
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error)?;
@@ -458,7 +473,7 @@ impl PgLpnContainerRepository {
     }
 }
 
-async fn append_lpn_audit(
+pub(crate) async fn append_lpn_audit(
     tx: &mut Transaction<'_, Postgres>,
     ctx: &AuthContext,
     action: &str,
@@ -540,7 +555,7 @@ async fn insert_new_container_in_tx(
     Ok(created)
 }
 
-async fn lock_idempotency_key(
+pub(crate) async fn lock_idempotency_key(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     idempotency_key: &str,
@@ -550,7 +565,7 @@ async fn lock_idempotency_key(
         .map_err(Into::into)
 }
 
-async fn replay_idempotency<T: DeserializeOwned>(
+pub(crate) async fn replay_idempotency<T: DeserializeOwned>(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     idempotency_key: &str,
@@ -571,7 +586,7 @@ async fn replay_idempotency<T: DeserializeOwned>(
     .await?)
 }
 
-async fn store_idempotency_success<T: Serialize>(
+pub(crate) async fn store_idempotency_success<T: Serialize>(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     idempotency_key: &str,
@@ -598,15 +613,17 @@ async fn store_idempotency_success<T: Serialize>(
     .await?)
 }
 
-fn request_hash(value: &serde_json::Value) -> Result<String, LpnContainerRepositoryError> {
+pub(crate) fn request_hash(
+    value: &serde_json::Value,
+) -> Result<String, LpnContainerRepositoryError> {
     idempotency::request_hash(value).map_err(Into::into)
 }
 
-fn map_db_error(error: sqlx::Error) -> LpnContainerRepositoryError {
+pub(crate) fn map_db_error(error: sqlx::Error) -> LpnContainerRepositoryError {
     LpnContainerRepositoryError::Database(error.to_string())
 }
 
-fn map_write_error(error: sqlx::Error) -> LpnContainerRepositoryError {
+pub(crate) fn map_write_error(error: sqlx::Error) -> LpnContainerRepositoryError {
     if let sqlx::Error::Database(db_error) = &error {
         if db_error.code().as_deref() == Some("23505") {
             return LpnContainerRepositoryError::DuplicateCode;
@@ -626,5 +643,5 @@ fn map_write_error(error: sqlx::Error) -> LpnContainerRepositoryError {
 }
 
 include!("lpn_container_repository_quality_lock.rs");
-include!("lpn_container_repository_quality_lock_ops.rs");
+include!("lpn_container_repository_quality_lock_sql.rs");
 include!("lpn_container_repository_write.rs");

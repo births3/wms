@@ -1,5 +1,6 @@
-const QUALITY_LOCK_PATH: &str = "/api/v1/master-data/lpn-containers/{id}/quality-lock";
-const QUALITY_LOCK_RELEASE_PATH: &str =
+pub(crate) const QUALITY_LOCK_PATH: &str =
+    "/api/v1/master-data/lpn-containers/{id}/quality-lock";
+pub(crate) const QUALITY_LOCK_RELEASE_PATH: &str =
     "/api/v1/master-data/lpn-containers/{id}/quality-lock/release";
 
 /// 移库任务 `lock_move` 标记（落点：inventory_relocations.reason 前缀，
@@ -9,26 +10,10 @@ pub const LOCK_MOVE_MARKER: &str = "lock_move:";
 pub const LOCK_MOVE_BACK_MARKER: &str = "lock_move_back:";
 /// 未上架容器的暂存占位库位编码（from_location_id 用 nil UUID，表中无外键约束）。
 pub const LOCK_MOVE_STAGING_CODE: &str = "STAGING";
-/// 锁-区域映射：锁类别 → 目标库区 quality_color。
-pub fn quality_color_for_lock_category(category: &str) -> &'static str {
-    if category == LPN_LOCK_CATEGORY_QUARANTINE {
-        "quarantine_yellow"
-    } else {
-        "unqualified_red"
-    }
-}
-
-/// 容器质量锁事件记录：锁定类别 → 库存批次状态 的共享映射。
-fn batch_status_for_lock_category(category: &str) -> &'static str {
-    if category == LPN_LOCK_CATEGORY_QUARANTINE {
-        STATUS_QUARANTINED
-    } else {
-        STATUS_UNQUALIFIED
-    }
-}
+pub use wms_domain::{batch_status_for_lock_category, quality_color_for_lock_category};
 
 /// 主档 FOR UPDATE 锁定读取（加锁 / 换原因 / 解锁共用）。
-async fn lock_container_row_for_update(
+pub(crate) async fn lock_container_row_for_update(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     id: Uuid,
@@ -85,7 +70,7 @@ async fn recommend_qualified_move_back_target(
 
 /// 库存流水（qty_delta=0，质量锁不改变数量）：movement_type 取 quality_lock / quality_lock_change / quality_lock_release。
 #[allow(clippy::too_many_arguments)]
-async fn append_quality_lock_movement(
+pub(crate) async fn append_quality_lock_movement(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     container_id: Uuid,
@@ -128,7 +113,7 @@ async fn append_quality_lock_movement(
 
 /// 批次状态联动的前后值记录（inventory_status_changes，纯 INSERT 审计）。
 #[allow(clippy::too_many_arguments)]
-async fn append_quality_lock_status_change(
+pub(crate) async fn append_quality_lock_status_change(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     batch_id: Uuid,
@@ -187,7 +172,7 @@ async fn container_current_location(
 
 /// 同事务生成隔离移库任务（lock_move）：目标 = 锁类别对应质量区推荐位。
 #[allow(clippy::too_many_arguments)]
-async fn insert_lock_move_task(
+pub(crate) async fn insert_lock_move_task(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     lpn_code: &str,
@@ -205,7 +190,8 @@ async fn insert_lock_move_task(
     )
     .await?
     else {
-        return Err(LpnContainerRepositoryError::ZoneMismatch);
+        // 加锁已生效；无对应质量区空位时允许暂缓移库，不回滚整单。
+        return Ok(());
     };
     let (from_location_id, from_location_code) =
         container_current_location(tx, owner_id, current_location_id).await?;
@@ -233,7 +219,9 @@ async fn insert_lock_move_task(
     .bind(&to_location_code)
     .bind(lpn_code)
     .bind(batch_status)
-    .bind(format!("{LOCK_MOVE_MARKER}{lock_category}:{reason_dict_item_code}"))
+    .bind(format!(
+        "{LOCK_MOVE_MARKER}{lock_category}:{reason_dict_item_code}"
+    ))
     .bind(created_by)
     .bind(now)
     .execute(&mut **tx)
@@ -245,7 +233,7 @@ async fn insert_lock_move_task(
 /// 解锁后生成移回合格区任务（lock_move_back）：目标 = 原库位或系统推荐合格位；
 /// 容器无当前库位（未上架）或已在合格区时不生成。
 #[allow(clippy::too_many_arguments)]
-async fn insert_lock_move_back_task(
+pub(crate) async fn insert_lock_move_back_task(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     lpn_code: &str,
@@ -347,7 +335,7 @@ struct BatchAllocationRefRow {
 /// 释放批次已分配量并发出波次重算 outbox 事件：
 /// 事件 payload 携带 outbound_order_id + line_no + 释放数量，供波次侧精准回退重算；
 /// 订单行"等待重新分配"由波次消费端据此重算（outbound_order_lines 无分配状态列，最小改动落点=事件携带订单行引用）。
-async fn release_batch_allocations_with_outbox(
+pub(crate) async fn release_batch_allocations_with_outbox(
     tx: &mut Transaction<'_, Postgres>,
     owner_id: Uuid,
     batch_id: Uuid,
@@ -445,10 +433,148 @@ async fn release_batch_allocations_with_outbox(
     Ok(())
 }
 
+pub(crate) async fn create_liaison_for_lock(
+    tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
+    lpn_code: &str,
+    now: DateTime<Utc>,
+) -> Result<Uuid, LpnContainerRepositoryError> {
+    sqlx::query(
+        r#"
+        INSERT INTO quality_liaison_types (
+            id, owner_id, type_code, type_name, approval_template_id, approver_user_id,
+            timeout_seconds, enabled, created_by, created_at, updated_at
+        ) VALUES (
+            $1, $2, 'container_quality_lock', '容器质量锁', 'container_quality_lock', $3,
+            86400, true, $3, $4, $4
+        )
+        ON CONFLICT (owner_id, type_code) DO NOTHING
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ctx.owner_id)
+    .bind(ctx.user_id)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    let type_code = "container_quality_lock";
+    let liaison_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO quality_liaison_orders (
+            id, owner_id, liaison_no, type_code, related_document_type, related_document_no,
+            problem_description, disposition_suggestion, trigger_source, business_payload,
+            status, created_by, created_at, updated_at
+        ) VALUES (
+            $1, $2, $3, $4, 'container_quality_lock', $5,
+            $6, '按锁类别移入对应质量区并跟踪处置', 'container_quality_lock', $7::jsonb,
+            'pending_approval', $8, $9, $9
+        )
+        "#,
+    )
+    .bind(liaison_id)
+    .bind(ctx.owner_id)
+    .bind(format!("MQL-LOCK-{}", &liaison_id.to_string()[..8]))
+    .bind(type_code)
+    .bind(lpn_code)
+    .bind(format!("容器 {lpn_code} 质量锁"))
+    .bind(serde_json::json!({ "lpn_code": lpn_code }))
+    .bind(ctx.user_id)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    Ok(liaison_id)
+}
+
+pub(crate) async fn bind_liaison_to_container(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    liaison_id: Uuid,
+    lpn_code: &str,
+    now: DateTime<Utc>,
+) -> Result<(), LpnContainerRepositoryError> {
+    sqlx::query(
+        r#"
+        UPDATE quality_liaison_orders
+           SET related_document_type = 'container_quality_lock',
+               related_document_no = $3,
+               updated_at = $4
+         WHERE id = $1 AND owner_id = $2
+        "#,
+    )
+    .bind(liaison_id)
+    .bind(owner_id)
+    .bind(lpn_code)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    Ok(())
+}
+
+pub(crate) async fn classify_unlock_batches(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    lpn_code: &str,
+    expected_status: &str,
+    container_id: Uuid,
+) -> Result<(Vec<(Uuid, String)>, Vec<UnlockSkippedBatch>), LpnContainerRepositoryError> {
+    let batches = sqlx::query_as::<_, (Uuid, String)>(
+        r#"
+        SELECT id, status
+          FROM inventory_batches
+         WHERE owner_id = $1 AND container_lpn = $2
+           AND status NOT IN ('loss_deducted', 'pending_destruction')
+        "#,
+    )
+    .bind(owner_id)
+    .bind(lpn_code)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(map_db_error)?;
+    let mut rewrite = Vec::new();
+    let mut skipped = Vec::new();
+    for (batch_id, status) in batches {
+        let last_is_this_lock: bool = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(
+                (SELECT approval_source = 'M-QL' AND to_status = $3 AND approval_id = $4
+                   FROM inventory_status_changes
+                  WHERE owner_id = $1 AND batch_id = $2
+                  ORDER BY occurred_at DESC
+                  LIMIT 1),
+                false
+            )
+            "#,
+        )
+        .bind(owner_id)
+        .bind(batch_id)
+        .bind(expected_status)
+        .bind(container_id.to_string())
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(map_db_error)?;
+        if unlock_should_rewrite_batch(&status, expected_status, last_is_this_lock) {
+            rewrite.push((batch_id, status));
+        } else {
+            skipped.push(UnlockSkippedBatch {
+                batch_id,
+                status,
+                reason: if last_is_this_lock {
+                    "status_changed_by_other_flow".to_string()
+                } else {
+                    "not_set_by_this_lock".to_string()
+                },
+            });
+        }
+    }
+    Ok((rewrite, skipped))
+}
+
 impl PgLpnContainerRepository {
-    pub async fn list_lock_move_owner_ids(
-        &self,
-    ) -> Result<Vec<Uuid>, LpnContainerRepositoryError> {
+    pub async fn list_lock_move_owner_ids(&self) -> Result<Vec<Uuid>, LpnContainerRepositoryError> {
         sqlx::query_scalar(
             r#"
             SELECT DISTINCT owner_id
@@ -527,5 +653,86 @@ impl PgLpnContainerRepository {
         tx.commit().await.map_err(map_db_error)?;
         Ok(inserted)
     }
-}
 
+    /// 扫描 lock_move 未完成超过阈值的容器。
+    pub async fn scan_overdue_lock_moves(
+        &self,
+        owner_id: Uuid,
+        threshold_hours: i64,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<OverdueLockMove>, LpnContainerRepositoryError> {
+        let threshold_time = now - chrono::Duration::hours(threshold_hours);
+        let rows = sqlx::query_as::<_, (Uuid, String, DateTime<Utc>)>(
+            r#"
+            SELECT c.id, c.lpn_code, MAX(r.created_at)
+              FROM inventory_relocations r
+              JOIN lpn_containers c
+                ON c.owner_id = r.owner_id
+               AND c.lpn_code = r.lpn_code
+             WHERE r.owner_id = $1
+               AND r.reason LIKE $2
+               AND r.status <> 'completed'
+               AND r.created_at <= $3
+             GROUP BY c.id, c.lpn_code
+             ORDER BY MAX(r.created_at) ASC
+            "#,
+        )
+        .bind(owner_id)
+        .bind(format!("{LOCK_MOVE_MARKER}%"))
+        .bind(threshold_time)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+
+        let mut overdue = Vec::new();
+        for (container_id, lpn_code, task_created_at) in rows {
+            let lock_category: Option<String> = sqlx::query_scalar(
+                "SELECT current_lock_category FROM lpn_containers WHERE id = $1 AND owner_id = $2",
+            )
+            .bind(container_id)
+            .bind(owner_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_db_error)?
+            .flatten();
+            let Some(category) = lock_category else {
+                continue;
+            };
+            if category != LPN_LOCK_CATEGORY_QUARANTINE && category != LPN_LOCK_CATEGORY_REJECTED {
+                continue;
+            }
+            let expected_color = quality_color_for_lock_category(&category);
+            let current_matches: bool = sqlx::query_scalar(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM lpn_containers container
+                      JOIN warehouse_locations location
+                        ON location.id = container.location_id
+                       AND location.owner_id = container.owner_id
+                      JOIN warehouse_zones zone
+                        ON zone.id = location.zone_id
+                       AND zone.owner_id = location.owner_id
+                     WHERE container.id = $1
+                       AND container.owner_id = $2
+                       AND zone.quality_color = $3
+                )
+                "#,
+            )
+            .bind(container_id)
+            .bind(owner_id)
+            .bind(expected_color)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_db_error)?;
+            if !current_matches {
+                overdue.push(OverdueLockMove {
+                    container_id,
+                    lpn_code,
+                    task_created_at,
+                });
+            }
+        }
+        Ok(overdue)
+    }
+}

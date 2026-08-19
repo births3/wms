@@ -14,12 +14,13 @@ use wms_domain::{
     ApplyContainerQualityLockRequest, BatchCreateLpnContainerRequest,
     ChangeContainerQualityLockReasonRequest, CreateLpnContainerRequest, ErrorResponse,
     LpnContainer, LpnContainerListResponse, LpnContainerTypePolicy,
-    ReleaseContainerQualityLockRequest, UpdateLpnContainerRequest,
-    UpsertLpnContainerTypePolicyRequest,
+    ReleaseContainerQualityLockRequest, ReleaseContainerQualityLockResponse,
+    UpdateLpnContainerRequest, UpsertLpnContainerTypePolicyRequest,
 };
 
 use crate::{
     auth::{AuthContext, AuthError},
+    lpn_container_quality_lock_service::LpnContainerQualityLockService,
     lpn_container_repository::{LpnContainerRepositoryError, PgLpnContainerRepository},
 };
 
@@ -39,6 +40,10 @@ impl LpnContainerAppState {
             repository: Arc::new(PgLpnContainerRepository::new(pool)),
         }
     }
+
+    pub fn quality_lock(&self) -> LpnContainerQualityLockService {
+        LpnContainerQualityLockService::from_repository(self.repository.as_ref())
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -47,6 +52,7 @@ struct ListLpnContainersQuery {
     #[serde(rename = "type")]
     container_type: Option<String>,
     status: Option<String>,
+    lock_category: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -247,6 +253,7 @@ async fn list_lpn_containers_handler(
                 query.keyword.as_deref(),
                 query.container_type.as_deref(),
                 query.status.as_deref(),
+                query.lock_category.as_deref(),
             )
             .await?,
     }))
@@ -337,7 +344,7 @@ async fn apply_quality_lock_handler(
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .repository
+            .quality_lock()
             .apply_quality_lock(&ctx, id, request, Utc::now(), &idempotency_key)
             .await?,
     ))
@@ -354,7 +361,7 @@ async fn change_quality_lock_reason_handler(
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .repository
+            .quality_lock()
             .change_quality_lock_reason(&ctx, id, request, Utc::now(), &idempotency_key)
             .await?,
     ))
@@ -366,12 +373,12 @@ async fn release_quality_lock_handler(
     Path(id): Path<Uuid>,
     headers: HeaderMap,
     Json(request): Json<ReleaseContainerQualityLockRequest>,
-) -> Result<Json<LpnContainer>, LpnContainerHandlerError> {
+) -> Result<Json<ReleaseContainerQualityLockResponse>, LpnContainerHandlerError> {
     ctx.require_permission(QUALITY_LOCK_PERMISSION)?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
         state
-            .repository
+            .quality_lock()
             .release_quality_lock(&ctx, id, request, Utc::now(), &idempotency_key)
             .await?,
     ))

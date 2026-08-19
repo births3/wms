@@ -9,6 +9,7 @@ use super::*;
         ("keyword" = Option<String>, Query, description = "LPN 码关键字"),
         ("type" = Option<String>, Query, description = "容器类型"),
         ("status" = Option<String>, Query, description = "容器状态"),
+        ("lock_category" = Option<String>, Query, description = "当前质量锁类别"),
     ),
     responses(
         (status = 200, description = "LPN 容器列表", body = LpnContainerListResponse),
@@ -183,7 +184,7 @@ pub(crate) fn change_lpn_container_quality_lock_reason() {}
     ),
     request_body = ReleaseContainerQualityLockRequest,
     responses(
-        (status = 200, description = "解锁成功", body = LpnContainer),
+        (status = 200, description = "解锁成功", body = ReleaseContainerQualityLockResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 404, description = "容器不存在", body = ErrorResponse),

@@ -288,6 +288,7 @@ pub fn putaway_req(fixture: &PutawayFixture, lpn: &str) -> PutawayRequest {
         location_code: fixture.location_code.clone(),
         quality_status: STATUS_QUALIFIED.to_string(),
         lpn_code: Some(lpn.to_string()),
+        witness_id: None,
     }
 }
 
@@ -301,6 +302,7 @@ pub fn loose_putaway_req(fixture: &PutawayFixture) -> PutawayRequest {
         location_code: fixture.location_code.clone(),
         quality_status: STATUS_QUALIFIED.to_string(),
         lpn_code: None,
+        witness_id: None,
     }
 }
 

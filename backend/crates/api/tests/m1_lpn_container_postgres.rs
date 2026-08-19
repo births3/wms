@@ -41,6 +41,7 @@ async fn lpn_container_create_list_and_duplicate(pool: PgPool) {
             Some(&created.lpn_code),
             Some("pallet"),
             Some("idle"),
+            None,
         )
         .await
         .expect("list");
@@ -62,7 +63,7 @@ async fn lpn_container_create_list_and_duplicate(pool: PgPool) {
     .await
     .expect("other owner can also allocate");
     let own = repo
-        .list(&actor, None, None, None)
+        .list(&actor, None, None, None, None)
         .await
         .expect("owner scoped list");
     assert_eq!(own.len(), 2);
