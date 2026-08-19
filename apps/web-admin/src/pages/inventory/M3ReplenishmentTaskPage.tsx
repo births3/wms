@@ -65,20 +65,20 @@ const columns: DataGridColumn<ReplenishmentTask>[] = [
 ];
 
 export function M3ReplenishmentTaskPage() {
-  const listQuery = useReplenishmentTasksQuery();
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
+  const listQuery = useReplenishmentTasksQuery(toTaskFilters(appliedQuery));
   const createMutation = useCreateReplenishmentTaskMutation();
   const cancelMutation = useCancelReplenishmentTaskMutation();
   const reassignMutation = useReassignReplenishmentTaskMutation();
   const [selected, setSelected] = React.useState<string[]>([]);
-  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
-    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [form, setForm] = React.useState<CreateForm>(emptyForm());
   const [cancelReason, setCancelReason] = React.useState("supervisor_cancel");
   const createDialog = useDialogState<null>();
   const cancelDialog = useDialogState<ReplenishmentTask>();
   const reassignDialog = useDialogState<ReplenishmentTask>();
   const [notice, setNotice] = React.useState<Notice>(null);
-  const rows = React.useMemo(() => filterRows(listQuery.data?.data ?? [], appliedQuery), [appliedQuery, listQuery.data]);
+  const rows = listQuery.data?.data ?? [];
   const selectedRow = rows.find((row) => row.id === selected[0]);
   const busy = createMutation.isPending || cancelMutation.isPending || reassignMutation.isPending;
   const refreshAction: DataGridRefreshAction = { label: BUTTON_REFRESH, description: "刷新补货任务", disabled: listQuery.isFetching, onClick: () => void listQuery.refetch() };
@@ -246,18 +246,13 @@ function isTimeoutRow(row: ReplenishmentTask) {
   }
   return false;
 }
-function filterRows(rows: ReplenishmentTask[], query: QueryPanelValue) {
-  const status = queryString(query.status);
-  const trigger = queryString(query.trigger_mode);
-  const priority = queryString(query.priority);
-  const location = queryString(query.location).trim().toLowerCase();
-  const operator = queryString(query.operator).trim().toLowerCase();
-  const owner = queryString(query.owner).trim().toLowerCase();
-  return rows.filter((row) =>
-    (!status || row.status === status)
-    && (!trigger || row.trigger_mode === trigger)
-    && (!priority || row.priority === priority)
-    && (!location || row.source_location_id.toLowerCase().includes(location) || row.target_location_id.toLowerCase().includes(location))
-    && (!operator || (row.operator_id ?? "").toLowerCase().includes(operator))
-    && (!owner || row.owner_id.toLowerCase().includes(owner)));
+function toTaskFilters(query: QueryPanelValue) {
+  return {
+    status: queryString(query.status),
+    trigger_mode: queryString(query.trigger_mode),
+    priority: queryString(query.priority),
+    location_id: queryString(query.location),
+    operator_id: queryString(query.operator),
+    keyword: queryString(query.keyword),
+  };
 }

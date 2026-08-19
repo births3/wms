@@ -28,15 +28,42 @@ function requireData<T>(
   return data;
 }
 
-export function useReplenishmentTasksQuery() {
+export type ReplenishmentTaskListQuery = {
+  status?: string;
+  trigger_mode?: string;
+  priority?: string;
+  location_id?: string;
+  operator_id?: string;
+  wave_id?: string;
+  keyword?: string;
+};
+
+export function useReplenishmentTasksQuery(filters?: ReplenishmentTaskListQuery) {
   return useQuery<ReplenishmentTaskListResponse, ApiError>({
-    queryKey: replenishmentTasksQueryKey,
+    queryKey: [...replenishmentTasksQueryKey, filters ?? {}],
     queryFn: async () => {
-      const result = await api.GET("/api/v1/replenishment/tasks");
+      const result = await api.GET("/api/v1/replenishment/tasks", {
+        params: {
+          query: {
+            status: emptyToUndefined(filters?.status),
+            trigger_mode: emptyToUndefined(filters?.trigger_mode),
+            priority: emptyToUndefined(filters?.priority),
+            location_id: emptyToUndefined(filters?.location_id),
+            operator_id: emptyToUndefined(filters?.operator_id),
+            wave_id: emptyToUndefined(filters?.wave_id),
+            keyword: emptyToUndefined(filters?.keyword),
+          },
+        },
+      });
       return requireData(result.data, result.error, result.response.status, "读取补货任务失败");
     },
     retry: false,
   });
+}
+
+function emptyToUndefined(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export function useCreateReplenishmentTaskMutation() {

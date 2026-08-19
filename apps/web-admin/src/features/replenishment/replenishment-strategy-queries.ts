@@ -40,15 +40,36 @@ function requireData<T>(
   return data;
 }
 
-export function useReplenishmentStrategiesQuery() {
+export type ReplenishmentStrategyListQuery = {
+  keyword?: string;
+  enabled?: boolean;
+  scope_type?: string;
+  target_type?: string;
+};
+
+export function useReplenishmentStrategiesQuery(filters?: ReplenishmentStrategyListQuery) {
   return useQuery<ReplenishmentStrategyListResponse, ApiError>({
-    queryKey: replenishmentStrategiesQueryKey,
+    queryKey: [...replenishmentStrategiesQueryKey, filters ?? {}],
     queryFn: async () => {
-      const result = await api.GET("/api/v1/replenishment/strategies");
+      const result = await api.GET("/api/v1/replenishment/strategies", {
+        params: {
+          query: {
+            keyword: emptyToUndefined(filters?.keyword),
+            enabled: filters?.enabled,
+            scope_type: emptyToUndefined(filters?.scope_type),
+            target_type: emptyToUndefined(filters?.target_type),
+          },
+        },
+      });
       return requireData(result.data, result.error, result.response.status, "读取补货策略失败");
     },
     retry: false,
   });
+}
+
+function emptyToUndefined(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export function useCreateReplenishmentStrategyMutation() {

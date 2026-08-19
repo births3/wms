@@ -117,7 +117,9 @@ const columns: DataGridColumn<ReplenishmentStrategy>[] = [
 ];
 
 export function M3ReplenishmentStrategyPage() {
-  const listQuery = useReplenishmentStrategiesQuery();
+  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
+  const listQuery = useReplenishmentStrategiesQuery(toStrategyFilters(appliedQuery));
   const createMutation = useCreateReplenishmentStrategyMutation();
   const updateMutation = useUpdateReplenishmentStrategyMutation();
   const disableMutation = useDisableReplenishmentStrategyMutation();
@@ -125,8 +127,6 @@ export function M3ReplenishmentStrategyPage() {
   const bindMutation = useBindReplenishmentLocationsMutation();
   const groupMutation = useUpsertReplenishmentLocationGroupMutation();
   const [selected, setSelected] = React.useState<string[]>([]);
-  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
-    usePageQueryState<QueryPanelValue>(defaultQuery, normalizeQuery);
   const [form, setForm] = React.useState<Form>(emptyForm());
   const [groupForm, setGroupForm] = React.useState<GroupForm>(emptyGroupForm());
   const [previewRows, setPreviewRows] = React.useState<ReplenishmentPreviewItem[]>([]);
@@ -136,7 +136,7 @@ export function M3ReplenishmentStrategyPage() {
   const bindDialog = useDialogState<ReplenishmentStrategy>();
   const groupDialog = useDialogState<null>();
   const [notice, setNotice] = React.useState<Notice>(null);
-  const rows = React.useMemo(() => filterRows(listQuery.data?.data ?? [], appliedQuery), [appliedQuery, listQuery.data]);
+  const rows = listQuery.data?.data ?? [];
   const selectedRow = rows.find((row) => row.id === selected[0]);
   const busy = createMutation.isPending || updateMutation.isPending || disableMutation.isPending || bindMutation.isPending || groupMutation.isPending;
   const refreshAction: DataGridRefreshAction = { label: BUTTON_REFRESH, description: "刷新补货策略", disabled: listQuery.isFetching, onClick: () => void listQuery.refetch() };
@@ -422,16 +422,14 @@ function toRequest(form: Form): UpsertReplenishmentStrategyRequest {
 function parseIds(value: string): string[] {
   return value.split(/[,，\s]+/).map((item) => item.trim()).filter(Boolean);
 }
-function filterRows(rows: ReplenishmentStrategy[], query: QueryPanelValue) {
-  const keyword = queryString(query.keyword).trim().toLowerCase();
+function toStrategyFilters(query: QueryPanelValue) {
   const enabled = queryString(query.enabled);
-  const scopeType = queryString(query.scope_type);
-  const targetType = queryString(query.target_type);
-  return rows.filter((row) =>
-    (!keyword || `${row.strategy_code} ${row.strategy_name}`.toLowerCase().includes(keyword))
-    && (!enabled || String(row.enabled) === enabled)
-    && (!scopeType || row.scope_type === scopeType)
-    && (!targetType || row.target_type === targetType));
+  return {
+    keyword: queryString(query.keyword),
+    enabled: enabled === "" ? undefined : enabled === "true",
+    scope_type: queryString(query.scope_type),
+    target_type: queryString(query.target_type),
+  };
 }
 function validate(form: Form) {
   if (!form.strategyCode.trim() || !form.strategyName.trim()) return "策略编码和名称不能为空";
