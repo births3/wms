@@ -470,3 +470,120 @@ async fn execute_list_includes_own_task_outside_zone(pool: PgPool) {
         .collect();
     assert!(nos.contains(&"RP-OWN"));
 }
+
+fn manage_ctx(owner_id: Uuid) -> AuthContext {
+    AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id,
+        actor_name: "replenish-pc".into(),
+        permissions: vec!["m3.replenishment.manage".into()],
+        jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
+    }
+}
+
+async fn get_tasks_uri(
+    pool: PgPool,
+    auth: AuthContext,
+    uri: &str,
+) -> (StatusCode, serde_json::Value) {
+    let response = app(pool, auth)
+        .oneshot(
+            Request::builder()
+                .uri(uri)
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("oneshot");
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body");
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::json!({}));
+    (status, json)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn list_task_response_includes_table_columns(pool: PgPool) {
+    let world = seed_world(&pool).await;
+    insert_task(&pool, &world, "RP-COLS", "normal", world.pick_in_seq10).await;
+    let (status, body) = get_tasks(pool, manage_ctx(world.owner_id)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let row = &body["data"][0];
+    assert!(row.get("confirmed_at").is_some(), "{row}");
+    assert!(row.get("cancel_reason").is_some(), "{row}");
+    assert!(row.get("updated_at").is_some(), "{row}");
+    assert!(row["updated_at"].as_str().is_some());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn list_tasks_paginates_with_limit_and_cursor(pool: PgPool) {
+    let world = seed_world(&pool).await;
+    insert_task(&pool, &world, "RP-P1", "normal", world.pick_in_seq10).await;
+    insert_task(&pool, &world, "RP-P2", "normal", world.pick_in_seq10).await;
+    insert_task(&pool, &world, "RP-P3", "normal", world.pick_in_seq10).await;
+    let (status, first) = get_tasks_uri(
+        pool.clone(),
+        manage_ctx(world.owner_id),
+        "/api/v1/replenishment/tasks?limit=2",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{first}");
+    assert_eq!(first["data"].as_array().expect("data").len(), 2);
+    assert_eq!(first["page"]["count"], 2);
+    let cursor = first["page"]["next_cursor"].as_str().expect("cursor");
+    let (status, second) = get_tasks_uri(
+        pool,
+        manage_ctx(world.owner_id),
+        &format!("/api/v1/replenishment/tasks?limit=2&cursor={cursor}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{second}");
+    assert_eq!(second["data"].as_array().expect("data").len(), 1);
+    assert!(second["page"]["next_cursor"].is_null());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn list_tasks_filters_keyword_wave_and_created_window(pool: PgPool) {
+    let world = seed_world(&pool).await;
+    let matched = insert_task(&pool, &world, "RP-WAVE-A", "normal", world.pick_in_seq10).await;
+    insert_task(&pool, &world, "RP-OTHER", "normal", world.pick_in_seq10).await;
+    let wave_id = Uuid::new_v4();
+    sqlx::query("UPDATE replenishment_tasks SET wave_id = $2 WHERE id = $1")
+        .bind(matched)
+        .bind(wave_id)
+        .execute(&pool)
+        .await
+        .expect("wave");
+    let (status, by_keyword) = get_tasks_uri(
+        pool.clone(),
+        manage_ctx(world.owner_id),
+        "/api/v1/replenishment/tasks?keyword=WAVE",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{by_keyword}");
+    let nos: Vec<&str> = by_keyword["data"]
+        .as_array()
+        .expect("data")
+        .iter()
+        .map(|row| row["task_no"].as_str().expect("task_no"))
+        .collect();
+    assert_eq!(nos, vec!["RP-WAVE-A"]);
+    let (status, by_wave) = get_tasks_uri(
+        pool.clone(),
+        manage_ctx(world.owner_id),
+        &format!("/api/v1/replenishment/tasks?wave_id={wave_id}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{by_wave}");
+    assert_eq!(by_wave["data"].as_array().expect("data").len(), 1);
+    let (status, by_time) = get_tasks_uri(
+        pool,
+        manage_ctx(world.owner_id),
+        "/api/v1/replenishment/tasks?created_from=2099-01-01T00:00:00Z",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{by_time}");
+    assert!(by_time["data"].as_array().expect("data").is_empty());
+}
