@@ -21,7 +21,7 @@ use wms_domain::{
     is_temperature_zone_subset, task_qty, validate_external_fragrant, validate_replenish_route,
     zone_treats_as_qualified, BindReplenishmentLocationsRequest,
     BindReplenishmentLocationsResponse, CreateReplenishmentTaskRequest, PageMeta, Quantity,
-    ReplenishmentLocationGroup, ReplenishmentLocationGroupListResponse,
+    ReplenishmentLocationGroup, ReplenishmentLocationGroupListResponse, ReplenishmentPreviewItem,
     ReplenishmentPreviewResponse, ReplenishmentTask, ReplenishmentTaskListResponse,
     UpsertReplenishmentLocationGroupRequest, UpsertReplenishmentStrategyRequest,
 };
@@ -191,7 +191,30 @@ impl ReplenishmentService {
             .get_strategy(ctx.owner_id, strategy_id)
             .await?
             .ok_or(ReplenishmentError::StrategyNotFound)?;
-        let data = self.repo.preview_strategy(ctx.owner_id, &strategy).await?;
+        let locations = self.repo.preview_strategy(ctx.owner_id, &strategy).await?;
+        let mut tx = self.repo.pool().begin().await?;
+        let mut data = Vec::new();
+        for location in locations {
+            for product_id in self
+                .patrol_products(&strategy, location.location_id)
+                .await?
+            {
+                let available_qty = self
+                    .repo
+                    .pick_available_qty(&mut tx, ctx.owner_id, location.location_id, product_id)
+                    .await?;
+                data.push(ReplenishmentPreviewItem {
+                    location_id: location.location_id,
+                    location_code: location.location_code.clone(),
+                    product_id: Some(product_id),
+                    available_qty,
+                    min_safety_threshold: strategy.min_safety_threshold,
+                    max_replenish_target: strategy.max_replenish_target,
+                    would_trigger: available_qty <= strategy.min_safety_threshold,
+                });
+            }
+        }
+        tx.commit().await?;
         Ok(ReplenishmentPreviewResponse { data })
     }
 

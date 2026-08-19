@@ -185,7 +185,7 @@ impl ReplenishmentService {
         Ok(created)
     }
 
-    async fn patrol_products(
+    pub(crate) async fn patrol_products(
         &self,
         strategy: &ReplenishmentStrategy,
         location_id: Uuid,

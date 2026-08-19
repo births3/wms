@@ -115,6 +115,18 @@ pub fn can_confirm(status: &str, picked_qty: Quantity) -> bool {
     status == REPLENISH_STATUS_IN_PROGRESS || status == REPLENISH_STATUS_SUSPENDED
 }
 
+/// confirm 仅在已领取的 in_progress 且尚未下架时跑冻结挂起（GWT 17）。
+pub fn confirm_runs_freeze_check(
+    status: &str,
+    picked_qty: Quantity,
+    operator_id: Option<Uuid>,
+    user_id: Uuid,
+) -> bool {
+    picked_qty <= Quantity::ZERO
+        && status == REPLENISH_STATUS_IN_PROGRESS
+        && operator_id == Some(user_id)
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpsertReplenishmentStrategyRequest {
     pub strategy_code: String,
@@ -383,6 +395,35 @@ mod tests {
         assert_eq!(task_qty(q(18), q(30), 1), q(18));
         assert_eq!(task_qty(q(5), q(30), 12), q(0));
         assert_eq!(task_qty(q(25), q(20), 6), q(18));
+    }
+
+    #[test]
+    fn confirm_freeze_check_only_for_claimed_in_progress_unpicked() {
+        let user = Uuid::from_u128(1);
+        assert!(confirm_runs_freeze_check(
+            REPLENISH_STATUS_IN_PROGRESS,
+            q(0),
+            Some(user),
+            user,
+        ));
+        assert!(!confirm_runs_freeze_check(
+            REPLENISH_STATUS_PENDING,
+            q(0),
+            Some(user),
+            user,
+        ));
+        assert!(!confirm_runs_freeze_check(
+            REPLENISH_STATUS_IN_PROGRESS,
+            q(4),
+            Some(user),
+            user,
+        ));
+        assert!(!confirm_runs_freeze_check(
+            REPLENISH_STATUS_IN_PROGRESS,
+            q(0),
+            Some(Uuid::from_u128(2)),
+            user,
+        ));
     }
 
     #[test]

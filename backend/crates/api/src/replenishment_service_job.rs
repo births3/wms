@@ -232,7 +232,12 @@ impl ReplenishmentService {
         if task.version != req.version {
             return Err(ReplenishmentError::StateInvalid);
         }
-        if task.picked_qty <= Quantity::ZERO {
+        if wms_domain::confirm_runs_freeze_check(
+            &task.status,
+            task.picked_qty,
+            task.operator_id,
+            ctx.user_id,
+        ) {
             if let Some(suspended) = self
                 .suspend_if_source_short(&mut tx, ctx, &mut task, req.version)
                 .await?
