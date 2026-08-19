@@ -1,14 +1,22 @@
 //! T09：波次缺口引擎（GWT 4/27）。不改正文出库行。
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, TimeZone, Utc};
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
     replenishment_repository::PgReplenishmentRepository,
     replenishment_service::{CreateWaveGapTasksRequest, ReplenishmentService},
+    wave4_handlers::Wave4ReplenishService,
+    wave4_repository::PgWave4Repository,
 };
-use wms_domain::Quantity;
+use wms_domain::{
+    CreateOutboundOrderLineRequest, CreateOutboundOrderRequest, CreateOutboundWaveRequest, Quantity,
+};
+
+#[path = "support/h9.rs"]
+mod h9_support;
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -556,7 +564,61 @@ async fn fill_wave_pick_gaps_skips_putaway_blocked_without_failing(pool: PgPool)
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn fill_wave_pick_gaps_prefers_outbound_pick_task_location(pool: PgPool) {
+async fn fill_wave_pick_gaps_ignores_this_wave_frozen_qty(pool: PgPool) {
+    let world = seed_world(&pool, 3, 30).await;
+    insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
+    let wave_id = Uuid::new_v4();
+    insert_wave_order(&pool, &world, wave_id, 10).await;
+    let order_id: Uuid = sqlx::query_scalar(
+        "SELECT outbound_order_id FROM outbound_wave_orders WHERE wave_id = $1 AND owner_id = $2",
+    )
+    .bind(wave_id)
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("order");
+    let pick_batch_id: Uuid = sqlx::query_scalar(
+        r#"
+        SELECT id FROM inventory_batches
+         WHERE owner_id = $1 AND location_id = $2 AND product_id = $3
+        "#,
+    )
+    .bind(world.owner_id)
+    .bind(world.pick_id)
+    .bind(world.product_id)
+    .fetch_one(&pool)
+    .await
+    .expect("pick batch");
+    sqlx::query("UPDATE inventory_batches SET qty_frozen = 3 WHERE id = $1")
+        .bind(pick_batch_id)
+        .execute(&pool)
+        .await
+        .expect("freeze pick face");
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_allocations (
+            id, owner_id, outbound_order_id, line_no, batch_id, allocated_qty, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, 1, $4, 3, 'locked', now(), now())
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(world.owner_id)
+    .bind(order_id)
+    .bind(pick_batch_id)
+    .execute(&pool)
+    .await
+    .expect("allocation");
+    let created = service(pool)
+        .fill_wave_pick_gaps(world.owner_id, wave_id)
+        .await
+        .expect("fill");
+    assert_eq!(created.len(), 1);
+    assert_eq!(created[0].qty, Quantity::from(7));
+    assert_eq!(created[0].target_location_id, world.pick_id);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn fill_wave_pick_gaps_ignores_storage_allocation_location(pool: PgPool) {
     let world = seed_world(&pool, 0, 30).await;
     insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
     let warehouse_id: Uuid = sqlx::query_scalar(
@@ -575,13 +637,13 @@ async fn fill_wave_pick_gaps_prefers_outbound_pick_task_location(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .expect("zone");
-    let assigned = seed_loc(
+    let storage_pick = seed_loc(
         &pool,
         world.owner_id,
         warehouse_id,
         zone_id,
-        "PP-09",
-        "piece_pick",
+        "ST-09",
+        "storage",
     )
     .await;
     let wave_id = Uuid::new_v4();
@@ -600,7 +662,7 @@ async fn fill_wave_pick_gaps_prefers_outbound_pick_task_location(pool: PgPool) {
             id, owner_id, wave_id, outbound_order_id, line_no, batch_id,
             product_code, batch_no, location_id, location_code, planned_qty, route_sequence
         ) VALUES (
-            $1, $2, $3, $4, 1, $5, $6, 'B-SRC', $7, 'PP-09', 8, 1
+            $1, $2, $3, $4, 1, $5, $6, 'B-SRC', $7, 'ST-09', 8, 1
         )
         "#,
     )
@@ -610,7 +672,7 @@ async fn fill_wave_pick_gaps_prefers_outbound_pick_task_location(pool: PgPool) {
     .bind(order_id)
     .bind(world.source_batch_id)
     .bind(format!("P-{}", &world.product_id.simple().to_string()[..8]))
-    .bind(assigned)
+    .bind(storage_pick)
     .execute(&pool)
     .await
     .expect("pick task");
@@ -619,6 +681,118 @@ async fn fill_wave_pick_gaps_prefers_outbound_pick_task_location(pool: PgPool) {
         .await
         .expect("fill");
     assert_eq!(created.len(), 1);
-    assert_eq!(created[0].target_location_id, assigned);
-    assert_ne!(created[0].target_location_id, world.pick_id);
+    assert_eq!(created[0].target_location_id, world.pick_id);
+    assert_ne!(created[0].target_location_id, storage_pick);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn wave4_replenish_after_allocate_uses_pick_face_gap(pool: PgPool) {
+    let world = seed_world(&pool, 3, 30).await;
+    insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;
+    let warehouse_id: Uuid = sqlx::query_scalar(
+        "SELECT warehouse_id FROM warehouse_locations WHERE id = $1 AND owner_id = $2",
+    )
+    .bind(world.pick_id)
+    .bind(world.owner_id)
+    .fetch_one(&pool)
+    .await
+    .expect("warehouse");
+    let product_code = format!("P-{}", &world.product_id.simple().to_string()[..8]);
+    sqlx::query(
+        r#"
+        UPDATE inventory_batches
+           SET product_code = $3, batch_no = 'B-SRC'
+         WHERE owner_id = $1 AND product_id = $2
+        "#,
+    )
+    .bind(world.owner_id)
+    .bind(world.product_id)
+    .bind(&product_code)
+    .execute(&pool)
+    .await
+    .expect("align batch codes");
+    let now = Utc
+        .with_ymd_and_hms(2026, 8, 19, 9, 0, 0)
+        .single()
+        .expect("now");
+    let customer_id = Uuid::new_v4();
+    let delivery_address_id = h9_support::seed_outbound_route_binding(
+        &pool,
+        world.owner_id,
+        warehouse_id,
+        customer_id,
+        now,
+    )
+    .await;
+    let waves = Arc::new(PgWave4Repository::new(pool.clone()));
+    let replenishment = Arc::new(service(pool.clone()));
+    let orchestrator = Wave4ReplenishService::new(pool.clone(), waves.clone(), replenishment);
+    let ctx = AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: world.owner_id,
+        actor_name: "wave-fill-it".into(),
+        permissions: vec!["m4.write".into(), "m3.replenishment.manage".into()],
+        jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
+    };
+    let order = waves
+        .create_outbound_order(
+            &ctx,
+            CreateOutboundOrderRequest {
+                document_type: "sales_outbound".to_string(),
+                wms_order_no: "WMS-GAP-001".to_string(),
+                erp_order_no: None,
+                invoice_no: None,
+                transport_mode_code: None,
+                department_code: None,
+                sales_group_code: None,
+                order_group_no: None,
+                business_type_code: None,
+                customer_id,
+                warehouse_id,
+                delivery_address_id,
+                required_ship_at: None,
+                lines: vec![CreateOutboundOrderLineRequest {
+                    line_no: 1,
+                    product_code,
+                    batch_no: "B-SRC".to_string(),
+                    planned_qty: 10.into(),
+                }],
+            },
+            now,
+            "wave-gap-order-1",
+            None,
+        )
+        .await
+        .expect("order")
+        .value;
+    let wave = orchestrator
+        .create_outbound_wave(
+            &ctx,
+            CreateOutboundWaveRequest {
+                wave_no: "WAVE-GAP-001".to_string(),
+                order_ids: vec![order.id],
+            },
+            now,
+            "wave-gap-create-1",
+            None,
+        )
+        .await
+        .expect("wave")
+        .value;
+    let tasks: Vec<(Uuid, Quantity)> = sqlx::query_as(
+        r#"
+        SELECT target_location_id, qty
+          FROM replenishment_tasks
+         WHERE owner_id = $1 AND wave_id = $2
+        "#,
+    )
+    .bind(world.owner_id)
+    .bind(wave.id)
+    .fetch_all(&pool)
+    .await
+    .expect("tasks");
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0].0, world.pick_id);
+    assert_eq!(tasks[0].1, Quantity::from(7));
 }

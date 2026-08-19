@@ -348,6 +348,33 @@ async fn cancel_pending_releases_transit(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn cancel_already_cancelled_task_is_rejected(pool: PgPool) {
+    let world = seed_world(&pool, 10).await;
+    let task = create_task(&pool, &world, 10, "ex-cancel-once").await;
+    let first = post(
+        app(pool.clone(), manage_ctx(world.owner_id)),
+        &uri(task["id"].as_str().expect("id"), "cancel"),
+        serde_json::json!({ "version": task["version"], "reason": "计划取消" }),
+        "ex-cancel-once-first",
+    )
+    .await;
+    assert_eq!(first.0, StatusCode::OK);
+    let (before_on, before_out) = transit(&pool, world.source_batch_id).await;
+    let second = post(
+        app(pool.clone(), manage_ctx(world.owner_id)),
+        &uri(task["id"].as_str().expect("id"), "cancel"),
+        serde_json::json!({ "version": first.1["version"], "reason": "再次取消" }),
+        "ex-cancel-twice",
+    )
+    .await;
+    assert_eq!(second.0, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(second.1["code"], "M3_REPLENISH_CANCEL_BLOCKED");
+    let (after_on, after_out) = transit(&pool, world.source_batch_id).await;
+    assert_eq!(after_on, before_on);
+    assert_eq!(after_out, before_out);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn confirm_when_source_frozen_suspends_task(pool: PgPool) {
     let world = seed_world(&pool, 10).await;
     let task = create_task(&pool, &world, 10, "ex-17-create").await;
@@ -377,8 +404,8 @@ async fn confirm_when_source_frozen_suspends_task(pool: PgPool) {
         "ex-17-confirm",
     )
     .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(body["code"], "M3_REPLENISH_SOURCE_UNAVAILABLE");
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"], "suspended");
     let task_status: String =
         sqlx::query_scalar("SELECT status FROM replenishment_tasks WHERE id = $1")
             .bind(Uuid::parse_str(id).expect("uuid"))
@@ -386,6 +413,21 @@ async fn confirm_when_source_frozen_suspends_task(pool: PgPool) {
             .await
             .expect("status");
     assert_eq!(task_status, "suspended");
+    let audits: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+          FROM audit_event
+         WHERE owner_id = $1
+           AND action = 'suspend_replenishment_task'
+           AND resource_id = $2
+        "#,
+    )
+    .bind(world.owner_id)
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .expect("audit");
+    assert_eq!(audits, 1);
     let (on_hand, _) = transit(&pool, world.source_batch_id).await;
     assert_eq!(on_hand, Quantity::from(10));
     let frozen_alerts: i64 = sqlx::query_scalar(
@@ -463,7 +505,8 @@ async fn suspended_confirm_delivers_picked_qty_only(pool: PgPool) {
         "ex-31-pick2",
     )
     .await;
-    assert_eq!(blocked.0, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(blocked.0, StatusCode::OK);
+    assert_eq!(blocked.1["status"], "suspended");
     let version: i64 = sqlx::query_scalar("SELECT version FROM replenishment_tasks WHERE id = $1")
         .bind(Uuid::parse_str(id).expect("uuid"))
         .fetch_one(&pool)
