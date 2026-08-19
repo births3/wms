@@ -344,7 +344,7 @@ GRANT 给 `wms_app`。不做兼容双写、不做旧表回填。不建 IoT 四�
 | 6 维 | **生成**时对目标位跑 ②温区 ③质量 ⑥外用串味+容量；失败跳过该位并写 `replenishment.patrol_fail`。**送达确认**时再跑 ②③⑥，失败 `M3_REPLENISH_PUTAWAY_BLOCKED` | 不重做 ①品类大区以外的上架全流水；④特药双人在补货送达不强制（补货不是上架事务） |
 | 库位形态 | 来源 `location_type` 必须等于策略 `source_type`；目标必须等于 `target_type`；`storage` 来源可带 `source_lpn_id`；`case_pick` 来源 `source_lpn_id` 必空 | 不把补货目标写成 `storage`/`staging` |
 | 路径序 | PDA/大盘作业排序用目标位 `pick_sequence_no` | 不改向导生成规则 |
-| 库位锁与 M3 作业锁 | `lock_status∈{lock_all,lock_out}` 的目标跳过生成、确认阻断；来源 `lock_all`/`lock_in` 不可下架。目标处于盘点锁或养护作业锁时生成跳过、确认 `M3_REPLENISH_PUTAWAY_BLOCKED`（复用既有 M3 锁查询，不新造锁） | 不新造补货专用库位锁 |
+| 库位锁与 M3 作业锁 | 目标（上架）跳过/确认阻断 `lock_in`/`lock_all`；来源不可下架 `lock_out`/`lock_all`。对齐 P1：`lock_in` 禁入、`lock_out` 禁出。目标处于盘点锁或养护作业锁时生成跳过、确认 `M3_REPLENISH_PUTAWAY_BLOCKED`（复用既有 M3 锁查询，不新造锁） | 不新造补货专用库位锁、不改 P1 锁方向 |
 | 在途字段 | 只按第 4 节公式读写已有列 | 不把 `qty_frozen` 当补货占用 |
 
 完成联动（任务 `done` 后异步，不在确认事务内调波次模块）：
