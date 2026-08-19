@@ -185,7 +185,7 @@ in_progress / suspended / pending ──cancel(picked_qty=0,done_qty=0)──►
 
 **pick**：`{ "version": n, "scanned_location_code": string, "scanned_lpn_code"?: string, "qty": decimal }`。有 `source_lpn_id` 时 `scanned_lpn_code` 必填且必须匹配。
 
-**confirm**：`{ "version": n, "scanned_location_code": string, "qty": decimal }`
+**confirm**：`{ "version": n, "scanned_location_code": string, "qty": decimal }`。执行确认操作者必须与领用人一致（`operator_id == user_id`），防止未领取人假冒领用人触发非预期状态流转；若未领取或非本人领用则返回 422 `M3_REPLENISH_STATE_INVALID`。
 
 **cancel**：`{ "version": n, "reason": string }`，`reason` 非空。
 

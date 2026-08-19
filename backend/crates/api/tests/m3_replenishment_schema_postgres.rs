@@ -167,11 +167,11 @@ async fn replenishment_h4_alert_definitions_are_seeded(pool: PgPool) {
     .expect("owner");
     let event_types: Vec<String> = sqlx::query_scalar(
         r#"
-        SELECT event_type
+        SELECT alert_code
           FROM alert_definitions
          WHERE owner_id = $1
-           AND event_type = ANY($2)
-         ORDER BY event_type
+           AND alert_code = ANY($2)
+         ORDER BY alert_code
         "#,
     )
     .bind(owner_id)
