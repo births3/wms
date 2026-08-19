@@ -309,34 +309,20 @@ fn disposition_response(
 
 async fn list_driver_today_tasks_handler(
     ctx: AuthContext,
-    State(_state): State<Wave4AppState>,
+    State(state): State<Wave4AppState>,
 ) -> Result<Json<DriverTaskListResponse>, Wave4HandlerError> {
     ctx.require_permission("h-driver.read")?;
-    Ok(Json(DriverTaskListResponse {
-        data: Vec::new(),
-        page: PageMeta {
-            next_cursor: None,
-            count: 0,
-            total: None,
-        },
-    }))
+    let resp = state.wave4_repository.list_driver_today_tasks(&ctx).await?;
+    Ok(Json(resp))
 }
 
 async fn get_store_dashboard_handler(
     ctx: AuthContext,
-    State(_state): State<Wave4AppState>,
+    State(state): State<Wave4AppState>,
 ) -> Result<Json<StoreDashboardResponse>, Wave4HandlerError> {
     ctx.require_permission("h-store.read")?;
-    Ok(Json(StoreDashboardResponse {
-        store_id: None,
-        pending_receipt_orders: 0,
-        in_transit_orders: 0,
-        signed_orders_last_7_days: 0,
-        inventory_alert_count: 0,
-        returns_this_month: 0,
-        exceptions_this_month: 0,
-        generated_at: Utc::now(),
-    }))
+    let resp = state.wave4_repository.get_store_dashboard(&ctx).await?;
+    Ok(Json(resp))
 }
 
 include!("wave4_handlers_orders.rs");
@@ -586,15 +572,7 @@ mod tests {
                 if permission == "h-driver.read"
         ));
 
-        let Json(tasks) = list_driver_today_tasks_handler(
-            ctx(owner_id, &["h-driver.read"]),
-            State(state.clone()),
-        )
-        .await
-        .expect("authorized driver should read tasks");
-        assert_eq!(tasks.page.count, 0);
-
-        let store_denied = get_store_dashboard_handler(ctx(owner_id, &[]), State(state.clone()))
+        let store_denied = get_store_dashboard_handler(ctx(owner_id, &[]), State(state))
             .await
             .expect_err("store dashboard should require h-store.read");
         assert!(matches!(
@@ -602,6 +580,20 @@ mod tests {
             Wave4HandlerError::Auth(AuthError::PermissionDenied(permission))
                 if permission == "h-store.read"
         ));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn postgres_driver_and_store_read_handlers_query_database(pool: PgPool) {
+        let owner_id = Uuid::new_v4();
+        let state = Wave4AppState::with_postgres(pool);
+
+        let Json(tasks) = list_driver_today_tasks_handler(
+            ctx(owner_id, &["h-driver.read"]),
+            State(state.clone()),
+        )
+        .await
+        .expect("authorized driver should read tasks");
+        assert_eq!(tasks.page.count, 0);
 
         let Json(dashboard) =
             get_store_dashboard_handler(ctx(owner_id, &["h-store.read"]), State(state))
