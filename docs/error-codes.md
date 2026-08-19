@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
 > 时间：2026-08-20
-> 版本：v3.14（当前 249 项）
+> 版本：v3.14（当前 250 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 83 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 155 | 业务异常（数据冲突 / 校验失败）|
+| error | 156 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **249** | — |
+| **合计** | **250** | — |
 
 ---
 
@@ -95,7 +95,7 @@
 | H8 | 1 | ERP 接口表探查 |
 | H_DOCK | 11 | 月台预约 |
 | H_AL | 28 | 告警引擎 |
-| M1 | 53 | 主数据校验 / 配置中心 / 设备中台 |
+| M1 | 54 | 主数据校验 / 配置中心 / 设备中台 |
 | M2 | 18 | 入库流程 |
 | M3 | 30 | 库存与状态 / 补货 |
 | M4 | 10 | 出库与拣选 |
@@ -1852,6 +1852,18 @@ error_codes:
     introduced_in: v3.14
 
 
+  - code: M1_DEVICE_INTERNAL
+    module: M1
+    category: DEVICE
+    detail: INTERNAL
+    http_status: 500
+    severity: error
+    message_zh: '设备中台内部错误'
+    message_en: 'Device platform internal error'
+    related_fields: []
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
   - code: M2_PUTAWAY_ZONE_CATEGORY_DENIED
     module: M2
     category: PUTAWAY
@@ -3180,4 +3192,4 @@ error_codes:
 | 2026-08-17 | v3.11 | 登记 M1_QUALITY_LOCK_*（5 项）与 M2_PUTAWAY_*（7 项）容器质量锁/6 维校验错误码；脚本统计当前合计 203 项 |
 | 2026-08-18 | v3.12 | 补登记 M1_QUALITY_LOCK_REASON_INVALID / MQL_REQUIRED / NOT_LOCKED；脚本统计当前合计 206 项 |
 | 2026-08-19 | v3.13 | 登记 US-M3-012 补货 `M3_REPLENISH_*` 22 项；脚本统计当前合计 228 项 |
-| 2026-08-20 | v3.14 | 登记 Phase 3 设备中台 `M1_DEVICE_*` / `M1_BIND_*` / `M1_WCS_TASK_*` / `M1_PTL_*` / `M1_POD_*` / `M1_LOCATION_UNREACHABLE` / `M1_AGV_*` / `M1_EVENT_*` / `M1_NUMBERING_UNAVAILABLE` 22 项；脚本统计当前合计 250 项 |
+| 2026-08-20 | v3.14 | 登记 Phase 3 设备中台 `M1_DEVICE_*` / `M1_BIND_*` / `M1_WCS_TASK_*` / `M1_PTL_*` / `M1_POD_*` / `M1_LOCATION_UNREACHABLE` / `M1_AGV_*` / `M1_EVENT_*` / `M1_NUMBERING_UNAVAILABLE` 22 项（另加 M1_DEVICE_INTERNAL 500 兜底）；脚本统计当前合计 250 项 |
