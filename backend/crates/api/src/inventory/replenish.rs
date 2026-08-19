@@ -13,6 +13,16 @@ pub enum InventoryReplenishError {
     Database(String),
 }
 
+async fn set_lock_timeout(
+    tx: &mut Transaction<'_, Postgres>,
+) -> Result<(), InventoryReplenishError> {
+    sqlx::query("SET LOCAL lock_timeout = '3s'")
+        .execute(&mut **tx)
+        .await
+        .map_err(|error| InventoryReplenishError::Database(error.to_string()))?;
+    Ok(())
+}
+
 struct SourceBatchRow {
     product_id: Option<Uuid>,
     product_code: Option<String>,
@@ -33,6 +43,7 @@ pub async fn reserve_replenish_in_tx(
     if qty <= Quantity::ZERO {
         return Err(InventoryReplenishError::InvalidQuantity);
     }
+    set_lock_timeout(tx).await?;
 
     let source = sqlx::query_as::<_, (Option<Uuid>, Option<String>, String, NaiveDate, NaiveDate)>(
         r#"
