@@ -1,0 +1,45 @@
+# H8：容器化「外部 ERP 厂商」模拟端（通道 A REST 回执）
+# 可与 docker-compose.h8-erp-if.yml（接口库）并行使用。
+#
+# 用法：
+#   cd deploy
+#   export H8_ERP_VENDOR_BEARER_TOKEN='replace-with-local-test-token'
+#   docker compose -f docker-compose.h8-erp-vendor.yml up -d --build
+#   export ERP_CALLBACK_BASE=http://127.0.0.1:18092
+#
+# 主备降级联调（前 2 次 POST 503）：
+#   ERP_FAIL_COUNT=2 docker compose -f docker-compose.h8-erp-vendor.yml up -d --build --force-recreate
+
+services:
+  erp-vendor-a:
+    build:
+      context: ./h8-erp-vendor
+      dockerfile: Dockerfile
+    image: wms-h8-erp-vendor:local
+    container_name: wms-h8-erp-vendor-a
+    environment:
+      ERP_VENDOR_CODE: "${H8_ERP_VENDOR_CODE:-container-erp-vendor-a}"
+      ERP_VENDOR_PORT: "8080"
+      ERP_VENDOR_DATA: "/data"
+      ERP_VENDOR_BEARER_TOKEN: "${H8_ERP_VENDOR_BEARER_TOKEN:?required}"
+      # 启动后前 N 次业务 POST 返回 503，用于 failover 联调
+      ERP_FAIL_COUNT: "${ERP_FAIL_COUNT:-0}"
+    ports:
+      - "${H8_ERP_VENDOR_PORT:-18092}:8080"
+    volumes:
+      - h8_erp_vendor_a_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import os, urllib.request; token=os.environ['ERP_VENDOR_BEARER_TOKEN']; req=urllib.request.Request('http://127.0.0.1:8080/healthz', headers={'Authorization': 'Bearer '+token}); urllib.request.urlopen(req, timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  h8_erp_vendor_a_data:

@@ -1,0 +1,16 @@
+[Unit]
+Description=WMS local development application services
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/wms
+EnvironmentFile=-%h/workspace/wms/deploy/env/dev-h2.env
+Environment=PATH=%h/.cargo/bin:%h/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.cargo/bin/just dev-services api,render
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

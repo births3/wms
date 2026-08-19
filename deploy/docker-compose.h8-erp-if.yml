@@ -1,0 +1,33 @@
+# H8：本地模拟「无 API ERP」接口库（SQL Server）
+# 用法：
+#   cd deploy && docker compose -f docker-compose.h8-erp-if.yml up -d
+#   ./h8-erp-if/wait-and-init.sh
+#
+# 默认 SA 密码仅用于本地开发，禁止用于生产。
+
+services:
+  mssql-erp-if:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: wms-mssql-erp-if
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${H8_MSSQL_SA_PASSWORD:-Wms_Erp_If_Dev_2026!}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "${H8_MSSQL_PORT:-14333}:1433"
+    volumes:
+      - h8_mssql_erp_if_data:/var/opt/mssql
+      - ./h8-erp-if/init:/docker-init:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+volumes:
+  h8_mssql_erp_if_data:
