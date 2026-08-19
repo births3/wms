@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "generated_at": "2026-07-11T15:43:56Z",
+  "max_counts": {
+    "check_audit_trail_coverage": 0,
+    "check_idempotency_test": 0
+  },
+  "note": "由 check_baseline_health.py 维护；每个 check 的 baseline 数量上限。"
+}

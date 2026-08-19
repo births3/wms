@@ -1,0 +1,160 @@
+# wms 治理脚本数据配置（check-data.toml）
+#
+# 用途：
+#   把治理脚本中的硬编码数据（豁免列表、跨模块引用清单等）抽到此文件，
+#   让"新增模块/故事"无需改 Python 脚本，只改此 TOML。
+#
+# 详细规则：见 docs/governance.md §2.3 治理脚本约定（v0.4）
+
+# ============================================================
+# check_doc_links.py — 附录跨模块引用规则
+# ============================================================
+# 格式：每个附录定义在哪个文件，期望被哪些故事文件引用
+# 缺一报告（违反"附录必须被使用方引用"原则）
+
+[[appendix_references]]
+appendix = "附录 A"  # 储存条件温度区间表
+defined_in = "user-stories-m1-master-data.md"
+expected_in = [
+    "user-stories-m5-cold-chain.md",
+    "user-stories-mvr-validation-rules.md",
+    "user-stories-m2-inbound.md",
+]
+
+# ============================================================
+# check_approval_source_chain.py — 豁免故事 ID 列表
+# ============================================================
+# 触发库存状态变更但允许不显式声明审批源的故事；
+# 加豁免必须有理由（reason）写明，PR 评审检查理由是否成立。
+
+[[approval_source_exemptions]]
+story_id = "US-M3-001"
+reason = "实时库存查询 — 只读"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-002"
+reason = "批次效期管理 — 主要为查询和管理"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-003"
+reason = "M3-003 自身定义审批源枚举，是源头不是消费方"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-005"
+reason = "盘点 — 盘盈盘亏审批源默认=系统盘点（隐含）"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-006"
+reason = "移库 — 不改库存状态"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-007"
+reason = "跨仓调拨 — 不改库存状态（移动）"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-008"
+reason = "货主转换 — 不改库存状态"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-009"
+reason = "预警 — 仅推送，无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M3-010"
+reason = "ABC 分类 — 仅分类，无状态变更"
+
+[[approval_source_exemptions]]
+story_id = "US-M1-008"
+reason = "配置中心 — 不直接改库存"
+
+[[approval_source_exemptions]]
+story_id = "US-M2-007"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M2-008"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M2-009"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M2-010"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-007"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-009"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-010"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-011"
+reason = "看板/打印类 — 无写操作"
+
+[[approval_source_exemptions]]
+story_id = "US-M2-005"
+reason = "上架 — 状态变更是 M2 流程内置（已通过 M-VR 路由）"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-003"
+reason = "拣选 — 状态变更是 M4 流程内置"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-004"
+reason = "复核 — 状态变更是 M4 流程内置"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-006"
+reason = "出库 — 状态变更是 M4 流程内置"
+
+[[approval_source_exemptions]]
+story_id = "US-VR-002"
+reason = "M-VR 路由 — 中转，不是终端动作"
+
+[[approval_source_exemptions]]
+story_id = "US-VR-003"
+reason = "M-VR 路由 — 中转，不是终端动作"
+
+[[approval_source_exemptions]]
+story_id = "US-TE-005"
+reason = "M-TE 任务流转 — 中转，不是终端动作"
+
+[[approval_source_exemptions]]
+story_id = "US-TC-006"
+reason = "出库码核销 — 状态字段是码自身，不是库存状态"
+
+[[approval_source_exemptions]]
+story_id = "US-TC-007"
+reason = "码上放心上报 — 追溯码状态变更，不是库存状态"
+
+[[approval_source_exemptions]]
+story_id = "US-PK-005"
+reason = "包装站扫码核销 — 同 TC-006，码状态不是库存状态"
+
+[[approval_source_exemptions]]
+story_id = "US-RP-004"
+reason = "补拣 — 是 M3 内部，已在 M3 跨故事约束兜底"
+
+[[approval_source_exemptions]]
+story_id = "US-M4-008"
+reason = "退货上架 — 审批源=退货审批，走 M-QL 流程隐含"
+
+[[approval_source_exemptions]]
+story_id = "US-DOCK-001"
+reason = "月台档案管理 — 月台启用/停用是物理资源管理，非库存状态变更"
+
+[[approval_source_exemptions]]
+story_id = "US-H2-005"
+reason = "事件总线 — 基础设施级订阅注册，本身不改库存状态"
+
+[[approval_source_exemptions]]
+story_id = "US-MPM-006"
+reason = "交易类型字典 — 字典管理，非库存状态变更（业务流水中使用 code 才会触发）"

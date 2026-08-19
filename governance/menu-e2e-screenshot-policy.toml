@@ -1,0 +1,44 @@
+# 新增管理端菜单页的真实 E2E 截图门禁。
+# legacy_pages 只记录本规则启用前已存在的页面，不得用于豁免新页面；检查器冻结了债务上限，清单只能减少。
+
+[policy]
+version = 1
+effective_at = "2026-07-15"
+legacy_pages = [
+  "dashboard",
+  "dock-management",
+  "h1-api-keys",
+  "h1-menu-management",
+  "h1-role-permission",
+  "h1-session-management",
+  "h2-audit-trail",
+  "h3-api-contract",
+  "h4-notify-configs",
+  "h4-notify-records",
+  "h4-wechat-settings",
+  "h5-express",
+  "h9-print-templates",
+  "m-di-platforms",
+  "m1-business-partners",
+  "m1-feature-flags",
+  "m1-locations",
+  "m1-products",
+  "m1-system-dictionary",
+  "m1-warehouses",
+  "m1-zones",
+  "m10-route-plans",
+  "m2-inspecting",
+  "m2-putaway",
+  "m2-receiving",
+  "m3-batches",
+  "m3-status-config",
+  "m4-orders",
+  "m4-returns",
+  "m4-review",
+  "m4-waves",
+  "m9-billing-rules",
+  "mcg-numbering",
+  "mte-task-dispatch",
+  "mte-task-groups",
+  "mte-task-types",
+]
