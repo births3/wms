@@ -39,6 +39,7 @@ mod stock_adjustment;
 mod system_dictionary;
 mod task_engine;
 mod task_type;
+mod wcs_task;
 
 pub use alert_definition::*;
 pub use alert_engine::*;
@@ -83,5 +84,6 @@ pub use stock_adjustment::*;
 pub use system_dictionary::*;
 pub use task_engine::*;
 pub use task_type::*;
+pub use wcs_task::*;
 
 // Schema helper fns are re-exported from common for module-level attributes.
