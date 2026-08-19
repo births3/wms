@@ -1,0 +1,20 @@
+{
+  "environment": "staging",
+  "service_url": "http://wms-staging.internal",
+  "source_switched_to": "config_center",
+  "migrated_count": 1,
+  "reconcile": {
+    "matched": 1,
+    "missing_in_config_center": [],
+    "mismatched": []
+  },
+  "business_smoke": {
+    "path": "/api/v1/inventory/batches",
+    "enabled_flag": "m3_inventory_batches_config_center_smoke",
+    "success_status": 200,
+    "fail_closed_error_code": "M1_CONFIG_FLAG_MISSING"
+  },
+  "smoke_log_ref": "ci/staging/wave2-feature-flags-smoke/nginx-smoke-20260607214526",
+  "reconcile_log_ref": "ci/staging/wave2-feature-flags-reconcile/nginx-smoke-20260607214526",
+  "archive_ref": "artifact/staging/feature-flags/archive/nginx-smoke-20260607214526"
+}

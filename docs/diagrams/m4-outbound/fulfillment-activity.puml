@@ -1,0 +1,88 @@
+@startuml
+title M4 出库拣选、复核、打印与发货主流程
+
+start
+:接收或创建出库订单;
+:M-CG 生成 WMS 单号;
+:校验 M1 document_type\n方向为 outbound;
+:读取 ERP 指定的商品、批号、数量;
+:WMS 校验合格库存和出库规则;
+
+if (校验通过?) then (是)
+  :订单状态 = 已确认;
+else (否)
+  :订单状态 = 校验异常;
+  :人工修改后重新校验\n或反馈 ERP;
+  stop
+endif
+
+:创建 / 加入波次;
+:波次算法分配库位、数量和路径;
+:锁定库存;
+:M-TE 生成拣选任务;
+
+:PDA 拣选前查询 M-VR\nprocess=出库, node=拣货;
+:扫源库位、商品 / LPN、批号;
+if (发生短拣?) then (是)
+  :记录差异、异常代码和审计;
+  :生成补拣任务 / 企业微信通知主管;
+  if (发货前补齐?) then (是)
+    :继续复核;
+  else (否)
+    :阻止发货\n不允许部分发货;
+    stop
+  endif
+else (否)
+  :拣选完成;
+endif
+
+:复核前查询 M-VR\nprocess=出库, node=复核;
+:复核人和拣选人不同;
+if (复核模式 = 包装站?) then (是)
+  :包装站 PC + 扫码枪复核;
+elseif (复核模式 = PDA 整件?) then (是)
+  :PDA 扫容器 LPN 复核;
+else (PDA 零件)
+  :PDA 逐件扫追溯码复核;
+endif
+
+:复核确认，订单状态 = 已复核;
+:装箱前查询 M-VR\nprocess=出库, node=装箱;
+if (装箱模式 = 包装站?) then (是)
+  :M-PK 包装站装箱;
+  :M-PK 称重校验;
+else (PDA 整件直发)
+  :M-PK PDA 装箱;
+endif
+:追溯码出库核销 / M-TC 上报;
+:打印随货同行单\n多货主使用货主抬头;
+:接收 M10 / H5 配送方结果;
+
+if (配送方类型?) then (自有车队)
+  :记录司机 user_id、车辆、签字;
+  :自营送货单号由 M-CG 生成;
+else (第三方快递)
+  :记录快递商、运单号、快递员和签字图片;
+endif
+
+if (冷链商品?) then (是)
+  :记录装车温度、保温箱和冰袋配置;
+endif
+
+:交接前查询 M-VR\nprocess=出库, node=发货交接;
+:发货交接确认;
+:发货时扣减库存;
+:校验 H1 权限和 Idempotency-Key\n写 H2 审计并异步反馈 ERP 已出库;
+:订单状态 = 已发货;
+stop
+
+note right
+复核无“不通过”状态。
+发现问题按故事记录差异并走后续退回流程。
+end note
+
+note bottom
+所有写操作需要 H1 权限、Idempotency-Key 和 H2 审计。
+M-VR 查询必须发生在对应作业提交前。
+end note
+@enduml

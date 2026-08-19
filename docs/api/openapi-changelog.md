@@ -1,0 +1,43 @@
+# OpenAPI 变更日志
+
+> 本文件记录 H3 OpenAPI 契约可见变更。Spec 文件仍以 Git diff 和提交记录为最终追踪来源。
+
+## 2026-07-25
+
+- M-RC 定时对账用 service-only `POST /api/v1/reconciliation/claims` 替代无认领的到期窗口读取，
+  新增 claim 续租与失败上报 API。
+- M-RC 定时 `POST /api/v1/reconciliation/runs` 增加 claim id/token，成功对账与 claim 完成同事务；
+  首版前直接同步当前契约，不保留旧 `GET /api/v1/reconciliation/due-owners`。
+
+## 2026-07-15
+
+- 增加 H-AL 告警定义列表、详情和变更申请 API；新增、编辑、启停、删除统一经 M-QL 审批后原子生效。
+- H-AL 补齐货主隔离、版本冲突、受控条件/角色校验、GSP 强制保护、幂等、审计和管理端生成类型。
+- 增加 H-AL 告警实例查询与确认/处理/关闭/忽略 API，补齐生命周期状态机、静默去重和 H4 通知重试。
+- 增加 H-AL 最多三级升级规则 API，以及活跃看板、月度统计、GSP 生命周期、变化订阅和 Excel/PDF 导出 API。
+- 增加 M-QL 质量联系单类型配置、创建、详情和 H4 审批回写 API。
+- M-QL 审批通过可同事务创建 M-SA 销毁报损单，联动失败时 H4 与联系单状态一并回滚。
+- 增加 M-SA 报损单创建、详情、质量审批回写、开始执行和完成执行 API。
+- 增加 M-SA 报溢单创建、详情、质量审批回写、开始执行和完成执行 API，并接通 M2 库位规则与 M-VR 报溢执行策略。
+- 报损执行契约返回 M-VR 双人策略、命中规则、两名操作人及 H4 审批证据摘要。
+- 新增 `stock_loss` 单据类型与 M-CG 默认编号规则，OpenAPI 和 `@wms/api-client` 类型同步生成。
+
+## 2026-07-08
+
+- 增加生产只读文档入口 `GET /redoc`。
+- 增加 Prometheus 文本指标入口 `GET /metrics`。
+- H3 韧性保护补齐单用户、单 API Key、全局三层令牌桶限流。
+- H3 熔断补齐打开、半开、恢复关闭状态。
+- H3 限流和熔断事件接入 H2 append-only 审计。
+- API 文档补齐对接认证说明和自动生成的 curl 示例索引。
+
+## 变更要求
+
+每次修改 OpenAPI 后必须执行：
+
+```bash
+just openapi-sync
+python3 scripts/governance/generate_openapi_curl_examples.py
+python3 scripts/governance/generate_openapi_curl_examples.py --check
+just openapi-check
+```

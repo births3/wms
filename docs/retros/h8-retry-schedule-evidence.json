@@ -1,0 +1,39 @@
+{
+  "collected_at": "2026-07-23T04:17:50+08:00",
+  "story": "US-H8-003",
+  "scope": "ADR-0018 L2 next_retry_at persistence and MSSQL retry due gate",
+  "ok": true,
+  "implementation": {
+    "base_delay_seconds": [1, 2, 4, 8, 16],
+    "jitter_percent": 20,
+    "jitter_seed": "idempotency_key",
+    "retry_after_fifth_attempt_seconds": 16,
+    "manual_replay_bypasses_delay": true
+  },
+  "postgresql": {
+    "failed_transition_persists_next_retry_at": true,
+    "processing_succeeded_dead_and_replay_clear_next_retry_at": true,
+    "attempt_and_message_update_share_transaction": true
+  },
+  "mssql_runtime": {
+    "container": "wms-mssql-erp-if",
+    "database": "wms_h8_retry_codex_20260723_jitter",
+    "database_isolated_and_dropped": true,
+    "current_jitter_sql_executed": true,
+    "not_due_claimed": 0,
+    "due_after_20_seconds_claimed": 1,
+    "manual_replay_claimed_immediately": 1,
+    "shared_rows_modified": false
+  },
+  "checks": [
+    "cargo test --manifest-path backend/Cargo.toml -p wms-domain --lib h8_erp",
+    "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib h8_erp_messages",
+    "PYTHONPATH=scripts/h8_erp_interface_sync python3 -m unittest test_h8_sync_worker test_exchange_lifecycle test_inbound_canonical test_outbound_routing test_inbound_terminal_state"
+  ],
+  "conclusion": "LOCAL_L2_RETRY_SCHEDULE_PASS",
+  "limitations": [
+    "This is V2 local software evidence and does not replace customer ERP dev/staging V4 evidence.",
+    "The archive_revision L3 five-minute/24-hour runtime boundary is not proven by this evidence.",
+    "Production-volume P95 and production RANGE partition evidence remain separate US-H8-003 gaps."
+  ]
+}

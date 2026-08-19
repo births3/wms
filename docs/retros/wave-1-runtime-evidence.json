@@ -1,0 +1,10 @@
+{
+  "environment": "staging",
+  "captured_at": "2026-06-07T22:09:24+08:00",
+  "signal_type": "http",
+  "signal_url": "http://wms-staging.internal/wave1/staging/fail-rollback-signal",
+  "rollback_triggered": true,
+  "rollback_exit_code": 0,
+  "rollback_log_ref": "s3://wms-staging-evidence/wave1/rollback-rollback-20260607T140923Z.log",
+  "external_log_ref": "s3://wms-staging-evidence/wave1/smoke-alert-rollback-20260607T140923Z.log"
+}
