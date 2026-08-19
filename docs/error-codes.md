@@ -76,10 +76,10 @@
 | 级别 | 数量 | 主要场景 |
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
-| warning | 80 | 业务规则拦截（库存不足 / 资质过期等）|
+| warning | 83 | 业务规则拦截（库存不足 / 资质过期等）|
 | error | 133 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **224** | — |
+| **合计** | **227** | — |
 
 ---
 
@@ -97,7 +97,7 @@
 | H_AL | 28 | 告警引擎 |
 | M1 | 32 | 主数据校验 / 配置中心 |
 | M2 | 18 | 入库流程 |
-| M3 | 26 | 库存与状态 / 补货 |
+| M3 | 29 | 库存与状态 / 补货 |
 | M4 | 10 | 出库与拣选 |
 | M_VR | 10 | 规则引擎与双人策略 |
 | M_QL | 1 | 质量联系单 |
@@ -1954,6 +1954,42 @@ error_codes:
     related_stories: [US-M3-012]
     introduced_in: v3.13
 
+  - code: M3_REPLENISH_STRATEGY_NOT_FOUND
+    module: M3
+    category: REPLENISH
+    detail: STRATEGY_NOT_FOUND
+    http_status: 404
+    severity: warning
+    message_zh: '补货策略不存在'
+    message_en: 'Replenishment strategy was not found'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_GROUP_NOT_FOUND
+    module: M3
+    category: REPLENISH
+    detail: GROUP_NOT_FOUND
+    http_status: 404
+    severity: warning
+    message_zh: '补货库位组不存在'
+    message_en: 'Replenishment location group was not found'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
+  - code: M3_REPLENISH_WAVE_GAP
+    module: M3
+    category: REPLENISH
+    detail: WAVE_GAP
+    http_status: 422
+    severity: warning
+    message_zh: '波次补货缺口生成失败'
+    message_en: 'Wave replenishment gap generation failed'
+    related_fields: []
+    related_stories: [US-M3-012]
+    introduced_in: v3.13
+
   - code: M3_REPLENISH_STATE_INVALID
     module: M3
     category: REPLENISH
@@ -2879,4 +2915,4 @@ error_codes:
 | 2026-07-21 | v3.10 | 登记 US-H8-004 接口表探查凭据未配置错误码；脚本统计当前合计 175 项 |
 | 2026-08-17 | v3.11 | 登记 M1_QUALITY_LOCK_*（5 项）与 M2_PUTAWAY_*（7 项）容器质量锁/6 维校验错误码；脚本统计当前合计 203 项 |
 | 2026-08-18 | v3.12 | 补登记 M1_QUALITY_LOCK_REASON_INVALID / MQL_REQUIRED / NOT_LOCKED；脚本统计当前合计 206 项 |
-| 2026-08-19 | v3.13 | 登记 US-M3-012 补货 `M3_REPLENISH_*` 18 项；脚本统计当前合计 224 项 |
+| 2026-08-19 | v3.13 | 登记 US-M3-012 补货 `M3_REPLENISH_*` 21 项；脚本统计当前合计 227 项 |
