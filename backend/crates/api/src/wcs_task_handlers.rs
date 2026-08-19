@@ -224,6 +224,11 @@ impl IntoResponse for WcsTaskHandlerError {
                     "M1_POD_MOVE_ACTIVE",
                     "同一货架已有未完成搬运任务",
                 ),
+                DeviceError::LocationUnreachable => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_LOCATION_UNREACHABLE",
+                    "格口处于 AGV 搬运不可达期",
+                ),
                 DeviceError::EventTaskMismatch => (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     "M1_EVENT_TASK_MISMATCH",
