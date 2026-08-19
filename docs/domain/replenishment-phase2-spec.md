@@ -53,6 +53,8 @@ US-M3-012 取代仓内补货的实施口径：水位只读策略表 Min-Max，�
 | ADR-0048 基线⑥ | Phase 2 建齐 IoT 四表结构 | 按决策 9 里程碑推迟到 Phase 3，本切片明确不做 |
 | ADR-0048 决策 7 状态机 | 未写 `suspended` | 同 US-M3-012#8，增加 `suspended` |
 | US-M3-012#2「订单行标记等待补货」 | 像是补货事务内改出库行 | 补货事务只写 `event_bus_event`（`replenishment.waiting`）；波次模块消费后打等待态。本切片 GWT 验收停在事件已落库 |
+| §4.2 字面扣减全部 `qty_allocated` | 波次算单后拣选面占用再减一次，`urgent_qty` 放大 | **明确不做字面二次扣减**。波次缺口可用量 = §4.2 + 加回本波次 `inventory_allocations.status=locked`（`pick_available_qty_excluding_wave`）。本波次冻结不算缺口洞；GWT 4 / `wave4_replenish_after_allocate_uses_pick_face_gap` 期望 `qty=7`。不回退。 |
+| §6.2 `M3_REPLENISH_SOURCE_UNAVAILABLE` 422 | 冻结上升也返回 422 | **作业冻结挂起明确不走 422**。生成/库存命令仍 422。`pick`/`confirm` 发现来源冻结：200 + `status=suspended` + H4（GWT 17/31）。不把挂起路径改回 422。 |
 
 ## 3. 领域对象
 
@@ -77,6 +79,7 @@ US-M3-012 取代仓内补货的实施口径：水位只读策略表 Min-Max，�
    - 拣选位某商品可用量 = 该位该商品全部 `status=qualified` 行的 `Σ(qty_on_hand − qty_allocated − qty_frozen + qty_replenish_in_transit)`
    - 来源批次可下架量 = `qty_on_hand − qty_allocated − qty_frozen − qty_replenish_out_transit`
    `qty_frozen` 含容器质量锁联动冻结，与补货在途互不混用。
+   波次缺口引擎在上式之上 **加回本波次** `inventory_allocations.status=locked`（见 §2.4、§10.2）。Min-Max 巡检不加回。
 3. **Min-Max 触发**：目标拣选位该商品可用量 `<= min_safety_threshold` 才生成；任务量 = `min(max_replenish_target − 可用量, 来源可下架量)`，再按商品默认包装向下取整（§10.7）；余量不足 1 包装本轮不生成。
 4. **波次缺口**：`urgent_qty = 订单需求 − 拣选位该商品可用量`；`urgent_qty <= 0` 则不生成。可用量已含在途，不再减第二次。
 5. **在途权威**：任务生成同事务 +Δ 双字段；确认同事务 −Δ 并转在手；取消/20 分钟未领超时同事务回冲。禁止靠聚合任务表算可用量。
@@ -207,7 +210,7 @@ in_progress / suspended / pending ──cancel(picked_qty=0,done_qty=0)──►
 | `M3_REPLENISH_QTY_EXCEEDED` | 422 | 下架/确认超量 |
 | `M3_REPLENISH_SOURCE_MISMATCH` | 422 | 扫描来源库位/LPN 与任务不符 |
 | `M3_REPLENISH_TARGET_MISMATCH` | 422 | 扫描目标位与任务不符 |
-| `M3_REPLENISH_SOURCE_UNAVAILABLE` | 422 | 来源可下架量不足（含冻结上升）；任务同时置 `suspended` 并告警 |
+| `M3_REPLENISH_SOURCE_UNAVAILABLE` | 422 | 生成/库存命令：来源可下架量不足。作业中冻结上升 **不** 用本码（200 + `suspended`，GWT 17，§2.4） |
 | `M3_REPLENISH_CANCEL_BLOCKED` | 422 | `done_qty>0` 或 `picked_qty>0` |
 | `M3_REPLENISH_RETURN_BLOCKED` | 422 | `picked_qty>0` 不可退回 |
 | `M3_REPLENISH_IDEMPOTENCY_CONFLICT` | 409 | 同键不同体 |
@@ -387,7 +390,7 @@ GRANT 给 `wms_app`。不做兼容双写、不做旧表回填。不建 IoT 四�
 
 1. 校验目标位本货主且 `location_type ∈ {case_pick, piece_pick}`。
 2. 按 scope 优先级找 `enabled` 且 `trigger_modes` 含 `wave_gap` 的策略；找不到则默认 `source_type=storage`、`target_type=该位 location_type`，`strategy_id` 空。
-3. `urgent_qty = demand_qty − 该位该商品可用量`；`<= 0` 则不生成、不写事件。
+3. `urgent_qty = demand_qty − 该位该商品可用量`；可用量 = §4.2 + 加回本波次 locked 占用（本波次冻结不算缺口洞，§2.4）。`<= 0` 则不生成、不写事件。
 4. FEFO 生成一条或多条 `trigger_mode=wave_gap`,`priority=urgent` 任务（规则同 §10.1 步 3–6）。每条按包装取整；最后不足 1 包装的余量丢弃，本轮不再生成（与 Min-Max 同一取整）。`created_by=system:wave:{wave_id}`。
 5. 同事务写 `event_bus_event` `replenishment.waiting`（每条任务一条，幂等键含 `task_id`）。方法返回本次插入的任务列表，可空；调用方不得假定一定生成。
 
@@ -510,7 +513,7 @@ FEFO：`ORDER BY expiry_date ASC NULLS LAST, id`。一任务一批次。整托�
 17. **来源冻结挂起**
     Given 任务 `in_progress`、`picked_qty=0`，确认前该批次 `qty_frozen` 升至使可下架量 < 剩余量
     When confirm
-    Then 任务 `suspended`，H4 告警，在手不改。
+    Then **HTTP 200**，任务 `suspended`，H4 告警，在手不改。不返回 422 `M3_REPLENISH_SOURCE_UNAVAILABLE`（§2.4）。
 
 18. **扫码不匹配**
     Given 任务来源位 A、作业员已 claim

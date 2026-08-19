@@ -6054,7 +6054,7 @@ api_paths = [
   "POST /api/v1/replenishment/tasks/{id}/return",
 ]
 database_objects = ["replenishment_tasks", "replenishment_strategies", "replenishment_location_groups", "replenishment_location_group_members", "inventory_batches", "alert_definitions"]
-reason = "Phase 2 已实施：策略/任务 API、PC 页、execute 列表契约与 H4 种子已落地。PDA 生产 UI 受 ADR-0027 阻断，真实 E2E 截图仍待补齐。"
+reason = "Phase 2 已实施：策略/任务 API、PC 页、execute 列表契约与 H4 种子已落地。PDA 生产 UI 受 ADR-0027 阻断，真实 E2E 截图仍待补齐。明确不做：波次缺口不按字面二次扣减本波次占用（GWT 4 qty=7）；作业冻结挂起走 200+suspended 不走 422（GWT 17）。"
 owner = "M3 库内作业模块负责人"
 resume_when = "ADR-0027 Accepted 且真实 E2E 截图补齐后迁出 deferred。"
 evidence_refs = [
