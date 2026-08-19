@@ -1,0 +1,270 @@
+//! PostgreSQL-only 幂等锁、回放和结果保存。
+
+use chrono::{DateTime, Duration, Utc};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use sqlx::{PgPool, Postgres, Transaction};
+use uuid::Uuid;
+
+const IDEMPOTENCY_TTL: Duration = Duration::hours(24);
+
+#[derive(Debug)]
+pub(crate) enum IdempotencyError {
+    Conflict,
+    Database(sqlx::Error),
+    Serialize(String),
+}
+
+pub(crate) fn request_hash<T: Serialize>(value: &T) -> Result<String, IdempotencyError> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|error| IdempotencyError::Serialize(error.to_string()))?;
+    Ok(hex::encode(Sha256::digest(bytes)))
+}
+
+pub(crate) async fn lock_key(
+    tx: &mut Transaction<'_, Postgres>,
+    namespace: &str,
+    owner_id: Uuid,
+    key: &str,
+) -> Result<(), IdempotencyError> {
+    let digest = Sha256::digest(format!("{namespace}\0{owner_id}\0{key}").as_bytes());
+    let mut bytes = [0_u8; 8];
+    bytes.copy_from_slice(&digest[..8]);
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(i64::from_be_bytes(bytes))
+        .execute(&mut **tx)
+        .await
+        .map_err(IdempotencyError::Database)?;
+    Ok(())
+}
+
+pub(crate) async fn replay<T: DeserializeOwned>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    method: &str,
+    path: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<T>, IdempotencyError> {
+    let row: Option<(String, String, String, Value, DateTime<Utc>)> = sqlx::query_as(
+        r#"
+        SELECT request_hash, method, path, response_body, expires_at
+          FROM idempotency_request
+         WHERE owner_id = $1 AND idempotency_key = $2
+         FOR UPDATE
+        "#,
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(IdempotencyError::Database)?;
+    let Some((stored_hash, stored_method, stored_path, response_body, expires_at)) = row else {
+        return Ok(None);
+    };
+    if expires_at <= now {
+        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
+            .bind(owner_id)
+            .bind(key)
+            .execute(&mut **tx)
+            .await
+            .map_err(IdempotencyError::Database)?;
+        return Ok(None);
+    }
+    if stored_hash != request_hash || stored_method != method || stored_path != path {
+        return Err(IdempotencyError::Conflict);
+    }
+    serde_json::from_value(response_body)
+        .map(Some)
+        .map_err(|error| IdempotencyError::Serialize(error.to_string()))
+}
+
+/// 兼容尚未携带路由元数据的旧调用方；新写入路径应使用 [`replay`]。
+pub(crate) async fn replay_hash_only<T: DeserializeOwned>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<T>, IdempotencyError> {
+    let row: Option<(String, Value, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT request_hash, response_body, expires_at FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 FOR UPDATE",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(IdempotencyError::Database)?;
+    let Some((stored_hash, response_body, expires_at)) = row else {
+        return Ok(None);
+    };
+    if expires_at <= now {
+        sqlx::query("DELETE FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2")
+            .bind(owner_id)
+            .bind(key)
+            .execute(&mut **tx)
+            .await
+            .map_err(IdempotencyError::Database)?;
+        return Ok(None);
+    }
+    if stored_hash != request_hash {
+        return Err(IdempotencyError::Conflict);
+    }
+    serde_json::from_value(response_body)
+        .map(Some)
+        .map_err(|error| IdempotencyError::Serialize(error.to_string()))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn store_success<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    method: &str,
+    path: &str,
+    resource_type: &str,
+    resource_id: &str,
+    response: &T,
+    now: DateTime<Utc>,
+) -> Result<(), IdempotencyError> {
+    store_success_with_status(
+        tx,
+        owner_id,
+        key,
+        request_hash,
+        method,
+        path,
+        200,
+        resource_type,
+        resource_id,
+        response,
+        now,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn store_success_with_status<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    method: &str,
+    path: &str,
+    status_code: i32,
+    resource_type: &str,
+    resource_id: &str,
+    response: &T,
+    now: DateTime<Utc>,
+) -> Result<(), IdempotencyError> {
+    let response_body = serde_json::to_value(response)
+        .map_err(|error| IdempotencyError::Serialize(error.to_string()))?;
+    sqlx::query(
+        r#"
+        INSERT INTO idempotency_request (
+            id, owner_id, idempotency_key, request_hash, method, path,
+            status_code, response_body, resource_type, resource_id, expires_at, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(key)
+    .bind(request_hash)
+    .bind(method)
+    .bind(path)
+    .bind(status_code)
+    .bind(response_body)
+    .bind(resource_type)
+    .bind(resource_id)
+    .bind(now + IDEMPOTENCY_TTL)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(IdempotencyError::Database)?;
+    Ok(())
+}
+
+pub(crate) async fn load_response(
+    pool: &PgPool,
+    owner_id: Uuid,
+    key: &str,
+) -> Result<Option<(String, i32, Value)>, IdempotencyError> {
+    sqlx::query_as(
+        "SELECT request_hash, status_code, response_body FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2 AND expires_at > now()",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_optional(pool)
+    .await
+    .map_err(IdempotencyError::Database)
+}
+
+pub(crate) async fn update_response<T: Serialize>(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    response: &T,
+) -> Result<(), IdempotencyError> {
+    let response_body = serde_json::to_value(response)
+        .map_err(|error| IdempotencyError::Serialize(error.to_string()))?;
+    sqlx::query(
+        "UPDATE idempotency_request SET response_body = $4 WHERE owner_id = $1 AND idempotency_key = $2 AND request_hash = $3",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .bind(request_hash)
+    .bind(response_body)
+    .execute(&mut **tx)
+    .await
+    .map_err(IdempotencyError::Database)?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) async fn count_for_test(
+    pool: &PgPool,
+    owner_id: Uuid,
+    key: &str,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM idempotency_request WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind(key)
+    .fetch_one(pool)
+    .await
+}
+
+#[cfg(test)]
+pub(crate) async fn reject_insert_path_for_test(
+    pool: &PgPool,
+    path: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        CREATE FUNCTION reject_idempotency_insert() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION 'forced idempotency insert failure';
+        END;
+        $$;
+        "#,
+    )
+    .execute(pool)
+    .await?;
+    sqlx::query(&format!(
+        "CREATE TRIGGER reject_idempotency_insert \
+         BEFORE INSERT ON idempotency_request FOR EACH ROW \
+         WHEN (NEW.path = '{path}') \
+         EXECUTE FUNCTION reject_idempotency_insert()"
+    ))
+    .execute(pool)
+    .await
+    .map(|_| ())
+}
