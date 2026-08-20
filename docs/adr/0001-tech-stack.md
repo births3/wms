@@ -4,6 +4,7 @@
 - 日期：2026-05-15
 - 决策者：项目发起人
 - 关联：`docs/governance.md`、`ROADMAP.md`
+- 修订：2026-08-20 数据库大版本钉为 PostgreSQL 18（部署镜像 `postgres:18`；v1 前按 ADR-0038 直接改基线）
 
 ---
 
@@ -45,7 +46,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，需求特点：
 
 | 候选 | 优点 | 缺点 |
 |------|------|------|
-| **PostgreSQL** | 类型丰富、JSON/JSONB、扩展生态（TimescaleDB、PostGIS）、事务可靠 | 运维成本中 |
+| **PostgreSQL 18** | 类型丰富、JSON/JSONB、扩展生态（TimescaleDB、PostGIS）、事务可靠；当前部署基线 `postgres:18` | 运维成本中 |
 | MySQL | 部署简单、人才多 | 数据类型/约束弱于 PG，复杂业务吃亏 |
 | SQLite | 零运维 | 并发写差，不适合服务端长期 |
 
@@ -114,7 +115,7 @@ wms 是一个**医药冷链 GSP 合规仓储管理系统**，需求特点：
 
 - **语言/框架**：Rust + Axum
 - **ORM**：SQLx
-- **数据库**：PostgreSQL
+- **数据库**：PostgreSQL 18（部署镜像 `postgres:18`）
 - **异步运行时**：Tokio
 - **错误处理**：thiserror + anyhow
 - **日志/追踪**：tracing + tracing-subscriber

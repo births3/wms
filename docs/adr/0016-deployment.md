@@ -128,13 +128,13 @@ ENTRYPOINT ["./wms-api"]
 # deploy/docker-compose.yml（最小可运行示例）
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_DB: wms
       POSTGRES_USER: wms
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./initdb:/docker-entrypoint-initdb.d:ro
     secrets:
       - db_password
@@ -393,3 +393,4 @@ if feature_flags.is_enabled("m4_outbound_v2_picker", &owner_id, &user_id) {
 | 2026-05-18 | v3.1.2 | 补 Wave 1 → Wave 2 Feature Flag 迁移路径：5 步走 + 迁移脚本 `feature_flags_w1_to_w2.py` + 双人审批（关联 ADR-0014 数据迁移策略；ADR-0013 v1.1 同步加 cross-ref）|
 | 2026-05-18 | v3.1.3 | §灰度发布策略顶部加「ADR 性质声明」明示方向性 ADR + 实施级细节由 W1.D / W2 迁移任务回写；修订迁移路径段去掉具体脚本名 / 目录 / 审批主体（B1-B3 修），改"参 ADR-0014"为"对账思路对齐 ADR-0014 §数据校验规则"避免过度引用 |
 | 2026-06-03 | v3.2 | Wave 2 W2.G 实施回写：配置中心 Feature Flag API 路径、`just wave-2-complete-check` 静态完成门禁、`docs/runbooks/wave-2-runtime-evidence.md` + `just wave-2-runtime-evidence-validate` 预发布 runtime evidence 门禁；明确无稳定 dev/staging 时不得伪造证据 |
+| 2026-08-20 | v3.3 | 数据库大版本从 PostgreSQL 16 改为 18（`postgres:18`）；v1 前按 ADR-0038 直接改基线，不保留 16 兼容层。历史 staging 预演记录仍按当时镜像如实记载。官方镜像 18+ 数据目录挂载改为 `/var/lib/postgresql`（不再用 `/var/lib/postgresql/data`）。 |

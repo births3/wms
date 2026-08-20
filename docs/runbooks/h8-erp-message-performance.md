@@ -6,7 +6,7 @@
 
 ## 本机 Docker 预检
 
-可以复用现有 Compose 文件建立隔离的 PostgreSQL 16 / Redis / API 环境，用于检查 migration、
+可以复用现有 Compose 文件建立隔离的 PostgreSQL 18 / Redis / API 环境，用于检查 migration、
 分区表、索引和应用健康状态。必须使用独立 Compose project 和未占用端口，不得复用共享
 staging 的卷：
 
@@ -40,7 +40,7 @@ dev/staging 主机、真实网络入口和真实 JWT；运维确认容量、入�
 
 ## 验收基线
 
-- PostgreSQL 16，记录 CPU、内存、磁盘类型、数据库参数和应用实例规格。
+- PostgreSQL 18，记录 CPU、内存、磁盘类型、数据库参数和应用实例规格。
 - 单货主单自然月 10,000,000 条消息，每条至少 1 条已完成尝试。
 - 关闭 dev-mock，使用真实 API、真实 JWT 和真实网络入口。
 - 16 并发；预热 5 分钟，分别连续测量列表和统计 15 分钟。

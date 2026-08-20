@@ -15,7 +15,7 @@
 
 | 编号 | 标题 | 状态 | 摘要 |
 |------|------|------|------|
-| [ADR-0001](0001-tech-stack.md) | 技术栈选型 | Accepted | Rust+Axum / SQLx / PostgreSQL / Vite+React+shadcn/ui / Zustand / TanStack Query / RN PDA / OpenAPI 契约 |
+| [ADR-0001](0001-tech-stack.md) | 技术栈选型 | Accepted | Rust+Axum / SQLx / PostgreSQL 18 / Vite+React+shadcn/ui / Zustand / TanStack Query / RN PDA / OpenAPI 契约 |
 | [ADR-0002](0002-monorepo-structure.md) | 仓库结构 | Accepted | monorepo + Cargo workspace + pnpm workspace；依赖红线 domain ⊥ infra |
 | [ADR-0003](0003-governance-model.md) | 治理模型 | Accepted | 5 类 + 4 Tier + Baseline + diff 触发；与 ADR-0006 集成 |
 | [ADR-0006](0006-tdd-and-test-layers.md) | TDD + 11 层测试维度 | Accepted | outside-in 双层 TDD；L1-L11 测试维度；Tier×Layer 执行矩阵 |

@@ -71,7 +71,7 @@ ADR-0001 选 SQLx 的核心理由是**编译期校验 SQL**。但默认模式要
 ### 步骤 2：跑 prepare（1 小时）
 
 ```bash
-docker run -d --name spike-pg -p 5432:5432 -e POSTGRES_PASSWORD=spike postgres:16
+docker run -d --name spike-pg -p 5432:5432 -e POSTGRES_PASSWORD=spike postgres:18
 export DATABASE_URL=postgres://postgres:spike@localhost:5432/postgres
 cd spikes/spike-004-sqlx-offline  # 历史 PoC 路径，当前仓库已移除
 sqlx migrate run
