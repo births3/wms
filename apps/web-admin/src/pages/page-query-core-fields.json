@@ -9,6 +9,7 @@
       "fieldConstant": "queryFields",
       "coreConstant": "defaultVisibleFieldKeys",
       "core": [
+        "warehouse_id",
         "status"
       ],
       "more": [
@@ -23,6 +24,7 @@
       "fieldConstant": "queryFields",
       "coreConstant": "defaultVisibleFieldKeys",
       "core": [
+        "warehouse_id",
         "status",
         "task_type"
       ],

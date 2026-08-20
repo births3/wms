@@ -18,6 +18,7 @@ import {
 import { AlertCircle, RefreshCw } from "lucide-react";
 
 import { useDialogState } from "@/lib/use-dialog-state";
+import { useMasterDataRowsQuery } from "@/features/master-data/master-data-queries";
 import {
   useBindDeviceMutation,
   useDevicesQuery,
@@ -30,11 +31,12 @@ import {
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 export const queryFields: QueryPanelField[] = [
+  { key: "warehouse_id", label: "仓库", type: "multiSelect", options: [] },
   { key: "status", label: "在线状态", type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "在线", value: "online" }, { label: "离线", value: "offline" }, { label: "停用", value: "disabled" }] },
   { key: "device_type", label: "设备类型", type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "AGV", value: "agv" }, { label: "PTL", value: "ptl_light" }, { label: "DWS", value: "dws" }, { label: "RFID", value: "rfid_antenna" }, { label: "堆垛机", value: "stacker" }] },
 ];
 
-export const defaultVisibleFieldKeys = ["status"];
+export const defaultVisibleFieldKeys = ["warehouse_id", "status"];
 
 const DEVICE_TYPES: Record<string, string> = {
   agv: "AGV 搬运车",
@@ -47,6 +49,7 @@ const DEVICE_TYPES: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = { online: "在线", offline: "离线", disabled: "停用" };
 
 type RegisterForm = {
+  warehouse_id: string;
   device_code: string;
   device_type: string;
   vendor: string;
@@ -55,13 +58,24 @@ type RegisterForm = {
   ip_address: string;
 };
 
-function emptyForm(): RegisterForm {
-  return { device_code: "", device_type: "ptl_light", vendor: "", model: "", protocol: "http", ip_address: "" };
+function emptyForm(warehouseId = ""): RegisterForm {
+  return { warehouse_id: warehouseId, device_code: "", device_type: "ptl_light", vendor: "", model: "", protocol: "http", ip_address: "" };
 }
 
 export function M1DevicePage() {
   const [queryValue, setQueryValue] = React.useState<QueryPanelValue>({});
+  const warehousesQuery = useMasterDataRowsQuery("m1-warehouses");
+  const warehouses = warehousesQuery.data ?? [];
+  const warehouseId = typeof queryValue.warehouse_id === "string"
+    ? queryValue.warehouse_id
+    : warehouses[0]?.id ?? "";
+  React.useEffect(() => {
+    if (!queryValue.warehouse_id && warehouses[0]) {
+      setQueryValue((current) => ({ ...current, warehouse_id: warehouses[0].id }));
+    }
+  }, [queryValue.warehouse_id, warehouses]);
   const listQuery = useDevicesQuery({
+    warehouse_id: warehouseId,
     online_status: typeof queryValue.status === "string" && queryValue.status ? queryValue.status : undefined,
     device_type:
       typeof queryValue.device_type === "string" && queryValue.device_type ? queryValue.device_type : undefined,
@@ -77,6 +91,9 @@ export function M1DevicePage() {
   const unbindDialog = useDialogState<Device>();
   const [unbindReason, setUnbindReason] = React.useState("");
   const [form, setForm] = React.useState<RegisterForm>(emptyForm());
+  const effectiveQueryFields = queryFields.map((field) => field.key === "warehouse_id"
+    ? { ...field, options: warehouses.map((warehouse) => ({ label: `${warehouse.code} · ${warehouse.name}`, value: warehouse.id })) }
+    : field);
   const [bindForm, setBindForm] = React.useState({
     location_id: "",
     binding_role: "ptl_light",
@@ -115,7 +132,7 @@ export function M1DevicePage() {
       description: "登记新设备档案",
       disabled: busy,
       onClick: () => {
-        setForm(emptyForm());
+        setForm(emptyForm(warehouseId));
         registerDialog.openWith(null);
       },
     },
@@ -147,7 +164,7 @@ export function M1DevicePage() {
 
   async function onSubmitToggle(row: Device) {
     try {
-      await toggleMutation.mutateAsync({ id: row.id, enabled: !row.enabled });
+      await toggleMutation.mutateAsync({ id: row.id, enabled: !row.enabled, expectedVersion: row.version });
       setNotice({ kind: "success", text: row.enabled ? "设备已停用" : "设备已启用" });
     } catch (error) {
       setNotice({ kind: "error", text: error instanceof Error ? error.message : "启停失败" });
@@ -157,6 +174,7 @@ export function M1DevicePage() {
   async function onSubmitRegister() {
     try {
       await registerMutation.mutateAsync({
+        warehouse_id: form.warehouse_id,
         device_code: form.device_code,
         device_type: form.device_type,
         vendor: form.vendor || undefined,
@@ -246,6 +264,14 @@ export function M1DevicePage() {
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm">
+              仓库
+              <select className="mt-1 w-full rounded border px-2 py-1" value={form.warehouse_id} onChange={(event) => setForm({ ...form, warehouse_id: event.target.value })}>
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
               设备编码
               <Input required value={form.device_code} onChange={(event) => setForm({ ...form, device_code: event.target.value })} className="mt-1" />
             </label>
@@ -281,7 +307,7 @@ export function M1DevicePage() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => registerDialog.close()} disabled={busy}>取消</Button>
-            <Button type="button" onClick={() => void onSubmitRegister()} disabled={busy || !form.device_code}>注册</Button>
+            <Button type="button" onClick={() => void onSubmitRegister()} disabled={busy || !form.warehouse_id || !form.device_code}>注册</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

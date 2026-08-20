@@ -32,26 +32,29 @@ function requireData<T>(
 }
 
 export type DeviceListQuery = {
+  warehouse_id: string;
   device_type?: string;
   online_status?: string;
   enabled?: boolean;
 };
 
-export function useDevicesQuery(filters?: DeviceListQuery) {
+export function useDevicesQuery(filters: DeviceListQuery) {
   return useQuery<Device[], ApiError>({
-    queryKey: [...devicesQueryKey, filters ?? {}],
+    queryKey: [...devicesQueryKey, filters],
     queryFn: async () => {
       const result = await api.GET("/api/v1/iot-devices", {
         params: {
           query: {
-            device_type: filters?.device_type || undefined,
-            online_status: filters?.online_status || undefined,
-            enabled: filters?.enabled,
+            warehouse_id: filters.warehouse_id,
+            device_type: filters.device_type || undefined,
+            online_status: filters.online_status || undefined,
+            enabled: filters.enabled,
           },
         },
       });
       return requireData(result.data, result.error, result.response.status, "设备列表加载失败");
     },
+    enabled: Boolean(filters.warehouse_id),
   });
 }
 
@@ -74,10 +77,13 @@ export function useRegisterDeviceMutation() {
 export function useToggleDeviceEnabledMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+    mutationFn: async ({ id, enabled, expectedVersion }: { id: string; enabled: boolean; expectedVersion: number }) => {
       const result = await api.PATCH("/api/v1/iot-devices/{id}", {
-        params: { path: { id } },
-        body: { enabled },
+        params: {
+          path: { id },
+          header: { "Idempotency-Key": idempotencyKey("device-update") },
+        },
+        body: { enabled, expected_version: expectedVersion },
       });
       return requireData(result.data, result.error, result.response.status, "设备启停失败");
     },
@@ -101,7 +107,10 @@ export function useUnbindDeviceMutation() {
       }
       for (const binding of bindings) {
         const result = await api.POST("/api/v1/location-device-bindings/{id}/unbind", {
-          params: { path: { id: binding.id } },
+          params: {
+            path: { id: binding.id },
+            header: { "Idempotency-Key": idempotencyKey(`device-unbind-${binding.id}`) },
+          },
           body: { reason },
         });
         if (!result.response.ok) {
@@ -153,13 +162,16 @@ export function useWcsTasksQuery(filters?: WcsTaskListQuery) {
   });
 }
 
-export function useDeviceDashboardQuery() {
+export function useDeviceDashboardQuery(warehouseId: string) {
   return useQuery<DeviceDashboardSummary, ApiError>({
-    queryKey: ["device", "dashboard"],
+    queryKey: ["device", "dashboard", warehouseId],
     queryFn: async () => {
-      const result = await api.GET("/api/v1/device-dashboard");
+      const result = await api.GET("/api/v1/device-dashboard", {
+        params: { query: { warehouse_id: warehouseId } },
+      });
       return requireData(result.data, result.error, result.response.status, "设备大盘加载失败");
     },
+    enabled: Boolean(warehouseId),
   });
 }
 
@@ -168,7 +180,10 @@ export function useResendWcsTaskMutation() {
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const result = await api.POST("/api/v1/wcs-tasks/{id}/resend", {
-        params: { path: { id } },
+        params: {
+          path: { id },
+          header: { "Idempotency-Key": idempotencyKey("wcs-resend") },
+        },
         body: { reason },
       });
       return requireData(result.data, result.error, result.response.status, "任务重发失败");
@@ -184,7 +199,10 @@ export function useConfirmSkipWcsTaskMutation() {
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const result = await api.POST("/api/v1/wcs-tasks/{id}/confirm-skip", {
-        params: { path: { id } },
+        params: {
+          path: { id },
+          header: { "Idempotency-Key": idempotencyKey("wcs-confirm-skip") },
+        },
         body: { reason },
       });
       return requireData(result.data, result.error, result.response.status, "跳过确认失败");
@@ -200,7 +218,10 @@ export function useVoidWcsTaskMutation() {
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       const result = await api.POST("/api/v1/wcs-tasks/{id}/void", {
-        params: { path: { id } },
+        params: {
+          path: { id },
+          header: { "Idempotency-Key": idempotencyKey("wcs-void") },
+        },
         body: { reason },
       });
       return requireData(result.data, result.error, result.response.status, "任务作废失败");

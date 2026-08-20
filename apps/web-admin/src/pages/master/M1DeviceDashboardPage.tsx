@@ -17,6 +17,7 @@ import {
 } from "@wms/ui";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import { useDialogState } from "@/lib/use-dialog-state";
+import { useMasterDataRowsQuery } from "@/features/master-data/master-data-queries";
 import {
   useConfirmSkipWcsTaskMutation,
   useDeviceDashboardQuery,
@@ -29,13 +30,15 @@ import {
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 export const queryFields: QueryPanelField[] = [
+  { key: "warehouse_id", label: "仓库", type: "multiSelect", options: [] },
   { key: "status", label: "任务状态", type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "待派发", value: "pending" }, { label: "已下发", value: "sent" }, { label: "执行中", value: "executing" }, { label: "成功", value: "succeeded" }, { label: "失败", value: "failed" }, { label: "超时", value: "timeout" }] },
   { key: "task_type", label: "指令类型", type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "PTL 亮灯", value: "ptl_light_on" }, { label: "PTL 灭灯", value: "ptl_light_off" }, { label: "搬运", value: "pod_move" }, { label: "称重", value: "dws_weigh" }, { label: "RFID 扫描", value: "rfid_scan" }] },
 ];
 
-export const defaultVisibleFieldKeys = ["status", "task_type"];
+export const defaultVisibleFieldKeys = ["warehouse_id", "status", "task_type"];
 
 type QueryValue = {
+  warehouse_id?: string;
   status?: string;
   task_type?: string;
 };
@@ -44,6 +47,7 @@ const defaultQuery: QueryValue = {};
 
 function normalizeQuery(value: QueryPanelValue): QueryValue {
   return {
+    warehouse_id: typeof value.warehouse_id === "string" ? value.warehouse_id : undefined,
     status: typeof value.status === "string" ? value.status : undefined,
     task_type: typeof value.task_type === "string" ? value.task_type : undefined,
   };
@@ -59,10 +63,22 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function M1DeviceDashboardPage() {
-  const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
+  const { draftQuery, setDraftQuery, appliedQuery, setAppliedQuery, applyQuery, resetQuery } =
     usePageQueryState<QueryValue>(() => defaultQuery, normalizeQuery);
+  const warehousesQuery = useMasterDataRowsQuery("m1-warehouses");
+  const warehouses = warehousesQuery.data ?? [];
+  React.useEffect(() => {
+    if (!draftQuery.warehouse_id && warehouses[0]) {
+      const next = { ...draftQuery, warehouse_id: warehouses[0].id };
+      setDraftQuery(next);
+      setAppliedQuery(next);
+    }
+  }, [draftQuery, setAppliedQuery, setDraftQuery, warehouses]);
+  const effectiveQueryFields = queryFields.map((field) => field.key === "warehouse_id"
+    ? { ...field, options: warehouses.map((warehouse) => ({ label: `${warehouse.code} · ${warehouse.name}`, value: warehouse.id })) }
+    : field);
   const listQuery = useWcsTasksQuery(appliedQuery);
-  const dashboardQuery = useDeviceDashboardQuery();
+  const dashboardQuery = useDeviceDashboardQuery(appliedQuery.warehouse_id ?? "");
   const resendMutation = useResendWcsTaskMutation();
   const voidMutation = useVoidWcsTaskMutation();
   const confirmSkipMutation = useConfirmSkipWcsTaskMutation();
