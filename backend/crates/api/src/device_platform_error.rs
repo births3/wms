@@ -118,6 +118,16 @@ impl IntoResponse for DevicePlatformHandlerError {
                     "M1_NUMBERING_UNAVAILABLE",
                     "wcs_task 无可用编号规则",
                 ),
+                DeviceError::VersionConflict => (
+                    StatusCode::CONFLICT,
+                    "M1_DEVICE_VERSION_CONFLICT",
+                    "设备档案已被其他操作更新",
+                ),
+                DeviceError::IdempotencyConflict => (
+                    StatusCode::CONFLICT,
+                    "M1_WCS_TASK_IDEMPOTENCY_CONFLICT",
+                    "幂等键已用于不同请求",
+                ),
                 DeviceError::Database(_) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "M1_DEVICE_INTERNAL",

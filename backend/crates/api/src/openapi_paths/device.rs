@@ -15,6 +15,7 @@ use crate::device_service::{
     request_body = RegisterDeviceRequest,
     responses(
         (status = 200, description = "设备注册成功", body = DeviceResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 409, description = "设备编码重复"),
         (status = 422, description = "设备类型非法"),
     ),
@@ -27,11 +28,15 @@ pub(crate) fn register_iot_device() {}
     path = "/api/v1/iot-devices",
     tag = "device",
     params(
+        ("warehouse_id" = Uuid, Query, description = "仓库 ID"),
         ("device_type" = Option<String>, Query, description = "设备类型"),
         ("online_status" = Option<String>, Query, description = "在线状态"),
         ("enabled" = Option<bool>, Query, description = "启停"),
     ),
-    responses((status = 200, description = "设备列表", body = Vec<DeviceResponse>)),
+    responses(
+        (status = 200, description = "设备列表", body = Vec<DeviceResponse>),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn list_iot_devices() {}
@@ -41,7 +46,10 @@ pub(crate) fn list_iot_devices() {}
     path = "/api/v1/iot-devices/{id}",
     tag = "device",
     params(("id" = Uuid, Path, description = "设备 ID")),
-    responses((status = 200, description = "设备详情", body = DeviceResponse)),
+    responses(
+        (status = 200, description = "设备详情", body = DeviceResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn get_iot_device() {}
@@ -50,9 +58,16 @@ pub(crate) fn get_iot_device() {}
     patch,
     path = "/api/v1/iot-devices/{id}",
     tag = "device",
-    params(("id" = Uuid, Path, description = "设备 ID")),
+    params(
+        ("id" = Uuid, Path, description = "设备 ID"),
+        ("Idempotency-Key" = String, Header, description = "设备更新幂等键"),
+    ),
     request_body = UpdateDeviceRequest,
-    responses((status = 200, description = "设备维护/启停", body = DeviceResponse)),
+    responses(
+        (status = 200, description = "设备维护/启停", body = DeviceResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+        (status = 409, description = "版本或幂等冲突", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn update_iot_device() {}
@@ -61,8 +76,14 @@ pub(crate) fn update_iot_device() {}
     post,
     path = "/api/v1/iot-devices/{id}/heartbeat",
     tag = "device",
-    params(("id" = Uuid, Path, description = "设备 ID")),
-    responses((status = 200, description = "心跳上报", body = DeviceResponse)),
+    params(
+        ("id" = Uuid, Path, description = "设备 ID"),
+        ("Idempotency-Key" = String, Header, description = "心跳幂等键"),
+    ),
+    responses(
+        (status = 200, description = "心跳上报", body = DeviceResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn heartbeat_iot_device() {}
@@ -75,6 +96,7 @@ pub(crate) fn heartbeat_iot_device() {}
     request_body = BindDeviceRequest,
     responses(
         (status = 200, description = "绑定成功", body = DeviceBindingResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 409, description = "绑定冲突"),
     ),
 )]
@@ -85,9 +107,15 @@ pub(crate) fn bind_location_device() {}
     post,
     path = "/api/v1/location-device-bindings/{id}/unbind",
     tag = "device",
-    params(("id" = Uuid, Path, description = "绑定 ID")),
+    params(
+        ("id" = Uuid, Path, description = "绑定 ID"),
+        ("Idempotency-Key" = String, Header, description = "解绑幂等键"),
+    ),
     request_body = UnbindRequest,
-    responses((status = 204, description = "软解绑成功")),
+    responses(
+        (status = 204, description = "软解绑成功"),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn unbind_location_device() {}

@@ -7,11 +7,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::audit::{append_event_in_tx, AuditWriteRequest};
-use crate::auth::AuthContext;
 use crate::device_repository::get_device;
 use crate::device_service::DeviceError;
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
+use crate::operation_context::OperationContext as AuthContext;
 use crate::wcs_task_repository::{
     clear_pod_unreachable_in_tx, find_active_pod_move, find_active_task_by_device_location,
     find_task_by_idempotency, get_task, insert_task, list_tasks, set_pod_unreachable_in_tx,
@@ -80,8 +80,9 @@ pub struct CreateWcsTaskRequest {
     pub payload: Value,
 }
 
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DeviceEventRequest {
+    pub event_id: Uuid,
     pub event_type: String,
     #[serde(default)]
     pub task_id: Option<Uuid>,
@@ -90,17 +91,17 @@ pub struct DeviceEventRequest {
     pub payload: Value,
 }
 
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ResendRequest {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VoidRequest {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ConfirmSkipRequest {
     pub reason: String,
     pub qty: Option<i64>,
@@ -156,7 +157,7 @@ impl WcsTaskService {
         req: CreateWcsTaskRequest,
         idempotency_key: &str,
     ) -> Result<CreatedWcsTask, DeviceError> {
-        let device = get_device(&self.pool, ctx.owner_id, req.device_id)
+        let device = get_device(&self.pool, req.device_id)
             .await?
             .ok_or(DeviceError::NotFound)?;
         if !device.enabled {
@@ -582,15 +583,36 @@ impl WcsTaskService {
         ctx: &AuthContext,
         task_id: Uuid,
         reason: String,
+        idempotency_key: &str,
     ) -> Result<WcsTaskResponse, DeviceError> {
         let now = Utc::now();
+        let path = format!("/api/v1/wcs-tasks/{task_id}/resend");
+        let hash = idempotency::request_hash(&json!({"task_id": task_id, "reason": &reason}))
+            .map_err(idempotency_err)?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        idempotency::lock_key(&mut tx, "wcs_task_resend", ctx.owner_id, idempotency_key)
+            .await
+            .map_err(idempotency_err)?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?
+        {
+            return Ok(replay);
+        }
         let task = get_task(&self.pool, ctx.owner_id, task_id)
             .await?
             .ok_or(DeviceError::TaskNotFound)?;
         if !resend_allowed(&task.status) {
             return Err(DeviceError::TaskStateInvalid);
         }
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
         let row = transition_in_tx(
             &mut tx,
             TaskTransition {
@@ -610,6 +632,21 @@ impl WcsTaskService {
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
+        let response = WcsTaskResponse::from(row);
+        idempotency::store_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            "wcs_task",
+            &task_id.to_string(),
+            &response,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?;
         append_event_in_tx(
             &mut tx,
             &AuditWriteRequest::from_auth_context(
@@ -624,7 +661,7 @@ impl WcsTaskService {
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
-        Ok(row.into())
+        Ok(response)
     }
 
     /// 人工作废（仅未落账任务：status != succeeded）。
@@ -633,15 +670,36 @@ impl WcsTaskService {
         ctx: &AuthContext,
         task_id: Uuid,
         req: VoidRequest,
+        idempotency_key: &str,
     ) -> Result<WcsTaskResponse, DeviceError> {
         let now = Utc::now();
+        let path = format!("/api/v1/wcs-tasks/{task_id}/void");
+        let hash = idempotency::request_hash(&json!({"task_id": task_id, "request": &req}))
+            .map_err(idempotency_err)?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        idempotency::lock_key(&mut tx, "wcs_task_void", ctx.owner_id, idempotency_key)
+            .await
+            .map_err(idempotency_err)?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?
+        {
+            return Ok(replay);
+        }
         let task = get_task(&self.pool, ctx.owner_id, task_id)
             .await?
             .ok_or(DeviceError::TaskNotFound)?;
         if task.status == "succeeded" {
             return Err(DeviceError::TaskVoidBlocked);
         }
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
         if task.task_type == "pod_move" {
             let pod_code = task
                 .payload
@@ -671,6 +729,21 @@ impl WcsTaskService {
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
+        let response = WcsTaskResponse::from(row);
+        idempotency::store_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            "wcs_task",
+            &task_id.to_string(),
+            &response,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?;
         append_event_in_tx(
             &mut tx,
             &AuditWriteRequest::from_auth_context(
@@ -685,7 +758,7 @@ impl WcsTaskService {
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
-        Ok(row.into())
+        Ok(response)
     }
 
     pub async fn list(
@@ -707,4 +780,11 @@ impl WcsTaskService {
 
 fn db_err(error: sqlx::Error) -> DeviceError {
     DeviceError::Database(error.to_string())
+}
+
+pub(crate) fn idempotency_err(error: idempotency::IdempotencyError) -> DeviceError {
+    match error {
+        idempotency::IdempotencyError::Conflict => DeviceError::IdempotencyConflict,
+        other => DeviceError::Database(format!("{other:?}")),
+    }
 }

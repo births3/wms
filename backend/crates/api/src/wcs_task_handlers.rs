@@ -60,6 +60,7 @@ pub struct TaskListQuery {
 
 #[derive(Deserialize)]
 pub struct EventListQuery {
+    pub warehouse_id: Uuid,
     #[serde(default)]
     pub device_id: Option<Uuid>,
     #[serde(default)]
@@ -68,12 +69,23 @@ pub struct EventListQuery {
     pub limit: Option<i64>,
 }
 
+#[derive(Deserialize)]
+pub struct DashboardQuery {
+    pub warehouse_id: Uuid,
+}
+
 async fn dashboard_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
+    Query(query): Query<DashboardQuery>,
 ) -> Result<Json<DeviceDashboardSummary>, DevicePlatformHandlerError> {
     require_monitor(&ctx)?;
-    Ok(Json(state.service.dashboard_summary(&ctx).await?))
+    Ok(Json(
+        state
+            .service
+            .dashboard_summary(&ctx, query.warehouse_id)
+            .await?,
+    ))
 }
 
 async fn list_events_handler(
@@ -85,7 +97,12 @@ async fn list_events_handler(
     Ok(Json(
         state
             .service
-            .list_events(&ctx, query.device_id, query.event_type, query.limit)
+            .list_events(
+                query.warehouse_id,
+                query.device_id,
+                query.event_type,
+                query.limit,
+            )
             .await?,
     ))
 }
@@ -134,11 +151,16 @@ async fn resend_task_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<ResendRequest>,
 ) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
     require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
     Ok(Json(
-        state.service.resend(&ctx, id, req.reason.clone()).await?,
+        state
+            .service
+            .resend(&ctx, id, req.reason.clone(), &key)
+            .await?,
     ))
 }
 
@@ -146,29 +168,35 @@ async fn void_task_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<VoidRequest>,
 ) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
     require_manage(&ctx)?;
-    Ok(Json(state.service.void(&ctx, id, req).await?))
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.void(&ctx, id, req, &key).await?))
 }
 
 async fn confirm_skip_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<ConfirmSkipRequest>,
 ) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
     require_manage(&ctx)?;
-    Ok(Json(state.service.confirm_skip(&ctx, id, req).await?))
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.confirm_skip(&ctx, id, req, &key).await?))
 }
 
 async fn device_event_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<DeviceEventRequest>,
 ) -> Result<StatusCode, DevicePlatformHandlerError> {
     require_manage(&ctx)?;
+    let _key = idempotency_key(&headers)?;
     state.service.handle_event(&ctx, id, req).await?;
     Ok(StatusCode::NO_CONTENT)
 }

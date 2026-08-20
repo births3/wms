@@ -45,4 +45,5 @@ impl LpnContainerQualityLockService {
     }
 }
 
-include!("lpn_container_repository_quality_lock_ops.rs");
+#[path = "lpn_container_repository_quality_lock_ops.rs"]
+mod quality_lock_ops;

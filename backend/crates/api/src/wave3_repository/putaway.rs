@@ -2,9 +2,7 @@ use super::*;
 use rust_decimal::prelude::ToPrimitive;
 use serde_json::Value;
 
-use super::putaway_validation::{
-    LocationZoneValidationRow, ProductValidationRow, PutawayDimensionScope,
-};
+use super::putaway_validation::LocationZoneValidationRow;
 
 #[derive(FromRow)]
 struct PutawayProductPolicyRow {

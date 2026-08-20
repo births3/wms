@@ -544,6 +544,11 @@ impl PgReplenishmentRepository {
              WHERE strategy.owner_id = $1
                AND strategy.enabled
                AND 'wave_gap' = ANY(strategy.trigger_modes)
+               AND strategy.target_type = (
+                    SELECT location_type
+                      FROM warehouse_locations
+                     WHERE owner_id = $1 AND id = $3
+               )
                AND (
                     (strategy.scope_type = 'product' AND strategy.scope_ref = $2)
                     OR (

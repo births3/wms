@@ -76,7 +76,19 @@ pub(crate) async fn insert_task(
     .bind(now)
     .execute(&mut **tx)
     .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    .map_err(|error| match &error {
+        sqlx::Error::Database(database)
+            if database.constraint() == Some("wcs_tasks_active_ptl_light_on_device_uq") =>
+        {
+            DeviceError::PtLightBusy
+        }
+        sqlx::Error::Database(database)
+            if database.constraint() == Some("wcs_tasks_active_pod_move_code_uq") =>
+        {
+            DeviceError::PodMoveActive
+        }
+        _ => DeviceError::Database(error.to_string()),
+    })?;
     Ok(())
 }
 
@@ -515,6 +527,7 @@ pub(crate) async fn list_events(
 /// 设备大盘汇总：设备状态计数与异常任务计数。
 pub(crate) async fn device_dashboard_summary(
     pool: &PgPool,
+    warehouse_id: Uuid,
     owner_id: Uuid,
 ) -> Result<(i64, i64, i64, i64, i64, i64), DeviceError> {
     let row = sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64)>(
@@ -523,11 +536,12 @@ pub(crate) async fn device_dashboard_summary(
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1) AS total_devices,
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'online') AS online_devices,
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'offline') AS offline_devices,
-            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status = 'failed') AS failed_tasks,
-            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status = 'timeout') AS timeout_tasks,
-            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status IN ('pending', 'sent', 'executing')) AS pending_tasks
+            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $2 AND status = 'failed') AS failed_tasks,
+            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $2 AND status = 'timeout') AS timeout_tasks,
+            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $2 AND status IN ('pending', 'sent', 'executing')) AS pending_tasks
         "#,
     )
+    .bind(warehouse_id)
     .bind(owner_id)
     .fetch_one(pool)
     .await

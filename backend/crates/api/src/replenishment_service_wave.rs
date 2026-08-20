@@ -40,9 +40,13 @@ impl ReplenishmentService {
             .repo
             .find_wave_gap_strategy(tx, ctx.owner_id, req.product_id, req.target_location_id)
             .await?;
-        let (source_type, strategy_id) = match &strategy {
-            Some(found) => (found.source_type.as_str(), Some(found.id)),
-            None => ("storage", None),
+        let (source_type, target_type, strategy_id) = match &strategy {
+            Some(found) => (
+                found.source_type.as_str(),
+                found.target_type.as_str(),
+                Some(found.id),
+            ),
+            None => ("storage", target.location_type.as_str(), None),
         };
         let available = self
             .repo
@@ -97,14 +101,7 @@ impl ReplenishmentService {
                 break;
             }
             match self
-                .ensure_target_putaway(
-                    tx,
-                    ctx.owner_id,
-                    &target,
-                    &target.location_type,
-                    req.product_id,
-                    qty,
-                )
+                .ensure_target_putaway(tx, ctx.owner_id, &target, target_type, req.product_id, qty)
                 .await
             {
                 Ok(()) => {}

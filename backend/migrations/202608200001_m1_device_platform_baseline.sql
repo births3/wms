@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS iot_devices (
     online_status VARCHAR(16) NOT NULL DEFAULT 'offline',
     last_heartbeat_at TIMESTAMPTZ,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    version BIGINT NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (warehouse_id, device_code),
@@ -72,6 +73,14 @@ CREATE INDEX IF NOT EXISTS wcs_tasks_device_status_idx
     ON wcs_tasks (device_id, status);
 CREATE INDEX IF NOT EXISTS wcs_tasks_business_ref_idx
     ON wcs_tasks (owner_id, business_ref_type, business_ref_no);
+CREATE UNIQUE INDEX IF NOT EXISTS wcs_tasks_active_ptl_light_on_device_uq
+    ON wcs_tasks (device_id)
+    WHERE task_type = 'ptl_light_on'
+      AND status IN ('pending', 'sent', 'executing', 'timeout');
+CREATE UNIQUE INDEX IF NOT EXISTS wcs_tasks_active_pod_move_code_uq
+    ON wcs_tasks ((payload->>'pod_code'))
+    WHERE task_type = 'pod_move'
+      AND status IN ('pending', 'sent', 'executing', 'timeout');
 
 -- ============================================================
 -- 3. iot_event_logs（硬件事件，纯审计追加流，只 INSERT）

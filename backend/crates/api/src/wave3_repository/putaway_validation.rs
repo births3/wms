@@ -81,6 +81,7 @@ impl PutawayDimensionScope {
     }
 
     /// 推荐主流程：可判定维度全开，④⑤ 关闭。
+    #[allow(dead_code)]
     pub(super) fn recommendation() -> Self {
         Self {
             category_zone: true,

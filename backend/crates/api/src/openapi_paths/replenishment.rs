@@ -10,7 +10,10 @@ use super::*;
         ("enabled" = Option<bool>, Query, description = "启停"),
         ("scope_type" = Option<String>, Query, description = "范围类型"),
     ),
-    responses((status = 200, description = "策略列表", body = ReplenishmentStrategyListResponse)),
+    responses(
+        (status = 200, description = "策略列表", body = ReplenishmentStrategyListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn list_replenishment_strategies() {}
@@ -20,7 +23,10 @@ pub(crate) fn list_replenishment_strategies() {}
     path = "/api/v1/replenishment/strategies/{id}",
     tag = "replenishment",
     params(("id" = Uuid, Path, description = "策略 ID")),
-    responses((status = 200, description = "策略详情", body = ReplenishmentStrategy)),
+    responses(
+        (status = 200, description = "策略详情", body = ReplenishmentStrategy),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn get_replenishment_strategy() {}
@@ -34,7 +40,10 @@ pub(crate) fn get_replenishment_strategy() {}
         ("Idempotency-Key" = String, Header, description = "更新幂等键"),
     ),
     request_body = UpsertReplenishmentStrategyRequest,
-    responses((status = 200, description = "更新补货策略", body = ReplenishmentStrategy)),
+    responses(
+        (status = 200, description = "更新补货策略", body = ReplenishmentStrategy),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn update_replenishment_strategy() {}
@@ -47,7 +56,10 @@ pub(crate) fn update_replenishment_strategy() {}
         ("id" = Uuid, Path, description = "策略 ID"),
         ("Idempotency-Key" = String, Header, description = "停用幂等键"),
     ),
-    responses((status = 200, description = "停用补货策略", body = ReplenishmentStrategy)),
+    responses(
+        (status = 200, description = "停用补货策略", body = ReplenishmentStrategy),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn disable_replenishment_strategy() {}
@@ -56,7 +68,10 @@ pub(crate) fn disable_replenishment_strategy() {}
     get,
     path = "/api/v1/replenishment/location-groups",
     tag = "replenishment",
-    responses((status = 200, description = "库位组列表", body = ReplenishmentLocationGroupListResponse)),
+    responses(
+        (status = 200, description = "库位组列表", body = ReplenishmentLocationGroupListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn list_replenishment_location_groups() {}
@@ -69,6 +84,7 @@ pub(crate) fn list_replenishment_location_groups() {}
     request_body = UpsertReplenishmentStrategyRequest,
     responses(
         (status = 200, description = "创建补货策略", body = ReplenishmentStrategy),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 400, description = "缺少幂等键", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 404, description = "范围引用不存在", body = ErrorResponse),
@@ -89,6 +105,7 @@ pub(crate) fn create_replenishment_strategy() {}
     request_body = BindReplenishmentLocationsRequest,
     responses(
         (status = 200, description = "挂接拣选位", body = BindReplenishmentLocationsResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 409, description = "库位已挂其他策略", body = ErrorResponse),
     ),
@@ -103,6 +120,7 @@ pub(crate) fn bind_replenishment_locations() {}
     params(("id" = Uuid, Path, description = "策略 ID")),
     responses(
         (status = 200, description = "命中预览", body = ReplenishmentPreviewResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 404, description = "策略不存在", body = ErrorResponse),
     ),
@@ -118,6 +136,7 @@ pub(crate) fn preview_replenishment_strategy() {}
     request_body = UpsertReplenishmentLocationGroupRequest,
     responses(
         (status = 200, description = "创建库位组", body = ReplenishmentLocationGroup),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
     ),
 )]
@@ -129,7 +148,10 @@ pub(crate) fn create_replenishment_location_group() {}
     path = "/api/v1/replenishment/location-groups/{id}",
     tag = "replenishment",
     params(("id" = Uuid, Path, description = "库位组 ID")),
-    responses((status = 200, description = "库位组详情", body = ReplenishmentLocationGroup)),
+    responses(
+        (status = 200, description = "库位组详情", body = ReplenishmentLocationGroup),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn get_replenishment_location_group() {}
@@ -143,7 +165,10 @@ pub(crate) fn get_replenishment_location_group() {}
         ("Idempotency-Key" = String, Header, description = "更新幂等键"),
     ),
     request_body = UpsertReplenishmentLocationGroupRequest,
-    responses((status = 200, description = "更新库位组", body = ReplenishmentLocationGroup)),
+    responses(
+        (status = 200, description = "更新库位组", body = ReplenishmentLocationGroup),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn update_replenishment_location_group() {}
@@ -156,7 +181,10 @@ pub(crate) fn update_replenishment_location_group() {}
         ("id" = Uuid, Path, description = "库位组 ID"),
         ("Idempotency-Key" = String, Header, description = "停用幂等键"),
     ),
-    responses((status = 200, description = "停用库位组", body = ReplenishmentLocationGroup)),
+    responses(
+        (status = 200, description = "停用库位组", body = ReplenishmentLocationGroup),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn disable_replenishment_location_group() {}
@@ -180,7 +208,10 @@ pub(crate) fn disable_replenishment_location_group() {}
         ("limit" = Option<u32>, Query, description = "每页条数"),
         ("cursor" = Option<String>, Query, description = "分页游标"),
     ),
-    responses((status = 200, description = "补货任务列表", body = ReplenishmentTaskListResponse)),
+    responses(
+        (status = 200, description = "补货任务列表", body = ReplenishmentTaskListResponse),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn list_replenishment_tasks() {}
@@ -193,6 +224,7 @@ pub(crate) fn list_replenishment_tasks() {}
     request_body = CreateReplenishmentTaskRequest,
     responses(
         (status = 200, description = "手工发起补货任务", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 400, description = "缺少幂等键", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 422, description = "编号不可用、包装非整或来源不足", body = ErrorResponse),
@@ -206,7 +238,10 @@ pub(crate) fn create_replenishment_task() {}
     path = "/api/v1/replenishment/tasks/{id}",
     tag = "replenishment",
     params(("id" = Uuid, Path, description = "任务 ID")),
-    responses((status = 200, description = "补货任务详情", body = ReplenishmentTask)),
+    responses(
+        (status = 200, description = "补货任务详情", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn get_replenishment_task() {}
@@ -222,6 +257,7 @@ pub(crate) fn get_replenishment_task() {}
     request_body = ClaimReplenishmentTaskRequest,
     responses(
         (status = 200, description = "领取补货任务", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "权限不足", body = ErrorResponse),
         (status = 409, description = "领取冲突", body = ErrorResponse),
         (status = 422, description = "目标库区不在作业员班组", body = ErrorResponse),
@@ -241,6 +277,7 @@ pub(crate) fn claim_replenishment_task() {}
     request_body = PickReplenishmentTaskRequest,
     responses(
         (status = 200, description = "补货下架登记", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 422, description = "扫码不符或超量", body = ErrorResponse),
     ),
 )]
@@ -258,6 +295,7 @@ pub(crate) fn pick_replenishment_task() {}
     request_body = ConfirmReplenishmentTaskRequest,
     responses(
         (status = 200, description = "补货送达确认", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 422, description = "状态非法或上架阻断", body = ErrorResponse),
     ),
 )]
@@ -275,6 +313,7 @@ pub(crate) fn confirm_replenishment_task() {}
     request_body = CancelReplenishmentTaskRequest,
     responses(
         (status = 200, description = "取消补货任务", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 422, description = "已下架不可取消", body = ErrorResponse),
     ),
 )]
@@ -290,7 +329,10 @@ pub(crate) fn cancel_replenishment_task() {}
         ("Idempotency-Key" = String, Header, description = "改派幂等键"),
     ),
     request_body = ReassignReplenishmentTaskRequest,
-    responses((status = 200, description = "改派回池", body = ReplenishmentTask)),
+    responses(
+        (status = 200, description = "改派回池", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
+    ),
 )]
 #[allow(dead_code)]
 pub(crate) fn reassign_replenishment_task() {}
@@ -306,6 +348,7 @@ pub(crate) fn reassign_replenishment_task() {}
     request_body = ReturnReplenishmentTaskRequest,
     responses(
         (status = 200, description = "退回待领", body = ReplenishmentTask),
+        (status = 401, description = "未登录", body = ErrorResponse),
         (status = 422, description = "已下架不可退回", body = ErrorResponse),
     ),
 )]

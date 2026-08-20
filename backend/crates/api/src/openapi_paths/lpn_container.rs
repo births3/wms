@@ -123,6 +123,7 @@ pub(crate) fn list_lpn_container_type_policies() {}
     put,
     path = "/api/v1/master-data/lpn-container-type-policies",
     tag = "master-data",
+    params(("Idempotency-Key" = String, Header, description = "保存策略幂等键")),
     request_body = UpsertLpnContainerTypePolicyRequest,
     responses(
         (status = 200, description = "保存容器类型混装策略", body = LpnContainerTypePolicy),

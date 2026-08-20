@@ -56,6 +56,7 @@ pub fn device_router(state: DeviceAppState) -> Router {
 
 #[derive(Deserialize)]
 pub struct DeviceListQuery {
+    pub warehouse_id: Uuid,
     #[serde(default)]
     pub device_type: Option<String>,
     #[serde(default)]
@@ -87,7 +88,12 @@ async fn list_devices_handler(
     Ok(Json(
         state
             .service
-            .list(&ctx, query.device_type, query.online_status, query.enabled)
+            .list(
+                query.warehouse_id,
+                query.device_type,
+                query.online_status,
+                query.enabled,
+            )
             .await?,
     ))
 }
@@ -105,19 +111,23 @@ async fn update_device_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UpdateDeviceRequest>,
 ) -> Result<Json<DeviceResponse>, DevicePlatformHandlerError> {
     require_manage(&ctx)?;
-    Ok(Json(state.service.update(&ctx, id, req).await?))
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.update(&ctx, id, req, &key).await?))
 }
 
 async fn heartbeat_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> Result<Json<DeviceResponse>, DevicePlatformHandlerError> {
     require_manage(&ctx)?;
-    Ok(Json(state.service.heartbeat(&ctx, id).await?))
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.heartbeat(&ctx, id, &key).await?))
 }
 
 async fn bind_device_handler(
@@ -138,9 +148,11 @@ async fn unbind_device_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<UnbindRequest>,
 ) -> Result<StatusCode, DevicePlatformHandlerError> {
     require_bind_manage(&ctx)?;
-    state.service.unbind(&ctx, id, req).await?;
+    let key = idempotency_key(&headers)?;
+    state.service.unbind(&ctx, id, req, &key).await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -642,6 +642,12 @@ pub(crate) fn map_write_error(error: sqlx::Error) -> LpnContainerRepositoryError
     map_db_error(error)
 }
 
-include!("lpn_container_repository_quality_lock.rs");
-include!("lpn_container_repository_quality_lock_sql.rs");
-include!("lpn_container_repository_write.rs");
+#[path = "lpn_container_repository_quality_lock.rs"]
+mod quality_lock;
+#[path = "lpn_container_repository_quality_lock_sql.rs"]
+mod quality_lock_sql;
+#[path = "lpn_container_repository_write.rs"]
+mod write;
+
+pub(crate) use quality_lock::*;
+pub(crate) use quality_lock_sql::*;

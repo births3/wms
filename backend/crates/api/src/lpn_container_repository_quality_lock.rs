@@ -1,5 +1,6 @@
-pub(crate) const QUALITY_LOCK_PATH: &str =
-    "/api/v1/master-data/lpn-containers/{id}/quality-lock";
+use super::*;
+
+pub(crate) const QUALITY_LOCK_PATH: &str = "/api/v1/master-data/lpn-containers/{id}/quality-lock";
 pub(crate) const QUALITY_LOCK_RELEASE_PATH: &str =
     "/api/v1/master-data/lpn-containers/{id}/quality-lock/release";
 

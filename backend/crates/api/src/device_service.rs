@@ -7,7 +7,6 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::audit::{append_event_in_tx, AuditDiff, AuditWriteRequest};
-use crate::auth::AuthContext;
 use crate::device_repository::{
     find_active_binding, find_device_by_code, get_binding, get_device, insert_binding,
     insert_device, insert_event_log, list_devices, list_stale_online_devices, mark_offline,
@@ -15,6 +14,7 @@ use crate::device_repository::{
 };
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
+use crate::operation_context::OperationContext as AuthContext;
 
 const DEVICE_TYPES: [&str; 5] = ["agv", "ptl_light", "dws", "rfid_antenna", "stacker"];
 const BIND_ROLES: [&str; 2] = ["ptl_light", "rfid_antenna"];
@@ -39,6 +39,8 @@ pub enum DeviceError {
     EventTaskMismatch,
     LocationUnreachable,
     NumberingUnavailable,
+    VersionConflict,
+    IdempotencyConflict,
     Database(String),
 }
 
@@ -57,6 +59,7 @@ pub struct DeviceResponse {
     pub online_status: String,
     pub last_heartbeat_at: Option<chrono::DateTime<chrono::Utc>>,
     pub enabled: bool,
+    pub version: i64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bindings: Vec<DeviceBindingResponse>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -88,6 +91,7 @@ impl From<DeviceRow> for DeviceResponse {
             online_status: row.online_status,
             last_heartbeat_at: row.last_heartbeat_at,
             enabled: row.enabled,
+            version: row.version,
             bindings: Vec::new(),
             recent_events: Vec::new(),
         }
@@ -121,6 +125,7 @@ impl From<crate::device_repository::BindingRow> for DeviceBindingResponse {
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct RegisterDeviceRequest {
+    pub warehouse_id: Uuid,
     pub device_code: String,
     pub device_type: String,
     #[serde(default)]
@@ -136,8 +141,9 @@ pub struct RegisterDeviceRequest {
     pub extra_config: serde_json::Value,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct UpdateDeviceRequest {
+    pub expected_version: i64,
     #[serde(default)]
     pub device_code: Option<String>,
     #[serde(default)]
@@ -213,7 +219,7 @@ impl DeviceService {
         {
             return Ok(replay);
         }
-        if find_device_by_code(&self.pool, ctx.owner_id, &req.device_code)
+        if find_device_by_code(&self.pool, req.warehouse_id, &req.device_code)
             .await?
             .is_some()
         {
@@ -223,7 +229,7 @@ impl DeviceService {
         insert_device(
             &mut tx,
             id,
-            ctx.owner_id,
+            req.warehouse_id,
             &req.device_code,
             &req.device_type,
             req.vendor.as_deref(),
@@ -241,7 +247,7 @@ impl DeviceService {
         .await?;
         let response = DeviceResponse {
             id,
-            warehouse_id: ctx.owner_id,
+            warehouse_id: req.warehouse_id,
             device_code: req.device_code.clone(),
             device_type: req.device_type.clone(),
             vendor: req.vendor.clone(),
@@ -257,6 +263,7 @@ impl DeviceService {
             online_status: "offline".into(),
             last_heartbeat_at: None,
             enabled: true,
+            version: 1,
             bindings: Vec::new(),
             recent_events: Vec::new(),
         };
@@ -294,14 +301,14 @@ impl DeviceService {
 
     pub async fn list(
         &self,
-        ctx: &AuthContext,
+        warehouse_id: Uuid,
         device_type: Option<String>,
         online_status: Option<String>,
         enabled: Option<bool>,
     ) -> Result<Vec<DeviceResponse>, DeviceError> {
         let rows = list_devices(
             &self.pool,
-            ctx.owner_id,
+            warehouse_id,
             device_type.as_deref(),
             online_status.as_deref(),
             enabled,
@@ -310,20 +317,21 @@ impl DeviceService {
         Ok(rows.into_iter().map(DeviceResponse::from).collect())
     }
 
-    pub async fn get(&self, ctx: &AuthContext, id: Uuid) -> Result<DeviceResponse, DeviceError> {
-        let row = get_device(&self.pool, ctx.owner_id, id)
+    pub async fn get(&self, _ctx: &AuthContext, id: Uuid) -> Result<DeviceResponse, DeviceError> {
+        let row = get_device(&self.pool, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        let warehouse_id = row.warehouse_id;
         let mut response = DeviceResponse::from(row);
         response.bindings =
-            crate::device_repository::list_bindings_for_device(&self.pool, ctx.owner_id, id)
+            crate::device_repository::list_bindings_for_device(&self.pool, warehouse_id, id)
                 .await?
                 .into_iter()
                 .map(DeviceBindingResponse::from)
                 .collect();
         response.recent_events = crate::device_repository::list_recent_events_for_device(
             &self.pool,
-            ctx.owner_id,
+            warehouse_id,
             id,
             20,
         )
@@ -336,23 +344,44 @@ impl DeviceService {
         ctx: &AuthContext,
         id: Uuid,
         req: UpdateDeviceRequest,
+        idempotency_key: &str,
     ) -> Result<DeviceResponse, DeviceError> {
-        let existing = get_device(&self.pool, ctx.owner_id, id)
+        let now = Utc::now();
+        let path = format!("/api/v1/iot-devices/{id}");
+        let hash = idempotency::request_hash(&json!({"id": id, "request": &req}))
+            .map_err(idempotency_err)?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        idempotency::lock_key(&mut tx, "iot_device_update", ctx.owner_id, idempotency_key)
+            .await
+            .map_err(idempotency_err)?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "PATCH",
+            &path,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?
+        {
+            return Ok(replay);
+        }
+        let existing = get_device(&self.pool, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
         if let Some(device_code) = req.device_code.as_deref() {
-            if find_device_by_code(&self.pool, ctx.owner_id, device_code)
+            if find_device_by_code(&self.pool, existing.warehouse_id, device_code)
                 .await?
-                .is_some()
+                .is_some_and(|device| device.id != id)
             {
                 return Err(DeviceError::DuplicateCode);
             }
         }
-        let now = Utc::now();
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
-        crate::device_repository::update_device_in_tx(
+        let row = crate::device_repository::update_device_in_tx(
             &mut tx,
-            ctx.owner_id,
+            existing.warehouse_id,
             id,
             req.device_code.as_deref(),
             req.vendor.as_deref(),
@@ -361,12 +390,29 @@ impl DeviceService {
             req.port,
             req.extra_config.as_ref(),
             req.enabled,
+            req.expected_version,
             now,
         )
-        .await?;
+        .await?
+        .ok_or(DeviceError::VersionConflict)?;
         if req.enabled == Some(false) && existing.online_status == "online" {
             crate::device_repository::mark_offline_in_tx(&mut tx, id, now).await?;
         }
+        let response = DeviceResponse::from(row);
+        idempotency::store_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "PATCH",
+            &path,
+            "iot_device",
+            &id.to_string(),
+            &response,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?;
         append_event_in_tx(
             &mut tx,
             &AuditWriteRequest::from_auth_context(
@@ -381,24 +427,47 @@ impl DeviceService {
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
-        let row = get_device(&self.pool, ctx.owner_id, id)
-            .await?
-            .ok_or(DeviceError::NotFound)?;
-        Ok(row.into())
+        Ok(response)
     }
 
     pub async fn heartbeat(
         &self,
         ctx: &AuthContext,
         id: Uuid,
+        idempotency_key: &str,
     ) -> Result<DeviceResponse, DeviceError> {
         let now = Utc::now();
-        let row = touch_heartbeat(&self.pool, ctx.owner_id, id, now)
+        let path = format!("/api/v1/iot-devices/{id}/heartbeat");
+        let hash = idempotency::request_hash(&json!({"id": id})).map_err(idempotency_err)?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        idempotency::lock_key(
+            &mut tx,
+            "iot_device_heartbeat",
+            ctx.owner_id,
+            idempotency_key,
+        )
+        .await
+        .map_err(idempotency_err)?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?
+        {
+            return Ok(replay);
+        }
+        let row = touch_heartbeat(&self.pool, id, now)
             .await?
             .ok_or(DeviceError::NotFound)?;
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
         insert_event_log(
             &mut tx,
+            Uuid::new_v4(),
             row.warehouse_id,
             row.id,
             "heartbeat",
@@ -408,8 +477,23 @@ impl DeviceService {
             now,
         )
         .await?;
+        let response = DeviceResponse::from(row);
+        idempotency::store_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            "iot_device",
+            &id.to_string(),
+            &response,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?;
         tx.commit().await.map_err(db_err)?;
-        Ok(row.into())
+        Ok(response)
     }
 
     pub async fn bind(
@@ -421,7 +505,7 @@ impl DeviceService {
         if !BIND_ROLES.contains(&req.binding_role.as_str()) {
             return Err(DeviceError::TypeInvalid);
         }
-        let device = get_device(&self.pool, ctx.owner_id, req.device_id)
+        let device = get_device(&self.pool, req.device_id)
             .await?
             .ok_or(DeviceError::NotFound)?;
         let device_type_matches = match req.binding_role.as_str() {
@@ -438,9 +522,14 @@ impl DeviceService {
         if device.online_status == "offline" {
             return Err(DeviceError::Offline);
         }
-        if find_active_binding(&self.pool, ctx.owner_id, req.location_id, &req.binding_role)
-            .await?
-            .is_some()
+        if find_active_binding(
+            &self.pool,
+            device.warehouse_id,
+            req.location_id,
+            &req.binding_role,
+        )
+        .await?
+        .is_some()
         {
             return Err(DeviceError::BindConflict);
         }
@@ -453,7 +542,7 @@ impl DeviceService {
             .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         if let Some(replay) = idempotency::replay(
             &mut tx,
-            ctx.owner_id,
+            device.warehouse_id,
             idempotency_key,
             &hash,
             "POST",
@@ -479,7 +568,7 @@ impl DeviceService {
         .await?;
         let row = crate::device_repository::BindingRow {
             id,
-            warehouse_id: ctx.owner_id,
+            warehouse_id: device.warehouse_id,
             location_id: req.location_id,
             device_id: req.device_id,
             binding_role: req.binding_role.clone(),
@@ -525,16 +614,58 @@ impl DeviceService {
         ctx: &AuthContext,
         id: Uuid,
         req: UnbindRequest,
+        idempotency_key: &str,
     ) -> Result<(), DeviceError> {
-        let binding = get_binding(&self.pool, ctx.owner_id, id)
+        let now = Utc::now();
+        let path = format!("/api/v1/location-device-bindings/{id}/unbind");
+        let hash = idempotency::request_hash(&json!({"id": id, "request": &req}))
+            .map_err(idempotency_err)?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        idempotency::lock_key(
+            &mut tx,
+            "device_binding_unbind",
+            ctx.owner_id,
+            idempotency_key,
+        )
+        .await
+        .map_err(idempotency_err)?;
+        if idempotency::replay::<serde_json::Value>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?
+        .is_some()
+        {
+            return Ok(());
+        }
+        let binding = get_binding(&self.pool, id)
             .await?
             .ok_or(DeviceError::BindNotFound)?;
         if binding.valid_to.is_some() {
             return Err(DeviceError::BindNotFound);
         }
-        let now = Utc::now();
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
-        crate::device_repository::soft_unbind_in_tx(&mut tx, ctx.owner_id, id, now).await?;
+        crate::device_repository::soft_unbind_in_tx(&mut tx, binding.warehouse_id, id, now).await?;
+        idempotency::store_success_with_status(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            204,
+            "location_device_binding",
+            &id.to_string(),
+            &json!({}),
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?;
         append_event_in_tx(
             &mut tx,
             &AuditWriteRequest::from_auth_context(
@@ -599,4 +730,11 @@ impl DeviceService {
 
 fn db_err(error: sqlx::Error) -> DeviceError {
     DeviceError::Database(error.to_string())
+}
+
+fn idempotency_err(error: idempotency::IdempotencyError) -> DeviceError {
+    match error {
+        idempotency::IdempotencyError::Conflict => DeviceError::IdempotencyConflict,
+        other => DeviceError::Database(format!("{other:?}")),
+    }
 }

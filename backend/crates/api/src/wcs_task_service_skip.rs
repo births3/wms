@@ -8,11 +8,14 @@ use uuid::Uuid;
 use crate::audit::{append_event_in_tx, AuditWriteRequest};
 use crate::auth::AuthContext;
 use crate::device_service::DeviceError;
+use crate::idempotency;
 use crate::wcs_task_repository::{
     clear_pod_unreachable_in_tx, get_task, location_is_unreachable, transition_in_tx,
     TaskTransition, WcsTaskRow,
 };
-use crate::wcs_task_service::{ConfirmSkipRequest, WcsTaskResponse, WcsTaskService};
+use crate::wcs_task_service::{
+    idempotency_err, ConfirmSkipRequest, WcsTaskResponse, WcsTaskService,
+};
 use wms_domain::confirm_skip_allowed;
 
 impl WcsTaskService {
@@ -22,8 +25,38 @@ impl WcsTaskService {
         ctx: &AuthContext,
         task_id: Uuid,
         req: ConfirmSkipRequest,
+        idempotency_key: &str,
     ) -> Result<WcsTaskResponse, DeviceError> {
         let now = Utc::now();
+        let path = format!("/api/v1/wcs-tasks/{task_id}/confirm-skip");
+        let hash = idempotency::request_hash(&serde_json::json!({
+            "task_id": task_id,
+            "request": &req,
+        }))
+        .map_err(idempotency_err)?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        idempotency::lock_key(
+            &mut tx,
+            "wcs_task_confirm_skip",
+            ctx.owner_id,
+            idempotency_key,
+        )
+        .await
+        .map_err(idempotency_err)?;
+        if let Some(replay) = idempotency::replay(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?
+        {
+            return Ok(replay);
+        }
         let task = get_task(&self.pool, ctx.owner_id, task_id)
             .await?
             .ok_or(DeviceError::TaskNotFound)?;
@@ -38,7 +71,6 @@ impl WcsTaskService {
                 }
             }
         }
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
         if task.task_type == "pod_move" {
             let pod_code = task
                 .payload
@@ -156,6 +188,21 @@ impl WcsTaskService {
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
+        let response = WcsTaskResponse::from(row);
+        idempotency::store_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            "wcs_task",
+            &task_id.to_string(),
+            &response,
+            now,
+        )
+        .await
+        .map_err(idempotency_err)?;
         append_event_in_tx(
             &mut tx,
             &AuditWriteRequest::from_auth_context(
@@ -171,7 +218,7 @@ impl WcsTaskService {
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
         self.enqueue_ptl_light_off(ctx, &task).await?;
-        Ok(row.into())
+        Ok(response)
     }
 }
 

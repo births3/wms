@@ -459,10 +459,10 @@ pub(super) async fn resolve_rule_application_in_tx(
     if partitions.len() != 1 {
         return Err(PrintOrchestrationError::AggregationRuleMismatch);
     }
-    Ok(partitions
+    partitions
         .pop()
-        .expect("one partition was checked")
-        .application)
+        .map(|partition| partition.application)
+        .ok_or(PrintOrchestrationError::AggregationRuleMismatch)
 }
 
 pub(super) async fn partition_orders_by_rule_in_tx(

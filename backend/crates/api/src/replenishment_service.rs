@@ -28,12 +28,12 @@ use wms_domain::{
 
 use crate::{
     audit::{append_event_in_tx, AuditWriteRequest},
-    auth::AuthContext,
     document_numbering::{
         DocumentNumberingError, GenerateDocumentNumberRequest, PgDocumentNumberingService,
     },
     idempotency::{self, IdempotencyError},
     inventory::reserve_replenish_in_tx,
+    operation_context::OperationContext as AuthContext,
     replenishment_repository::{
         PgReplenishmentRepository, ReplenishmentRepoError, SourceBatchLock,
     },

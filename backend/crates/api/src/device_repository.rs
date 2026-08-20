@@ -22,6 +22,7 @@ pub struct DeviceRow {
     pub online_status: String,
     pub last_heartbeat_at: Option<DateTime<Utc>>,
     pub enabled: bool,
+    pub version: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -40,7 +41,7 @@ pub struct BindingRow {
 
 const DEVICE_COLUMNS: &str = "id, warehouse_id, device_code, device_type, vendor, model, \
      protocol, ip_address, port, extra_config, online_status, last_heartbeat_at, enabled, \
-     created_at, updated_at";
+     version, created_at, updated_at";
 
 pub(crate) async fn insert_device(
     tx: &mut Transaction<'_, Postgres>,
@@ -106,15 +107,10 @@ pub(crate) async fn find_device_by_code(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
-pub(crate) async fn get_device(
-    pool: &PgPool,
-    warehouse_id: Uuid,
-    id: Uuid,
-) -> Result<Option<DeviceRow>, DeviceError> {
+pub(crate) async fn get_device(pool: &PgPool, id: Uuid) -> Result<Option<DeviceRow>, DeviceError> {
     sqlx::query_as::<_, DeviceRow>(&format!(
-        "SELECT {DEVICE_COLUMNS} FROM iot_devices WHERE warehouse_id = $1 AND id = $2"
+        "SELECT {DEVICE_COLUMNS} FROM iot_devices WHERE id = $1"
     ))
-    .bind(warehouse_id)
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -150,22 +146,19 @@ pub(crate) async fn list_devices(
 
 pub(crate) async fn touch_heartbeat(
     pool: &PgPool,
-    warehouse_id: Uuid,
     id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<Option<DeviceRow>, DeviceError> {
     sqlx::query_as::<_, DeviceRow>(&format!(
         r#"
         UPDATE iot_devices
-           SET last_heartbeat_at = $3,
+           SET last_heartbeat_at = $2,
                online_status = CASE WHEN enabled THEN 'online' ELSE 'disabled' END,
-               updated_at = $3
-         WHERE warehouse_id = $1
-           AND id = $2
+               updated_at = $2
+         WHERE id = $1
          RETURNING {DEVICE_COLUMNS}
         "#
     ))
-    .bind(warehouse_id)
     .bind(id)
     .bind(now)
     .fetch_optional(pool)
@@ -175,6 +168,7 @@ pub(crate) async fn touch_heartbeat(
 
 pub(crate) async fn insert_event_log(
     tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
     warehouse_id: Uuid,
     device_id: Uuid,
     event_type: &str,
@@ -182,16 +176,18 @@ pub(crate) async fn insert_event_log(
     location_id: Option<Uuid>,
     payload: Value,
     now: DateTime<Utc>,
-) -> Result<(), DeviceError> {
-    sqlx::query(
+) -> Result<bool, DeviceError> {
+    let inserted = sqlx::query(
         r#"
         INSERT INTO iot_event_logs (
-            warehouse_id, device_id, event_type, task_id, location_id, payload,
+            id, warehouse_id, device_id, event_type, task_id, location_id, payload,
             occurred_at, received_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+        ON CONFLICT (id) DO NOTHING
         "#,
     )
+    .bind(id)
     .bind(warehouse_id)
     .bind(device_id)
     .bind(event_type)
@@ -202,7 +198,7 @@ pub(crate) async fn insert_event_log(
     .execute(&mut **tx)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))?;
-    Ok(())
+    Ok(inserted.rows_affected() == 1)
 }
 
 pub(crate) async fn insert_binding(
@@ -270,7 +266,6 @@ pub(crate) async fn find_active_binding(
 
 pub(crate) async fn get_binding(
     pool: &PgPool,
-    warehouse_id: Uuid,
     id: Uuid,
 ) -> Result<Option<BindingRow>, DeviceError> {
     sqlx::query_as::<_, BindingRow>(
@@ -278,10 +273,9 @@ pub(crate) async fn get_binding(
         SELECT id, warehouse_id, location_id, device_id, binding_role, point_address,
                valid_from, valid_to
           FROM location_device_bindings
-         WHERE warehouse_id = $1 AND id = $2
+         WHERE id = $1
         "#,
     )
-    .bind(warehouse_id)
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -375,9 +369,10 @@ pub(crate) async fn update_device_in_tx(
     port: Option<i32>,
     extra_config: Option<&Value>,
     enabled: Option<bool>,
+    expected_version: i64,
     now: DateTime<Utc>,
-) -> Result<(), DeviceError> {
-    sqlx::query(
+) -> Result<Option<DeviceRow>, DeviceError> {
+    sqlx::query_as::<_, DeviceRow>(&format!(
         r#"
         UPDATE iot_devices
            SET device_code = COALESCE($2, device_code),
@@ -387,11 +382,14 @@ pub(crate) async fn update_device_in_tx(
                port = COALESCE($6, port),
                extra_config = COALESCE($7, extra_config),
                enabled = COALESCE($8, enabled),
+               version = version + 1,
                updated_at = $9
          WHERE warehouse_id = $1
            AND id = $10
-        "#,
-    )
+           AND version = $11
+         RETURNING {DEVICE_COLUMNS}
+        "#
+    ))
     .bind(warehouse_id)
     .bind(device_code)
     .bind(vendor)
@@ -402,10 +400,10 @@ pub(crate) async fn update_device_in_tx(
     .bind(enabled)
     .bind(now)
     .bind(id)
-    .execute(&mut **tx)
+    .bind(expected_version)
+    .fetch_optional(&mut **tx)
     .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?;
-    Ok(())
+    .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
 pub(crate) async fn mark_offline_in_tx(
