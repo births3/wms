@@ -4,9 +4,9 @@
 
 ## 统计
 
-- 迁移文件：61
-- 数据表：193
-- 索引：168
+- 迁移文件：67
+- 数据表：208
+- 索引：188
 
 ## 表清单
 
@@ -16,23 +16,23 @@
 | `audit_event_2026_06` | Wave 1 审计 | `backend/migrations/202606020001_audit_event.sql` | 继承 audit_event | 0 | 0 | 0 | 0 |
 | `audit_chain_seal` | Wave 1 审计 | `backend/migrations/202606020001_audit_event.sql` | 无 | 4 | 0 | 0 | 0 |
 | `idempotency_request` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 12 | 1 | 0 | 0 |
-| `receiving_orders` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 12 | 1 | 0 | 0 |
-| `receiving_order_lines` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 11 | 1 | 1 | 1 |
-| `receiving_order_receipts` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 10 | 1 | 2 | 1 |
-| `receiving_inspections` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 12 | 1 | 2 | 1 |
+| `receiving_orders` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 12 | 1 | 1 | 0 |
+| `receiving_order_lines` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 11 | 1 | 2 | 1 |
+| `receiving_order_receipts` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 10 | 1 | 3 | 1 |
+| `receiving_inspections` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 12 | 1 | 3 | 1 |
 | `receiving_inspection_signatures` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 9 | 1 | 2 | 3 |
-| `receiving_putaways` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 11 | 1 | 2 | 1 |
-| `inventory_batches` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 15 | 3 | 1 | 0 |
-| `inventory_movements` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 16 | 4 | 2 | 1 |
+| `receiving_putaways` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 11 | 1 | 3 | 1 |
+| `inventory_batches` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 15 | 3 | 3 | 0 |
+| `inventory_movements` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 16 | 4 | 3 | 1 |
 | `inventory_status_changes` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 10 | 1 | 1 | 1 |
 | `cold_chain_devices` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 10 | 0 | 0 | 0 |
 | `temperature_readings` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 11 | 1 | 0 | 0 |
 | `temperature_excursion_events` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 12 | 1 | 0 | 0 |
 | `billing_accounts` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 8 | 0 | 0 | 0 |
 | `billing_contracts` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 10 | 1 | 1 | 1 |
-| `billing_rules` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 10 | 2 | 1 | 1 |
-| `outbound_orders` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 14 | 1 | 2 | 0 |
-| `outbound_order_lines` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 12 | 1 | 1 | 1 |
+| `billing_rules` | Wave 3 入库 / 库存 / 冷链 / 计费 | `backend/migrations/202606030001_wave3_core_tables.sql` | 有 | 10 | 2 | 2 | 1 |
+| `outbound_orders` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 14 | 1 | 3 | 0 |
+| `outbound_order_lines` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 12 | 1 | 2 | 1 |
 | `outbound_waves` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 7 | 0 | 0 | 0 |
 | `outbound_wave_orders` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 5 | 0 | 1 | 2 |
 | `outbound_shipments` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 18 | 1 | 2 | 3 |
@@ -40,10 +40,10 @@
 | `traceability_outbound_report_events` | Wave 4 出库 / 追溯 | `backend/migrations/202606040001_wave4_outbound_tables.sql` | 有 | 12 | 2 | 1 | 1 |
 | `packing_stations` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 11 | 0 | 0 | 0 |
 | `packing_jobs` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 17 | 1 | 1 | 2 |
-| `retail_replenishment_suggestions` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 13 | 0 | 0 | 0 |
-| `crossdock_plans` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 9 | 1 | 1 | 1 |
-| `billing_charge_calculations` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 11 | 0 | 1 | 1 |
-| `billing_statements` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 10 | 0 | 1 | 1 |
+| `retail_replenishment_suggestions` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 13 | 0 | 1 | 0 |
+| `crossdock_plans` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 9 | 1 | 2 | 1 |
+| `billing_charge_calculations` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 11 | 0 | 2 | 1 |
+| `billing_statements` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 10 | 0 | 2 | 1 |
 | `billing_statement_charges` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 5 | 0 | 1 | 2 |
 | `tms_dispatches` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 16 | 1 | 1 | 1 |
 | `transit_temperature_readings` | Wave 5 增值 / TMS / 计费 | `backend/migrations/202606050001_wave5_value_added_tables.sql` | 有 | 11 | 0 | 1 | 1 |
@@ -57,13 +57,13 @@
 | `auth_role_permissions` | H1 鉴权 / 货主访问 | `backend/migrations/202606060001_h1_auth_tables.sql` | 无 | 3 | 1 | 0 | 2 |
 | `system_dictionary_categories` | M1 系统字典 | `backend/migrations/202606280001_system_dictionary.sql` | 无 | 11 | 0 | 0 | 0 |
 | `system_dictionary_items` | M1 系统字典 | `backend/migrations/202606280001_system_dictionary.sql` | 有 | 14 | 2 | 1 | 1 |
-| `products` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 14 | 1 | 3 | 0 |
-| `suppliers` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 11 | 1 | 2 | 0 |
-| `customers` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 11 | 2 | 3 | 0 |
-| `customer_addresses` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 13 | 1 | 0 | 1 |
+| `products` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 14 | 1 | 6 | 0 |
+| `suppliers` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 11 | 1 | 3 | 0 |
+| `customers` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 11 | 2 | 4 | 0 |
+| `customer_addresses` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 13 | 1 | 1 | 1 |
 | `warehouses` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 10 | 2 | 0 | 0 |
-| `warehouse_zones` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 11 | 2 | 1 | 1 |
-| `warehouse_locations` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 17 | 1 | 1 | 3 |
+| `warehouse_zones` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 11 | 2 | 2 | 1 |
+| `warehouse_locations` | M1 主数据 / 数据库规范对齐 | `backend/migrations/202606280002_database_design_standard_alignment.sql` | 有 | 17 | 1 | 3 | 4 |
 | `document_number_rules` | mcg_document_numbering | `backend/migrations/202607020001_mcg_document_numbering.sql` | 有 | 15 | 2 | 0 | 1 |
 | `document_number_counters` | mcg_document_numbering | `backend/migrations/202607020001_mcg_document_numbering.sql` | 无 | 7 | 0 | 0 | 1 |
 | `document_number_allocations` | mcg_document_numbering | `backend/migrations/202607020001_mcg_document_numbering.sql` | 有 | 12 | 1 | 0 | 2 |
@@ -97,7 +97,7 @@
 | `auth_role_permission_exclusions` | h1_role_management | `backend/migrations/202607120002_h1_role_management.sql` | 无 | 3 | 0 | 0 | 2 |
 | `auth_sessions` | h1_auth_sessions | `backend/migrations/202607120003_h1_auth_sessions.sql` | 有 | 10 | 1 | 0 | 1 |
 | `auth_api_keys` | h1_api_key_lifecycle | `backend/migrations/202607120004_h1_api_key_lifecycle.sql` | 有 | 22 | 2 | 0 | 3 |
-| `inventory_allocations` | m3_inventory_allocations | `backend/migrations/202607130003_m3_inventory_allocations.sql` | 有 | 10 | 1 | 0 | 2 |
+| `inventory_allocations` | m3_inventory_allocations | `backend/migrations/202607130003_m3_inventory_allocations.sql` | 有 | 10 | 1 | 1 | 2 |
 | `warehouse_docks` | dock_master | `backend/migrations/202607130008_dock_master.sql` | 无 | 10 | 1 | 0 | 1 |
 | `inventory_recall_actions` | m3_recall_actions | `backend/migrations/202607130010_m3_recall_actions.sql` | 有 | 12 | 2 | 0 | 1 |
 | `dock_appointments` | dock_maintenance_permissions | `backend/migrations/202607130014_dock_maintenance_permissions.sql` | 有 | 20 | 3 | 0 | 3 |
@@ -107,23 +107,23 @@
 | `tms_route_plans` | m10_tms_route_plans | `backend/migrations/202607140003_m10_tms_route_plans.sql` | 有 | 12 | 1 | 0 | 0 |
 | `tms_route_stops` | m10_tms_route_plans | `backend/migrations/202607140003_m10_tms_route_plans.sql` | 有 | 7 | 0 | 0 | 1 |
 | `tms_route_orders` | m10_tms_route_plans | `backend/migrations/202607140003_m10_tms_route_plans.sql` | 有 | 6 | 1 | 0 | 3 |
-| `outbound_pick_tasks` | m4_outbound_pick_tasks | `backend/migrations/202607140004_m4_outbound_pick_tasks.sql` | 有 | 16 | 1 | 0 | 3 |
+| `outbound_pick_tasks` | m4_outbound_pick_tasks | `backend/migrations/202607140004_m4_outbound_pick_tasks.sql` | 有 | 16 | 1 | 1 | 3 |
 | `inventory_status_transitions` | m3_inventory_status_transitions | `backend/migrations/202607140005_m3_inventory_status_transitions.sql` | 有 | 8 | 2 | 0 | 0 |
 | `inventory_maintenance_tasks` | m3_inventory_maintenance | `backend/migrations/202607140006_m3_inventory_maintenance.sql` | 有 | 8 | 2 | 0 | 1 |
 | `inventory_maintenance_records` | m3_inventory_maintenance | `backend/migrations/202607140006_m3_inventory_maintenance.sql` | 有 | 22 | 2 | 0 | 2 |
 | `inventory_counts` | m3_inventory_counts | `backend/migrations/202607140008_m3_inventory_counts.sql` | 有 | 15 | 1 | 0 | 0 |
-| `inventory_count_lines` | m3_inventory_counts | `backend/migrations/202607140008_m3_inventory_counts.sql` | 有 | 14 | 1 | 0 | 2 |
+| `inventory_count_lines` | m3_inventory_counts | `backend/migrations/202607140008_m3_inventory_counts.sql` | 有 | 14 | 1 | 1 | 2 |
 | `drug_inspection_platforms` | mdi_drug_inspection_platforms | `backend/migrations/202607140009_mdi_drug_inspection_platforms.sql` | 有 | 16 | 1 | 0 | 1 |
 | `task_types` | mte_task_types | `backend/migrations/202607140010_mte_task_types.sql` | 有 | 12 | 2 | 1 | 1 |
 | `dual_person_policy_rules` | mvr_dual_person_policy | `backend/migrations/202607150001_mvr_dual_person_policy.sql` | 有 | 14 | 2 | 0 | 4 |
 | `outbound_review_records` | mvr_downstream_enforcement | `backend/migrations/202607150002_mvr_downstream_enforcement.sql` | 有 | 10 | 1 | 0 | 4 |
 | `task_groups` | mte_task_execution | `backend/migrations/202607150003_mte_task_execution.sql` | 有 | 11 | 0 | 0 | 2 |
 | `task_group_memberships` | mte_task_execution | `backend/migrations/202607150003_mte_task_execution.sql` | 有 | 4 | 1 | 1 | 4 |
-| `warehouse_tasks` | mte_task_execution | `backend/migrations/202607150003_mte_task_execution.sql` | 有 | 35 | 4 | 2 | 6 |
-| `task_execution_events` | mte_task_execution | `backend/migrations/202607150003_mte_task_execution.sql` | 有 | 12 | 1 | 0 | 3 |
+| `warehouse_tasks` | mte_task_execution | `backend/migrations/202607150003_mte_task_execution.sql` | 有 | 35 | 4 | 3 | 6 |
+| `task_execution_events` | mte_task_execution | `backend/migrations/202607150003_mte_task_execution.sql` | 有 | 12 | 1 | 1 | 3 |
 | `task_priority_rules` | mte_task_priority_rules | `backend/migrations/202607150006_mte_task_priority_rules.sql` | 有 | 9 | 0 | 0 | 1 |
-| `stock_adjustment_orders` | msa_stock_loss | `backend/migrations/202607150008_msa_stock_loss.sql` | 有 | 27 | 2 | 1 | 6 |
-| `stock_adjustment_execution_records` | msa_stock_loss | `backend/migrations/202607150008_msa_stock_loss.sql` | 有 | 13 | 1 | 0 | 5 |
+| `stock_adjustment_orders` | msa_stock_loss | `backend/migrations/202607150008_msa_stock_loss.sql` | 有 | 27 | 2 | 2 | 6 |
+| `stock_adjustment_execution_records` | msa_stock_loss | `backend/migrations/202607150008_msa_stock_loss.sql` | 有 | 13 | 1 | 1 | 5 |
 | `stock_adjustment_erp_feedback_outbox` | msa_stock_loss | `backend/migrations/202607150008_msa_stock_loss.sql` | 有 | 11 | 1 | 0 | 2 |
 | `quality_liaison_types` | mql_quality_liaison | `backend/migrations/202607150010_mql_quality_liaison.sql` | 有 | 12 | 0 | 0 | 2 |
 | `quality_liaison_orders` | mql_quality_liaison | `backend/migrations/202607150010_mql_quality_liaison.sql` | 有 | 19 | 1 | 0 | 4 |
@@ -135,15 +135,15 @@
 | `auth_user_warehouse_scopes` | hal_alert_dashboard | `backend/migrations/202607150014_hal_alert_dashboard.sql` | 有 | 4 | 0 | 0 | 4 |
 | `alert_report_exports` | hal_alert_dashboard | `backend/migrations/202607150014_hal_alert_dashboard.sql` | 有 | 18 | 1 | 0 | 2 |
 | `alert_statistics_snapshots` | hal_alert_dashboard | `backend/migrations/202607150014_hal_alert_dashboard.sql` | 有 | 6 | 0 | 0 | 1 |
-| `inventory_relocations` | m3_remaining_closeout | `backend/migrations/202607170004_m3_remaining_closeout.sql` | 有 | 18 | 1 | 0 | 0 |
+| `inventory_relocations` | m3_remaining_closeout | `backend/migrations/202607170004_m3_remaining_closeout.sql` | 有 | 18 | 1 | 1 | 0 |
 | `inventory_status_erp_feedback_outbox` | m3_remaining_closeout | `backend/migrations/202607170004_m3_remaining_closeout.sql` | 有 | 12 | 1 | 0 | 0 |
 | `inventory_alert_events` | m3_remaining_closeout | `backend/migrations/202607170004_m3_remaining_closeout.sql` | 有 | 16 | 2 | 0 | 0 |
-| `inventory_abc_classifications` | m3_remaining_closeout | `backend/migrations/202607170004_m3_remaining_closeout.sql` | 有 | 12 | 1 | 0 | 0 |
+| `inventory_abc_classifications` | m3_remaining_closeout | `backend/migrations/202607170004_m3_remaining_closeout.sql` | 有 | 12 | 1 | 1 | 0 |
 | `putaway_strategy_profiles` | m2_inbound_closeout | `backend/migrations/202607170006_m2_inbound_closeout.sql` | 有 | 12 | 2 | 1 | 0 |
-| `receiving_putaway_erp_feedback_outbox` | m2_putaway_lpn_erp | `backend/migrations/202607180003_m2_putaway_lpn_erp.sql` | 有 | 13 | 1 | 0 | 1 |
+| `receiving_putaway_erp_feedback_outbox` | m2_putaway_lpn_erp | `backend/migrations/202607180003_m2_putaway_lpn_erp.sql` | 有 | 13 | 1 | 1 | 1 |
 | `archive_revision_erp_feedback_outbox` | h8_erp_outbox_extensions | `backend/migrations/202607180005_h8_erp_outbox_extensions.sql` | 有 | 17 | 1 | 0 | 1 |
 | `reconciliation_erp_feedback_outbox` | h8_erp_outbox_extensions | `backend/migrations/202607180005_h8_erp_outbox_extensions.sql` | 有 | 12 | 1 | 0 | 1 |
-| `shipment_confirm_erp_feedback_outbox` | h8_erp_outbox_extensions | `backend/migrations/202607180005_h8_erp_outbox_extensions.sql` | 有 | 12 | 1 | 0 | 1 |
+| `shipment_confirm_erp_feedback_outbox` | h8_erp_outbox_extensions | `backend/migrations/202607180005_h8_erp_outbox_extensions.sql` | 有 | 12 | 1 | 1 | 1 |
 | `inventory_snapshot_erp_feedback_outbox` | h8_erp_outbox_extensions | `backend/migrations/202607180005_h8_erp_outbox_extensions.sql` | 有 | 11 | 1 | 0 | 1 |
 | `h8_erp_connectors` | h8_erp_connectors | `backend/migrations/202607190002_h8_erp_connectors.sql` | 有 | 28 | 1 | 1 | 1 |
 | `h8_erp_in_flight_messages` | h8_erp_connectors | `backend/migrations/202607190002_h8_erp_connectors.sql` | 有 | 12 | 1 | 0 | 2 |
@@ -165,8 +165,8 @@
 | `reconciliation_rules` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 5 | 0 | 0 | 1 |
 | `reconciliation_runs` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 11 | 0 | 0 | 1 |
 | `reconciliation_schedule_claims` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 15 | 0 | 0 | 2 |
-| `reconciliation_items` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 15 | 0 | 0 | 2 |
-| `reconciliation_item_adjustments` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 6 | 0 | 0 | 4 |
+| `reconciliation_items` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 15 | 0 | 1 | 2 |
+| `reconciliation_item_adjustments` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 6 | 0 | 1 | 4 |
 | `reconciliation_item_locks` | mrc_reconciliation | `backend/migrations/202607230004_mrc_reconciliation.sql` | 有 | 6 | 0 | 0 | 3 |
 | `h_file_upload_sessions` | h_file_attachments | `backend/migrations/202607250001_h_file_attachments.sql` | 有 | 17 | 2 | 0 | 2 |
 | `attachments` | h_file_attachments | `backend/migrations/202607250001_h_file_attachments.sql` | 有 | 12 | 1 | 1 | 2 |
@@ -189,7 +189,7 @@
 | `h9_outbound_route_snapshots` | h9_delivery_note_aggregation | `backend/migrations/202607260003_h9_delivery_note_aggregation.sql` | 有 | 8 | 1 | 0 | 2 |
 | `h9_delivery_note_groups` | h9_delivery_note_aggregation | `backend/migrations/202607260003_h9_delivery_note_aggregation.sql` | 有 | 14 | 2 | 1 | 3 |
 | `h9_delivery_note_group_orders` | h9_delivery_note_aggregation | `backend/migrations/202607260003_h9_delivery_note_aggregation.sql` | 有 | 8 | 0 | 0 | 2 |
-| `purchase_return_orders` | m4_purchase_return_orders | `backend/migrations/202607260004_m4_purchase_return_orders.sql` | 有 | 20 | 2 | 0 | 0 |
+| `purchase_return_orders` | m4_purchase_return_orders | `backend/migrations/202607260004_m4_purchase_return_orders.sql` | 有 | 20 | 2 | 1 | 0 |
 | `h9_aggregation_field_catalog` | h9_aggregation_rules | `backend/migrations/202607260005_h9_aggregation_rules.sql` | 无 | 5 | 0 | 0 | 0 |
 | `h9_aggregation_rule_versions` | h9_aggregation_rules | `backend/migrations/202607260005_h9_aggregation_rules.sql` | 有 | 15 | 1 | 0 | 0 |
 | `h9_print_sites` | h9_print_devices | `backend/migrations/202607270001_h9_print_devices.sql` | 无 | 7 | 0 | 0 | 0 |
@@ -205,6 +205,21 @@
 | `h9_document_file_bindings` | h_file_h9_category_pdfs | `backend/migrations/202607280001_h_file_h9_category_pdfs.sql` | 有 | 8 | 0 | 0 | 1 |
 | `h9_category_pdf_preparations` | h_file_h9_category_pdfs | `backend/migrations/202607280001_h_file_h9_category_pdfs.sql` | 有 | 11 | 0 | 0 | 1 |
 | `h9_category_pdf_outputs` | h_file_h9_category_pdfs | `backend/migrations/202607280001_h_file_h9_category_pdfs.sql` | 有 | 19 | 0 | 0 | 4 |
+| `erp_inventory_snapshot_staging` | erp_identity_quantity_alignment | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` | 有 | 10 | 1 | 0 | 1 |
+| `erp_inventory_snapshot_staging_items` | erp_identity_quantity_alignment | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` | 有 | 12 | 0 | 0 | 1 |
+| `erp_order_cancel_commands` | erp_identity_quantity_alignment | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` | 有 | 10 | 1 | 0 | 1 |
+| `lpn_containers` | m1_lpn_containers | `backend/migrations/202608150001_m1_lpn_containers.sql` | 有 | 9 | 0 | 2 | 0 |
+| `lpn_container_type_policies` | m1_lpn_type_policy_and_numbering | `backend/migrations/202608150002_m1_lpn_type_policy_and_numbering.sql` | 有 | 5 | 0 | 0 | 0 |
+| `replenishment_strategies` | phase1_storage_location_and_inventory_baseline | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` | 有 | 15 | 1 | 1 | 0 |
+| `replenishment_location_groups` | phase1_storage_location_and_inventory_baseline | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` | 有 | 6 | 0 | 0 | 0 |
+| `replenishment_location_group_members` | phase1_storage_location_and_inventory_baseline | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` | 无 | 2 | 0 | 0 | 1 |
+| `location_device_bindings` | phase1_storage_location_and_inventory_baseline | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` | 无 | 10 | 2 | 0 | 0 |
+| `container_quality_lock_events` | phase1_storage_location_and_inventory_baseline | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` | 有 | 14 | 1 | 0 | 2 |
+| `putaway_validation_rejection_logs` | phase1_storage_location_and_inventory_baseline | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` | 有 | 10 | 1 | 0 | 0 |
+| `replenishment_tasks` | m3_replenishment_tasks | `backend/migrations/202608190001_m3_replenishment_tasks.sql` | 有 | 29 | 3 | 0 | 1 |
+| `iot_devices` | m1_device_platform_baseline | `backend/migrations/202608200001_m1_device_platform_baseline.sql` | 无 | 16 | 2 | 0 | 0 |
+| `wcs_tasks` | m1_device_platform_baseline | `backend/migrations/202608200001_m1_device_platform_baseline.sql` | 有 | 22 | 5 | 0 | 1 |
+| `iot_event_logs` | m1_device_platform_baseline | `backend/migrations/202608200001_m1_device_platform_baseline.sql` | 无 | 9 | 3 | 0 | 2 |
 
 ## 字段明细
 
@@ -293,7 +308,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`receiving_orders_owner_status_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -317,7 +332,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`receiving_order_lines_owner_product_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`receiving_orders`
 
 | 字段 | SQL 定义 |
@@ -340,7 +355,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`receiving_order_receipts_owner_occurred_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607130009_receiving_receipt_details.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607130009_receiving_receipt_details.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`receiving_orders`
 
 | 字段 | SQL 定义 |
@@ -362,7 +377,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`receiving_inspections_owner_batch_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607180002_m2_receive_inspect_gsp.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607180002_m2_receive_inspect_gsp.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`receiving_orders`
 
 | 字段 | SQL 定义 |
@@ -407,7 +422,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`receiving_putaways_owner_batch_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607180003_m2_putaway_lpn_erp.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607180003_m2_putaway_lpn_erp.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`receiving_orders`
 
 | 字段 | SQL 定义 |
@@ -430,7 +445,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`inventory_batches_owner_expiry_idx`, `inventory_batches_owner_location_status_idx`, `inventory_batches_owner_product_batch_idx`
-- ALTER 迁移：`backend/migrations/202607170001_m3_inventory_query_snapshot.sql`
+- ALTER 迁移：`backend/migrations/202607170001_m3_inventory_query_snapshot.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`, `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -457,7 +472,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`inventory_movements_owner_batch_idx`, `inventory_movements_owner_from_location_occurred_idx`, `inventory_movements_owner_location_occurred_idx`, `inventory_movements_owner_to_location_occurred_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607150008_msa_stock_loss.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607150008_msa_stock_loss.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`inventory_batches`
 
 | 字段 | SQL 定义 |
@@ -618,7 +633,7 @@
 - 迁移：`backend/migrations/202606030001_wave3_core_tables.sql`
 - 货主字段：有
 - 索引：`billing_rules_owner_contract_idx`, `billing_rules_owner_effective_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`billing_contracts`
 
 | 字段 | SQL 定义 |
@@ -640,7 +655,7 @@
 - 迁移：`backend/migrations/202606040001_wave4_outbound_tables.sql`
 - 货主字段：有
 - 索引：`outbound_orders_owner_status_idx`
-- ALTER 迁移：`backend/migrations/202607130004_m4_outbound_document_type.sql`, `backend/migrations/202607260005_h9_aggregation_rules.sql`
+- ALTER 迁移：`backend/migrations/202607130004_m4_outbound_document_type.sql`, `backend/migrations/202607260005_h9_aggregation_rules.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -666,7 +681,7 @@
 - 迁移：`backend/migrations/202606040001_wave4_outbound_tables.sql`
 - 货主字段：有
 - 索引：`outbound_order_lines_owner_product_batch_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`outbound_orders`
 
 | 字段 | SQL 定义 |
@@ -853,7 +868,7 @@
 - 迁移：`backend/migrations/202606050001_wave5_value_added_tables.sql`
 - 货主字段：有
 - 索引：无
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -878,7 +893,7 @@
 - 迁移：`backend/migrations/202606050001_wave5_value_added_tables.sql`
 - 货主字段：有
 - 索引：`crossdock_plans_owner_store_idx`
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`outbound_orders`
 
 | 字段 | SQL 定义 |
@@ -899,7 +914,7 @@
 - 迁移：`backend/migrations/202606050001_wave5_value_added_tables.sql`
 - 货主字段：有
 - 索引：无
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`billing_contracts`
 
 | 字段 | SQL 定义 |
@@ -922,7 +937,7 @@
 - 迁移：`backend/migrations/202606050001_wave5_value_added_tables.sql`
 - 货主字段：有
 - 索引：无
-- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
+- ALTER 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`billing_contracts`
 
 | 字段 | SQL 定义 |
@@ -1204,7 +1219,7 @@
 - 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
 - 货主字段：有
 - 索引：`products_owner_status_idx`
-- ALTER 迁移：`backend/migrations/202607020002_master_data_source.sql`, `backend/migrations/202607120005_m1_product_attrs.sql`, `backend/migrations/202607230003_m1_complete_product_contract.sql`
+- ALTER 迁移：`backend/migrations/202607020002_master_data_source.sql`, `backend/migrations/202607120005_m1_product_attrs.sql`, `backend/migrations/202607230003_m1_complete_product_contract.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`, `backend/migrations/202608110001_products_barcode_69.sql`, `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -1230,7 +1245,7 @@
 - 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
 - 货主字段：有
 - 索引：`suppliers_owner_status_idx`
-- ALTER 迁移：`backend/migrations/202607020002_master_data_source.sql`, `backend/migrations/202607170006_m2_inbound_closeout.sql`
+- ALTER 迁移：`backend/migrations/202607020002_master_data_source.sql`, `backend/migrations/202607170006_m2_inbound_closeout.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -1253,7 +1268,7 @@
 - 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
 - 货主字段：有
 - 索引：`UNIQUE customers_owner_id_uidx`, `customers_owner_status_idx`
-- ALTER 迁移：`backend/migrations/202607020002_master_data_source.sql`, `backend/migrations/202607120001_customer_license_no.sql`, `backend/migrations/202607130012_m1_customer_profile_fields.sql`
+- ALTER 迁移：`backend/migrations/202607020002_master_data_source.sql`, `backend/migrations/202607120001_customer_license_no.sql`, `backend/migrations/202607130012_m1_customer_profile_fields.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -1276,7 +1291,7 @@
 - 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
 - 货主字段：有
 - 索引：`customer_addresses_owner_customer_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`customers`
 
 | 字段 | SQL 定义 |
@@ -1323,7 +1338,7 @@
 - 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
 - 货主字段：有
 - 索引：`UNIQUE warehouse_zones_owner_id_uidx`, `warehouse_zones_owner_warehouse_idx`
-- ALTER 迁移：`backend/migrations/202607130007_m3_quality_color_status_mapping.sql`
+- ALTER 迁移：`backend/migrations/202607130007_m3_quality_color_status_mapping.sql`, `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
 - 引用表：`warehouses`
 
 | 字段 | SQL 定义 |
@@ -1346,8 +1361,8 @@
 - 迁移：`backend/migrations/202606280002_database_design_standard_alignment.sql`
 - 货主字段：有
 - 索引：`warehouse_locations_owner_zone_status_idx`
-- ALTER 迁移：`backend/migrations/202607130006_m1_location_owner_binding.sql`
-- 引用表：`auth_owners`, `warehouse_zones`, `warehouses`
+- ALTER 迁移：`backend/migrations/202607130006_m1_location_owner_binding.sql`, `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`, `backend/migrations/202608200001_m1_device_platform_baseline.sql`
+- 引用表：`auth_owners`, `replenishment_strategies`, `warehouse_zones`, `warehouses`
 
 | 字段 | SQL 定义 |
 |---|---|
@@ -2164,7 +2179,7 @@
 - 迁移：`backend/migrations/202607130003_m3_inventory_allocations.sql`
 - 货主字段：有
 - 索引：`inventory_allocations_owner_order_status_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`inventory_batches`, `outbound_orders`
 
 | 字段 | SQL 定义 |
@@ -2390,7 +2405,7 @@
 - 迁移：`backend/migrations/202607140004_m4_outbound_pick_tasks.sql`
 - 货主字段：有
 - 索引：`outbound_pick_tasks_owner_wave_route_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`inventory_batches`, `outbound_orders`, `outbound_waves`
 
 | 字段 | SQL 定义 |
@@ -2519,7 +2534,7 @@
 - 迁移：`backend/migrations/202607140008_m3_inventory_counts.sql`
 - 货主字段：有
 - 索引：`inventory_count_lines_owner_batch_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`inventory_batches`, `inventory_counts`
 
 | 字段 | SQL 定义 |
@@ -2684,7 +2699,7 @@
 - 迁移：`backend/migrations/202607150003_mte_task_execution.sql`
 - 货主字段：有
 - 索引：`UNIQUE warehouse_tasks_source_identity_idx`, `warehouse_tasks_owner_assignee_idx`, `warehouse_tasks_owner_queue_idx`, `warehouse_tasks_owner_source_idx`
-- ALTER 迁移：`backend/migrations/202607150006_mte_task_priority_rules.sql`, `backend/migrations/202607150007_mte_task_release_control.sql`
+- ALTER 迁移：`backend/migrations/202607150006_mte_task_priority_rules.sql`, `backend/migrations/202607150007_mte_task_release_control.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`auth_owners`, `auth_users`, `task_groups`, `task_types`, `warehouse_tasks`, `warehouses`
 
 | 字段 | SQL 定义 |
@@ -2731,7 +2746,7 @@
 - 迁移：`backend/migrations/202607150003_mte_task_execution.sql`
 - 货主字段：有
 - 索引：`task_execution_events_owner_task_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`auth_owners`, `auth_users`, `warehouse_tasks`
 
 | 字段 | SQL 定义 |
@@ -2776,7 +2791,7 @@
 - 迁移：`backend/migrations/202607150008_msa_stock_loss.sql`
 - 货主字段：有
 - 索引：`UNIQUE stock_adjustment_orders_erp_ref_uidx`, `stock_adjustment_orders_query_idx`
-- ALTER 迁移：`backend/migrations/202607150009_msa_stock_surplus.sql`
+- ALTER 迁移：`backend/migrations/202607150009_msa_stock_surplus.sql`, `backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`auth_owners`, `auth_users`, `dual_person_policy_rules`, `h4_approval_records`, `inventory_batches`, `warehouses`
 
 | 字段 | SQL 定义 |
@@ -2815,7 +2830,7 @@
 - 迁移：`backend/migrations/202607150008_msa_stock_loss.sql`
 - 货主字段：有
 - 索引：`stock_adjustment_execution_owner_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`auth_owners`, `auth_users`, `dual_person_policy_rules`, `h4_approval_records`, `stock_adjustment_orders`
 
 | 字段 | SQL 定义 |
@@ -3113,7 +3128,7 @@
 - 迁移：`backend/migrations/202607170004_m3_remaining_closeout.sql`
 - 货主字段：有
 - 索引：`inventory_relocations_owner_created_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -3195,7 +3210,7 @@
 - 迁移：`backend/migrations/202607170004_m3_remaining_closeout.sql`
 - 货主字段：有
 - 索引：`inventory_abc_owner_class_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -3243,7 +3258,7 @@
 - 迁移：`backend/migrations/202607180003_m2_putaway_lpn_erp.sql`
 - 货主字段：有
 - 索引：`receiving_putaway_erp_outbox_owner_status_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`receiving_putaways`
 
 | 字段 | SQL 定义 |
@@ -3321,7 +3336,7 @@
 - 迁移：`backend/migrations/202607180005_h8_erp_outbox_extensions.sql`
 - 货主字段：有
 - 索引：`shipment_confirm_erp_outbox_poll_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`auth_owners`
 
 | 字段 | SQL 定义 |
@@ -3829,7 +3844,7 @@
 - 迁移：`backend/migrations/202607230004_mrc_reconciliation.sql`
 - 货主字段：有
 - 索引：无
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`auth_owners`, `reconciliation_runs`
 
 | 字段 | SQL 定义 |
@@ -3856,7 +3871,7 @@
 - 迁移：`backend/migrations/202607230004_mrc_reconciliation.sql`
 - 货主字段：有
 - 索引：无
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：`auth_owners`, `inventory_batches`, `reconciliation_items`, `stock_adjustment_orders`
 
 | 字段 | SQL 定义 |
@@ -4365,7 +4380,7 @@
 - 迁移：`backend/migrations/202607260004_m4_purchase_return_orders.sql`
 - 货主字段：有
 - 索引：`UNIQUE purchase_return_orders_owner_id_uidx`, `purchase_return_orders_owner_status_idx`
-- ALTER 迁移：无
+- ALTER 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
 - 引用表：无
 
 | 字段 | SQL 定义 |
@@ -4753,6 +4768,365 @@
 | `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
 | `processed_at` | `processed_at TIMESTAMPTZ` |
 
+### `erp_inventory_snapshot_staging`
+
+- 模块：erp_identity_quantity_alignment
+- 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
+- 货主字段：有
+- 索引：`erp_inventory_snapshot_staging_owner_status_idx`
+- ALTER 迁移：无
+- 引用表：`warehouses`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `warehouse_id` | `warehouse_id UUID NOT NULL` |
+| `snapshot_id` | `snapshot_id TEXT NOT NULL` |
+| `push_type` | `push_type INT NOT NULL CHECK (push_type IN (1, 2))` |
+| `push_time` | `push_time TIMESTAMPTZ NOT NULL` |
+| `payload_digest` | `payload_digest TEXT NOT NULL CHECK (length(payload_digest) = 64)` |
+| `status` | `status TEXT NOT NULL CHECK (status IN ('pending_approval', 'reconciliation_only'))` |
+| `summary` | `summary JSONB NOT NULL DEFAULT '{}'::JSONB` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+
+### `erp_inventory_snapshot_staging_items`
+
+- 模块：erp_identity_quantity_alignment
+- 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
+- 货主字段：有
+- 索引：无
+- ALTER 迁移：无
+- 引用表：`erp_inventory_snapshot_staging`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY` |
+| `snapshot_staging_id` | `snapshot_staging_id UUID NOT NULL REFERENCES erp_inventory_snapshot_staging(id) ON DELETE CASCADE` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `row_no` | `row_no INT NOT NULL CHECK (row_no > 0)` |
+| `product_code` | `product_code TEXT NOT NULL` |
+| `batch_no` | `batch_no TEXT NOT NULL` |
+| `expiry_date` | `expiry_date DATE` |
+| `location_code` | `location_code TEXT` |
+| `goods_status` | `goods_status TEXT` |
+| `quantity` | `quantity NUMERIC(19,4) NOT NULL CHECK (quantity >= 0)` |
+| `quarantined` | `quarantined BOOLEAN NOT NULL` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+
+### `erp_order_cancel_commands`
+
+- 模块：erp_identity_quantity_alignment
+- 迁移：`backend/migrations/202607290001_erp_identity_quantity_alignment.sql`
+- 货主字段：有
+- 索引：`erp_order_cancel_pending_idx`
+- ALTER 迁移：无
+- 引用表：`auth_owners`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `owner_id` | `owner_id UUID NOT NULL REFERENCES auth_owners(id) ON DELETE RESTRICT` |
+| `command_id` | `command_id TEXT NOT NULL` |
+| `erp_bill_code` | `erp_bill_code TEXT NOT NULL` |
+| `revision` | `revision INT NOT NULL CHECK (revision > 0)` |
+| `order_type` | `order_type INT NOT NULL CHECK (order_type IN (1, 2))` |
+| `correlation_id` | `correlation_id TEXT NOT NULL` |
+| `memo` | `memo TEXT` |
+| `status` | `status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'rejected'))` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+| `resolved_at` | `resolved_at TIMESTAMPTZ` |
+
+### `lpn_containers`
+
+- 模块：m1_lpn_containers
+- 迁移：`backend/migrations/202608150001_m1_lpn_containers.sql`
+- 货主字段：有
+- 索引：无
+- ALTER 迁移：`backend/migrations/202608160001_m1_lpn_container_soft_delete.sql`, `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
+- 引用表：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `lpn_code` | `lpn_code VARCHAR(64) NOT NULL` |
+| `container_type` | `container_type TEXT NOT NULL` |
+| `capacity_cm3` | `capacity_cm3 BIGINT` |
+| `status` | `status TEXT NOT NULL DEFAULT 'idle'` |
+| `location_id` | `location_id UUID` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+
+### `lpn_container_type_policies`
+
+- 模块：m1_lpn_type_policy_and_numbering
+- 迁移：`backend/migrations/202608150002_m1_lpn_type_policy_and_numbering.sql`
+- 货主字段：有
+- 索引：无
+- ALTER 迁移：无
+- 引用表：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `container_type` | `container_type TEXT NOT NULL` |
+| `allow_mix_batch` | `allow_mix_batch BOOLEAN NOT NULL DEFAULT FALSE` |
+| `allow_mix_sku` | `allow_mix_sku BOOLEAN NOT NULL DEFAULT FALSE` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` |
+
+### `replenishment_strategies`
+
+- 模块：phase1_storage_location_and_inventory_baseline
+- 迁移：`backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
+- 货主字段：有
+- 索引：`replenishment_strategies_owner_idx`
+- ALTER 迁移：`backend/migrations/202608190001_m3_replenishment_tasks.sql`
+- 引用表：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `strategy_code` | `strategy_code VARCHAR(64) NOT NULL` |
+| `strategy_name` | `strategy_name VARCHAR(128) NOT NULL` |
+| `scope_type` | `scope_type VARCHAR(16) NOT NULL` |
+| `scope_ref` | `scope_ref UUID NOT NULL` |
+| `location_type` | `location_type VARCHAR(16) NOT NULL` |
+| `source_type` | `source_type VARCHAR(16) NOT NULL DEFAULT 'storage'` |
+| `target_type` | `target_type VARCHAR(16) NOT NULL` |
+| `min_safety_threshold` | `min_safety_threshold NUMERIC(19, 4) NOT NULL` |
+| `max_replenish_target` | `max_replenish_target NUMERIC(19, 4) NOT NULL` |
+| `trigger_modes` | `trigger_modes TEXT[] NOT NULL DEFAULT '{min_max, wave_gap}'` |
+| `enabled` | `enabled BOOLEAN NOT NULL DEFAULT TRUE` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+
+### `replenishment_location_groups`
+
+- 模块：phase1_storage_location_and_inventory_baseline
+- 迁移：`backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
+- 货主字段：有
+- 索引：无
+- ALTER 迁移：无
+- 引用表：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `group_code` | `group_code VARCHAR(64) NOT NULL` |
+| `group_name` | `group_name VARCHAR(128) NOT NULL` |
+| `enabled` | `enabled BOOLEAN NOT NULL DEFAULT TRUE` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+
+### `replenishment_location_group_members`
+
+- 模块：phase1_storage_location_and_inventory_baseline
+- 迁移：`backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
+- 货主字段：无
+- 索引：无
+- ALTER 迁移：无
+- 引用表：`replenishment_location_groups`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `group_id` | `group_id UUID NOT NULL REFERENCES replenishment_location_groups(id) ON DELETE CASCADE` |
+| `location_id` | `location_id UUID NOT NULL` |
+
+### `location_device_bindings`
+
+- 模块：phase1_storage_location_and_inventory_baseline
+- 迁移：`backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
+- 货主字段：无
+- 索引：`UNIQUE location_device_bindings_active_uidx`, `location_device_bindings_device_idx`
+- ALTER 迁移：无
+- 引用表：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `warehouse_id` | `warehouse_id UUID NOT NULL` |
+| `location_id` | `location_id UUID NOT NULL` |
+| `device_id` | `device_id UUID NOT NULL` |
+| `binding_role` | `binding_role VARCHAR(16) NOT NULL` |
+| `point_address` | `point_address VARCHAR(64)` |
+| `valid_from` | `valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `valid_to` | `valid_to TIMESTAMPTZ` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+
+### `container_quality_lock_events`
+
+- 模块：phase1_storage_location_and_inventory_baseline
+- 迁移：`backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
+- 货主字段：有
+- 索引：`container_quality_lock_events_container_idx`
+- ALTER 迁移：无
+- 引用表：`lpn_containers`, `quality_liaison_orders`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `container_id` | `container_id UUID NOT NULL REFERENCES lpn_containers(id)` |
+| `lpn_code` | `lpn_code VARCHAR(64) NOT NULL` |
+| `event_type` | `event_type VARCHAR(16) NOT NULL` |
+| `lock_category` | `lock_category VARCHAR(32)` |
+| `reason_dict_item_code` | `reason_dict_item_code VARCHAR(64)` |
+| `reason_desc` | `reason_desc TEXT` |
+| `evidence_urls` | `evidence_urls JSONB DEFAULT '[]'` |
+| `quality_liaison_id` | `quality_liaison_id UUID REFERENCES quality_liaison_orders(id)` |
+| `operated_by` | `operated_by UUID NOT NULL` |
+| `witness_id` | `witness_id UUID` |
+| `occurred_at` | `occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `note` | `note TEXT` |
+
+### `putaway_validation_rejection_logs`
+
+- 模块：phase1_storage_location_and_inventory_baseline
+- 迁移：`backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql`
+- 货主字段：有
+- 索引：`putaway_rejection_logs_owner_time_idx`
+- ALTER 迁移：无
+- 引用表：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `operated_by` | `operated_by UUID NOT NULL` |
+| `container_code` | `container_code VARCHAR(64)` |
+| `product_id` | `product_id UUID` |
+| `target_location_id` | `target_location_id UUID NOT NULL` |
+| `rejection_dimension` | `rejection_dimension VARCHAR(32) NOT NULL` |
+| `error_code` | `error_code VARCHAR(64) NOT NULL` |
+| `reason` | `reason TEXT NOT NULL` |
+| `occurred_at` | `occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+
+### `replenishment_tasks`
+
+- 模块：m3_replenishment_tasks
+- 迁移：`backend/migrations/202608190001_m3_replenishment_tasks.sql`
+- 货主字段：有
+- 索引：`replenishment_tasks_owner_priority_created_idx`, `replenishment_tasks_owner_source_batch_idx`, `replenishment_tasks_owner_status_target_idx`
+- ALTER 迁移：无
+- 引用表：`replenishment_strategies`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `task_no` | `task_no VARCHAR(64) NOT NULL` |
+| `trigger_mode` | `trigger_mode VARCHAR(16) NOT NULL` |
+| `priority` | `priority VARCHAR(16) NOT NULL DEFAULT 'normal'` |
+| `strategy_id` | `strategy_id UUID REFERENCES replenishment_strategies(id)` |
+| `source_location_id` | `source_location_id UUID NOT NULL` |
+| `source_batch_id` | `source_batch_id UUID NOT NULL` |
+| `source_lpn_id` | `source_lpn_id UUID` |
+| `target_location_id` | `target_location_id UUID NOT NULL` |
+| `product_id` | `product_id UUID NOT NULL` |
+| `batch_no` | `batch_no VARCHAR(64) NOT NULL` |
+| `qty` | `qty NUMERIC(19, 4) NOT NULL CHECK (qty > 0)` |
+| `picked_qty` | `picked_qty NUMERIC(19, 4) NOT NULL DEFAULT 0` |
+| `done_qty` | `done_qty NUMERIC(19, 4) NOT NULL DEFAULT 0` |
+| `status` | `status VARCHAR(16) NOT NULL DEFAULT 'pending'` |
+| `operator_id` | `operator_id UUID` |
+| `wave_id` | `wave_id UUID` |
+| `outbound_order_id` | `outbound_order_id UUID` |
+| `outbound_line_no` | `outbound_line_no INT` |
+| `claimed_at` | `claimed_at TIMESTAMPTZ` |
+| `last_progress_at` | `last_progress_at TIMESTAMPTZ` |
+| `confirmed_at` | `confirmed_at TIMESTAMPTZ` |
+| `cancel_reason` | `cancel_reason TEXT` |
+| `return_reason` | `return_reason VARCHAR(32)` |
+| `created_by` | `created_by TEXT NOT NULL` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `version` | `version BIGINT NOT NULL DEFAULT 1` |
+
+### `iot_devices`
+
+- 模块：m1_device_platform_baseline
+- 迁移：`backend/migrations/202608200001_m1_device_platform_baseline.sql`
+- 货主字段：无
+- 索引：`iot_devices_warehouse_status_idx`, `iot_devices_warehouse_type_idx`
+- ALTER 迁移：无
+- 引用表：无
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `warehouse_id` | `warehouse_id UUID NOT NULL` |
+| `device_code` | `device_code VARCHAR(64) NOT NULL` |
+| `device_type` | `device_type VARCHAR(16) NOT NULL` |
+| `vendor` | `vendor VARCHAR(64)` |
+| `model` | `model VARCHAR(64)` |
+| `protocol` | `protocol VARCHAR(16) NOT NULL` |
+| `ip_address` | `ip_address VARCHAR(64)` |
+| `port` | `port INT` |
+| `extra_config` | `extra_config JSONB NOT NULL DEFAULT '{}'` |
+| `online_status` | `online_status VARCHAR(16) NOT NULL DEFAULT 'offline'` |
+| `last_heartbeat_at` | `last_heartbeat_at TIMESTAMPTZ` |
+| `enabled` | `enabled BOOLEAN NOT NULL DEFAULT TRUE` |
+| `version` | `version BIGINT NOT NULL DEFAULT 1` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+
+### `wcs_tasks`
+
+- 模块：m1_device_platform_baseline
+- 迁移：`backend/migrations/202608200001_m1_device_platform_baseline.sql`
+- 货主字段：有
+- 索引：`UNIQUE wcs_tasks_active_pod_move_code_uq`, `UNIQUE wcs_tasks_active_ptl_light_on_device_uq`, `wcs_tasks_business_ref_idx`, `wcs_tasks_device_status_idx`, `wcs_tasks_owner_status_idx`
+- ALTER 迁移：无
+- 引用表：`iot_devices`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `owner_id` | `owner_id UUID NOT NULL` |
+| `task_no` | `task_no VARCHAR(64) NOT NULL` |
+| `task_type` | `task_type VARCHAR(16) NOT NULL` |
+| `device_id` | `device_id UUID NOT NULL REFERENCES iot_devices(id)` |
+| `location_id` | `location_id UUID` |
+| `business_ref_type` | `business_ref_type VARCHAR(32)` |
+| `business_ref_no` | `business_ref_no VARCHAR(64)` |
+| `payload` | `payload JSONB NOT NULL DEFAULT '{}'` |
+| `status` | `status VARCHAR(16) NOT NULL DEFAULT 'pending'` |
+| `ack_payload` | `ack_payload JSONB DEFAULT '{}'` |
+| `error_code` | `error_code VARCHAR(32)` |
+| `error_message` | `error_message TEXT` |
+| `retry_count` | `retry_count INT NOT NULL DEFAULT 0` |
+| `max_retries` | `max_retries INT NOT NULL DEFAULT 3` |
+| `idempotency_key` | `idempotency_key VARCHAR(128) NOT NULL` |
+| `sent_at` | `sent_at TIMESTAMPTZ` |
+| `finished_at` | `finished_at TIMESTAMPTZ` |
+| `created_by` | `created_by TEXT NOT NULL` |
+| `created_at` | `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `updated_at` | `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `version` | `version BIGINT NOT NULL DEFAULT 1` |
+
+### `iot_event_logs`
+
+- 模块：m1_device_platform_baseline
+- 迁移：`backend/migrations/202608200001_m1_device_platform_baseline.sql`
+- 货主字段：无
+- 索引：`iot_event_logs_device_time_idx`, `iot_event_logs_location_time_idx`, `iot_event_logs_task_idx`
+- ALTER 迁移：无
+- 引用表：`iot_devices`, `wcs_tasks`
+
+| 字段 | SQL 定义 |
+|---|---|
+| `id` | `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `warehouse_id` | `warehouse_id UUID NOT NULL` |
+| `device_id` | `device_id UUID NOT NULL REFERENCES iot_devices(id)` |
+| `event_type` | `event_type VARCHAR(16) NOT NULL` |
+| `task_id` | `task_id UUID REFERENCES wcs_tasks(id)` |
+| `location_id` | `location_id UUID` |
+| `payload` | `payload JSONB NOT NULL DEFAULT '{}'` |
+| `occurred_at` | `occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+| `received_at` | `received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` |
+
 ## Schema 变更事件
 
 | 类型 | 表 | 目标 | 迁移 |
@@ -4816,3 +5190,44 @@
 | alter | `outbound_orders` | — | `backend/migrations/202607260005_h9_aggregation_rules.sql` |
 | alter | `attachments` | — | `backend/migrations/202607280001_h_file_h9_category_pdfs.sql` |
 | drop | `h9_ingested_document_files` | — | `backend/migrations/202607280001_h_file_h9_category_pdfs.sql` |
+| alter | `billing_charge_calculations` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `billing_rules` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `billing_statements` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `crossdock_plans` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `customer_addresses` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `customers` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `inventory_abc_classifications` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `inventory_allocations` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `inventory_batches` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `inventory_count_lines` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `inventory_movements` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `inventory_relocations` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `outbound_order_lines` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `outbound_orders` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `outbound_pick_tasks` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `products` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `purchase_return_orders` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `receiving_inspections` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `receiving_order_lines` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `receiving_order_receipts` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `receiving_orders` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `receiving_putaway_erp_feedback_outbox` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `receiving_putaways` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `reconciliation_item_adjustments` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `reconciliation_items` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `retail_replenishment_suggestions` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `shipment_confirm_erp_feedback_outbox` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `stock_adjustment_execution_records` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `stock_adjustment_orders` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `suppliers` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `task_execution_events` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `warehouse_tasks` | — | `backend/migrations/202607290001_erp_identity_quantity_alignment.sql` |
+| alter | `products` | — | `backend/migrations/202608110001_products_barcode_69.sql` |
+| alter | `lpn_containers` | — | `backend/migrations/202608160001_m1_lpn_container_soft_delete.sql` |
+| alter | `inventory_batches` | — | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` |
+| alter | `lpn_containers` | — | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` |
+| alter | `products` | — | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` |
+| alter | `warehouse_locations` | — | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` |
+| alter | `warehouse_zones` | — | `backend/migrations/202608180001_phase1_storage_location_and_inventory_baseline.sql` |
+| alter | `replenishment_strategies` | — | `backend/migrations/202608190001_m3_replenishment_tasks.sql` |
+| alter | `warehouse_locations` | — | `backend/migrations/202608200001_m1_device_platform_baseline.sql` |
