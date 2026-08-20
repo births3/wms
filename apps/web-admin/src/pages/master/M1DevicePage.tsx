@@ -23,6 +23,7 @@ import {
   useDevicesQuery,
   useRegisterDeviceMutation,
   useToggleDeviceEnabledMutation,
+  useUnbindDeviceMutation,
   type Device,
 } from "@/features/device/device-queries";
 
@@ -31,7 +32,6 @@ type Notice = { kind: "success" | "error"; text: string } | null;
 export const queryFields: QueryPanelField[] = [
   { key: "status", label: "在线状态", type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "在线", value: "online" }, { label: "离线", value: "offline" }, { label: "停用", value: "disabled" }] },
   { key: "device_type", label: "设备类型", type: "multiSelect", options: [{ label: "全部", value: "" }, { label: "AGV", value: "agv" }, { label: "PTL", value: "ptl_light" }, { label: "DWS", value: "dws" }, { label: "RFID", value: "rfid_antenna" }, { label: "堆垛机", value: "stacker" }] },
-  { key: "online_status", label: "在线状态筛选", type: "text", placeholder: "online/offline/disabled" },
 ];
 
 export const defaultVisibleFieldKeys = ["status"];
@@ -69,10 +69,13 @@ export function M1DevicePage() {
   const registerMutation = useRegisterDeviceMutation();
   const toggleMutation = useToggleDeviceEnabledMutation();
   const bindMutation = useBindDeviceMutation();
+  const unbindMutation = useUnbindDeviceMutation();
   const [notice, setNotice] = React.useState<Notice>(null);
   const [selected, setSelected] = React.useState<string[]>([]);
   const registerDialog = useDialogState<null>();
   const bindDialog = useDialogState<Device>();
+  const unbindDialog = useDialogState<Device>();
+  const [unbindReason, setUnbindReason] = React.useState("");
   const [form, setForm] = React.useState<RegisterForm>(emptyForm());
   const [bindForm, setBindForm] = React.useState({
     location_id: "",
@@ -83,7 +86,10 @@ export function M1DevicePage() {
   const rows = listQuery.data ?? [];
   const selectedRow = rows.find((row) => row.id === selected[0]);
   const busy =
-    registerMutation.isPending || toggleMutation.isPending || bindMutation.isPending;
+    registerMutation.isPending ||
+    toggleMutation.isPending ||
+    bindMutation.isPending ||
+    unbindMutation.isPending;
 
   const columns: DataGridColumn<Device>[] = [
     { key: "device_code", header: "设备编码", width: 140, sortable: true, filterValue: (row) => row.device_code, copyValue: (row) => row.device_code },
@@ -122,6 +128,18 @@ export function M1DevicePage() {
         if (selectedRow) {
           setBindForm({ location_id: "", binding_role: "ptl_light", point_address: "" });
           bindDialog.openWith(selectedRow);
+        }
+      },
+    },
+    {
+      key: "unbind",
+      label: "解绑",
+      description: "软解绑当前设备生效点位",
+      disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy,
+      onClick: () => {
+        if (selectedRow) {
+          setUnbindReason("");
+          unbindDialog.openWith(selectedRow);
         }
       },
     },
@@ -169,6 +187,18 @@ export function M1DevicePage() {
       bindDialog.close();
     } catch (error) {
       setNotice({ kind: "error", text: error instanceof Error ? error.message : "绑定失败" });
+    }
+  }
+
+  async function onSubmitUnbind() {
+    const target = unbindDialog.target;
+    if (!target) return;
+    try {
+      await unbindMutation.mutateAsync({ deviceId: target.id, reason: unbindReason.trim() });
+      setNotice({ kind: "success", text: "已软解绑" });
+      unbindDialog.close();
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "解绑失败" });
     }
   }
 
@@ -282,6 +312,23 @@ export function M1DevicePage() {
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => bindDialog.close()} disabled={busy}>取消</Button>
             <Button type="button" onClick={() => void onSubmitBind()} disabled={busy || !bindForm.location_id}>绑定</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={unbindDialog.open} onOpenChange={(open) => !busy && unbindDialog.setOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>解绑（{unbindDialog.target?.device_code ?? ""}）</DialogTitle>
+            <DialogDescription>软解绑置 valid_to，保留历史链；须填写原因。</DialogDescription>
+          </DialogHeader>
+          <label className="text-sm">
+            解绑原因
+            <Input value={unbindReason} onChange={(event) => setUnbindReason(event.target.value)} className="mt-1" />
+          </label>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => unbindDialog.close()} disabled={busy}>取消</Button>
+            <Button type="button" variant="destructive" onClick={() => void onSubmitUnbind()} disabled={busy || !unbindReason.trim()}>解绑</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

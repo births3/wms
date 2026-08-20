@@ -87,6 +87,34 @@ export function useToggleDeviceEnabledMutation() {
   });
 }
 
+export function useUnbindDeviceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deviceId, reason }: { deviceId: string; reason: string }) => {
+      const detail = await api.GET("/api/v1/iot-devices/{id}", {
+        params: { path: { id: deviceId } },
+      });
+      const device = requireData(detail.data, detail.error, detail.response.status, "设备详情加载失败");
+      const bindings = device.bindings ?? [];
+      if (bindings.length === 0) {
+        throw new ApiError(undefined, "该设备没有生效绑定", 422);
+      }
+      for (const binding of bindings) {
+        const result = await api.POST("/api/v1/location-device-bindings/{id}/unbind", {
+          params: { path: { id: binding.id } },
+          body: { reason },
+        });
+        if (!result.response.ok) {
+          throw new ApiError(result.error, "解绑失败", result.response.status);
+        }
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: devicesQueryKey });
+    },
+  });
+}
+
 export function useBindDeviceMutation() {
   const queryClient = useQueryClient();
   return useMutation({

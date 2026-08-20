@@ -23,6 +23,8 @@ assert.match(page, /设备类型/, "固定列应含设备类型");
 assert.match(page, /在线状态/, "固定列应含在线状态");
 assert.match(page, /注册设备/, "私有动作应含注册设备");
 assert.match(page, /库位绑定/, "私有动作应含库位绑定");
+assert.match(page, /解绑/, "私有动作应含解绑");
+assert.match(queries, /api\.POST\("\/api\/v1\/location-device-bindings\/\{id\}\/unbind"/, "解绑必须使用解绑 API");
 assert.match(page, /启停|停用/, "私有动作应含启停");
 assert.doesNotMatch(queries, /\bfetch\s*\(/, "设备查询必须统一使用生成的 api-client");
 assert.match(queries, /api\.GET\("\/api\/v1\/iot-devices"/, "列表必须使用设备列表 API");
