@@ -431,3 +431,85 @@ async fn gwt22_marker_inconsistency_scan_alerts(pool: PgPool) {
     let count = service.run_marker_scan().await.expect("marker scan 2");
     assert_eq!(count, 0);
 }
+#[sqlx::test(migrations = "../../migrations")]
+async fn i5_unreachable_guard_sql_blocks_existing_write_paths(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let device_id = seed_device(&pool, owner_id, "agv").await;
+    let pod_location = Uuid::new_v4();
+    seed_location(&pool, owner_id, pod_location, Some("POD-I5")).await;
+    let product_id = Uuid::new_v4();
+    seed_inventory_batch(&pool, owner_id, pod_location, product_id, 50).await;
+    let service = WcsTaskService::new(pool.clone());
+    let c = ctx(owner_id);
+
+    // pod_move executing → 格口不可达
+    let task = service
+        .create_task(
+            &c,
+            CreateWcsTaskRequest {
+                task_type: "pod_move".into(),
+                device_id,
+                location_id: Some(pod_location),
+                business_ref_type: None,
+                business_ref_no: None,
+                payload: json!({"pod_code": "POD-I5", "target_station": "ST-01"}),
+            },
+            "pod-i5",
+        )
+        .await
+        .expect("create pod move");
+    service.dispatch(&c, task.id).await.expect("dispatch");
+    service
+        .apply_receipt(&c, task.id, "start", None)
+        .await
+        .expect("start");
+
+    // I5 守卫 SQL：不可达期间对格口批次行的扣减/确认 UPDATE 命中 0 行（与
+    // confirm_replenish_in_tx / deduct_for_stock_loss_in_tx / wave4 拣选扣减的守卫条件同构）
+    let guarded_update = r#"
+        UPDATE inventory_batches
+           SET qty_on_hand = qty_on_hand - $3,
+               updated_at = $4,
+               version = version + 1
+         WHERE owner_id = $1 AND id = $2
+           AND NOT EXISTS (
+                SELECT 1 FROM warehouse_locations wl
+                 WHERE wl.id = inventory_batches.location_id
+                   AND wl.owner_id = inventory_batches.owner_id
+                   AND wl.agv_unreachable_at IS NOT NULL
+           )
+    "#;
+    let batch_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM inventory_batches WHERE location_id = $1 LIMIT 1")
+            .bind(pod_location)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    let blocked = sqlx::query(guarded_update)
+        .bind(owner_id)
+        .bind(batch_id)
+        .bind(5i64)
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap()
+        .rows_affected();
+    assert_eq!(blocked, 0, "不可达期间扣减应被守卫阻断（0 行）");
+
+    // 恢复可达后命中 1 行
+    service
+        .apply_receipt(&c, task.id, "success", None)
+        .await
+        .expect("finish");
+    let ok = sqlx::query(guarded_update)
+        .bind(owner_id)
+        .bind(batch_id)
+        .bind(5i64)
+        .bind(chrono::Utc::now())
+        .execute(&pool)
+        .await
+        .unwrap()
+        .rows_affected();
+    assert_eq!(ok, 1, "可达后扣减应恢复（1 行）");
+}

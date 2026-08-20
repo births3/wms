@@ -205,6 +205,12 @@ pub async fn confirm_replenish_in_tx(
            AND id = $2
            AND qty_on_hand >= $3
            AND qty_replenish_out_transit >= $3
+           AND NOT EXISTS (
+                SELECT 1 FROM warehouse_locations wl
+                 WHERE wl.id = inventory_batches.location_id
+                   AND wl.owner_id = inventory_batches.owner_id
+                   AND wl.agv_unreachable_at IS NOT NULL
+           )
         RETURNING qty_on_hand
         "#,
     )

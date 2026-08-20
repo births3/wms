@@ -50,6 +50,12 @@ pub(crate) async fn deduct_for_stock_loss_in_tx(
            AND id = $2
            AND $3 > 0
            AND qty_on_hand - qty_frozen >= $3
+           AND NOT EXISTS (
+                SELECT 1 FROM warehouse_locations wl
+                 WHERE wl.id = inventory_batches.location_id
+                   AND wl.owner_id = inventory_batches.owner_id
+                   AND wl.agv_unreachable_at IS NOT NULL
+           )
         RETURNING qty_on_hand
         "#,
     )
@@ -675,6 +681,12 @@ pub(crate) async fn confirm_putaway_in_tx(
                version = version + 1
          WHERE owner_id = $1
            AND id = $2
+           AND NOT EXISTS (
+                SELECT 1 FROM warehouse_locations wl
+                 WHERE wl.id = inventory_batches.location_id
+                   AND wl.owner_id = inventory_batches.owner_id
+                   AND wl.agv_unreachable_at IS NOT NULL
+           )
         "#,
     )
     .bind(owner_id)

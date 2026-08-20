@@ -524,6 +524,12 @@ async fn deduct_inventory_for_outbound(
                    updated_at = $4,
                    version = version + 1
              WHERE owner_id = $1 AND id = $2
+               AND NOT EXISTS (
+                    SELECT 1 FROM warehouse_locations wl
+                     WHERE wl.id = inventory_batches.location_id
+                       AND wl.owner_id = inventory_batches.owner_id
+                       AND wl.agv_unreachable_at IS NOT NULL
+               )
             "#,
         )
         .bind(owner_id)
