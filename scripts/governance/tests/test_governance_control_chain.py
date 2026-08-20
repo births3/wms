@@ -305,7 +305,7 @@ def test_gitea_workflow_uses_lightweight_pr_gates():
     assert "gitleaks_8.21.2_linux_x64.tar.gz" in text
     assert "gitleaks detect --redact --no-banner" in text
     assert "Start PostgreSQL for T3/T4" in text
-    assert "postgres:16" in text
+    assert "postgres:18" in text
     assert "openssl rand -hex 24" in text
     assert 'echo "DATABASE_URL=' in text
     assert '>> "$GITHUB_ENV"' in text

@@ -2,13 +2,13 @@ name: wms-dev-h2
 
 services:
   postgres-dev-h2:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_DB: wms_dev_h2
       POSTGRES_USER: wms_dev_h2
       POSTGRES_PASSWORD_FILE: /run/secrets/wms_dev_h2_db_password
     volumes:
-      - postgres_dev_h2_data:/var/lib/postgresql/data
+      - postgres_dev_h2_data:/var/lib/postgresql
     ports:
       - "${WMS_DEV_H2_DB_PORT:-15432}:5432"
     secrets:

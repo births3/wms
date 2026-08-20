@@ -1225,6 +1225,39 @@ wave-5-tms-readiness *args:
 wave-5-tms-evidence-record *args:
     @python3 scripts/governance/record_wave5_tms_evidence.py {{args}}
 
+# 本机 Docker 测试环境：PostgreSQL 18 + Redis。不能当作 Wave 6 正式 staging 证据。
+staging-test-up:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    env_file="{{ROOT}}/deploy/env/staging.env"
+    compose_file="{{ROOT}}/deploy/docker-compose.staging.yml"
+    secret_file="{{ROOT}}/deploy/secrets/wms_staging_db_password.txt"
+    test -f "$env_file" || { echo "缺少 $env_file，请先复制 staging.env.example" >&2; exit 2; }
+    test -s "$secret_file" || { echo "缺少 $secret_file" >&2; exit 2; }
+    set -a
+    source "$env_file"
+    set +a
+    : "${WMS_STAGING_DB_PASSWORD:?WMS_STAGING_DB_PASSWORD is required}"
+    test "$(cat "$secret_file")" = "$WMS_STAGING_DB_PASSWORD" || {
+      echo "数据库 secret 文件与 staging.env 不一致" >&2
+      exit 2
+    }
+    if docker compose version >/dev/null 2>&1; then
+      compose=(docker compose)
+    elif command -v docker-compose >/dev/null 2>&1; then
+      compose=(docker-compose)
+    else
+      compose=(sudo docker-compose)
+    fi
+    (
+      cd "{{ROOT}}/deploy"
+      "${compose[@]}" --env-file "$env_file" -f docker-compose.staging.yml \
+        up -d --no-build --wait --wait-timeout 60 postgres-staging redis-staging
+    )
+    echo "PostgreSQL 18 测试库 127.0.0.1:${WMS_STAGING_DB_PORT:-15433}  用户/库 wms_staging"
+    echo "Redis 127.0.0.1:${WMS_STAGING_REDIS_PORT:-16380}"
+    echo "sqlx 集成测试仍用 .env 的 127.0.0.1:5434/wms_test"
+
 # 报告 Wave 6 预发布证据收口状态（默认不阻塞；出口检查用 --strict）
 wave-6-status:
     @python3 scripts/governance/report_wave6_pre_release.py
@@ -1313,7 +1346,7 @@ wave-1-h2-runtime-readiness-dry-run:
 # Wave 1 H2 dev 基线材料状态：只读查看行数、分布、容量和 loader 进程，不写 runtime evidence
 wave-1-h2-baseline-status-container:
     @sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 psql -U wms_dev_h2 -d wms_dev_h2 -v ON_ERROR_STOP=1 -c "select count(*) as audit_event_rows from audit_event; select count(*) as audit_chain_seal_rows from audit_chain_seal; select occurred_at::date as day, count(*) as rows from audit_event group by 1 order by 1; with audit_event_relations as (select 'audit_event'::regclass as relid union select inhrelid from pg_inherits where inhparent = 'audit_event'::regclass) select pg_size_pretty(pg_database_size(current_database())) as db_size, pg_size_pretty(sum(pg_total_relation_size(relid))) as audit_event_total_size from audit_event_relations;"
-    @sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 df -h /var/lib/postgresql/data
+    @sudo -n docker exec wms-dev-h2-postgres-dev-h2-1 df -h /var/lib/postgresql
     @ps -eo pid,ppid,stat,pcpu,pmem,etime,cmd | rg '[w]ms-audit-baseline-load|[d]ocker run --rm --pull=never --network wms-dev-h2_default' || true
 
 # Wave 1 H2 dev 60M 基线材料 preflight：只读检查封档/混入/并发加载，然后 dry-run，不写 runtime evidence

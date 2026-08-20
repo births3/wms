@@ -2,13 +2,15 @@ name: wms-staging
 
 services:
   postgres-staging:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_DB: wms_staging
       POSTGRES_USER: wms_staging
       POSTGRES_PASSWORD_FILE: /run/secrets/wms_staging_db_password
     volumes:
-      - postgres_staging_data:/var/lib/postgresql/data
+      - postgres_staging_data:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${WMS_STAGING_DB_PORT:-15433}:5432"
     secrets:
       - wms_staging_db_password
     healthcheck:
@@ -23,6 +25,8 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_staging_data:/data
+    ports:
+      - "127.0.0.1:${WMS_STAGING_REDIS_PORT:-16380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
