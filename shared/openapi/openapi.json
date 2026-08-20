@@ -6490,6 +6490,26 @@
         }
       }
     },
+    "/api/v1/device-dashboard": {
+      "get": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "device_dashboard",
+        "responses": {
+          "200": {
+            "description": "设备大盘汇总",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceDashboardSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dock-appointments": {
       "get": {
         "tags": [
@@ -16021,6 +16041,63 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/iot-events": {
+      "get": {
+        "tags": [
+          "wcs_task"
+        ],
+        "operationId": "list_iot_events",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备 ID",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "description": "事件类型",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "条数上限",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "事件流",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceEventLog"
+                  }
                 }
               }
             }
@@ -38971,6 +39048,71 @@
           }
         }
       },
+      "DeviceDashboardSummary": {
+        "type": "object",
+        "required": [
+          "total_devices",
+          "online_devices",
+          "offline_devices",
+          "failed_tasks",
+          "timeout_tasks"
+        ],
+        "properties": {
+          "failed_tasks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offline_devices": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "online_devices": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "timeout_tasks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total_devices": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DeviceEventLog": {
+        "type": "object",
+        "required": [
+          "id",
+          "device_id",
+          "event_type",
+          "payload",
+          "received_at"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {},
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
       "DeviceEventRequest": {
         "type": "object",
         "required": [
@@ -52704,6 +52846,10 @@
       "UpdateDeviceRequest": {
         "type": "object",
         "properties": {
+          "device_code": {
+            "type": "string",
+            "nullable": true
+          },
           "enabled": {
             "type": "boolean",
             "nullable": true

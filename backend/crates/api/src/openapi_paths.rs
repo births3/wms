@@ -27,8 +27,8 @@ pub use crate::tms_plus::{
     ReceiveTmsRoutePlanRequest, TmsRoutePlan, TmsRouteStop, TmsRouteStopRequest,
 };
 pub use crate::wcs_task_service::{
-    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceEventRequest, ResendRequest, VoidRequest,
-    WcsTaskResponse,
+    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
+    DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse,
 };
 #[allow(unused_imports)]
 pub use wms_domain::{

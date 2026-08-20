@@ -60,6 +60,8 @@ use wms_domain::{
     ),
     paths(
         create_wcs_task,
+        device_dashboard,
+        list_iot_events,
         list_wcs_tasks,
         get_wcs_task,
         resend_wcs_task,
@@ -515,6 +517,8 @@ use wms_domain::{
         ConfirmSkipRequest,
         CreateWcsTaskRequest,
         DeviceBindingResponse,
+        DeviceDashboardSummary,
+        DeviceEventLog,
         DeviceEventRequest,
         DeviceResponse,
         RegisterDeviceRequest,

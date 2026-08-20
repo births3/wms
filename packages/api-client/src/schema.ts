@@ -1348,6 +1348,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/device-dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["device_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dock-appointments": {
         parameters: {
             query?: never;
@@ -3086,6 +3102,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["heartbeat_iot_device"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/iot-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_iot_events"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7899,6 +7931,30 @@ export interface components {
             /** Format: date-time */
             valid_to?: string | null;
         };
+        DeviceDashboardSummary: {
+            /** Format: int64 */
+            failed_tasks: number;
+            /** Format: int64 */
+            offline_devices: number;
+            /** Format: int64 */
+            online_devices: number;
+            /** Format: int64 */
+            timeout_tasks: number;
+            /** Format: int64 */
+            total_devices: number;
+        };
+        DeviceEventLog: {
+            /** Format: uuid */
+            device_id: string;
+            event_type: string;
+            /** Format: uuid */
+            id: string;
+            payload: unknown;
+            /** Format: date-time */
+            received_at: string;
+            /** Format: uuid */
+            task_id?: string | null;
+        };
         DeviceEventRequest: {
             event_type: string;
             /** Format: uuid */
@@ -12260,6 +12316,7 @@ export interface components {
             status?: string | null;
         };
         UpdateDeviceRequest: {
+            device_code?: string | null;
             enabled?: boolean | null;
             extra_config?: unknown;
             ip_address?: string | null;
@@ -17560,6 +17617,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    device_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 设备大盘汇总 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceDashboardSummary"];
                 };
             };
         };
@@ -24235,6 +24312,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeviceResponse"];
+                };
+            };
+        };
+    };
+    list_iot_events: {
+        parameters: {
+            query?: {
+                /** @description 设备 ID */
+                device_id?: string | null;
+                /** @description 事件类型 */
+                event_type?: string | null;
+                /** @description 条数上限 */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 事件流 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceEventLog"][];
                 };
             };
         };

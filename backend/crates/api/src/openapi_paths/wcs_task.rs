@@ -3,9 +3,32 @@ use super::*;
 
 #[allow(unused_imports)]
 use crate::wcs_task_service::{
-    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceEventRequest, ResendRequest, VoidRequest,
-    WcsTaskResponse,
+    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
+    DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse,
 };
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/device-dashboard",
+    tag = "wcs_task",
+    responses((status = 200, description = "设备大盘汇总", body = DeviceDashboardSummary)),
+)]
+#[allow(dead_code)]
+pub(crate) fn device_dashboard() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/iot-events",
+    tag = "wcs_task",
+    params(
+        ("device_id" = Option<Uuid>, Query, description = "设备 ID"),
+        ("event_type" = Option<String>, Query, description = "事件类型"),
+        ("limit" = Option<i64>, Query, description = "条数上限"),
+    ),
+    responses((status = 200, description = "事件流", body = Vec<DeviceEventLog>)),
+)]
+#[allow(dead_code)]
+pub(crate) fn list_iot_events() {}
 
 #[utoipa::path(
     post,
