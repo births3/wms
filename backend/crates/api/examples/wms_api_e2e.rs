@@ -22,6 +22,7 @@ use wms_api::{
     },
     auth_handlers::{auth_router, AuthAppState},
     config_center::{config_center_router, ConfigCenterAppState},
+    device_handlers::{device_router, DeviceAppState},
     dock_appointment_handlers::{dock_appointment_router, DockAppointmentAppState},
     dock_handlers::{dock_router, DockAppState},
     document_numbering_handlers::{document_numbering_router, DocumentNumberingAppState},
@@ -58,6 +59,7 @@ use wms_api::{
     wave3_handlers::{wave3_router, Wave3AppState},
     wave4_handlers::postgres_outbound,
     wave5_handlers::{wave5_router, Wave5AppState},
+    wcs_task_handlers::{wcs_task_router, WcsTaskAppState},
 };
 use wms_domain::HealthzResponse;
 
@@ -236,6 +238,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             ),
         ))
         .merge(print_device_router(PrintDeviceAppState::with_postgres(
+            pool.clone(),
+        )))
+        // Real browser tests must mount the same device-platform routes as production.
+        .merge(device_router(DeviceAppState::with_postgres(pool.clone())))
+        .merge(wcs_task_router(WcsTaskAppState::with_postgres(
             pool.clone(),
         )))
         .merge(role_management_router(RoleManagementState::new(
