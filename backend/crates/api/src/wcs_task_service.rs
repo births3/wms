@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::audit::{append_event, AuditWriteRequest};
 use crate::auth::AuthContext;
 use crate::device_repository::get_device;
 use crate::device_service::DeviceError;
@@ -13,9 +14,10 @@ use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
 use crate::wcs_task_repository::{
     clear_pod_unreachable, find_active_task_by_device_location, find_task_by_idempotency, get_task,
-    insert_task, list_tasks, location_is_unreachable, set_pod_unreachable, transition, WcsTaskRow,
+    insert_task, list_tasks, location_is_unreachable, set_pod_unreachable, transition,
+    transition_in_tx, WcsTaskRow,
 };
-use wms_domain::can_transition;
+use wms_domain::{can_transition, is_terminal};
 
 pub(crate) const TASK_TIMEOUT_SECS: i64 = 120;
 const ORPHAN_WINDOW_SECS: i64 = 30;
@@ -108,6 +110,24 @@ pub struct ConfirmSkipRequest {
     pub reason: String,
     pub qty: Option<i64>,
 }
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct DeviceEventLog {
+    pub id: Uuid,
+    pub device_id: Uuid,
+    pub event_type: String,
+    pub task_id: Option<Uuid>,
+    pub payload: Value,
+    pub received_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct DeviceDashboardSummary {
+    pub total_devices: i64,
+    pub online_devices: i64,
+    pub offline_devices: i64,
+    pub failed_tasks: i64,
+    pub timeout_tasks: i64,
+}
 
 #[derive(Clone)]
 pub struct WcsTaskService {
@@ -126,11 +146,15 @@ impl WcsTaskService {
         req: CreateWcsTaskRequest,
         idempotency_key: &str,
     ) -> Result<WcsTaskResponse, DeviceError> {
-        let device = get_device(&self.pool, req.device_id)
+        let device = get_device(&self.pool, ctx.owner_id, req.device_id)
             .await?
             .ok_or(DeviceError::NotFound)?;
         if !device.enabled {
             return Err(DeviceError::Disabled);
+        }
+        if req.task_type == "sorter_divert" {
+            // §2.2：sorter_divert 仅登记类型不派发
+            return Err(DeviceError::TypeInvalid);
         }
         let now = Utc::now();
         let hash = idempotency::request_hash(&req)
@@ -165,6 +189,7 @@ impl WcsTaskService {
                 req.device_id,
                 req.location_id,
                 "ptl_light_on",
+                None,
             )
             .await?
             .is_some()
@@ -178,6 +203,7 @@ impl WcsTaskService {
                 req.device_id,
                 req.location_id,
                 "pod_move",
+                req.payload.get("pod_code").and_then(|v| v.as_str()),
             )
             .await?
             .is_some()
@@ -354,6 +380,10 @@ impl WcsTaskService {
                 Ok(row.into())
             }
             "success" => {
+                if is_terminal(&task.status) {
+                    // I6：终态重复回执幂等忽略，返回当前任务
+                    return Ok(task.into());
+                }
                 if !can_transition(&task.status, "succeeded") {
                     return Err(DeviceError::TaskStateInvalid);
                 }
@@ -537,6 +567,16 @@ impl WcsTaskService {
         if task.status == "succeeded" {
             return Err(DeviceError::TaskVoidBlocked);
         }
+        if task.task_type == "pod_move" {
+            let pod_code = task
+                .payload
+                .get("pod_code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if !pod_code.is_empty() {
+                clear_pod_unreachable(&self.pool, task.owner_id, pod_code, now).await?;
+            }
+        }
         let row = transition(
             &self.pool,
             task.owner_id,
@@ -571,6 +611,127 @@ impl WcsTaskService {
         )
         .await?;
         Ok(rows.into_iter().map(WcsTaskResponse::from).collect())
+    }
+
+    /// 跳过确认（§10.5）：现场已人工完成，凭 payload 补录账务并置 succeeded（记录操作人）。
+    pub async fn confirm_skip(
+        &self,
+        ctx: &AuthContext,
+        task_id: Uuid,
+        _req: crate::wcs_task_service::ConfirmSkipRequest,
+    ) -> Result<WcsTaskResponse, DeviceError> {
+        let now = Utc::now();
+        let task = get_task(&self.pool, ctx.owner_id, task_id)
+            .await?
+            .ok_or(DeviceError::TaskNotFound)?;
+        if is_terminal(&task.status) {
+            return Err(DeviceError::TaskStateInvalid);
+        }
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        if task.business_ref_type.as_deref() == Some("putaway") {
+            let settled_qty = task
+                .payload
+                .get("qty")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let product_id = task
+                .payload
+                .get("product_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            let location_id = task
+                .payload
+                .get("location_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok())
+                .or(task.location_id);
+            if settled_qty > 0 {
+                if let (Some(product_id), Some(location_id)) = (product_id, location_id) {
+                    crate::inventory::confirm_putaway_in_tx(
+                        &mut tx,
+                        task.owner_id,
+                        location_id,
+                        product_id,
+                        wms_domain::Quantity::from(settled_qty),
+                        "wcs_task_skip",
+                        task.id,
+                        now,
+                    )
+                    .await
+                    .map_err(|error| DeviceError::Database(error.to_string()))?;
+                }
+            }
+        }
+        let row = transition_in_tx(
+            &mut tx,
+            task.owner_id,
+            task.id,
+            &["sent", "executing", "timeout", "failed"],
+            "succeeded",
+            None,
+            None,
+            None,
+            Some(json!({
+                "settled_by_skip": true,
+                "operator_id": ctx.user_id,
+                "operator_name": ctx.actor_name
+            })),
+            None,
+            Some(now),
+            task.version,
+            now,
+        )
+        .await?
+        .ok_or(DeviceError::TaskStateInvalid)?;
+        tx.commit().await.map_err(db_err)?;
+        Ok(row.into())
+    }
+
+    /// 事件流查询（只读，§6.1 GET /iot-events）。
+    pub async fn list_events(
+        &self,
+        ctx: &AuthContext,
+        device_id: Option<Uuid>,
+        event_type: Option<String>,
+        limit: Option<i64>,
+    ) -> Result<Vec<DeviceEventLog>, DeviceError> {
+        let rows = crate::wcs_task_repository::list_events(
+            &self.pool,
+            ctx.owner_id,
+            device_id,
+            event_type.as_deref(),
+            limit.unwrap_or(50).clamp(1, 500),
+        )
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(id, device_id, event_type, task_id, payload, received_at)| DeviceEventLog {
+                    id,
+                    device_id,
+                    event_type,
+                    task_id,
+                    payload,
+                    received_at,
+                },
+            )
+            .collect())
+    }
+
+    /// 设备大盘汇总（§6.1 GET /device-dashboard）。
+    pub async fn dashboard_summary(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<DeviceDashboardSummary, DeviceError> {
+        let (total, online, offline, failed, timeout) =
+            crate::wcs_task_repository::device_dashboard_summary(&self.pool, ctx.owner_id).await?;
+        Ok(DeviceDashboardSummary {
+            total_devices: total,
+            online_devices: online,
+            offline_devices: offline,
+            failed_tasks: failed,
+            timeout_tasks: timeout,
+        })
     }
 
     pub async fn get(

@@ -13,8 +13,8 @@ use uuid::Uuid;
 use crate::auth::AuthContext;
 use crate::device_service::DeviceError;
 use crate::wcs_task_service::{
-    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceEventRequest, ResendRequest, VoidRequest,
-    WcsTaskResponse, WcsTaskService,
+    ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
+    DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse, WcsTaskService,
 };
 
 #[derive(Clone)]
@@ -55,15 +55,50 @@ pub struct TaskListQuery {
     pub task_type: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct EventListQuery {
+    #[serde(default)]
+    pub device_id: Option<Uuid>,
+    #[serde(default)]
+    pub event_type: Option<String>,
+    #[serde(default)]
+    pub limit: Option<i64>,
+}
+
+async fn dashboard_handler(
+    ctx: AuthContext,
+    State(state): State<WcsTaskAppState>,
+) -> Result<Json<DeviceDashboardSummary>, WcsTaskHandlerError> {
+    require_monitor(&ctx)?;
+    Ok(Json(state.service.dashboard_summary(&ctx).await?))
+}
+
+async fn list_events_handler(
+    ctx: AuthContext,
+    State(state): State<WcsTaskAppState>,
+    Query(query): Query<EventListQuery>,
+) -> Result<Json<Vec<DeviceEventLog>>, WcsTaskHandlerError> {
+    require_monitor(&ctx)?;
+    Ok(Json(
+        state
+            .service
+            .list_events(&ctx, query.device_id, query.event_type, query.limit)
+            .await?,
+    ))
+}
+
 async fn create_task_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
     headers: HeaderMap,
     Json(req): Json<CreateWcsTaskRequest>,
-) -> Result<Json<WcsTaskResponse>, WcsTaskHandlerError> {
+) -> Result<(StatusCode, Json<WcsTaskResponse>), WcsTaskHandlerError> {
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
-    Ok(Json(state.service.create_task(&ctx, req, &key).await?))
+    Ok((
+        StatusCode::CREATED,
+        Json(state.service.create_task(&ctx, req, &key).await?),
+    ))
 }
 
 async fn list_tasks_handler(
@@ -113,10 +148,10 @@ async fn confirm_skip_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
     Path(id): Path<Uuid>,
-    Json(_req): Json<ConfirmSkipRequest>,
+    Json(req): Json<ConfirmSkipRequest>,
 ) -> Result<Json<WcsTaskResponse>, WcsTaskHandlerError> {
     require_manage(&ctx)?;
-    Ok(Json(state.service.get(&ctx, id).await?))
+    Ok(Json(state.service.confirm_skip(&ctx, id, req).await?))
 }
 
 async fn device_event_handler(
@@ -234,7 +269,37 @@ impl IntoResponse for WcsTaskHandlerError {
                     "M1_EVENT_TASK_MISMATCH",
                     "设备事件与指令任务不匹配",
                 ),
-                _other => (
+                DeviceError::DuplicateCode => (
+                    StatusCode::CONFLICT,
+                    "M1_DEVICE_DUPLICATE_CODE",
+                    "设备编码在仓库内已存在",
+                ),
+                DeviceError::TypeInvalid => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_DEVICE_TYPE_INVALID",
+                    "设备类型非法",
+                ),
+                DeviceError::Offline => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_DEVICE_OFFLINE",
+                    "设备离线",
+                ),
+                DeviceError::BindConflict => (
+                    StatusCode::CONFLICT,
+                    "M1_BIND_CONFLICT",
+                    "同一库位同一角色已有生效绑定",
+                ),
+                DeviceError::BindDeviceMismatch => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_BIND_DEVICE_MISMATCH",
+                    "绑定角色与设备类型不匹配",
+                ),
+                DeviceError::BindNotFound => (
+                    StatusCode::NOT_FOUND,
+                    "M1_BIND_NOT_FOUND",
+                    "绑定不存在或已解绑",
+                ),
+                DeviceError::Database(_) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "M1_DEVICE_INTERNAL",
                     "设备中台内部错误",

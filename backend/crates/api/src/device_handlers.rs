@@ -66,10 +66,13 @@ async fn register_device_handler(
     State(state): State<DeviceAppState>,
     headers: HeaderMap,
     Json(req): Json<RegisterDeviceRequest>,
-) -> Result<Json<DeviceResponse>, DeviceHandlerError> {
+) -> Result<(StatusCode, Json<DeviceResponse>), DeviceHandlerError> {
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
-    Ok(Json(state.service.register(&ctx, req, &key).await?))
+    Ok((
+        StatusCode::CREATED,
+        Json(state.service.register(&ctx, req, &key).await?),
+    ))
 }
 
 async fn list_devices_handler(
@@ -119,10 +122,13 @@ async fn bind_device_handler(
     State(state): State<DeviceAppState>,
     headers: HeaderMap,
     Json(req): Json<BindDeviceRequest>,
-) -> Result<Json<DeviceBindingResponse>, DeviceHandlerError> {
+) -> Result<(StatusCode, Json<DeviceBindingResponse>), DeviceHandlerError> {
     require_bind_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
-    Ok(Json(state.service.bind(&ctx, req, &key).await?))
+    Ok((
+        StatusCode::CREATED,
+        Json(state.service.bind(&ctx, req, &key).await?),
+    ))
 }
 
 async fn unbind_device_handler(
