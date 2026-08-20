@@ -23,7 +23,7 @@
 6. **AGV 货到人**：`pod_move` 一托一搬（同货架活跃任务 409）；executing 置格口 `agv_unreachable_at` 不可达标记，终态清除；不可达期间格口账务动作 422 阻断；搬运全程不产生库存账变。
 7. **超时重试与人工介入**：超时扫描置 `timeout`，退避重试（1/5/15 分钟，max_retries=3）耗尽 `failed` + H4 告警；管理端可重发/作废（未落账）/跳过确认。
 8. **孤儿事件与一致性**：无任务 `ptl_press` 30 秒窗口内认领，超窗 H4 `device_event_orphan`；AGV 不可达标记与活跃任务不一致 → H4 `agv_marker_inconsistent`。
-9. **模拟器先行**：设备端以可编程模拟网关替代（测试内联模拟器 + 开发 Mock）；真机协议驱动不在本切片范围。
+9. **模拟器先行**：设备端以可编程模拟网关替代（测试内联模拟器 + 开发 Mock）；以受 `m1.device.manage`、`Idempotency-Key` 和审计保护的 `dispatch` / `receipt` API 驱动状态闭环；真机协议驱动不在本切片范围。
 10. **审计与幂等**：`iot_event_logs` 纯审计追加流只 INSERT；写路径统一 `Idempotency-Key` 幂等。
 
 ### 验收对照（GWT 1-22，规格 §11）

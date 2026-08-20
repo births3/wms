@@ -952,7 +952,7 @@ dimensions = { requirement = "verified", fields = "verified", frontend = "verifi
 tests = { required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"] }
 test_checks = [
   "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml -p wms-domain -- wcs_task -- --test-threads=1",
-  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml --test m1_device_platform_schema_postgres --test m1_device_lifecycle_postgres --test m1_wcs_task_engine_postgres --test m1_ptl_agv_postgres -- --test-threads=1",
+  "set -a; source .env; set +a; cargo test --manifest-path backend/Cargo.toml --test m1_device_platform_schema_postgres --test m1_device_lifecycle_postgres --test m1_wcs_task_engine_postgres --test m1_wcs_event_matching_postgres --test m1_wcs_simulator_api_postgres --test m1_ptl_agv_postgres -- --test-threads=1",
 ]
 frontend_pages = ["m1-devices", "m1-device-dashboard"]
 navigation_checks = [
@@ -968,6 +968,8 @@ evidence_refs = [
   "backend/crates/api/tests/m1_device_platform_schema_postgres.rs",
   "backend/crates/api/tests/m1_device_lifecycle_postgres.rs",
   "backend/crates/api/tests/m1_wcs_task_engine_postgres.rs",
+  "backend/crates/api/tests/m1_wcs_event_matching_postgres.rs",
+  "backend/crates/api/tests/m1_wcs_simulator_api_postgres.rs",
   "backend/crates/api/tests/m1_ptl_agv_postgres.rs",
   "prototypes/e2e/web-admin-m1-device-real.spec.ts",
   "prototypes/e2e/web-admin-m1-device-dashboard-real.spec.ts",
@@ -988,6 +990,8 @@ api_paths = [
   "GET /api/v1/wcs-tasks",
   "GET /api/v1/wcs-tasks/{id}",
   "POST /api/v1/wcs-tasks",
+  "POST /api/v1/wcs-tasks/{id}/dispatch",
+  "POST /api/v1/wcs-tasks/{id}/receipt",
   "POST /api/v1/wcs-tasks/{id}/resend",
   "POST /api/v1/wcs-tasks/{id}/void",
   "POST /api/v1/wcs-tasks/{id}/confirm-skip",

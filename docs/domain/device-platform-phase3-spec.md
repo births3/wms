@@ -104,6 +104,8 @@ WMS 已具备空间/库位/补货/波次等仓内业务能力，但缺乏统一�
 | POST | `/api/v1/location-device-bindings/{binding_id}/unbind` | `m1.device-bind.manage` | 软解绑（置 `valid_to`，带原因） |
 | GET | `/api/v1/wcs-tasks` | `m1.device.manage` / `m1.device.monitor` | 指令任务列表（筛选：状态/类型/设备/业务引用） |
 | GET | `/api/v1/wcs-tasks/{task_id}` | 同上 | 任务详情（含回执与事件链） |
+| POST | `/api/v1/wcs-tasks/{task_id}/dispatch` | `m1.device.manage`（模拟器通道） | 受控模拟派发（`pending → sent`） |
+| POST | `/api/v1/wcs-tasks/{task_id}/receipt` | `m1.device.manage`（模拟器通道） | 受控模拟回执（`start` / `success` / `fail`） |
 | POST | `/api/v1/wcs-tasks/{task_id}/resend` | `m1.device.manage` | 人工重发（重置 `retry_count` 重新入队；仅 `failed`/`timeout`） |
 | POST | `/api/v1/wcs-tasks/{task_id}/void` | `m1.device.manage` | 人工作废（仅未落账任务；作废时按 §10.5 补偿并记原因） |
 | POST | `/api/v1/wcs-tasks/{task_id}/confirm-skip` | `m1.device.manage` | 跳过确认（现场已人工完成，凭证据补录账务，记录操作人） |
@@ -122,6 +124,7 @@ WMS 已具备空间/库位/补货/波次等仓内业务能力，但缺乏统一�
 | `M1_DEVICE_OFFLINE` | 设备离线，禁止绑定新点位/下发（降级路径除外） |
 | `M1_BIND_CONFLICT` | 同一库位同一角色已有生效绑定 |
 | `M1_BIND_DEVICE_MISMATCH` | 绑定角色与设备类型不匹配（ptl_light↔`ptl_light` 设备，rfid_antenna↔`rfid_antenna`） |
+| `M1_BIND_LOCATION_MISMATCH` | 库位不存在或不属于设备所在仓库 |
 | `M1_BIND_NOT_FOUND` | 绑定不存在/已解绑 |
 | `M1_WCS_TASK_NOT_FOUND` | 指令任务不存在 |
 | `M1_WCS_TASK_STATE_INVALID` | 状态迁移非法（I1） |
@@ -163,7 +166,7 @@ WMS 已具备空间/库位/补货/波次等仓内业务能力，但缺乏统一�
 |---|---|---|---|
 | 设备档案页 | 配置型（双栏/表格+详情弹窗） | T02 | 注册/启停/心跳展示，`apps/web-admin/src/pages/master/M1DevicePage.tsx`，自检 `m1-device-self-check.mjs` |
 | 绑定管理页 | 配置型 | T02 | 库位-设备点位绑定/解绑（含受影响库位提示） |
-| 设备大盘 | 列表型（ListPageTemplate + QueryPanel + DataGrid） | T06 | 设备状态汇总、受影响库位、待作业任务 |
+| 设备大盘 | 列表型（ListPageTemplate + QueryPanel + DataGrid） | T06 | 设备状态汇总、受影响库位、待作业任务；模拟器派发 / 回执 |
 | 异常任务大盘 | 列表型 | T06 | 失败/超时任务 + 重发/作废/跳过确认 Dialog |
 
 分层：`page -> features/device -> @wms/api-client`；禁止裸 fetch；`page-query-core-fields.json` 登记设备/任务列表查询核心字段；菜单 `m1-devices` / `m1-device-dashboard`。
@@ -184,7 +187,7 @@ WMS 已具备空间/库位/补货/波次等仓内业务能力，但缺乏统一�
 ### 10.1 指令生成与派发
 
 - 生成：业务事务内插入 `wcs_tasks`（`pending`），`idempotency_key = {business_ref_type}:{business_ref_no}:{task_type}`；同键已存在 → 返回已有任务（幂等）。
-- 派发：模拟网关通道——`pending → sent`（写 `sent_at`）→ 网关回执；模拟器返回「开始」回执 → `executing`；返回「成功」回执 → 校验 → `succeeded`（账务联动见 10.3-10.4）；返回「失败」回执 → 按 10.5 重试。
+- 派发：模拟网关通道由受权限控制的 `dispatch` API 驱动，`pending → sent`（写 `sent_at`）；`receipt` API 接收模拟器「开始」回执推进 `executing`、「成功」回执校验后推进 `succeeded`（账务联动见 10.3-10.4）、「失败」回执按 10.5 重试。两个模拟器写接口均要求 `m1.device.manage`、`Idempotency-Key` 并写审计；真机协议驱动后置。
 - 亮灯互斥（I3）：生成 `ptl_light_on` 前查该设备未终态亮灯任务，存在 → 409 `M1_PTL_LIGHT_BUSY`。
 
 ### 10.2 事件处理（异步事件通道）

@@ -84,7 +84,7 @@ just gov-t1
 
 ## T03 — 指令生成/派发/回执/事件处理/超时重试（含 DWS/RFID 校验）
 
-**What to build:** `wcs_tasks` 六态状态机引擎：业务事务内生成（幂等键）、派发（模拟网关同步回执）、事件通道（`ptl_press`/`rfid_batch`/`dws_result`/`heartbeat`）、超时扫描与退避重试、重试耗尽 failed、人工重发/作废/跳过确认。
+**What to build:** `wcs_tasks` 六态状态机引擎：业务事务内生成（幂等键）、受控模拟网关 `dispatch` / `receipt` API、事件通道（`ptl_press`/`rfid_batch`/`dws_result`/`heartbeat`）、超时扫描与退避重试、重试耗尽 failed、人工重发/作废/跳过确认。
 
 **Blocked by:** T01
 
@@ -92,7 +92,7 @@ just gov-t1
 
 **先失败测试：** 生成 `ptl_light_on`（幂等键 K）→ 201 `pending`；同键重复 → 200 同任务不重复插入（GWT 9）。
 
-**一条可失败验收：** GWT 9、11、15、19、20、21（幂等/回执幂等/孤儿事件/DWS 校验/RFID EPC 覆盖/重试耗尽与人工介入）；DWS/RFID 落账校验入引擎规则（规格 §10.2/§10.5）。
+**一条可失败验收：** GWT 9、11、15、19、20、21（幂等/回执幂等/孤儿事件/DWS 校验/RFID EPC 覆盖/重试耗尽与人工介入）；`dispatch` / `receipt` 要求 `m1.device.manage`、`Idempotency-Key` 与审计；DWS/RFID 落账校验入引擎规则（规格 §10.2/§10.5）。
 
 **模块/文件边界：**
 
@@ -177,7 +177,7 @@ just gov-t1
 
 ## T06 — 设备与异常任务大盘
 
-**What to build:** 设备档案页（配置型）、绑定管理页、设备大盘与异常任务大盘（列表型），含重发/作废/跳过确认 Dialog。
+**What to build:** 设备档案页（配置型）、绑定管理页、设备大盘与异常任务大盘（列表型），含模拟器派发/回执与重发/作废/跳过确认 Dialog。
 
 **Blocked by:** T02、T03、T04、T05
 
