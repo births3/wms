@@ -3,9 +3,9 @@ use serde_json::Value;
 use sqlx::FromRow;
 use uuid::Uuid;
 use wms_domain::{
-    is_temperature_zone_subset, validate_category_zone, validate_external_fragrant,
-    validate_pack_granularity, validate_quality_match, DualPersonPolicy,
-    PutawayLocationValidationRequest, PutawayLocationValidationResponse,
+    canonical_inventory_quality_status, is_temperature_zone_subset, validate_category_zone,
+    validate_external_fragrant, validate_pack_granularity, validate_quality_match,
+    DualPersonPolicy, PutawayLocationValidationRequest, PutawayLocationValidationResponse,
     ResolveDualPersonPolicyQuery, M2_PUTAWAY_EXTERNAL_FRAGRANT_CONFLICT,
     M2_PUTAWAY_PACK_GRANULARITY_INVALID, M2_PUTAWAY_QUALITY_LOCKED,
     M2_PUTAWAY_SPECIAL_DUAL_REQUIRED, M2_PUTAWAY_TEMPERATURE_MISMATCH,
@@ -361,12 +361,20 @@ impl PgWave3Repository {
 
         // ③ Container Quality Lock & Quality Color Matching
         if scope.quality_lock {
-            let quality_match = if is_container {
-                let cat = container_lock_category.unwrap_or("qualified");
-                validate_quality_match(&loc_zone.quality_color, cat)
+            let item_status = if is_container {
+                container_lock_category.unwrap_or("qualified")
             } else {
-                let batch_stat = batch_status.unwrap_or("qualified");
-                validate_quality_match(&loc_zone.quality_color, batch_stat)
+                batch_status.unwrap_or("qualified")
+            };
+            let quality_match = match self
+                .inventory_status_for_quality_color(ctx.owner_id, &loc_zone.quality_color, now)
+                .await?
+            {
+                Some(zone_status) => {
+                    canonical_inventory_quality_status(&zone_status)
+                        == canonical_inventory_quality_status(item_status)
+                }
+                None => validate_quality_match(&loc_zone.quality_color, item_status),
             };
             if !quality_match {
                 self.record_rejection(
@@ -556,5 +564,38 @@ impl PgWave3Repository {
         .await
         .map_err(map_db_error)?;
         Ok(())
+    }
+
+    async fn inventory_status_for_quality_color(
+        &self,
+        owner_id: Uuid,
+        quality_color: &str,
+        now: DateTime<Utc>,
+    ) -> Result<Option<String>, Wave3RepositoryError> {
+        sqlx::query_scalar(
+            r#"
+            SELECT item.params->>'inventory_quality_status'
+              FROM system_dictionary_items item
+              JOIN system_dictionary_categories category
+                ON category.dict_code = item.dict_code
+               AND category.enabled = TRUE
+             WHERE item.dict_code = 'quality_color'
+               AND item.item_code = $2
+               AND (item.owner_id IS NULL OR item.owner_id = $1)
+               AND item.enabled = TRUE
+               AND (item.effective_from IS NULL OR item.effective_from <= $3)
+               AND (item.effective_to IS NULL OR item.effective_to > $3)
+             ORDER BY CASE WHEN item.owner_id = $1 THEN 0 ELSE 1 END,
+                      item.updated_at DESC,
+                      item.item_code
+             LIMIT 1
+            "#,
+        )
+        .bind(owner_id)
+        .bind(quality_color)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)
     }
 }

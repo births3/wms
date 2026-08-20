@@ -326,14 +326,14 @@ impl PgWave3Repository {
             INSERT INTO inventory_relocations (
                 id, owner_id, batch_id, product_code, batch_no, qty,
                 from_location_id, from_location_code, to_location_id, to_location_code,
-                relocation_mode, lpn_code, status, status, reason,
+                relocation_mode, lpn_code, quality_status, status, reason,
                 created_by, created_at, updated_at
             ) VALUES (
                 $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'completed',$14,$15,$16,$16
             )
             RETURNING id, owner_id, batch_id, product_code, batch_no, qty,
                       from_location_id, from_location_code, to_location_id, to_location_code,
-                      relocation_mode, lpn_code, status, status, reason,
+                      relocation_mode, lpn_code, quality_status, status, reason,
                       created_by, created_at, updated_at
             "#,
         )
@@ -391,7 +391,7 @@ impl PgWave3Repository {
             r#"
             SELECT id, owner_id, batch_id, product_code, batch_no, qty,
                    from_location_id, from_location_code, to_location_id, to_location_code,
-                   relocation_mode, lpn_code, status, status, reason,
+                   relocation_mode, lpn_code, quality_status, status, reason,
                    created_by, created_at, updated_at
               FROM inventory_relocations
              WHERE owner_id = $1

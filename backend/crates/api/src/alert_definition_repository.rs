@@ -490,7 +490,7 @@ fn map_write_error(error: sqlx::Error) -> AlertDefinitionRepositoryError {
 fn map_delete_error(error: sqlx::Error) -> AlertDefinitionRepositoryError {
     if let sqlx::Error::Database(database) = &error {
         match database.code().as_deref() {
-            Some("23503") => return AlertDefinitionRepositoryError::InUse,
+            Some("23001" | "23503") => return AlertDefinitionRepositoryError::InUse,
             Some("23514") => return AlertDefinitionRepositoryError::GspForcedCannotDelete,
             _ => {}
         }

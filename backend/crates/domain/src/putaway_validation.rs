@@ -118,6 +118,15 @@ pub fn zone_treats_as_qualified(zone_quality_color: &str) -> bool {
     )
 }
 
+pub fn canonical_inventory_quality_status(value: &str) -> &str {
+    match value.trim() {
+        "qualified" | "qualified_green" => "qualified",
+        "quarantine" | "quarantined" | "quarantine_yellow" => "quarantined",
+        "rejected" | "unqualified" | "unqualified_red" => "unqualified",
+        other => other,
+    }
+}
+
 pub fn validate_quality_match(zone_quality_color: &str, lock_or_batch_status: &str) -> bool {
     match lock_or_batch_status {
         "qualified" => zone_treats_as_qualified(zone_quality_color),
@@ -248,6 +257,22 @@ mod tests {
         assert!(!validate_quality_match("quarantine_yellow", "qualified"));
         assert!(validate_quality_match("quarantine_yellow", "quarantine"));
         assert!(validate_quality_match("unqualified_red", "rejected"));
+    }
+
+    #[test]
+    fn canonical_inventory_quality_status_maps_color_and_lock_aliases() {
+        assert_eq!(
+            canonical_inventory_quality_status("qualified_green"),
+            "qualified"
+        );
+        assert_eq!(
+            canonical_inventory_quality_status("quarantine"),
+            "quarantined"
+        );
+        assert_eq!(
+            canonical_inventory_quality_status("unqualified_red"),
+            "unqualified"
+        );
     }
 
     #[test]
