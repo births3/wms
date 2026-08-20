@@ -2118,8 +2118,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。",
-        "x-auth-exempt-reason": "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。"
+        "x-auth-exempt-reason": "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。",
+        "x-idempotency-exempt-reason": "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。"
       }
     },
     "/api/v1/attachments/{attachment_id}/content": {
@@ -3032,8 +3032,8 @@
           }
         },
         "security": [],
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
       }
     },
     "/api/v1/auth/logout": {
@@ -7750,8 +7750,8 @@
             }
           }
         },
-        "x-idempotency-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。",
-        "x-audit-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。"
+        "x-audit-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。",
+        "x-idempotency-exempt-reason": "图像预览只读取不可变附件并返回派生图片，不写入业务数据；使用 POST 承载处理参数。"
       }
     },
     "/api/v1/drug-inspection/inbound-documents": {
@@ -10855,8 +10855,8 @@
             }
           }
         },
-        "x-idempotency-exempt-reason": "上架 6 维前置探测只执行合规校验与拦截留痕，不修改库存；使用 POST 承载探测参数。",
-        "x-audit-exempt-reason": "上架 6 维探测端点不修改业务数据，拦截记录自动写入专有拦截审计表。"
+        "x-audit-exempt-reason": "上架 6 维探测端点不修改业务数据，拦截记录自动写入专有拦截审计表。",
+        "x-idempotency-exempt-reason": "上架 6 维前置探测只执行合规校验与拦截留痕，不修改库存；使用 POST 承载探测参数。"
       }
     },
     "/api/v1/inbound/receiving-dashboard": {
@@ -39055,9 +39055,18 @@
           "online_devices",
           "offline_devices",
           "failed_tasks",
-          "timeout_tasks"
+          "timeout_tasks",
+          "pending_tasks",
+          "affected_location_ids"
         ],
         "properties": {
+          "affected_location_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           "failed_tasks": {
             "type": "integer",
             "format": "int64"
@@ -39067,6 +39076,10 @@
             "format": "int64"
           },
           "online_devices": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pending_tasks": {
             "type": "integer",
             "format": "int64"
           },
@@ -39226,6 +39239,34 @@
           }
         }
       },
+      "DeviceRecentEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "event_type",
+          "payload",
+          "received_at"
+        ],
+        "properties": {
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {},
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
       "DeviceResponse": {
         "type": "object",
         "required": [
@@ -39239,6 +39280,12 @@
           "enabled"
         ],
         "properties": {
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceBindingResponse"
+            }
+          },
           "device_code": {
             "type": "string"
           },
@@ -39276,6 +39323,12 @@
           },
           "protocol": {
             "type": "string"
+          },
+          "recent_events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceRecentEvent"
+            }
           },
           "vendor": {
             "type": "string",

@@ -7932,12 +7932,15 @@ export interface components {
             valid_to?: string | null;
         };
         DeviceDashboardSummary: {
+            affected_location_ids: string[];
             /** Format: int64 */
             failed_tasks: number;
             /** Format: int64 */
             offline_devices: number;
             /** Format: int64 */
             online_devices: number;
+            /** Format: int64 */
+            pending_tasks: number;
             /** Format: int64 */
             timeout_tasks: number;
             /** Format: int64 */
@@ -7995,7 +7998,18 @@ export interface components {
             data: components["schemas"]["DeviceLease"][];
             page: components["schemas"]["PageMeta"];
         };
+        DeviceRecentEvent: {
+            event_type: string;
+            /** Format: uuid */
+            id: string;
+            payload: unknown;
+            /** Format: date-time */
+            received_at: string;
+            /** Format: uuid */
+            task_id?: string | null;
+        };
         DeviceResponse: {
+            bindings?: components["schemas"]["DeviceBindingResponse"][];
             device_code: string;
             device_type: string;
             enabled: boolean;
@@ -8010,6 +8024,7 @@ export interface components {
             /** Format: int32 */
             port?: number | null;
             protocol: string;
+            recent_events?: components["schemas"]["DeviceRecentEvent"][];
             vendor?: string | null;
             /** Format: uuid */
             warehouse_id: string;
