@@ -1,7 +1,7 @@
 # 错误码字典（Error Codes Dictionary）
 
 > 时间：2026-08-20
-> 版本：v3.15（当前 252 项）
+> 版本：v3.15（当前 253 项）
 > 文档层级：L2 规范（必须遵守）
 > 关联：[ADR-0010](adr/0010-error-codes.md) / [coding-standards.md §4](coding-standards.md)
 
@@ -77,9 +77,9 @@
 |---|---|---|
 | info | 1 | 状态变更通知 / 数据已存在等正常路径 |
 | warning | 83 | 业务规则拦截（库存不足 / 资质过期等）|
-| error | 158 | 业务异常（数据冲突 / 校验失败）|
+| error | 159 | 业务异常（数据冲突 / 校验失败）|
 | critical | 10 | 合规/安全异常（跨货主访问 / 篡改尝试）|
-| **合计** | **252** | — |
+| **合计** | **253** | — |
 
 ---
 
@@ -95,7 +95,7 @@
 | H8 | 1 | ERP 接口表探查 |
 | H_DOCK | 11 | 月台预约 |
 | H_AL | 28 | 告警引擎 |
-| M1 | 56 | 主数据校验 / 配置中心 / 设备中台 |
+| M1 | 57 | 主数据校验 / 配置中心 / 设备中台 |
 | M2 | 18 | 入库流程 |
 | M3 | 30 | 库存与状态 / 补货 |
 | M4 | 10 | 出库与拣选 |
@@ -1620,6 +1620,18 @@ error_codes:
     message_zh: '设备类型非法'
     message_en: 'Invalid device type'
     related_fields: [device_type]
+    related_stories: [US-M1-010]
+    introduced_in: v3.14
+
+  - code: M1_DEVICE_VERSION_CONFLICT
+    module: M1
+    category: DEVICE
+    detail: VERSION_CONFLICT
+    http_status: 409
+    severity: error
+    message_zh: '设备档案已被其他操作更新'
+    message_en: 'Device record was updated by another operation'
+    related_fields: [version]
     related_stories: [US-M1-010]
     introduced_in: v3.14
 

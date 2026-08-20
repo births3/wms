@@ -116,6 +116,7 @@ WMS 已具备空间/库位/补货/波次等仓内业务能力，但缺乏统一�
 |---|---|
 | `M1_DEVICE_DUPLICATE_CODE` | 设备编码仓库内重复 |
 | `M1_DEVICE_TYPE_INVALID` | 设备类型非法（CHECK 外业务判定） |
+| `M1_DEVICE_VERSION_CONFLICT` | 设备档案乐观锁版本冲突 |
 | `M1_DEVICE_NOT_FOUND` | 设备不存在 |
 | `M1_DEVICE_DISABLED` | 设备已停用，禁止下发/重试 |
 | `M1_DEVICE_OFFLINE` | 设备离线，禁止绑定新点位/下发（降级路径除外） |
