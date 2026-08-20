@@ -285,7 +285,7 @@ async fn product_master_rest_maps_persists_and_replays_one_resource(pool: PgPool
         evidence,
         (
             1,
-            "cold".to_string(),
+            "cold_2_8".to_string(),
             Some("片剂".to_string()),
             "succeeded".to_string(),
             "owner-level".to_string(),
@@ -463,7 +463,7 @@ async fn product_master_rest_rejects_required_unmapped_values_without_product_wr
         activated_evidence,
         (
             "active".to_string(),
-            "normal".to_string(),
+            "normal_10_30".to_string(),
             "none".to_string(),
             1,
             1,

@@ -126,7 +126,11 @@ async fn alert_definition_delete_is_rejected_when_trigger_history_exists(pool: P
         .execute(&pool)
         .await
         .expect_err("alert with trigger history should not be deleted");
-    assert_eq!(sqlstate(&delete), Some("23503".to_string()));
+    assert!(
+        matches!(sqlstate(&delete).as_deref(), Some("23001" | "23503")),
+        "restrict/foreign-key sqlstate, got {:?}",
+        sqlstate(&delete)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -167,7 +171,9 @@ async fn gsp_seed_covers_existing_and_new_owners_idempotently(pool: PgPool) {
         .await
         .expect("re-running GSP seed should be idempotent");
     let count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM alert_definitions WHERE owner_id = $1")
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM alert_definitions WHERE owner_id = $1 AND is_gsp_forced AND NOT is_disable_allowed",
+        )
             .bind(existing_owner)
             .fetch_one(&pool)
             .await

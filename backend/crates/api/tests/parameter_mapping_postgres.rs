@@ -256,7 +256,7 @@ async fn map_route_requires_mpm_execute_permission(pool: PgPool) {
 async fn persisted_rule_survives_router_restart_and_unmatched_value_is_queued(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let auth = token(owner_id, &["mpm.execute"]);
-    for (key, expected_target) in [("map-1", "cold"), ("map-2", "cold")] {
+    for (key, expected_target) in [("map-1", "cold_2_8"), ("map-2", "cold_2_8")] {
         let response = app(pool.clone())
             .oneshot(map_request(&auth, " 2-8℃避光保存 ", key))
             .await
@@ -363,7 +363,7 @@ async fn owner_rule_overrides_global_without_leaking_to_another_owner(pool: PgPo
     .await
     .expect("owner rule should seed");
 
-    for (owner_id, expected) in [(owner_a, "frozen"), (owner_b, "cold")] {
+    for (owner_id, expected) in [(owner_a, "frozen"), (owner_b, "cold_2_8")] {
         let response = app(pool.clone())
             .oneshot(map_request(
                 &token(owner_id, &["mpm.execute"]),
@@ -399,7 +399,7 @@ async fn owner_rule_overrides_global_without_leaking_to_another_owner(pool: PgPo
     .expect("response should be json");
     assert_eq!(payload["status"], "matched");
     assert_eq!(
-        payload["target_value"], "normal",
+        payload["target_value"], "normal_10_30",
         "an owner override must retain global fallback rules"
     );
 }
@@ -416,8 +416,8 @@ async fn newest_rule_wins_when_matching_rules_have_the_same_priority(pool: PgPoo
     let newer_rule_id = Uuid::new_v4();
 
     for (rule_id, target_value, created_at) in [
-        (older_rule_id, "normal", "2026-07-25 08:00:00+00"),
-        (newer_rule_id, "cold", "2026-07-25 08:01:00+00"),
+        (older_rule_id, "normal_10_30", "2026-07-25 08:00:00+00"),
+        (newer_rule_id, "cold_2_8", "2026-07-25 08:01:00+00"),
     ] {
         sqlx::query(
             r#"
@@ -453,6 +453,6 @@ async fn newest_rule_wins_when_matching_rules_have_the_same_priority(pool: PgPoo
     .expect("response should be json");
 
     assert_eq!(payload["status"], "matched");
-    assert_eq!(payload["target_value"], "cold");
+    assert_eq!(payload["target_value"], "cold_2_8");
     assert_eq!(payload["rule_id"], newer_rule_id.to_string());
 }

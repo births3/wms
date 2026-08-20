@@ -95,6 +95,7 @@ async fn putaway_audit_failure_rolls_back_all_business_writes(pool: PgPool) {
         .expect("valid time");
     let (supplier_id, warehouse_id) = seed_active_supplier_and_warehouse(&pool, owner_id).await;
     let (location_id, location_code) = seed_location(&pool, owner_id, warehouse_id).await;
+    seed_idle_lpn(&pool, owner_id, "LPN-PUTAWAY-ROLLBACK").await;
     let order = repo
         .create_receiving_order(
             &ctx,
@@ -196,7 +197,7 @@ async fn putaway_audit_failure_rolls_back_all_business_writes(pool: PgPool) {
                 location_id,
                 location_code,
                 quality_status: STATUS_QUALIFIED.into(),
-                lpn_code: None,
+                lpn_code: Some("LPN-PUTAWAY-ROLLBACK".into()),
                 witness_id: None,
             },
             now,

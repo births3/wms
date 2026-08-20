@@ -397,6 +397,7 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
     .await
     .expect("owner quality-color override should persist");
     let (location_id, location_code) = seed_location(&pool, owner_id, warehouse_id).await;
+    seed_idle_lpn(&pool, owner_id, "LPN-PUTAWAY-COMMIT").await;
     sqlx::query("UPDATE warehouse_zones SET quality_color = 'qualified_owner_green' WHERE owner_id = $1 AND warehouse_id = $2")
         .bind(owner_id)
         .bind(warehouse_id)
@@ -490,7 +491,7 @@ async fn putaway_commits_receiving_inventory_and_movement_in_one_transaction(poo
         location_id,
         location_code,
         quality_status: STATUS_QUALIFIED.to_string(),
-        lpn_code: None,
+        lpn_code: Some("LPN-PUTAWAY-COMMIT".to_string()),
         witness_id: None,
     };
     let first = repo

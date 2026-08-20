@@ -102,16 +102,17 @@ async fn seed_loss_fixture(pool: &PgPool, category: &str) -> (Uuid, Uuid, Uuid, 
     sqlx::query(
         r#"
         INSERT INTO inventory_batches (
-            id, owner_id, product_code, batch_no, production_date, expiry_date,
+            id, owner_id, product_id, product_code, batch_no, production_date, expiry_date,
             qty_on_hand, qty_frozen, status, location_id, location_code,
             recall_flag, created_at, updated_at
         )
-        VALUES ($1, $2, $3, 'SA-BATCH-001', DATE '2026-01-01', DATE '2028-01-01',
-                10, 0, 'unqualified', $4, 'UNQUALIFIED-01', FALSE, $5, $5)
+        VALUES ($1, $2, $3, $4, 'SA-BATCH-001', DATE '2026-01-01', DATE '2028-01-01',
+                10, 0, 'unqualified', $5, 'UNQUALIFIED-01', FALSE, $6, $6)
         "#,
     )
     .bind(batch_id)
     .bind(owner_id)
+    .bind(product_id)
     .bind(product_code)
     .bind(location_id)
     .bind(Utc::now())

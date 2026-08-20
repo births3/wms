@@ -66,11 +66,13 @@ async fn document_type_presets_are_queryable(pool: PgPool) {
             "purchase_inbound",
             "purchase_return_outbound",
             "quality_liaison",
+            "replenishment_task",
             "sales_outbound",
             "sales_return",
             "sample_outbound",
             "stock_loss",
             "stock_surplus",
+            "wcs_task",
         ]
     );
     assert!(items.iter().all(|item| item.source == "global"));

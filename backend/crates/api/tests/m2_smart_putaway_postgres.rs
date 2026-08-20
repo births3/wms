@@ -52,8 +52,8 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
     .await
     .expect("warehouse should seed");
     for (id, code, temperature_zone) in [
-        (zone_id, "M2-ZONE-NORMAL", "normal"),
-        (cold_zone_id, "M2-ZONE-COLD", "cold"),
+        (zone_id, "M2-ZONE-NORMAL", "normal_10_30"),
+        (cold_zone_id, "M2-ZONE-COLD", "cold_2_8"),
     ] {
         sqlx::query(
             "INSERT INTO warehouse_zones (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color, status) VALUES ($1, $2, $3, $4, 'M2 test zone', $5, 'qualified_green', 'active')",
@@ -137,7 +137,7 @@ async fn seed_fixture(pool: &PgPool) -> Fixture {
     .await
     .expect("receiving line should seed");
     sqlx::query(
-        "INSERT INTO receiving_inspections (id, receiving_order_id, owner_id, batch_no, accepted_qty, rejected_qty, production_date, expiry_date, status, occurred_at) VALUES ($1, $2, $3, 'M2-BATCH-001', 10, 0, '2026-01-01', '2028-01-01', 'qualified', $4)",
+        "INSERT INTO receiving_inspections (id, receiving_order_id, owner_id, batch_no, accepted_qty, rejected_qty, production_date, expiry_date, quality_status, occurred_at) VALUES ($1, $2, $3, 'M2-BATCH-001', 10, 0, '2026-01-01', '2028-01-01', 'qualified', $4)",
     )
     .bind(Uuid::new_v4())
     .bind(order_id)
@@ -191,7 +191,7 @@ async fn smart_putaway_recommends_and_commits_owner_scoped_inventory_atomically(
     assert!(recommendations
         .data
         .iter()
-        .all(|item| item.temperature_zone == "normal"));
+        .all(|item| item.temperature_zone == "normal_10_30"));
     assert!(!recommendations
         .data
         .iter()

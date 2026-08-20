@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-const STATIC_SCHEMA_FINGERPRINT: &str = "e5cdc87a75eae2007f8939296efa9bdf";
+const STATIC_SCHEMA_FINGERPRINT: &str = "e9a6b2972389675ce9022a29bd0c99e9";
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: PgPool) {
@@ -19,7 +19,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL relations");
-    assert_eq!(static_table_count, 204);
+    assert_eq!(static_table_count, 207);
 
     let static_index_count: i64 = sqlx::query_scalar(
         r#"
@@ -37,7 +37,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL indexes");
-    assert_eq!(static_index_count, 617);
+    assert_eq!(static_index_count, 634);
 
     let fingerprint: String = sqlx::query_scalar(
         r#"
@@ -102,7 +102,8 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL constraints");
-    assert_eq!(constraint_count, 1209);
+    // PostgreSQL 18 把 NOT NULL 登记为 pg_constraint.contype='n'，约束总数高于 16。
+    assert_eq!(constraint_count, 3236);
 
     let (permission_count, category_count, item_count): (i64, i64, i64) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM auth_permissions), (SELECT count(*) FROM system_dictionary_categories), (SELECT count(*) FROM system_dictionary_items)",
@@ -110,7 +111,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("read migration seed rows");
-    assert_eq!(permission_count, 126);
-    assert_eq!(category_count, 11);
-    assert_eq!(item_count, 55);
+    assert_eq!(permission_count, 133);
+    assert_eq!(category_count, 13);
+    assert_eq!(item_count, 65);
 }

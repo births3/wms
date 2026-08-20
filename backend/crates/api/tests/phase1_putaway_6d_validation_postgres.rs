@@ -308,7 +308,7 @@ async fn test_dim4_special_drug_dual_verification(pool: PgPool) {
         "normal_10_30",
         false,
         false,
-        "toxic_narcotic",
+        "narcotic",
     )
     .await;
 

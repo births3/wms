@@ -560,7 +560,10 @@ async fn product_change_rest_rejects_unmapped_storage_before_business_write(pool
     .fetch_one(&pool)
     .await
     .expect("load failed product change evidence");
-    assert_eq!(evidence, ("normal".to_string(), 1, "dead".to_string(), 1));
+    assert_eq!(
+        evidence,
+        ("normal_10_30".to_string(), 1, "dead".to_string(), 1)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

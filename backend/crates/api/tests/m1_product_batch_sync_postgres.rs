@@ -61,7 +61,7 @@ fn request(code: &str) -> CreateProductRequest {
             is_default: true,
             sort_order: 1,
         }],
-        attrs: json!({"storage_condition": "normal", "source": "api_import"}),
+        attrs: json!({"storage_condition": "normal_10_30", "source": "api_import"}),
     }
 }
 

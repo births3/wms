@@ -16,7 +16,7 @@ use wms_domain::{
 };
 
 mod postgres_test_support;
-use postgres_test_support::ensure_audit_partition;
+use postgres_test_support::{ensure_audit_partition, seed_idle_lpn};
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {

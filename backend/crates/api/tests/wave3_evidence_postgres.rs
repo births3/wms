@@ -21,7 +21,7 @@ use wms_domain::{
 mod auth_support;
 mod postgres_test_support;
 
-use postgres_test_support::ensure_audit_partition;
+use postgres_test_support::{ensure_audit_partition, seed_idle_lpn};
 
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
@@ -337,6 +337,7 @@ async fn inbound_chain_persists_inventory_movement_and_audit_end_to_end(pool: Pg
     sqlx::query("INSERT INTO warehouse_locations (id,owner_id,warehouse_id,zone_id,location_code,row_no,column_no,layer_no,max_volume_cm3,used_volume_cm3,max_sku_count,location_type,status) VALUES ($1,$2,$3,$4,$5,1,1,1,100000,0,3,'storage','available')")
         .bind(location_id).bind(owner_id).bind(warehouse_id).bind(zone_id)
         .bind(&location_code).execute(&pool).await.expect("seed location");
+    seed_idle_lpn(&pool, owner_id, "LPN-CHAIN-001").await;
     let mut request = receiving_order_req("ASN-CHAIN-001");
     request.supplier_id = Some(supplier_id);
     request.warehouse_id = warehouse_id;
@@ -461,7 +462,7 @@ async fn inbound_chain_persists_inventory_movement_and_audit_end_to_end(pool: Pg
             location_id,
             location_code,
             quality_status: STATUS_QUALIFIED.into(),
-            lpn_code: None,
+            lpn_code: Some("LPN-CHAIN-001".into()),
             witness_id: None,
         },
         now,

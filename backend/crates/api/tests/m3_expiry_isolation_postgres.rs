@@ -180,7 +180,7 @@ async fn inventory_query_returns_location_snapshot_and_supports_product_and_temp
             &ctx(owner_id),
             InventoryBatchQuery {
                 q: Some("阿莫西林".to_string()),
-                temperature_zone: Some("normal".to_string()),
+                temperature_zone: Some("normal_10_30".to_string()),
                 ..InventoryBatchQuery::default()
             },
             1,
@@ -193,7 +193,7 @@ async fn inventory_query_returns_location_snapshot_and_supports_product_and_temp
     let row = &rows[0];
     assert_eq!(row.product_name.as_deref(), Some("阿莫西林胶囊"));
     assert_eq!(row.zone_code.as_deref(), Some("ZONE-A"));
-    assert_eq!(row.temperature_zone.as_deref(), Some("normal"));
+    assert_eq!(row.temperature_zone.as_deref(), Some("normal_10_30"));
     assert_eq!(row.quality_color.as_deref(), Some("qualified_green"));
     assert_eq!(row.row_no, Some(1));
     assert_eq!(row.column_no, Some(1));

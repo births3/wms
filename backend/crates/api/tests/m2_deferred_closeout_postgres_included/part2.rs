@@ -129,6 +129,7 @@ async fn putaway_is_partial_until_all_accepted_quantity_is_committed(pool: PgPoo
     let ctx = context(owner_id);
     let repository = PgWave3Repository::new(pool.clone());
     let (warehouse_id, location_id) = seed_putaway_location(&pool, owner_id).await;
+    seed_idle_lpn(&pool, owner_id, "LPN-M2-PARTIAL").await;
     let mut purchase = request(RECEIVING_DOCUMENT_TYPE_PURCHASE_INBOUND, None);
     seed_asn_references(&pool, owner_id, &mut purchase).await;
     purchase.warehouse_id = warehouse_id;
@@ -227,7 +228,7 @@ async fn putaway_is_partial_until_all_accepted_quantity_is_committed(pool: PgPoo
                     .await
                     .expect("read location code"),
                     quality_status: STATUS_QUALIFIED.to_string(),
-                    lpn_code: None,
+                    lpn_code: Some("LPN-M2-PARTIAL".to_string()),
                     witness_id: None,
                 },
                 chrono::Utc::now(),

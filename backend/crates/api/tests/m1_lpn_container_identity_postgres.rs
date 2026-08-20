@@ -18,6 +18,13 @@ use postgres_test_support::ensure_audit_partition;
 async fn putaway_rejects_lpn_after_loose_same_sku_batch_location(pool: PgPool) {
     ensure_audit_partition(&pool, at(0)).await;
     let fixture = seed_putaway(&pool).await;
+    sqlx::query(
+        "UPDATE warehouse_locations SET location_type = 'staging', allows_container = FALSE WHERE id = $1",
+    )
+    .bind(fixture.location_id)
+    .execute(&pool)
+    .await
+    .expect("identity mix location should allow loose and unlocked container");
     seed_lpn_numbering(&pool, at(0), fixture.owner_id).await;
     let actor = ctx(fixture.owner_id);
     let lpn_repo = PgLpnContainerRepository::new(pool.clone());
@@ -65,6 +72,13 @@ async fn putaway_rejects_lpn_after_loose_same_sku_batch_location(pool: PgPool) {
 async fn putaway_rejects_loose_after_lpn_same_sku_batch_location(pool: PgPool) {
     ensure_audit_partition(&pool, at(0)).await;
     let fixture = seed_putaway(&pool).await;
+    sqlx::query(
+        "UPDATE warehouse_locations SET location_type = 'staging', allows_container = FALSE WHERE id = $1",
+    )
+    .bind(fixture.location_id)
+    .execute(&pool)
+    .await
+    .expect("identity mix location should allow loose and unlocked container");
     seed_lpn_numbering(&pool, at(0), fixture.owner_id).await;
     let actor = ctx(fixture.owner_id);
     let lpn_repo = PgLpnContainerRepository::new(pool.clone());

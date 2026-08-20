@@ -548,8 +548,9 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
         .unwrap();
     sqlx::query(
         "
-            SET status='quarantined'
-          WHERE owner_id=$1 AND id=$2",
+            UPDATE inventory_batches
+               SET status='quarantined'
+             WHERE owner_id=$1 AND id=$2",
     )
     .bind(owner_id)
     .bind(p4_batch_id)
@@ -579,8 +580,9 @@ async fn reconciliation_compares_persists_notifies_audits_and_replays(pool: PgPo
     assert_eq!(external_lock_count, 0);
     sqlx::query(
         "
-            SET status='qualified'
-          WHERE owner_id=$1 AND id=$2",
+            UPDATE inventory_batches
+               SET status='qualified'
+             WHERE owner_id=$1 AND id=$2",
     )
     .bind(owner_id)
     .bind(p4_batch_id)
