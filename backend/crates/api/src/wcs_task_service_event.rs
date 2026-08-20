@@ -9,8 +9,8 @@ use crate::device_repository::insert_event_log;
 use crate::device_service::DeviceError;
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::wcs_task_repository::{
-    find_active_task_by_device_location, get_task, link_event_to_task, list_orphan_press_events,
-    location_is_unreachable, transition, WcsTaskRow,
+    find_active_task_by_device_location, get_task, list_orphan_press_events,
+    location_is_unreachable, transition, transition_in_tx, WcsTaskRow,
 };
 use crate::wcs_task_service::{
     DeviceEventRequest, WcsTaskService, PTL_DIFF_MAX_ABS, PTL_DIFF_RATIO, RETRY_BACKOFF_SECS,
@@ -56,7 +56,19 @@ impl WcsTaskService {
             }
             "ptl_press" => {
                 let task = if let Some(task_id) = req.task_id {
-                    get_task(&self.pool, ctx.owner_id, task_id).await?
+                    // 显式 task_id：校验设备/类型/库位归属（§10.2 事件-任务匹配）
+                    let found = get_task(&self.pool, ctx.owner_id, task_id).await?;
+                    match found {
+                        Some(t)
+                            if t.task_type == "ptl_light_on"
+                                && t.device_id == device_id
+                                && (req.location_id.is_none()
+                                    || t.location_id == req.location_id) =>
+                        {
+                            Some(t)
+                        }
+                        _ => None,
+                    }
                 } else {
                     find_active_task_by_device_location(
                         &self.pool,
@@ -64,6 +76,7 @@ impl WcsTaskService {
                         device_id,
                         req.location_id,
                         "ptl_light_on",
+                        None,
                     )
                     .await?
                 };
@@ -264,7 +277,6 @@ impl WcsTaskService {
                 return Err(DeviceError::LocationUnreachable);
             }
         }
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
         let ref_type = task.business_ref_type.as_deref().unwrap_or("");
         let settled_qty = if qty > 0 {
             qty
@@ -274,57 +286,70 @@ impl WcsTaskService {
                 .and_then(|v| v.as_i64())
                 .unwrap_or(0)
         };
+        // 账务确认与状态推进同一事务（I7）：落账走既有 inventory 上下文命令（§9），
+        // 状态推进走 transition_in_tx；任一失败整体回滚，业务账不回。
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
         if ref_type == "putaway" && settled_qty > 0 {
             let product_id = task
                 .payload
                 .get("product_id")
                 .and_then(|v| v.as_str())
-                .map(Uuid::parse_str)
-                .transpose()
-                .ok()
-                .flatten();
+                .and_then(|s| Uuid::parse_str(s).ok());
             let location_id = task
                 .payload
                 .get("location_id")
                 .and_then(|v| v.as_str())
-                .map(Uuid::parse_str)
-                .transpose()
-                .ok()
-                .flatten()
+                .and_then(|s| Uuid::parse_str(s).ok())
                 .or(task.location_id);
-            if let (Some(product_id), Some(location_id)) = (product_id, location_id) {
-                let updated = sqlx::query(
-                    r#"
-                    UPDATE inventory_batches
-                       SET qty_on_hand = qty_on_hand + $3,
-                           version = version + 1,
-                           updated_at = $4
-                     WHERE owner_id = $1
-                       AND location_id = $2
-                       AND product_id = $5
-                       AND qty_on_hand >= 0
-                    "#,
-                )
-                .bind(task.owner_id)
-                .bind(location_id)
-                .bind(settled_qty)
-                .bind(now)
-                .bind(product_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(|error| DeviceError::Database(error.to_string()))?
-                .rows_affected();
-                if updated == 0 {
-                    // 无库存行：落账失败 → 任务 failed 不回账
-                    let row = transition(
-                        &self.pool,
+            match (product_id, location_id) {
+                (Some(product_id), Some(location_id)) => {
+                    let settled = crate::inventory::confirm_putaway_in_tx(
+                        &mut tx,
+                        task.owner_id,
+                        location_id,
+                        product_id,
+                        wms_domain::Quantity::from(settled_qty),
+                        "wcs_task",
+                        task.id,
+                        now,
+                    )
+                    .await
+                    .map_err(|error| DeviceError::Database(error.to_string()))?;
+                    if !settled {
+                        // 无库存行/数量非法：落账失败 → 任务 failed 不回账
+                        let row = transition_in_tx(
+                            &mut tx,
+                            task.owner_id,
+                            task.id,
+                            &["sent", "executing", "timeout"],
+                            "failed",
+                            None,
+                            Some("M1_EVENT_TASK_MISMATCH"),
+                            Some("落账目标库存行不存在"),
+                            Some(json!({"settled_qty": settled_qty})),
+                            None,
+                            Some(now),
+                            task.version,
+                            now,
+                        )
+                        .await?
+                        .ok_or(DeviceError::TaskStateInvalid)?;
+                        tx.commit().await.map_err(db_err)?;
+                        self.publish_task_failed(&row, now).await?;
+                        return Err(DeviceError::EventTaskMismatch);
+                    }
+                }
+                (None, _) | (_, None) => {
+                    // payload 缺少商品/库位：任务 failed 不回账
+                    let row = transition_in_tx(
+                        &mut tx,
                         task.owner_id,
                         task.id,
                         &["sent", "executing", "timeout"],
                         "failed",
                         None,
                         Some("M1_EVENT_TASK_MISMATCH"),
-                        Some("落账目标库存行不存在"),
+                        Some("落账 payload 缺少 product_id/location_id"),
                         Some(json!({"settled_qty": settled_qty})),
                         None,
                         Some(now),
@@ -339,8 +364,8 @@ impl WcsTaskService {
                 }
             }
         }
-        let row = transition(
-            &self.pool,
+        transition_in_tx(
+            &mut tx,
             task.owner_id,
             task.id,
             &["sent", "executing", "timeout"],
@@ -370,7 +395,6 @@ impl WcsTaskService {
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
-        let _ = row;
         Ok(())
     }
 
@@ -396,12 +420,34 @@ impl WcsTaskService {
             if task.status == "pending" {
                 continue; // 未派发任务不参与超时重试
             }
-            let exhausted = task.retry_count >= task.max_retries;
-            if exhausted {
-                let row = transition(
+            // §10.5：先置 timeout 中间态，再按退避与重试计数决定去向
+            let current = if task.status != "timeout" {
+                transition(
                     &self.pool,
                     task.owner_id,
                     task.id,
+                    &["sent", "executing"],
+                    "timeout",
+                    None,
+                    None,
+                    Some("超时未收到终态回执"),
+                    None,
+                    None,
+                    None,
+                    task.version,
+                    now,
+                )
+                .await?
+                .ok_or(DeviceError::TaskStateInvalid)?
+            } else {
+                task.clone()
+            };
+            let exhausted = current.retry_count >= current.max_retries;
+            if exhausted {
+                let row = transition(
+                    &self.pool,
+                    current.owner_id,
+                    current.id,
                     &["sent", "executing", "timeout"],
                     "failed",
                     None,
@@ -410,7 +456,7 @@ impl WcsTaskService {
                     None,
                     None,
                     Some(now),
-                    task.version,
+                    current.version,
                     now,
                 )
                 .await?
@@ -418,24 +464,24 @@ impl WcsTaskService {
                 self.publish_task_failed(&row, now).await?;
             } else {
                 let backoff = RETRY_BACKOFF_SECS
-                    .get(task.retry_count as usize)
+                    .get(current.retry_count as usize)
                     .copied()
                     .unwrap_or(900);
-                let eligible = task.updated_at + Duration::seconds(backoff) <= now;
+                let eligible = current.updated_at + Duration::seconds(backoff) <= now;
                 if eligible {
                     transition(
                         &self.pool,
-                        task.owner_id,
-                        task.id,
+                        current.owner_id,
+                        current.id,
                         &["sent", "executing", "timeout"],
                         "sent",
-                        Some(task.retry_count + 1),
+                        Some(current.retry_count + 1),
                         None,
                         Some("超时重试"),
                         None,
                         Some(now),
                         None,
-                        task.version,
+                        current.version,
                         now,
                     )
                     .await?;
@@ -443,32 +489,56 @@ impl WcsTaskService {
             }
             handled += 1;
         }
-        Ok(handled)
+        // §6.3：设备停用致活跃任务停滞 → H4 wcs_task_stalled
+        let stalled: Vec<WcsTaskRow> = sqlx::query_as(&format!(
+            r#"
+            SELECT {TASK_COLUMNS}
+              FROM wcs_tasks
+             WHERE status IN ('pending', 'sent', 'executing', 'timeout')
+               AND updated_at < $1 - make_interval(secs => 300)
+               AND NOT EXISTS (
+                    SELECT 1 FROM iot_devices
+                     WHERE iot_devices.id = wcs_tasks.device_id
+                       AND iot_devices.enabled = TRUE
+               )
+            "#
+        ))
+        .bind(now)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| DeviceError::Database(error.to_string()))?;
+        for task in &stalled {
+            let mut tx = self.pool.begin().await.map_err(db_err)?;
+            publish_event_in_tx(
+                &mut tx,
+                task.owner_id,
+                &format!("wcs_task_stalled:{}", task.id),
+                "business.wcs_task_stalled",
+                "M1",
+                "wcs_task",
+                &task.id.to_string(),
+                json!({"task_no": task.task_no, "stalled_minutes": 5}),
+                now,
+            )
+            .await
+            .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+            tx.commit().await.map_err(db_err)?;
+        }
+        Ok(handled + stalled.len())
     }
 
-    /// 孤儿事件扫描：窗口超时未认领的 ptl_press → H4 device_event_orphan。
+    /// 孤儿事件扫描：窗口超时未认领的 ptl_press → H4 device_event_orphan（系统级，owner=nil）。
+    /// 窗口内认领由 handle_event 同步路径完成（按设备+库位匹配活跃任务）；扫描不做任务表 UPDATE
+    /// （iot_event_logs 纯审计只 INSERT，wms_app 无 UPDATE 权限）。
     pub async fn run_orphan_scan(&self) -> Result<usize, DeviceError> {
         let now = Utc::now();
         let orphans = list_orphan_press_events(&self.pool, ORPHAN_WINDOW_SECS, now).await?;
         let mut count = 0usize;
-        for (event_id, device_id, location_id) in orphans {
-            // 窗口内尝试认领：同设备同库位未终态亮灯任务
-            if let Some(task) = find_active_task_by_device_location(
-                &self.pool,
-                device_id,
-                device_id,
-                location_id,
-                "ptl_light_on",
-            )
-            .await?
-            {
-                link_event_to_task(&self.pool, event_id, task.id).await?;
-                continue;
-            }
+        for (event_id, device_id, _location_id) in orphans {
             let mut tx = self.pool.begin().await.map_err(db_err)?;
             publish_event_in_tx(
                 &mut tx,
-                device_id,
+                Uuid::nil(),
                 &format!("device_event_orphan:{event_id}"),
                 "business.device_event_orphan",
                 "M1",

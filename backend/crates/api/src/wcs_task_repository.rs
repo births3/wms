@@ -195,6 +195,7 @@ pub(crate) async fn find_active_task_by_device_location(
     device_id: Uuid,
     location_id: Option<Uuid>,
     task_type: &str,
+    pod_code: Option<&str>,
 ) -> Result<Option<WcsTaskRow>, DeviceError> {
     sqlx::query_as::<_, WcsTaskRow>(&format!(
         r#"
@@ -205,6 +206,7 @@ pub(crate) async fn find_active_task_by_device_location(
            AND task_type = $3
            AND status IN ('pending', 'sent', 'executing', 'timeout')
            AND ($2::uuid IS NULL OR location_id = $2)
+           AND ($5::text IS NULL OR payload->>'pod_code' = $5)
          ORDER BY created_at
          LIMIT 1
         "#
@@ -213,6 +215,7 @@ pub(crate) async fn find_active_task_by_device_location(
     .bind(location_id)
     .bind(task_type)
     .bind(owner_id)
+    .bind(pod_code)
     .fetch_optional(pool)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))
@@ -327,4 +330,128 @@ pub(crate) async fn link_event_to_task(
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))?;
     Ok(())
+}
+
+/// 同事务状态推进（账务与状态必须同一事务，I7）。签名与 transition 一致。
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn transition_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    id: Uuid,
+    from_statuses: &[&str],
+    to: &str,
+    retry_count: Option<i32>,
+    error_code: Option<&str>,
+    error_message: Option<&str>,
+    ack_payload: Option<Value>,
+    sent_at: Option<DateTime<Utc>>,
+    finished_at: Option<DateTime<Utc>>,
+    expected_version: i64,
+    now: DateTime<Utc>,
+) -> Result<Option<WcsTaskRow>, DeviceError> {
+    let result = sqlx::query_as::<_, WcsTaskRow>(&format!(
+        r#"
+        UPDATE wcs_tasks
+           SET status = $3,
+               retry_count = COALESCE($4, retry_count),
+               error_code = COALESCE($5, error_code),
+               error_message = COALESCE($6, error_message),
+               ack_payload = COALESCE($7::jsonb, ack_payload),
+               sent_at = COALESCE($8, sent_at),
+               finished_at = COALESCE($9, finished_at),
+               version = version + 1,
+               updated_at = $10
+         WHERE owner_id = $12
+           AND id = $1
+           AND version = $11
+           AND status = ANY($2)
+         RETURNING {TASK_COLUMNS}
+        "#
+    ))
+    .bind(id)
+    .bind(from_statuses)
+    .bind(to)
+    .bind(retry_count)
+    .bind(error_code)
+    .bind(error_message)
+    .bind(ack_payload)
+    .bind(sent_at)
+    .bind(finished_at)
+    .bind(now)
+    .bind(expected_version)
+    .bind(owner_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    Ok(result)
+}
+
+/// 事件流查询（只读）：按设备/类型/时间窗倒序。
+pub(crate) async fn list_events(
+    pool: &PgPool,
+    warehouse_id: Uuid,
+    device_id: Option<Uuid>,
+    event_type: Option<&str>,
+    limit: i64,
+) -> Result<
+    Vec<(
+        Uuid,
+        Uuid,
+        String,
+        Option<Uuid>,
+        Value,
+        chrono::DateTime<chrono::Utc>,
+    )>,
+    DeviceError,
+> {
+    sqlx::query_as::<
+        _,
+        (
+            Uuid,
+            Uuid,
+            String,
+            Option<Uuid>,
+            Value,
+            chrono::DateTime<chrono::Utc>,
+        ),
+    >(
+        r#"
+        SELECT id, device_id, event_type, task_id, payload, received_at
+          FROM iot_event_logs
+         WHERE warehouse_id = $1
+           AND ($2::uuid IS NULL OR device_id = $2)
+           AND ($3::text IS NULL OR event_type = $3)
+         ORDER BY received_at DESC
+         LIMIT $4
+        "#,
+    )
+    .bind(warehouse_id)
+    .bind(device_id)
+    .bind(event_type)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
+/// 设备大盘汇总：设备状态计数与异常任务计数。
+pub(crate) async fn device_dashboard_summary(
+    pool: &PgPool,
+    owner_id: Uuid,
+) -> Result<(i64, i64, i64, i64, i64), DeviceError> {
+    let row = sqlx::query_as::<_, (i64, i64, i64, i64, i64)>(
+        r#"
+        SELECT
+            (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1) AS total_devices,
+            (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'online') AS online_devices,
+            (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'offline') AS offline_devices,
+            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status = 'failed') AS failed_tasks,
+            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status = 'timeout') AS timeout_tasks
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    Ok(row)
 }

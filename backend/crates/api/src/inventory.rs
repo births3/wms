@@ -628,3 +628,82 @@ mod tests {
         assert_eq!(store.list_batches(&other)[0].status, STATUS_QUALIFIED);
     }
 }
+
+/// 设备中台 PTL 拍灯/称重/RFID 确认的上架落账（§10.4 复用既有 inventory 上下文）：
+/// 限定该库位该商品的一行批次做 qty_on_hand +Δ，并写 inventory_movements 审计行。
+/// 必须与 wcs_tasks 状态推进同一事务。
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn confirm_putaway_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    owner_id: Uuid,
+    location_id: Uuid,
+    product_id: Uuid,
+    qty: wms_domain::Quantity,
+    source_document_type: &str,
+    source_document_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<bool, sqlx::Error> {
+    if qty <= wms_domain::Quantity::ZERO {
+        return Ok(false);
+    }
+    // 限定单行：该库位该商品取最老批次（FEFO 语义近似），一次只确认一行
+    let batch_id: Option<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT id
+          FROM inventory_batches
+         WHERE owner_id = $1
+           AND location_id = $2
+           AND product_id = $3
+           AND qty_on_hand >= 0
+         ORDER BY expiry_date NULLS LAST, created_at
+         LIMIT 1
+        "#,
+    )
+    .bind(owner_id)
+    .bind(location_id)
+    .bind(product_id)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some(batch_id) = batch_id else {
+        return Ok(false);
+    };
+    let updated = sqlx::query(
+        r#"
+        UPDATE inventory_batches
+           SET qty_on_hand = qty_on_hand + $3,
+               updated_at = $4,
+               version = version + 1
+         WHERE owner_id = $1
+           AND id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(batch_id)
+    .bind(qty)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    if updated == 0 {
+        return Ok(false);
+    }
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_movements (
+            id, owner_id, batch_id, movement_type, qty_delta,
+            source_document_type, source_document_id, approval_source,
+            approval_id, occurred_at
+        ) VALUES ($1,$2,$3,'putaway_confirm',$4,$5,$6,'device_platform','system',$7)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(batch_id)
+    .bind(qty)
+    .bind(source_document_type)
+    .bind(source_document_id)
+    .bind(now)
+    .execute(&mut **tx)
+    .await?;
+    Ok(true)
+}
