@@ -166,7 +166,7 @@ pub async fn seed_m4_review_data(pool: &PgPool) -> Result<(), sqlx::Error> {
         VALUES (
             '00000000-0000-0000-0000-000000001704', $1,
             'P-M4-REVIEW-E2E-001', 'M4 复核策略 E2E 商品', '1 unit',
-            'normal', 'none', 'active'
+            'normal_10_30', 'none', 'active'
         )
         ON CONFLICT (owner_id, product_code) DO UPDATE
         SET special_drug_category = 'none', status = 'active', updated_at = now()

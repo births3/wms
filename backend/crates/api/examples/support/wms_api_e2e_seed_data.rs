@@ -301,7 +301,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         VALUES (
             '00000000-0000-0000-0000-000000001001', '00000000-0000-0000-0000-000000000001',
             'P-M1-E2E-001', 'E2E 冷藏胰岛素', '10ml*1支', '注射剂',
-            'cold', 'none', '国药准字E2E001', 'E2E 示例药业', 'active',
+            'cold_2_8', 'none', '国药准字E2E001', 'E2E 示例药业', 'active',
             '06901234567891', '81000000000000000001',
             120, 100, 30, 360, 180
         )
@@ -530,7 +530,7 @@ pub async fn seed_e2e_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
         )
         VALUES (
             '00000000-0000-0000-0000-000000001302', '00000000-0000-0000-0000-000000000001',
-            '00000000-0000-0000-0000-000000001301', 'A01', 'E2E 冷藏区', 'cold',
+            '00000000-0000-0000-0000-000000001301', 'A01', 'E2E 冷藏区', 'cold_2_8',
             'qualified_green', 'active'
         )
         ON CONFLICT (owner_id, warehouse_id, zone_code) DO UPDATE

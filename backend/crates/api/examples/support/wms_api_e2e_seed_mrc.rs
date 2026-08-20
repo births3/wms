@@ -18,7 +18,7 @@ pub async fn seed_mrc_data(pool: &PgPool) -> Result<(), Box<dyn Error>> {
             'M-RC 多库存批次验收商品',
             '1mg*10片',
             '片剂',
-            'normal',
+            'normal_10_30',
             'none',
             '国药准字RC-E2E-001',
             'M-RC 验收药业',
