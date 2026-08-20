@@ -61,7 +61,11 @@ function emptyForm(): RegisterForm {
 
 export function M1DevicePage() {
   const [queryValue, setQueryValue] = React.useState<QueryPanelValue>({});
-  const listQuery = useDevicesQuery();
+  const listQuery = useDevicesQuery({
+    online_status: typeof queryValue.status === "string" && queryValue.status ? queryValue.status : undefined,
+    device_type:
+      typeof queryValue.device_type === "string" && queryValue.device_type ? queryValue.device_type : undefined,
+  });
   const registerMutation = useRegisterDeviceMutation();
   const toggleMutation = useToggleDeviceEnabledMutation();
   const bindMutation = useBindDeviceMutation();
@@ -283,7 +287,7 @@ export function M1DevicePage() {
       </Dialog>
 
       {notice && (
-        <div className={`rounded border p-2 text-sm ${notice.kind === "success" ? "border-green-300 text-green-700" : "border-red-300 text-red-700"}`}>
+        <div className={`rounded border p-2 text-sm ${notice.kind === "success" ? "border-emerald-600/40 text-emerald-700 dark:text-emerald-300" : "border-destructive/40 text-destructive"}`}>
           {notice.text}
         </div>
       )}

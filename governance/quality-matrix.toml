@@ -975,6 +975,8 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m1-device-dashboard/dashboard.png",
 ]
 api_paths = [
+  "GET /api/v1/device-dashboard",
+  "GET /api/v1/iot-events",
   "GET /api/v1/iot-devices",
   "POST /api/v1/iot-devices",
   "GET /api/v1/iot-devices/{id}",
