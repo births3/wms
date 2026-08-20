@@ -67,6 +67,55 @@ async fn seed_device(pool: &PgPool, owner_id: Uuid, device_type: &str) -> Uuid {
     device.id
 }
 
+async fn seed_device_in_warehouse(
+    pool: &PgPool,
+    owner_id: Uuid,
+    warehouse_id: Uuid,
+    device_type: &str,
+    device_code: &str,
+) -> Uuid {
+    sqlx::query(
+        r#"
+        INSERT INTO auth_owners (id, owner_code, owner_name)
+        VALUES ($1, 'T03-SHARED-OWNER', 'T03 shared owner')
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(owner_id)
+    .execute(pool)
+    .await
+    .expect("insert owner for shared warehouse device");
+    let service = DeviceService::new(pool.clone());
+    let c = ctx(owner_id);
+    let device = service
+        .register(
+            &c,
+            RegisterDeviceRequest {
+                warehouse_id,
+                device_code: device_code.into(),
+                device_type: device_type.into(),
+                vendor: None,
+                model: None,
+                protocol: "http".into(),
+                ip_address: None,
+                port: None,
+                extra_config: json!({}),
+            },
+            &format!("reg-{device_code}"),
+        )
+        .await
+        .expect("register shared warehouse device");
+    service
+        .heartbeat(
+            &c,
+            device.id,
+            &format!("heartbeat-{device_code}-{}", device.id),
+        )
+        .await
+        .expect("heartbeat shared warehouse device");
+    device.id
+}
+
 async fn post_json(
     router: &axum::Router,
     _c: &AuthContext,
@@ -168,12 +217,14 @@ async fn dashboard_and_event_routes_are_mounted(pool: PgPool) {
     let _device_id = seed_device(&pool, owner_id, "ptl_light").await;
     let router = combined_router(pool, &c).await;
 
-    let (status, body) = get_json(&router, "/api/v1/device-dashboard").await;
+    let dashboard_path = format!("/api/v1/device-dashboard?warehouse_id={owner_id}");
+    let (status, body) = get_json(&router, &dashboard_path).await;
     assert_eq!(status, StatusCode::OK, "大盘应挂路由: {body}");
     assert!(body["total_devices"].as_i64().unwrap_or(0) >= 1);
     assert!(body.get("affected_location_ids").is_some());
 
-    let (status, body) = get_json(&router, "/api/v1/iot-events").await;
+    let events_path = format!("/api/v1/iot-events?warehouse_id={owner_id}");
+    let (status, body) = get_json(&router, &events_path).await;
     assert_eq!(status, StatusCode::OK, "事件流应挂路由: {body}");
     assert!(body.as_array().is_some());
 }
@@ -181,8 +232,16 @@ async fn dashboard_and_event_routes_are_mounted(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn gwt15_press_claimed_when_task_arrives_in_window(pool: PgPool) {
     let owner_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
     let c = ctx(owner_id);
-    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let device_id = seed_device_in_warehouse(
+        &pool,
+        owner_id,
+        warehouse_id,
+        "ptl_light",
+        "PTL-SHARED-CLAIM",
+    )
+    .await;
     let router = combined_router(pool.clone(), &c).await;
     let location_id = Uuid::new_v4();
 
@@ -190,8 +249,8 @@ async fn gwt15_press_claimed_when_task_arrives_in_window(pool: PgPool) {
         &router,
         &c,
         &format!("/api/v1/iot-devices/{device_id}/events"),
-        json!({"event_type": "ptl_press", "location_id": location_id, "payload": {"press_qty": 2}}),
-        None,
+        json!({"event_id": Uuid::new_v4(), "event_type": "ptl_press", "location_id": location_id, "payload": {"press_qty": 2}}),
+        Some("pending-press-claim"),
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
@@ -210,7 +269,7 @@ async fn gwt15_press_claimed_when_task_arrives_in_window(pool: PgPool) {
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{created}");
-    let service = WcsTaskService::new(pool);
+    let service = WcsTaskService::new(pool.clone());
     let task = service
         .get(
             &c,
@@ -219,6 +278,97 @@ async fn gwt15_press_claimed_when_task_arrives_in_window(pool: PgPool) {
         .await
         .expect("load claimed task");
     assert_eq!(task.status, "succeeded", "窗口内任务到达应认领拍灯并落账");
+
+    sqlx::query(
+        "UPDATE iot_event_logs SET received_at = received_at - interval '2 minutes' WHERE device_id = $1",
+    )
+    .bind(device_id)
+    .execute(&pool)
+    .await
+    .expect("age claimed press event");
+    sqlx::query(
+        "UPDATE wcs_tasks SET created_at = created_at - interval '2 minutes' WHERE id = $1",
+    )
+    .bind(task.id)
+    .execute(&pool)
+    .await
+    .expect("age claimed task by the same duration");
+    assert_eq!(
+        service
+            .run_orphan_scan()
+            .await
+            .expect("scan claimed events"),
+        0,
+        "已认领事件不得因 owner_id/warehouse_id 语义不同被误报为孤儿"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn pending_press_claim_applies_ptl_quantity_threshold(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let router = combined_router(pool.clone(), &c).await;
+    let location_id = Uuid::new_v4();
+
+    let (status, body) = post_json(
+        &router,
+        &c,
+        &format!("/api/v1/iot-devices/{device_id}/events"),
+        json!({
+            "event_id": Uuid::new_v4(),
+            "event_type": "ptl_press",
+            "location_id": location_id,
+            "payload": {"press_qty": 30}
+        }),
+        Some("pending-press-threshold"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "窗口内事件应先挂起: {body}");
+
+    let (status, body) = post_json(
+        &router,
+        &c,
+        "/api/v1/wcs-tasks",
+        json!({
+            "task_type": "ptl_light_on",
+            "device_id": device_id,
+            "location_id": location_id,
+            "payload": {"qty": 5, "location_id": location_id}
+        }),
+        Some("claim-threshold"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "超阈值认领应阻断: {body}"
+    );
+    assert_eq!(body["code"], "M1_PTL_QTY_DIFF_EXCEEDED");
+    let (replay_status, replay_body) = post_json(
+        &router,
+        &c,
+        "/api/v1/wcs-tasks",
+        json!({
+            "task_type": "ptl_light_on",
+            "device_id": device_id,
+            "location_id": location_id,
+            "payload": {"qty": 5, "location_id": location_id}
+        }),
+        Some("claim-threshold"),
+    )
+    .await;
+    assert_eq!(replay_status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(replay_body["code"], "M1_PTL_QTY_DIFF_EXCEEDED");
+    let status: String = sqlx::query_scalar(
+        "SELECT status FROM wcs_tasks WHERE owner_id = $1 AND idempotency_key = $2",
+    )
+    .bind(owner_id)
+    .bind("claim-threshold")
+    .fetch_one(&pool)
+    .await
+    .expect("load claimed task");
+    assert_eq!(status, "failed", "超阈值认领不得直接结算成功");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -328,14 +478,18 @@ async fn pod_move_without_pod_code_rejected(pool: PgPool) {
 async fn gwt11_receipt_cycle_and_terminal_replay_ignored(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let c = ctx(owner_id);
-    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let device_id = seed_device(&pool, owner_id, "agv").await;
     let router = combined_router(pool.clone(), &c).await;
 
     let (_, created) = post_json(
         &router,
         &c,
         "/api/v1/wcs-tasks",
-        task_body(device_id, "ptl_light_on", json!({"qty": 5})),
+        task_body(
+            device_id,
+            "pod_move",
+            json!({"pod_code": "POD-GWT11", "workstation": "WS-GWT11"}),
+        ),
         Some("task-1"),
     )
     .await;
@@ -380,11 +534,24 @@ async fn gwt15_orphan_press_window_then_h4(pool: PgPool) {
         &router,
         &c,
         &format!("/api/v1/iot-devices/{device_id}/events"),
-        json!({"event_type": "ptl_press", "location_id": Uuid::new_v4(), "payload": {"press_qty": 5}}),
-        None,
+        json!({"event_id": Uuid::new_v4(), "event_type": "ptl_press", "location_id": Uuid::new_v4(), "payload": {"press_qty": 5}}),
+        Some("orphan-press-window"),
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, body) = post_json(
+        &router,
+        &c,
+        &format!("/api/v1/iot-devices/{device_id}/events"),
+        json!({"event_id": Uuid::new_v4(), "event_type": "ptl_press", "location_id": Uuid::new_v4(), "payload": {"press_qty": 5}}),
+        Some("orphan-press-window"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "同 header 不得接受不同事件: {body}"
+    );
     let count = service.run_orphan_scan().await.unwrap();
     assert_eq!(count, 0, "窗口内不应告警");
 
@@ -519,17 +686,17 @@ async fn gwt21_retry_exhausted_then_resend_void(pool: PgPool) {
     let task_id = Uuid::parse_str(created["id"].as_str().unwrap()).unwrap();
     service.dispatch(&c, task_id).await.unwrap();
 
-    // 3 次自动重试 + 第 4 次失败回执 → 耗尽 failed（max_retries=3，retry_count 0→1→2→3）
-    for i in 0..4 {
+    // 第 3 次失败回执耗尽 → failed（max_retries=3，retry_count 0→1→2→3）
+    for i in 0..3 {
         let r = service
             .apply_receipt(&c, task_id, "fail", Some("DEV_ERR"))
             .await
             .unwrap();
-        if i == 3 {
-            assert_eq!(r.status, "failed", "第 4 次失败应耗尽进入 failed");
+        if i == 2 {
+            assert_eq!(r.status, "failed", "第 3 次失败应耗尽进入 failed");
             assert_eq!(r.retry_count, 3);
         } else {
-            assert_eq!(r.status, "sent", "前三次应重试回 sent");
+            assert_eq!(r.status, "sent", "前两次应重试回 sent");
         }
     }
 

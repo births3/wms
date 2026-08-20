@@ -226,6 +226,46 @@ async fn register_online_ptl(pool: &PgPool, owner_id: Uuid) -> (Uuid, Uuid) {
     (device.id, owner_id)
 }
 
+async fn seed_location(pool: &PgPool, owner_id: Uuid, warehouse_id: Uuid, location_id: Uuid) {
+    let zone_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type)
+           VALUES ($1, $2, $3, 'Device test warehouse', 'medicine')"#,
+    )
+    .bind(warehouse_id)
+    .bind(owner_id)
+    .bind(format!("WH-{warehouse_id}"))
+    .execute(pool)
+    .await
+    .expect("seed binding warehouse");
+    sqlx::query(
+        r#"INSERT INTO warehouse_zones
+           (id, owner_id, warehouse_id, zone_code, zone_name, temperature_zone, quality_color)
+           VALUES ($1, $2, $3, $4, 'Device zone', 'normal_10_30', 'green')"#,
+    )
+    .bind(zone_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(format!("ZONE-{zone_id}"))
+    .execute(pool)
+    .await
+    .expect("seed binding zone");
+    sqlx::query(
+        r#"INSERT INTO warehouse_locations
+           (id, owner_id, warehouse_id, zone_id, location_code, row_no, column_no, layer_no,
+            max_volume_cm3, max_sku_count, location_type, status)
+           VALUES ($1, $2, $3, $4, $5, 1, 1, 1, 1000, 1, 'piece_pick', 'available')"#,
+    )
+    .bind(location_id)
+    .bind(owner_id)
+    .bind(warehouse_id)
+    .bind(zone_id)
+    .bind(format!("LOC-{location_id}"))
+    .execute(pool)
+    .await
+    .expect("seed binding location");
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn gwt4_bind_conflict_and_ok(pool: PgPool) {
     let owner_id = Uuid::new_v4();
@@ -233,6 +273,7 @@ async fn gwt4_bind_conflict_and_ok(pool: PgPool) {
     let ctx = bind_ctx(owner_id);
     let router = router(pool.clone(), &ctx).await;
     let location_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, owner_id, location_id).await;
 
     let (status, body) = post_json(
         &router,
@@ -264,6 +305,106 @@ async fn gwt4_bind_conflict_and_ok(pool: PgPool) {
     .await;
     assert_eq!(status, StatusCode::CONFLICT, "同库位同角色应 409: {body}");
     assert_eq!(body["code"], "M1_BIND_CONFLICT");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn bind_uses_device_warehouse_and_replays_same_request(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
+    let service = DeviceService::new(pool.clone());
+    let manage = manage_ctx(owner_id);
+    let device = service
+        .register(
+            &manage,
+            wms_api::device_service::RegisterDeviceRequest {
+                warehouse_id,
+                device_code: "PTL-SHARED-01".into(),
+                device_type: "ptl_light".into(),
+                vendor: None,
+                model: None,
+                protocol: "http".into(),
+                ip_address: None,
+                port: None,
+                extra_config: json!({}),
+            },
+            "reg-shared-device",
+        )
+        .await
+        .expect("register warehouse-scoped device");
+    service
+        .heartbeat(&manage, device.id, "heartbeat-shared-device")
+        .await
+        .expect("bring warehouse-scoped device online");
+
+    let bind = bind_ctx(owner_id);
+    let router = router(pool.clone(), &bind).await;
+    let location_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, warehouse_id, location_id).await;
+    let request = json!({
+        "location_id": location_id,
+        "device_id": device.id,
+        "binding_role": "ptl_light",
+        "point_address": "A-SHARED"
+    });
+
+    let (status, first) = post_json(
+        &router,
+        &bind,
+        "/api/v1/location-device-bindings",
+        request.clone(),
+        Some("bind-shared-1"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "首次绑定应成功: {first}");
+
+    let (status, replay) = post_json(
+        &router,
+        &bind,
+        "/api/v1/location-device-bindings",
+        request,
+        Some("bind-shared-1"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "同键重放应返回首次结果: {replay}"
+    );
+    assert_eq!(replay["id"], first["id"]);
+
+    let other_warehouse_id = Uuid::new_v4();
+    let other_location_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, other_warehouse_id, other_location_id).await;
+    let (status, mismatch) = post_json(
+        &router,
+        &bind,
+        "/api/v1/location-device-bindings",
+        json!({
+            "location_id": other_location_id,
+            "device_id": device.id,
+            "binding_role": "ptl_light"
+        }),
+        Some("bind-cross-warehouse"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(mismatch["code"], "M1_BIND_LOCATION_MISMATCH");
+
+    let (stored_warehouse_id, binding_count): (Uuid, i64) = sqlx::query_as(
+        r#"
+        SELECT warehouse_id,
+               (SELECT count(*) FROM location_device_bindings WHERE location_id = $1)
+          FROM location_device_bindings
+         WHERE location_id = $1
+         LIMIT 1
+        "#,
+    )
+    .bind(location_id)
+    .fetch_one(&pool)
+    .await
+    .expect("load persisted binding");
+    assert_eq!(stored_warehouse_id, warehouse_id);
+    assert_eq!(binding_count, 1, "幂等重放不得重复创建绑定");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -406,6 +547,7 @@ async fn gwt8_disable_device_blocks_and_unbind_works(pool: PgPool) {
     let ctx = manage_ctx(owner_id);
     let router = router(pool.clone(), &ctx).await;
     let location_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, owner_id, location_id).await;
 
     // 绑定
     let (status, body) = post_json(
