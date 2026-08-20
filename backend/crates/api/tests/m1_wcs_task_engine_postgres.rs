@@ -12,7 +12,7 @@ use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
     device_handlers::{device_router, DeviceAppState},
-    device_service::{DeviceService, RegisterDeviceRequest},
+    device_service::{DeviceError, DeviceService, RegisterDeviceRequest},
     wcs_task_handlers::{wcs_task_router, WcsTaskAppState},
     wcs_task_service::WcsTaskService,
 };
@@ -42,6 +42,7 @@ async fn seed_device(pool: &PgPool, owner_id: Uuid, device_type: &str) -> Uuid {
         .register(
             &c,
             RegisterDeviceRequest {
+                warehouse_id: owner_id,
                 device_code: format!("DEV-{device_type}"),
                 device_type: device_type.into(),
                 vendor: None,
@@ -55,13 +56,20 @@ async fn seed_device(pool: &PgPool, owner_id: Uuid, device_type: &str) -> Uuid {
         )
         .await
         .expect("register device");
-    service.heartbeat(&c, device.id).await.expect("heartbeat");
+    service
+        .heartbeat(
+            &c,
+            device.id,
+            &format!("heartbeat-{device_type}-{}", device.id),
+        )
+        .await
+        .expect("heartbeat");
     device.id
 }
 
 async fn post_json(
     router: &axum::Router,
-    c: &AuthContext,
+    _c: &AuthContext,
     path: &str,
     body: Value,
     key: Option<&str>,
@@ -263,6 +271,33 @@ async fn gwt10_ptl_light_busy_conflicts(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_ptl_light_on_keeps_one_active_task(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let service = WcsTaskService::new(pool);
+    let request = wms_api::wcs_task_service::CreateWcsTaskRequest {
+        task_type: "ptl_light_on".into(),
+        device_id,
+        location_id: None,
+        business_ref_type: None,
+        business_ref_no: None,
+        payload: json!({"qty": 5}),
+    };
+
+    let (first, second) = tokio::join!(
+        service.create_task(&c, request.clone(), "concurrent-light-1"),
+        service.create_task(&c, request, "concurrent-light-2")
+    );
+
+    assert_eq!(usize::from(first.is_ok()) + usize::from(second.is_ok()), 1);
+    assert!(
+        matches!(first, Err(DeviceError::PtLightBusy))
+            || matches!(second, Err(DeviceError::PtLightBusy))
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn pod_move_without_pod_code_rejected(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let c = ctx(owner_id);
@@ -399,6 +434,7 @@ async fn gwt19_dws_validation_fail_and_pass(pool: PgPool) {
             &c,
             device_id,
             wms_api::wcs_task_service::DeviceEventRequest {
+                event_id: Uuid::new_v4(),
                 event_type: "dws_result".into(),
                 task_id: Some(Uuid::parse_str(&task_id).unwrap()),
                 location_id: None,
@@ -447,6 +483,7 @@ async fn gwt20_rfid_epc_coverage(pool: PgPool) {
             &c,
             device_id,
             wms_api::wcs_task_service::DeviceEventRequest {
+                event_id: Uuid::new_v4(),
                 event_type: "rfid_batch".into(),
                 task_id: Some(Uuid::parse_str(&task_id).unwrap()),
                 location_id: None,
@@ -506,7 +543,7 @@ async fn gwt21_retry_exhausted_then_resend_void(pool: PgPool) {
 
     // 人工重发 → sent 且 retry_count 归零
     let resend = service
-        .resend(&c, task_id, "测试重发".into())
+        .resend(&c, task_id, "测试重发".into(), "manual-resend")
         .await
         .unwrap();
     assert_eq!(resend.status, "sent");
@@ -520,8 +557,45 @@ async fn gwt21_retry_exhausted_then_resend_void(pool: PgPool) {
             wms_api::wcs_task_service::VoidRequest {
                 reason: "现场处置".into(),
             },
+            "manual-void",
         )
         .await
         .unwrap();
     assert_eq!(voided.status, "failed");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn timeout_task_reenters_sent_after_first_backoff(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let router = combined_router(pool.clone(), &c).await;
+    let service = WcsTaskService::new(pool.clone());
+
+    let (_, created) = post_json(
+        &router,
+        &c,
+        "/api/v1/wcs-tasks",
+        task_body(device_id, "ptl_light_on", json!({"qty": 5})),
+        Some("timeout-retry"),
+    )
+    .await;
+    let task_id = Uuid::parse_str(created["id"].as_str().unwrap()).unwrap();
+    sqlx::query(
+        "UPDATE wcs_tasks SET status = 'timeout', updated_at = NOW() - INTERVAL '61 seconds' WHERE id = $1",
+    )
+    .bind(task_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(service.run_timeout_scan().await.unwrap(), 1);
+    let (status, retry_count): (String, i32) =
+        sqlx::query_as("SELECT status, retry_count FROM wcs_tasks WHERE id = $1")
+            .bind(task_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(status, "sent");
+    assert_eq!(retry_count, 1);
 }

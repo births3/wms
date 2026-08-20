@@ -1,6 +1,6 @@
 //! T04/T05：PTL 拍灯落账与差异规则（GWT 12/13/14）、AGV pod_move 不可达（GWT 16/17/18/22）。
 
-use serde_json::{json, Value};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
@@ -36,6 +36,7 @@ async fn seed_device(pool: &PgPool, owner_id: Uuid, device_type: &str) -> Uuid {
         .register(
             &c,
             RegisterDeviceRequest {
+                warehouse_id: owner_id,
                 device_code: format!("T45-{device_type}"),
                 device_type: device_type.into(),
                 vendor: None,
@@ -49,7 +50,14 @@ async fn seed_device(pool: &PgPool, owner_id: Uuid, device_type: &str) -> Uuid {
         )
         .await
         .expect("register");
-    service.heartbeat(&c, device.id).await.expect("heartbeat");
+    service
+        .heartbeat(
+            &c,
+            device.id,
+            &format!("heartbeat-{device_type}-{}", device.id),
+        )
+        .await
+        .expect("heartbeat");
     device.id
 }
 
@@ -154,6 +162,7 @@ async fn gwt12_13_14_ptl_press_settles_with_diff_rules(pool: PgPool) {
             &c,
             device_id,
             DeviceEventRequest {
+                event_id: Uuid::new_v4(),
                 event_type: "ptl_press".into(),
                 task_id: Some(task.id),
                 location_id: Some(location_id),
@@ -216,6 +225,7 @@ async fn gwt12_13_14_ptl_press_settles_with_diff_rules(pool: PgPool) {
             &c,
             device_id,
             DeviceEventRequest {
+                event_id: Uuid::new_v4(),
                 event_type: "ptl_press".into(),
                 task_id: Some(task2.id),
                 location_id: Some(location_id),
@@ -267,6 +277,7 @@ async fn gwt12_13_14_ptl_press_settles_with_diff_rules(pool: PgPool) {
             &c,
             device_id,
             DeviceEventRequest {
+                event_id: Uuid::new_v4(),
                 event_type: "ptl_press".into(),
                 task_id: Some(task3.id),
                 location_id: Some(location_id),
@@ -290,6 +301,86 @@ async fn gwt12_13_14_ptl_press_settles_with_diff_rules(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(on_hand, sqlx::types::Decimal::from(26), "超阈值不应落账");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn replenish_press_without_batch_evidence_fails(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let location_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, location_id, None).await;
+    let service = WcsTaskService::new(pool.clone());
+    let task = service
+        .create_task(
+            &c,
+            CreateWcsTaskRequest {
+                task_type: "ptl_light_on".into(),
+                device_id,
+                location_id: Some(location_id),
+                business_ref_type: Some("replenish".into()),
+                business_ref_no: Some("RP-MISSING-EVIDENCE".into()),
+                payload: json!({"qty": 5}),
+            },
+            "replenish-missing-evidence",
+        )
+        .await
+        .expect("create replenish task");
+    service.dispatch(&c, task.id).await.expect("dispatch");
+
+    let result = service
+        .handle_event(
+            &c,
+            device_id,
+            DeviceEventRequest {
+                event_id: Uuid::new_v4(),
+                event_type: "ptl_press".into(),
+                task_id: Some(task.id),
+                location_id: Some(location_id),
+                payload: json!({"press_qty": 5}),
+            },
+        )
+        .await;
+
+    assert!(matches!(result, Err(DeviceError::EventTaskMismatch)));
+    let status: String = sqlx::query_scalar("SELECT status FROM wcs_tasks WHERE id = $1")
+        .bind(task.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "failed", "补货落账证据缺失不得成功");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn duplicate_event_id_is_ignored(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let service = WcsTaskService::new(pool.clone());
+    let event_id = Uuid::new_v4();
+    let event = DeviceEventRequest {
+        event_id,
+        event_type: "heartbeat".into(),
+        task_id: None,
+        location_id: None,
+        payload: json!({}),
+    };
+
+    service
+        .handle_event(&c, device_id, event.clone())
+        .await
+        .expect("first event");
+    service
+        .handle_event(&c, device_id, event)
+        .await
+        .expect("duplicate event");
+
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM iot_event_logs WHERE id = $1")
+        .bind(event_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1, "同一事件 ID 只能追加一次");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -338,6 +429,7 @@ async fn gwt16_17_18_pod_move_unreachable_cycle(pool: PgPool) {
         .register(
             &c,
             RegisterDeviceRequest {
+                warehouse_id: owner_id,
                 device_code: "AGV-I4-B".into(),
                 device_type: "agv".into(),
                 vendor: None,
@@ -352,7 +444,7 @@ async fn gwt16_17_18_pod_move_unreachable_cycle(pool: PgPool) {
         .await
         .expect("second agv");
     DeviceService::new(pool.clone())
-        .heartbeat(&c, other_agv.id)
+        .heartbeat(&c, other_agv.id, "heartbeat-other-agv")
         .await
         .expect("heartbeat b");
     let cross_device = service
@@ -428,6 +520,7 @@ async fn gwt16_17_18_pod_move_unreachable_cycle(pool: PgPool) {
             &c,
             ptl_id,
             DeviceEventRequest {
+                event_id: Uuid::new_v4(),
                 event_type: "ptl_press".into(),
                 task_id: Some(ptl_task.id),
                 location_id: Some(pod_location),
@@ -475,8 +568,8 @@ async fn gwt16_17_18_pod_move_unreachable_cycle(pool: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn gwt22_marker_inconsistency_scan_alerts(pool: PgPool) {
     let owner_id = Uuid::new_v4();
-    let c = ctx(owner_id);
-    let device_id = seed_device(&pool, owner_id, "agv").await;
+    let _c = ctx(owner_id);
+    let _device_id = seed_device(&pool, owner_id, "agv").await;
     let pod_location = Uuid::new_v4();
     seed_location(&pool, owner_id, pod_location, Some("POD-99")).await;
     let service = WcsTaskService::new(pool.clone());
@@ -628,6 +721,7 @@ async fn confirm_skip_putaway_honors_qty_or_fails_and_lights_off(pool: PgPool) {
                 reason: "无商品".into(),
                 qty: Some(4),
             },
+            "confirm-skip-missing",
         )
         .await;
     assert!(
@@ -665,6 +759,7 @@ async fn confirm_skip_putaway_honors_qty_or_fails_and_lights_off(pool: PgPool) {
                 reason: "现场已完成".into(),
                 qty: Some(3),
             },
+            "confirm-skip-ok",
         )
         .await
         .expect("skip settle");

@@ -53,8 +53,9 @@ async fn patch_json(
     ctx: &AuthContext,
     path: &str,
     body: Value,
+    idempotency_key: Option<&str>,
 ) -> (StatusCode, Value) {
-    request_json(router, "PATCH", ctx, path, body, None).await
+    request_json(router, "PATCH", ctx, path, body, idempotency_key).await
 }
 
 async fn request_json(
@@ -86,6 +87,7 @@ async fn request_json(
 #[sqlx::test(migrations = "../../migrations")]
 async fn gwt1_register_device_returns_201_offline(pool: PgPool) {
     let owner_id = Uuid::new_v4();
+    let warehouse_id = Uuid::new_v4();
     let ctx = manage_ctx(owner_id);
     let router = router(pool.clone(), &ctx).await;
 
@@ -94,6 +96,7 @@ async fn gwt1_register_device_returns_201_offline(pool: PgPool) {
         &ctx,
         "/api/v1/iot-devices",
         json!({
+            "warehouse_id": warehouse_id,
             "device_code": "PTL-01",
             "device_type": "ptl_light",
             "vendor": "厂商A",
@@ -108,6 +111,8 @@ async fn gwt1_register_device_returns_201_offline(pool: PgPool) {
     assert_eq!(body["device_type"], "ptl_light");
     assert_eq!(body["online_status"], "offline");
     assert_eq!(body["enabled"], true);
+    assert_eq!(body["warehouse_id"], warehouse_id.to_string());
+    assert_eq!(body["version"], 1);
 
     let audits: i64 = sqlx::query_scalar(
         r#"SELECT count(*) FROM audit_event WHERE action = 'register_device' AND resource_id = $1"#,
@@ -129,7 +134,7 @@ async fn gwt2_duplicate_code_conflicts(pool: PgPool) {
         &router,
         &ctx,
         "/api/v1/iot-devices",
-        json!({"device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
+        json!({"warehouse_id": owner_id, "device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
         Some("reg-1"),
     )
     .await;
@@ -139,7 +144,7 @@ async fn gwt2_duplicate_code_conflicts(pool: PgPool) {
         &router,
         &ctx,
         "/api/v1/iot-devices",
-        json!({"device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
+        json!({"warehouse_id": owner_id, "device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
         Some("reg-2"),
     )
     .await;
@@ -157,7 +162,7 @@ async fn gwt3_invalid_device_type_rejected(pool: PgPool) {
         &router,
         &ctx,
         "/api/v1/iot-devices",
-        json!({"device_code": "ROB-01", "device_type": "robot", "protocol": "http"}),
+        json!({"warehouse_id": owner_id, "device_code": "ROB-01", "device_type": "robot", "protocol": "http"}),
         Some("reg-1"),
     )
     .await;
@@ -175,7 +180,7 @@ async fn gwt9_idempotent_register_replays(pool: PgPool) {
         &router,
         &ctx,
         "/api/v1/iot-devices",
-        json!({"device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
+        json!({"warehouse_id": owner_id, "device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
         Some("reg-1"),
     )
     .await;
@@ -185,7 +190,7 @@ async fn gwt9_idempotent_register_replays(pool: PgPool) {
         &router,
         &ctx,
         "/api/v1/iot-devices",
-        json!({"device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
+        json!({"warehouse_id": owner_id, "device_code": "PTL-01", "device_type": "ptl_light", "protocol": "http"}),
         Some("reg-1"),
     )
     .await;
@@ -200,6 +205,7 @@ async fn register_online_ptl(pool: &PgPool, owner_id: Uuid) -> (Uuid, Uuid) {
         .register(
             &ctx,
             wms_api::device_service::RegisterDeviceRequest {
+                warehouse_id: owner_id,
                 device_code: "PTL-01".into(),
                 device_type: "ptl_light".into(),
                 vendor: None,
@@ -213,7 +219,10 @@ async fn register_online_ptl(pool: &PgPool, owner_id: Uuid) -> (Uuid, Uuid) {
         )
         .await
         .expect("register device");
-    service.heartbeat(&ctx, device.id).await.expect("heartbeat");
+    service
+        .heartbeat(&ctx, device.id, "heartbeat-register-online")
+        .await
+        .expect("heartbeat");
     (device.id, owner_id)
 }
 
@@ -266,6 +275,7 @@ async fn gwt5_bind_role_device_mismatch(pool: PgPool) {
         .register(
             &ctx,
             wms_api::device_service::RegisterDeviceRequest {
+                warehouse_id: owner_id,
                 device_code: "DWS-01".into(),
                 device_type: "dws".into(),
                 vendor: None,
@@ -279,7 +289,10 @@ async fn gwt5_bind_role_device_mismatch(pool: PgPool) {
         )
         .await
         .expect("register");
-    service.heartbeat(&ctx, device.id).await.expect("heartbeat");
+    service
+        .heartbeat(&ctx, device.id, "heartbeat-role-mismatch")
+        .await
+        .expect("heartbeat");
 
     let router = router(pool.clone(), &bind_ctx(owner_id)).await;
     let (status, body) = post_json(
@@ -307,6 +320,7 @@ async fn gwt6_bind_offline_device_blocked(pool: PgPool) {
         .register(
             &ctx,
             wms_api::device_service::RegisterDeviceRequest {
+                warehouse_id: owner_id,
                 device_code: "PTL-02".into(),
                 device_type: "ptl_light".into(),
                 vendor: None,
@@ -410,11 +424,12 @@ async fn gwt8_disable_device_blocks_and_unbind_works(pool: PgPool) {
     let binding_id = body["id"].as_str().unwrap().to_string();
 
     // 停用设备
-    let (status, body) = patch_json(
+    let (status, _body) = patch_json(
         &router,
         &ctx,
         &format!("/api/v1/iot-devices/{device_id}"),
-        json!({"enabled": false}),
+        json!({"enabled": false, "expected_version": 1}),
+        Some("device-disable"),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -443,7 +458,7 @@ async fn gwt8_disable_device_blocks_and_unbind_works(pool: PgPool) {
         json!(UnbindRequest {
             reason: "换绑测试".into()
         }),
-        None,
+        Some("unbind-1"),
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
@@ -456,4 +471,34 @@ async fn gwt8_disable_device_blocks_and_unbind_works(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(valid_to, 1, "解绑应置 valid_to");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn device_update_rejects_stale_version(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let (device_id, _) = register_online_ptl(&pool, owner_id).await;
+    let ctx = manage_ctx(owner_id);
+    let router = router(pool, &ctx).await;
+
+    let (status, updated) = patch_json(
+        &router,
+        &ctx,
+        &format!("/api/v1/iot-devices/{device_id}"),
+        json!({"vendor": "厂商B", "expected_version": 1}),
+        Some("device-update-1"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(updated["version"], 2);
+
+    let (status, body) = patch_json(
+        &router,
+        &ctx,
+        &format!("/api/v1/iot-devices/{device_id}"),
+        json!({"vendor": "过期写入", "expected_version": 1}),
+        Some("device-update-stale"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(body["code"], "M1_DEVICE_VERSION_CONFLICT");
 }

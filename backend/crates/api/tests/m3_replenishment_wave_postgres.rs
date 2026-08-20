@@ -90,6 +90,38 @@ async fn wave_gap_without_strategy_uses_default_storage_route(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn wave_gap_ignores_strategy_for_another_target_type(pool: PgPool) {
+    let world = seed_world(&pool, 0, 30).await;
+    sqlx::query(
+        r#"
+        INSERT INTO replenishment_strategies (
+            id, owner_id, strategy_code, strategy_name, scope_type, scope_ref,
+            location_type, source_type, target_type,
+            min_safety_threshold, max_replenish_target, trigger_modes, enabled
+        ) VALUES (
+            $1, $2, 'STR-WG-CASE', '箱拣缺口策略', 'product', $3,
+            'case_pick', 'storage', 'case_pick',
+            0, 100, ARRAY['wave_gap'], TRUE
+        )
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(world.owner_id)
+    .bind(world.product_id)
+    .execute(&pool)
+    .await
+    .expect("mismatched strategy");
+
+    let created = service(pool.clone())
+        .create_wave_gap_tasks(&ctx(world.owner_id), gap_req(&world, 5))
+        .await
+        .expect("gap");
+
+    assert_eq!(created.len(), 1);
+    assert!(created[0].strategy_id.is_none());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn wave_gap_returns_empty_when_available_covers_demand(pool: PgPool) {
     let world = seed_world(&pool, 10, 30).await;
     insert_wave_gap_strategy(&pool, world.owner_id, world.product_id, world.pick_id).await;

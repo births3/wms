@@ -22,6 +22,7 @@ async fn iot_tables_exist_with_expected_columns(pool: PgPool) {
                 "online_status",
                 "last_heartbeat_at",
                 "enabled",
+                "version",
             ],
         ),
         (
