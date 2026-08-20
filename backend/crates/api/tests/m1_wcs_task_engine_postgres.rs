@@ -116,7 +116,7 @@ async fn gwt9_create_task_idempotent(pool: PgPool) {
         Some("task-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "生成应成功: {first}");
+    assert_eq!(status, StatusCode::CREATED, "生成应成功: {first}");
     assert_eq!(first["status"], "pending");
     assert!(first["task_no"].as_str().unwrap().starts_with("WCST-"));
     assert_eq!(first["retry_count"], 0);
@@ -129,7 +129,7 @@ async fn gwt9_create_task_idempotent(pool: PgPool) {
         Some("task-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
     assert_eq!(first["id"], replay["id"], "幂等重放应返回同一任务");
 }
 
@@ -148,7 +148,7 @@ async fn gwt10_ptl_light_busy_conflicts(pool: PgPool) {
         Some("task-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
 
     let (status, body) = post_json(
         &router,
@@ -197,11 +197,12 @@ async fn gwt11_receipt_cycle_and_terminal_replay_ignored(pool: PgPool) {
     assert_eq!(succeeded.status, "succeeded");
     assert_eq!(succeeded.ack_payload["outcome"], "success");
 
-    // 终态重复回执：幂等忽略（transition 无匹配 → TaskStateInvalid 语义改为忽略）
+    // I6：终态重复回执幂等忽略，返回当前任务
     let again = service
         .apply_receipt(&c, Uuid::parse_str(&task_id).unwrap(), "success", None)
-        .await;
-    assert!(again.is_err(), "终态重复回执应被忽略（不可再迁移）");
+        .await
+        .expect("终态重复回执应幂等返回");
+    assert_eq!(again.status, "succeeded");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

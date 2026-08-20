@@ -103,7 +103,7 @@ async fn gwt1_register_device_returns_201_offline(pool: PgPool) {
     )
     .await;
 
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
     assert_eq!(body["device_code"], "PTL-01");
     assert_eq!(body["device_type"], "ptl_light");
     assert_eq!(body["online_status"], "offline");
@@ -124,7 +124,7 @@ async fn gwt2_duplicate_code_conflicts(pool: PgPool) {
         Some("reg-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
 
     let (status, body) = post_json(
         &router,
@@ -170,7 +170,7 @@ async fn gwt9_idempotent_register_replays(pool: PgPool) {
         Some("reg-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
 
     let (status, replay) = post_json(
         &router,
@@ -180,7 +180,7 @@ async fn gwt9_idempotent_register_replays(pool: PgPool) {
         Some("reg-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
     assert_eq!(first["id"], replay["id"], "幂等重放应返回同一设备");
 }
 
@@ -229,7 +229,7 @@ async fn gwt4_bind_conflict_and_ok(pool: PgPool) {
         Some("bind-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "首次绑定应成功: {body}");
+    assert_eq!(status, StatusCode::CREATED, "首次绑定应成功: {body}");
 
     let (status, body) = post_json(
         &router,
@@ -397,7 +397,7 @@ async fn gwt8_disable_device_blocks_and_unbind_works(pool: PgPool) {
         Some("bind-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED);
     let binding_id = body["id"].as_str().unwrap().to_string();
 
     // 停用设备
@@ -408,7 +408,6 @@ async fn gwt8_disable_device_blocks_and_unbind_works(pool: PgPool) {
         json!({"enabled": false}),
     )
     .await;
-    eprintln!("PATCH2 status={status} body={body}");
     assert_eq!(status, StatusCode::OK);
 
     // 停用后绑定新点位被拒
