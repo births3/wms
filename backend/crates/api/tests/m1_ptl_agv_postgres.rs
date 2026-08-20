@@ -6,7 +6,9 @@ use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
     device_service::{DeviceError, DeviceService, RegisterDeviceRequest},
-    wcs_task_service::{CreateWcsTaskRequest, DeviceEventRequest, WcsTaskService},
+    wcs_task_service::{
+        ConfirmSkipRequest, CreateWcsTaskRequest, DeviceEventRequest, WcsTaskService,
+    },
 };
 
 fn ctx(owner_id: Uuid) -> AuthContext {
@@ -169,6 +171,22 @@ async fn gwt12_13_14_ptl_press_settles_with_diff_rules(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(on_hand, sqlx::types::Decimal::from(15), "拍灯确认应在手 +5");
+    let off_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM wcs_tasks WHERE task_type = 'ptl_light_off' AND device_id = $1",
+    )
+    .bind(device_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(off_count, 1, "拍灯落账后应生成 ptl_light_off 收尾指令");
+    let off_status: String = sqlx::query_scalar(
+        "SELECT status FROM wcs_tasks WHERE task_type = 'ptl_light_off' AND device_id = $1",
+    )
+    .bind(device_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_ne!(off_status, "pending", "灭灯收尾应已派发，不得停在 pending");
     let status: String = sqlx::query_scalar("SELECT status FROM wcs_tasks WHERE id = $1")
         .bind(task.id)
         .fetch_one(&pool)
@@ -316,6 +334,45 @@ async fn gwt16_17_18_pod_move_unreachable_cycle(pool: PgPool) {
         )
         .await;
     assert!(conflict.is_err(), "同一货架应 409 PodMoveActive");
+    let other_agv = DeviceService::new(pool.clone())
+        .register(
+            &c,
+            RegisterDeviceRequest {
+                device_code: "AGV-I4-B".into(),
+                device_type: "agv".into(),
+                vendor: None,
+                model: None,
+                protocol: "http".into(),
+                ip_address: None,
+                port: None,
+                extra_config: json!({}),
+            },
+            "reg-agv-b",
+        )
+        .await
+        .expect("second agv");
+    DeviceService::new(pool.clone())
+        .heartbeat(&c, other_agv.id)
+        .await
+        .expect("heartbeat b");
+    let cross_device = service
+        .create_task(
+            &c,
+            CreateWcsTaskRequest {
+                task_type: "pod_move".into(),
+                device_id: other_agv.id,
+                location_id: Some(pod_location),
+                business_ref_type: None,
+                business_ref_no: None,
+                payload: json!({"pod_code": "POD-45", "target_station": "ST-09"}),
+            },
+            "pod-cross-device",
+        )
+        .await;
+    assert!(
+        matches!(cross_device, Err(DeviceError::PodMoveActive)),
+        "I4 应按货架互斥、不限设备: {cross_device:?}"
+    );
 
     // GWT 16：executing → 置不可达；格口落账阻断（LocationUnreachable）；succeeded → 清除恢复
     service.dispatch(&c, task.id).await.expect("dispatch");
@@ -331,6 +388,22 @@ async fn gwt16_17_18_pod_move_unreachable_cycle(pool: PgPool) {
     .await
     .unwrap();
     assert!(marked, "executing 应置格口不可达标记");
+    service
+        .apply_receipt(&c, task.id, "fail", Some("transient"))
+        .await
+        .expect("retry fail");
+    let marked_after_retry: bool = sqlx::query_scalar(
+        "SELECT agv_unreachable_at IS NOT NULL FROM warehouse_locations WHERE id = $1",
+    )
+    .bind(pod_location)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(marked_after_retry, "未耗尽失败回执不应清除不可达标记");
+    service
+        .apply_receipt(&c, task.id, "start", None)
+        .await
+        .expect("re-enter executing");
 
     // 不可达期间落账阻断（PTL 确认路径前置校验 I5）
     let ptl_id = seed_device(&pool, owner_id, "ptl_light").await;
@@ -515,4 +588,114 @@ async fn i5_unreachable_guard_sql_blocks_existing_write_paths(pool: PgPool) {
         .unwrap()
         .rows_affected();
     assert_eq!(ok, 1, "可达后扣减应恢复（1 行）");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn confirm_skip_putaway_honors_qty_or_fails_and_lights_off(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let location_id = Uuid::new_v4();
+    let product_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, location_id, None).await;
+    seed_inventory_batch(&pool, owner_id, location_id, product_id, 10).await;
+    let service = WcsTaskService::new(pool.clone());
+
+    let missing = service
+        .create_task(
+            &c,
+            CreateWcsTaskRequest {
+                task_type: "ptl_light_on".into(),
+                device_id,
+                location_id: Some(location_id),
+                business_ref_type: Some("putaway".into()),
+                business_ref_no: Some("PA-SKIP-MISS".into()),
+                payload: json!({"qty": 4, "location_id": location_id}),
+            },
+            "skip-miss",
+        )
+        .await
+        .expect("create skip miss");
+    service
+        .dispatch(&c, missing.id)
+        .await
+        .expect("dispatch miss");
+    let miss = service
+        .confirm_skip(
+            &c,
+            missing.id,
+            ConfirmSkipRequest {
+                reason: "无商品".into(),
+                qty: Some(4),
+            },
+        )
+        .await;
+    assert!(
+        matches!(miss, Err(DeviceError::EventTaskMismatch)),
+        "缺 product_id 应按 I7 失败: {miss:?}"
+    );
+    let miss_status: String = sqlx::query_scalar("SELECT status FROM wcs_tasks WHERE id = $1")
+        .bind(missing.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(miss_status, "failed", "跳过确认缺证据应回 failed");
+
+    let ok_task = service
+        .create_task(
+            &c,
+            CreateWcsTaskRequest {
+                task_type: "ptl_light_on".into(),
+                device_id,
+                location_id: Some(location_id),
+                business_ref_type: Some("putaway".into()),
+                business_ref_no: Some("PA-SKIP-OK".into()),
+                payload: json!({"qty": 9, "product_id": product_id, "location_id": location_id}),
+            },
+            "skip-ok",
+        )
+        .await
+        .expect("create skip ok");
+    service.dispatch(&c, ok_task.id).await.expect("dispatch ok");
+    let skipped = service
+        .confirm_skip(
+            &c,
+            ok_task.id,
+            ConfirmSkipRequest {
+                reason: "现场已完成".into(),
+                qty: Some(3),
+            },
+        )
+        .await
+        .expect("skip settle");
+    assert_eq!(skipped.status, "succeeded");
+    let on_hand: sqlx::types::Decimal = sqlx::query_scalar(
+        "SELECT qty_on_hand FROM inventory_batches WHERE location_id = $1 AND product_id = $2",
+    )
+    .bind(location_id)
+    .bind(product_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        on_hand,
+        sqlx::types::Decimal::from(13),
+        "跳过确认应按 req.qty 落账 +3"
+    );
+    let off_count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM wcs_tasks WHERE task_type = 'ptl_light_off' AND payload->>'closes' = $1",
+    )
+    .bind(ok_task.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(off_count, 1, "跳过确认后应生成 ptl_light_off 收尾");
+    let skip_off_status: String = sqlx::query_scalar(
+        "SELECT status FROM wcs_tasks WHERE task_type = 'ptl_light_off' AND payload->>'closes' = $1",
+    )
+    .bind(ok_task.id.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_ne!(skip_off_status, "pending", "跳过确认灭灯应收尾派发");
 }

@@ -1,11 +1,12 @@
 //! 设备中台统一 HTTP 错误（单一 IntoResponse 来源；设备与指令两路由共用）。
 
 use axum::{
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 
+use crate::auth::AuthContext;
 use crate::device_service::DeviceError;
 
 pub enum DevicePlatformHandlerError {
@@ -133,4 +134,46 @@ impl IntoResponse for DevicePlatformHandlerError {
         )
             .into_response()
     }
+}
+
+pub(crate) fn require_manage(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
+    if ctx.permissions.iter().any(|p| p == "m1.device.manage") {
+        Ok(())
+    } else {
+        Err(DevicePlatformHandlerError::PermissionDenied)
+    }
+}
+
+pub(crate) fn require_monitor(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
+    if ctx
+        .permissions
+        .iter()
+        .any(|p| p == "m1.device.manage" || p == "m1.device.monitor")
+    {
+        Ok(())
+    } else {
+        Err(DevicePlatformHandlerError::PermissionDenied)
+    }
+}
+
+pub(crate) fn require_bind_manage(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
+    if ctx
+        .permissions
+        .iter()
+        .any(|p| p == "m1.device-bind.manage" || p == "m1.device.manage")
+    {
+        Ok(())
+    } else {
+        Err(DevicePlatformHandlerError::PermissionDenied)
+    }
+}
+
+pub(crate) fn idempotency_key(headers: &HeaderMap) -> Result<String, DevicePlatformHandlerError> {
+    headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .ok_or(DevicePlatformHandlerError::MissingIdempotencyKey)
 }

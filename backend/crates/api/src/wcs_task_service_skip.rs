@@ -1,0 +1,208 @@
+//! 跳过确认（规格 §10.5）。
+
+use chrono::{DateTime, Utc};
+use serde_json::json;
+use sqlx::{Postgres, Transaction};
+use uuid::Uuid;
+
+use crate::audit::{append_event_in_tx, AuditWriteRequest};
+use crate::auth::AuthContext;
+use crate::device_service::DeviceError;
+use crate::wcs_task_repository::{
+    clear_pod_unreachable_in_tx, get_task, location_is_unreachable, transition_in_tx,
+    TaskTransition, WcsTaskRow,
+};
+use crate::wcs_task_service::{ConfirmSkipRequest, WcsTaskResponse, WcsTaskService};
+use wms_domain::confirm_skip_allowed;
+
+impl WcsTaskService {
+    /// 跳过确认（§10.5）：现场已人工完成，凭证据补录账务并置 succeeded。
+    pub async fn confirm_skip(
+        &self,
+        ctx: &AuthContext,
+        task_id: Uuid,
+        req: ConfirmSkipRequest,
+    ) -> Result<WcsTaskResponse, DeviceError> {
+        let now = Utc::now();
+        let task = get_task(&self.pool, ctx.owner_id, task_id)
+            .await?
+            .ok_or(DeviceError::TaskNotFound)?;
+        if !confirm_skip_allowed(&task.status) {
+            return Err(DeviceError::TaskStateInvalid);
+        }
+        let ref_type = task.business_ref_type.as_deref().unwrap_or("");
+        if matches!(ref_type, "putaway" | "replenish") {
+            if let Some(location_id) = task.location_id {
+                if location_is_unreachable(&self.pool, task.owner_id, location_id).await? {
+                    return Err(DeviceError::LocationUnreachable);
+                }
+            }
+        }
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        if task.task_type == "pod_move" {
+            let pod_code = task
+                .payload
+                .get("pod_code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if !pod_code.is_empty() {
+                clear_pod_unreachable_in_tx(&mut tx, task.owner_id, pod_code, now).await?;
+            }
+        }
+        let settled_qty = req
+            .qty
+            .or_else(|| task.payload.get("qty").and_then(|v| v.as_i64()))
+            .unwrap_or(0);
+        if ref_type == "replenish" {
+            let source_batch_id = task
+                .payload
+                .get("source_batch_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            let target_batch_id = task
+                .payload
+                .get("target_batch_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            match (settled_qty > 0, source_batch_id, target_batch_id) {
+                (true, Some(source_batch_id), Some(target_batch_id)) => {
+                    crate::inventory::confirm_replenish_in_tx(
+                        &mut tx,
+                        task.owner_id,
+                        source_batch_id,
+                        target_batch_id,
+                        wms_domain::Quantity::from(settled_qty),
+                        task.id,
+                        "device_platform_skip",
+                        &ctx.actor_name,
+                        now,
+                    )
+                    .await
+                    .map_err(|error| match error {
+                        crate::inventory::InventoryReplenishError::LocationUnreachable => {
+                            DeviceError::LocationUnreachable
+                        }
+                        other => DeviceError::Database(format!("{other:?}")),
+                    })?;
+                }
+                _ => {
+                    mark_skip_putaway_failed(&mut tx, &task, now, "跳过确认缺少补货落账证据")
+                        .await?;
+                    tx.commit().await.map_err(db_err)?;
+                    return Err(DeviceError::EventTaskMismatch);
+                }
+            }
+        }
+        if ref_type == "putaway" {
+            let product_id = task
+                .payload
+                .get("product_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            let location_id = task
+                .payload
+                .get("location_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok())
+                .or(task.location_id);
+            match (settled_qty > 0, product_id, location_id) {
+                (true, Some(product_id), Some(location_id)) => {
+                    let settled = crate::inventory::confirm_putaway_in_tx(
+                        &mut tx,
+                        task.owner_id,
+                        location_id,
+                        product_id,
+                        wms_domain::Quantity::from(settled_qty),
+                        "wcs_task_skip",
+                        task.id,
+                        now,
+                    )
+                    .await
+                    .map_err(|error| DeviceError::Database(error.to_string()))?;
+                    if !settled {
+                        mark_skip_putaway_failed(&mut tx, &task, now, "跳过确认落账失败").await?;
+                        tx.commit().await.map_err(db_err)?;
+                        return Err(DeviceError::EventTaskMismatch);
+                    }
+                }
+                _ => {
+                    mark_skip_putaway_failed(&mut tx, &task, now, "跳过确认缺少落账证据").await?;
+                    tx.commit().await.map_err(db_err)?;
+                    return Err(DeviceError::EventTaskMismatch);
+                }
+            }
+        }
+        let row = transition_in_tx(
+            &mut tx,
+            TaskTransition {
+                owner_id: task.owner_id,
+                id: task.id,
+                from_statuses: &["sent", "executing", "timeout", "failed"],
+                to: "succeeded",
+                retry_count: None,
+                error_code: None,
+                error_message: None,
+                ack_payload: Some(json!({
+                    "settled_by_skip": true,
+                    "reason": req.reason,
+                    "operator_id": ctx.user_id,
+                    "operator_name": ctx.actor_name
+                })),
+                sent_at: None,
+                finished_at: Some(now),
+                expected_version: task.version,
+                now,
+            },
+        )
+        .await?
+        .ok_or(DeviceError::TaskStateInvalid)?;
+        append_event_in_tx(
+            &mut tx,
+            &AuditWriteRequest::from_auth_context(
+                ctx,
+                "confirm_skip_wcs_task",
+                "M1",
+                "wcs_task",
+                task_id.to_string(),
+                None,
+            ),
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+        tx.commit().await.map_err(db_err)?;
+        self.enqueue_ptl_light_off(ctx, &task).await?;
+        Ok(row.into())
+    }
+}
+
+async fn mark_skip_putaway_failed(
+    tx: &mut Transaction<'_, Postgres>,
+    task: &WcsTaskRow,
+    now: DateTime<Utc>,
+    message: &str,
+) -> Result<(), DeviceError> {
+    transition_in_tx(
+        tx,
+        TaskTransition {
+            owner_id: task.owner_id,
+            id: task.id,
+            from_statuses: &["sent", "executing", "timeout", "failed"],
+            to: "failed",
+            retry_count: None,
+            error_code: Some("M1_EVENT_TASK_MISMATCH"),
+            error_message: Some(message),
+            ack_payload: Some(json!({"settled_by_skip": false})),
+            sent_at: None,
+            finished_at: Some(now),
+            expected_version: task.version,
+            now,
+        },
+    )
+    .await?
+    .ok_or(DeviceError::TaskStateInvalid)?;
+    Ok(())
+}
+
+fn db_err(error: sqlx::Error) -> DeviceError {
+    DeviceError::Database(error.to_string())
+}

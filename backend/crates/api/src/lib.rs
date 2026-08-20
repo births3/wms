@@ -134,6 +134,7 @@ pub mod wcs_task_handlers;
 pub mod wcs_task_repository;
 pub mod wcs_task_service;
 pub mod wcs_task_service_event;
+pub mod wcs_task_service_skip;
 pub mod wcs_task_timeout_job;
 pub mod wechat_notify;
 mod wechat_notify_idempotency;

@@ -14,8 +14,8 @@ use crate::wcs_task_repository::{
     TASK_COLUMNS,
 };
 use crate::wcs_task_service::{
-    DeviceEventRequest, WcsTaskResponse, WcsTaskService, ORPHAN_WINDOW_SECS, PTL_DIFF_MAX_ABS,
-    PTL_DIFF_RATIO, RETRY_BACKOFF_SECS, TASK_TIMEOUT_SECS,
+    CreateWcsTaskRequest, DeviceEventRequest, WcsTaskResponse, WcsTaskService, ORPHAN_WINDOW_SECS,
+    PTL_DIFF_MAX_ABS, PTL_DIFF_RATIO, RETRY_BACKOFF_SECS, TASK_TIMEOUT_SECS,
 };
 use wms_domain::{dws_result_passes, is_terminal, ptl_qty_diff_within_threshold, rfid_epcs_cover};
 
@@ -82,9 +82,11 @@ impl WcsTaskService {
                 match task {
                     Some(task) => {
                         if task.status == "succeeded" {
-                            return Ok(()); // 重复拍灯幂等
+                            // 重复拍灯幂等；补发可能失败的灭灯收尾。
+                            self.enqueue_ptl_light_off(ctx, &task).await?;
+                            return Ok(());
                         }
-                        if !matches!(task.status.as_str(), "sent" | "executing" | "timeout") {
+                        if !wms_domain::retry_allowed(&task.status) {
                             return Err(DeviceError::TaskStateInvalid);
                         }
                         let expected = task
@@ -147,8 +149,7 @@ impl WcsTaskService {
                             self.publish_task_failed(&row, now).await?;
                             return Err(DeviceError::PtQtyDiffExceeded);
                         }
-                        self.confirm_and_settle(ctx.owner_id, task.id, pressed, now)
-                            .await
+                        self.confirm_and_settle(ctx, task.id, pressed, now).await
                     }
                     None => {
                         // 无匹配任务：窗口内等待认领，超窗由扫描 H4（GWT 15）
@@ -180,7 +181,7 @@ impl WcsTaskService {
                     .and_then(|v| v.as_i64())
                     .unwrap_or(0);
                 if dws_result_passes(pass, weight, expected) {
-                    self.confirm_and_settle(ctx.owner_id, task.id, 0, now).await
+                    self.confirm_and_settle(ctx, task.id, 0, now).await
                 } else {
                     let row = transition(
                         &self.pool,
@@ -234,7 +235,7 @@ impl WcsTaskService {
                     })
                     .unwrap_or_default();
                 if rfid_epcs_cover(&target, &scanned) {
-                    self.confirm_and_settle(ctx.owner_id, task.id, 0, now).await
+                    self.confirm_and_settle(ctx, task.id, 0, now).await
                 } else {
                     let row = transition(
                         &self.pool,
@@ -266,16 +267,19 @@ impl WcsTaskService {
     /// 校验通过 → 同事务账务确认（putaway 落账 +Δ）→ succeeded。
     pub(crate) async fn confirm_and_settle(
         &self,
-        owner_id: Uuid,
+        ctx: &AuthContext,
         task_id: Uuid,
         qty: i64,
         now: chrono::DateTime<Utc>,
     ) -> Result<(), DeviceError> {
-        let task = get_task(&self.pool, owner_id, task_id)
+        let task = get_task(&self.pool, ctx.owner_id, task_id)
             .await?
             .ok_or(DeviceError::TaskNotFound)?;
         if is_terminal(&task.status) {
-            return Ok(()); // 重复事件幂等
+            if task.status == "succeeded" {
+                self.enqueue_ptl_light_off(ctx, &task).await?;
+            }
+            return Ok(());
         }
         if let Some(location_id) = task.location_id {
             if location_is_unreachable(&self.pool, task.owner_id, location_id).await? {
@@ -440,6 +444,36 @@ impl WcsTaskService {
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
+        self.enqueue_ptl_light_off(ctx, &task).await?;
+        Ok(())
+    }
+
+    /// 规格 §2.1 / 模型 §6.6：账务确认后下发 `ptl_light_off` 收尾；幂等键按源任务。
+    pub(crate) async fn enqueue_ptl_light_off(
+        &self,
+        ctx: &AuthContext,
+        task: &WcsTaskRow,
+    ) -> Result<(), DeviceError> {
+        if task.task_type != "ptl_light_on" {
+            return Ok(());
+        }
+        // 打破 create_task → confirm_and_settle → enqueue 的 async 递归（E0733）。
+        let created = Box::pin(self.create_task(
+            ctx,
+            CreateWcsTaskRequest {
+                task_type: "ptl_light_off".into(),
+                device_id: task.device_id,
+                location_id: task.location_id,
+                business_ref_type: task.business_ref_type.clone(),
+                business_ref_no: task.business_ref_no.clone(),
+                payload: json!({"closes": task.id}),
+            },
+            &format!("{}:ptl_light_off", task.id),
+        ))
+        .await?;
+        if created.task.status == "pending" {
+            self.dispatch(ctx, created.task.id).await?;
+        }
         Ok(())
     }
 
@@ -635,7 +669,7 @@ impl WcsTaskService {
             .and_then(|value| value.as_i64())
             .unwrap_or(0);
         self.dispatch(ctx, task.id).await?;
-        self.confirm_and_settle(ctx.owner_id, task.id, pressed, Utc::now())
+        self.confirm_and_settle(ctx, task.id, pressed, Utc::now())
             .await
     }
 

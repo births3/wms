@@ -13,11 +13,11 @@ use crate::device_service::DeviceError;
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
 use crate::wcs_task_repository::{
-    clear_pod_unreachable_in_tx, find_active_task_by_device_location, find_task_by_idempotency,
-    get_task, insert_task, list_tasks, set_pod_unreachable_in_tx, transition, transition_in_tx,
-    TaskTransition, WcsTaskRow,
+    clear_pod_unreachable_in_tx, find_active_pod_move, find_active_task_by_device_location,
+    find_task_by_idempotency, get_task, insert_task, list_tasks, set_pod_unreachable_in_tx,
+    transition, transition_in_tx, TaskTransition, WcsTaskRow,
 };
-use wms_domain::{can_transition, confirm_skip_allowed, is_terminal, resend_allowed};
+use wms_domain::{can_transition, is_terminal, resend_allowed};
 
 pub(crate) const TASK_TIMEOUT_SECS: i64 = 120;
 pub(crate) const ORPHAN_WINDOW_SECS: i64 = 30;
@@ -126,6 +126,7 @@ pub struct DeviceDashboardSummary {
     pub affected_location_ids: Vec<Uuid>,
 }
 
+#[derive(Debug)]
 pub struct CreatedWcsTask {
     pub task: WcsTaskResponse,
     pub created: bool,
@@ -202,7 +203,7 @@ impl WcsTaskService {
                 &self.pool,
                 ctx.owner_id,
                 req.device_id,
-                req.location_id,
+                None,
                 "ptl_light_on",
                 None,
             )
@@ -211,19 +212,20 @@ impl WcsTaskService {
         {
             return Err(DeviceError::PtLightBusy);
         }
-        if req.task_type == "pod_move"
-            && find_active_task_by_device_location(
-                &self.pool,
-                ctx.owner_id,
-                req.device_id,
-                req.location_id,
-                "pod_move",
-                req.payload.get("pod_code").and_then(|v| v.as_str()),
-            )
-            .await?
-            .is_some()
-        {
-            return Err(DeviceError::PodMoveActive);
+        if req.task_type == "pod_move" {
+            let pod_code = req
+                .payload
+                .get("pod_code")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|code| !code.is_empty())
+                .ok_or(DeviceError::EventTaskMismatch)?;
+            if find_active_pod_move(&self.pool, ctx.owner_id, pod_code)
+                .await?
+                .is_some()
+            {
+                return Err(DeviceError::PodMoveActive);
+            }
         }
         let task_no = self
             .generate_task_no(&mut tx, ctx, idempotency_key, now)
@@ -468,7 +470,7 @@ impl WcsTaskService {
             "fail" => {
                 let exhausted = task.retry_count >= task.max_retries;
                 let mut tx = self.pool.begin().await.map_err(db_err)?;
-                if task.task_type == "pod_move" {
+                if exhausted && task.task_type == "pod_move" {
                     let pod_code = task
                         .payload
                         .get("pod_code")
@@ -521,7 +523,7 @@ impl WcsTaskService {
             SELECT {}
               FROM wcs_tasks
              WHERE task_type = 'pod_move'
-               AND status IN ('pending', 'sent', 'executing', 'timeout')
+               AND status IN ('executing', 'timeout')
                AND NOT EXISTS (
                     SELECT 1 FROM warehouse_locations
                      WHERE agv_pod_code = wcs_tasks.payload->>'pod_code'
@@ -700,96 +702,6 @@ impl WcsTaskService {
         )
         .await?;
         Ok(rows.into_iter().map(WcsTaskResponse::from).collect())
-    }
-
-    /// 跳过确认（§10.5）：现场已人工完成，凭 payload 补录账务并置 succeeded（记录操作人）。
-    pub async fn confirm_skip(
-        &self,
-        ctx: &AuthContext,
-        task_id: Uuid,
-        req: crate::wcs_task_service::ConfirmSkipRequest,
-    ) -> Result<WcsTaskResponse, DeviceError> {
-        let now = Utc::now();
-        let task = get_task(&self.pool, ctx.owner_id, task_id)
-            .await?
-            .ok_or(DeviceError::TaskNotFound)?;
-        if !confirm_skip_allowed(&task.status) {
-            return Err(DeviceError::TaskStateInvalid);
-        }
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
-        if task.business_ref_type.as_deref() == Some("putaway") {
-            let settled_qty = task
-                .payload
-                .get("qty")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0);
-            let product_id = task
-                .payload
-                .get("product_id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| Uuid::parse_str(s).ok());
-            let location_id = task
-                .payload
-                .get("location_id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| Uuid::parse_str(s).ok())
-                .or(task.location_id);
-            if settled_qty > 0 {
-                if let (Some(product_id), Some(location_id)) = (product_id, location_id) {
-                    crate::inventory::confirm_putaway_in_tx(
-                        &mut tx,
-                        task.owner_id,
-                        location_id,
-                        product_id,
-                        wms_domain::Quantity::from(settled_qty),
-                        "wcs_task_skip",
-                        task.id,
-                        now,
-                    )
-                    .await
-                    .map_err(|error| DeviceError::Database(error.to_string()))?;
-                }
-            }
-        }
-        let row = transition_in_tx(
-            &mut tx,
-            TaskTransition {
-                owner_id: task.owner_id,
-                id: task.id,
-                from_statuses: &["sent", "executing", "timeout", "failed"],
-                to: "succeeded",
-                retry_count: None,
-                error_code: None,
-                error_message: None,
-                ack_payload: Some(json!({
-                    "settled_by_skip": true,
-                    "reason": req.reason,
-                    "operator_id": ctx.user_id,
-                    "operator_name": ctx.actor_name
-                })),
-                sent_at: None,
-                finished_at: Some(now),
-                expected_version: task.version,
-                now,
-            },
-        )
-        .await?
-        .ok_or(DeviceError::TaskStateInvalid)?;
-        append_event_in_tx(
-            &mut tx,
-            &AuditWriteRequest::from_auth_context(
-                ctx,
-                "confirm_skip_wcs_task",
-                "M1",
-                "wcs_task",
-                task_id.to_string(),
-                None,
-            ),
-        )
-        .await
-        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
-        tx.commit().await.map_err(db_err)?;
-        Ok(row.into())
     }
 }
 

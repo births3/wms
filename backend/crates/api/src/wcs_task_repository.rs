@@ -238,6 +238,31 @@ pub(crate) async fn find_active_task_by_device_location(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
+/// I4：同一货架（payload.pod_code）同一时刻最多一个未终态 pod_move，不限设备。
+pub(crate) async fn find_active_pod_move(
+    pool: &PgPool,
+    owner_id: Uuid,
+    pod_code: &str,
+) -> Result<Option<WcsTaskRow>, DeviceError> {
+    sqlx::query_as::<_, WcsTaskRow>(&format!(
+        r#"
+        SELECT {TASK_COLUMNS}
+          FROM wcs_tasks
+         WHERE owner_id = $1
+           AND task_type = 'pod_move'
+           AND status IN ('pending', 'sent', 'executing', 'timeout')
+           AND payload->>'pod_code' = $2
+         ORDER BY created_at
+         LIMIT 1
+        "#
+    ))
+    .bind(owner_id)
+    .bind(pod_code)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
 /// 孤儿事件：无 task_id 的 ptl_press 超过窗口未认领。
 pub(crate) async fn list_orphan_press_events(
     pool: &PgPool,

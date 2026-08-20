@@ -31,9 +31,10 @@ pub fn resend_allowed(status: &str) -> bool {
     matches!(status, "failed" | "timeout")
 }
 
-/// 跳过确认（规格 §10.5）：已落账 succeeded 不可再补录。
+/// 跳过确认（规格 §10.5）：sent / executing / timeout / failed 可补录；
+/// pending 尚未派发、succeeded 已落账，均不可跳过。
 pub fn confirm_skip_allowed(status: &str) -> bool {
-    status != "succeeded"
+    matches!(status, "sent" | "executing" | "timeout" | "failed")
 }
 
 /// DWS 称重校验：pass=true 且重量在预估 ±20% 内（规格 §10.2）。
@@ -123,6 +124,8 @@ mod tests {
         assert!(confirm_skip_allowed("failed"));
         assert!(confirm_skip_allowed("timeout"));
         assert!(confirm_skip_allowed("executing"));
+        assert!(confirm_skip_allowed("sent"));
+        assert!(!confirm_skip_allowed("pending"));
         assert!(!confirm_skip_allowed("succeeded"));
     }
 

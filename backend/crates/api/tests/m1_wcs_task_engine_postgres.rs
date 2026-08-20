@@ -240,6 +240,53 @@ async fn gwt10_ptl_light_busy_conflicts(pool: PgPool) {
     .await;
     assert_eq!(status, StatusCode::CONFLICT, "亮灯互斥应 409: {body}");
     assert_eq!(body["code"], "M1_PTL_LIGHT_BUSY");
+
+    let loc_a = Uuid::new_v4();
+    let (status, body) = post_json(
+        &router,
+        &c,
+        "/api/v1/wcs-tasks",
+        json!({
+            "task_type": "ptl_light_on",
+            "device_id": device_id,
+            "location_id": loc_a,
+            "payload": {"qty": 1, "location_id": loc_a}
+        }),
+        Some("busy-loc-a"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "同设备不同库位仍应 I3 互斥: {body}"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn pod_move_without_pod_code_rejected(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "agv").await;
+    let router = combined_router(pool, &c).await;
+
+    let (status, body) = post_json(
+        &router,
+        &c,
+        "/api/v1/wcs-tasks",
+        json!({
+            "task_type": "pod_move",
+            "device_id": device_id,
+            "payload": {"target_station": "ST-01"}
+        }),
+        Some("pod-no-code"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "缺 pod_code 应 422: {body}"
+    );
+    assert_eq!(body["code"], "M1_EVENT_TASK_MISMATCH");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

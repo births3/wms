@@ -10,7 +10,10 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::auth::AuthContext;
-use crate::device_platform_error::DevicePlatformHandlerError;
+use crate::device_platform_error::{
+    idempotency_key, require_bind_manage, require_manage, require_monitor,
+    DevicePlatformHandlerError,
+};
 use crate::device_service::{
     BindDeviceRequest, DeviceBindingResponse, DeviceResponse, DeviceService, RegisterDeviceRequest,
     UnbindRequest, UpdateDeviceRequest,
@@ -140,46 +143,4 @@ async fn unbind_device_handler(
     require_bind_manage(&ctx)?;
     state.service.unbind(&ctx, id, req).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-fn require_manage(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
-    if ctx.permissions.iter().any(|p| p == "m1.device.manage") {
-        Ok(())
-    } else {
-        Err(DevicePlatformHandlerError::PermissionDenied)
-    }
-}
-
-fn require_monitor(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
-    if ctx
-        .permissions
-        .iter()
-        .any(|p| p == "m1.device.manage" || p == "m1.device.monitor")
-    {
-        Ok(())
-    } else {
-        Err(DevicePlatformHandlerError::PermissionDenied)
-    }
-}
-
-fn require_bind_manage(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
-    if ctx
-        .permissions
-        .iter()
-        .any(|p| p == "m1.device-bind.manage" || p == "m1.device.manage")
-    {
-        Ok(())
-    } else {
-        Err(DevicePlatformHandlerError::PermissionDenied)
-    }
-}
-
-fn idempotency_key(headers: &HeaderMap) -> Result<String, DevicePlatformHandlerError> {
-    headers
-        .get("idempotency-key")
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .ok_or(DevicePlatformHandlerError::MissingIdempotencyKey)
 }

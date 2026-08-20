@@ -122,6 +122,12 @@ pub async fn putaway_receiving_order_and_inventory(
         if !matches!(location_status.as_str(), "available" | "occupied") {
             return Err(Wave3RepositoryError::InvalidLocation);
         }
+        if crate::inventory::location_is_unreachable_in_tx(&mut tx, ctx.owner_id, req.location_id)
+            .await
+            .map_err(map_db_error)?
+        {
+            return Err(Wave3RepositoryError::LocationUnreachable);
+        }
         if location_quality_color != expected_quality_color {
             return Err(Wave3RepositoryError::LocationQualityMismatch);
         }

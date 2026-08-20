@@ -6,7 +6,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::audit::{append_event_in_tx, AuditWriteRequest};
+use crate::audit::{append_event_in_tx, AuditDiff, AuditWriteRequest};
 use crate::auth::AuthContext;
 use crate::device_repository::{
     find_active_binding, find_device_by_code, get_binding, get_device, insert_binding,
@@ -524,7 +524,7 @@ impl DeviceService {
         &self,
         ctx: &AuthContext,
         id: Uuid,
-        _req: UnbindRequest,
+        req: UnbindRequest,
     ) -> Result<(), DeviceError> {
         let binding = get_binding(&self.pool, ctx.owner_id, id)
             .await?
@@ -543,7 +543,11 @@ impl DeviceService {
                 "M1",
                 "location_device_binding",
                 id.to_string(),
-                None,
+                Some(AuditDiff {
+                    before: json!({"valid_to": null}),
+                    after: json!({"valid_to": now, "reason": req.reason}),
+                    changed_keys: vec!["valid_to".into(), "reason".into()],
+                }),
             ),
         )
         .await

@@ -10,7 +10,9 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::auth::AuthContext;
-use crate::device_platform_error::DevicePlatformHandlerError;
+use crate::device_platform_error::{
+    idempotency_key, require_manage, require_monitor, DevicePlatformHandlerError,
+};
 use crate::wcs_task_service::{
     ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
     DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse, WcsTaskService,
@@ -169,34 +171,4 @@ async fn device_event_handler(
     require_manage(&ctx)?;
     state.service.handle_event(&ctx, id, req).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-fn require_manage(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
-    if ctx.permissions.iter().any(|p| p == "m1.device.manage") {
-        Ok(())
-    } else {
-        Err(DevicePlatformHandlerError::PermissionDenied)
-    }
-}
-
-fn require_monitor(ctx: &AuthContext) -> Result<(), DevicePlatformHandlerError> {
-    if ctx
-        .permissions
-        .iter()
-        .any(|p| p == "m1.device.manage" || p == "m1.device.monitor")
-    {
-        Ok(())
-    } else {
-        Err(DevicePlatformHandlerError::PermissionDenied)
-    }
-}
-
-fn idempotency_key(headers: &HeaderMap) -> Result<String, DevicePlatformHandlerError> {
-    headers
-        .get("idempotency-key")
-        .and_then(|value| value.to_str().ok())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .ok_or(DevicePlatformHandlerError::MissingIdempotencyKey)
 }
