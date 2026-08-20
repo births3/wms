@@ -175,6 +175,52 @@ export function useDeviceDashboardQuery(warehouseId: string) {
   });
 }
 
+function invalidateTaskViews(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: wcsTasksQueryKey });
+  void queryClient.invalidateQueries({ queryKey: ["device", "dashboard"] });
+}
+
+export function useDispatchWcsTaskMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const result = await api.POST("/api/v1/wcs-tasks/{id}/dispatch", {
+        params: {
+          path: { id },
+          header: { "Idempotency-Key": idempotencyKey("wcs-dispatch") },
+        },
+      });
+      return requireData(result.data, result.error, result.response.status, "任务派发失败");
+    },
+    onSuccess: () => invalidateTaskViews(queryClient),
+  });
+}
+
+export function useReceiptWcsTaskMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      outcome,
+      errorCode,
+    }: {
+      id: string;
+      outcome: string;
+      errorCode?: string;
+    }) => {
+      const result = await api.POST("/api/v1/wcs-tasks/{id}/receipt", {
+        params: {
+          path: { id },
+          header: { "Idempotency-Key": idempotencyKey("wcs-receipt") },
+        },
+        body: { outcome, error_code: errorCode || null },
+      });
+      return requireData(result.data, result.error, result.response.status, "回执处理失败");
+    },
+    onSuccess: () => invalidateTaskViews(queryClient),
+  });
+}
+
 export function useResendWcsTaskMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -188,28 +234,32 @@ export function useResendWcsTaskMutation() {
       });
       return requireData(result.data, result.error, result.response.status, "任务重发失败");
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: wcsTasksQueryKey });
-    },
+    onSuccess: () => invalidateTaskViews(queryClient),
   });
 }
 
 export function useConfirmSkipWcsTaskMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+    mutationFn: async ({
+      id,
+      reason,
+      qty,
+    }: {
+      id: string;
+      reason: string;
+      qty?: number;
+    }) => {
       const result = await api.POST("/api/v1/wcs-tasks/{id}/confirm-skip", {
         params: {
           path: { id },
           header: { "Idempotency-Key": idempotencyKey("wcs-confirm-skip") },
         },
-        body: { reason },
+        body: { reason, qty: qty ?? null },
       });
       return requireData(result.data, result.error, result.response.status, "跳过确认失败");
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: wcsTasksQueryKey });
-    },
+    onSuccess: () => invalidateTaskViews(queryClient),
   });
 }
 
@@ -226,8 +276,6 @@ export function useVoidWcsTaskMutation() {
       });
       return requireData(result.data, result.error, result.response.status, "任务作废失败");
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: wcsTasksQueryKey });
-    },
+    onSuccess: () => invalidateTaskViews(queryClient),
   });
 }

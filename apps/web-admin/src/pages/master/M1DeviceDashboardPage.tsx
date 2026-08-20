@@ -1,7 +1,6 @@
 import * as React from "react";
 import {
   Button,
-  DataGrid,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,6 +20,8 @@ import { useMasterDataRowsQuery } from "@/features/master-data/master-data-queri
 import {
   useConfirmSkipWcsTaskMutation,
   useDeviceDashboardQuery,
+  useDispatchWcsTaskMutation,
+  useReceiptWcsTaskMutation,
   useResendWcsTaskMutation,
   useVoidWcsTaskMutation,
   useWcsTasksQuery,
@@ -74,25 +75,41 @@ export function M1DeviceDashboardPage() {
       setAppliedQuery(next);
     }
   }, [draftQuery, setAppliedQuery, setDraftQuery, warehouses]);
-  const effectiveQueryFields = queryFields.map((field) => field.key === "warehouse_id"
-    ? { ...field, options: warehouses.map((warehouse) => ({ label: `${warehouse.code} · ${warehouse.name}`, value: warehouse.id })) }
-    : field);
+  const warehouseField = queryFields.find((field) => field.key === "warehouse_id");
+  if (warehouseField) {
+    warehouseField.options = warehouses.map((warehouse) => ({
+      label: `${warehouse.code} · ${warehouse.name}`,
+      value: warehouse.id,
+    }));
+  }
   const listQuery = useWcsTasksQuery(appliedQuery);
   const dashboardQuery = useDeviceDashboardQuery(appliedQuery.warehouse_id ?? "");
+  const dispatchMutation = useDispatchWcsTaskMutation();
+  const receiptMutation = useReceiptWcsTaskMutation();
   const resendMutation = useResendWcsTaskMutation();
   const voidMutation = useVoidWcsTaskMutation();
   const confirmSkipMutation = useConfirmSkipWcsTaskMutation();
   const [selected, setSelected] = React.useState<string[]>([]);
+  const receiptDialog = useDialogState<WcsTask>();
   const resendDialog = useDialogState<WcsTask>();
   const voidDialog = useDialogState<WcsTask>();
   const skipDialog = useDialogState<WcsTask>();
   const [reason, setReason] = React.useState("");
+  const [receiptOutcome, setReceiptOutcome] = React.useState("start");
+  const [receiptError, setReceiptError] = React.useState("");
+  const [skipQty, setSkipQty] = React.useState("");
   const [notice, setNotice] = React.useState<Notice>(null);
 
   const rows = listQuery.data ?? [];
   const selectedRow = rows.find((row) => row.id === selected[0]);
-  const busy = resendMutation.isPending || voidMutation.isPending || confirmSkipMutation.isPending;
+  const busy =
+    dispatchMutation.isPending ||
+    receiptMutation.isPending ||
+    resendMutation.isPending ||
+    voidMutation.isPending ||
+    confirmSkipMutation.isPending;
   const summary = dashboardQuery.data;
+  const successReceiptAllowed = ["pod_move", "ptl_light_off"].includes(selectedRow?.task_type ?? "");
 
   const columns: DataGridColumn<WcsTask>[] = [
     { key: "task_no", header: "任务号", width: 180, sortable: true, filterValue: (row) => row.task_no, copyValue: (row) => row.task_no },
@@ -105,6 +122,33 @@ export function M1DeviceDashboardPage() {
   ];
 
   const toolbarActions: DataGridToolbarAction[] = [
+    {
+      key: "dispatch",
+      label: "派发",
+      description: "模拟网关派发待派发指令",
+      disabled: (ctx) => ctx.selectedRowKeys.length !== 1 || busy || selectedRow?.status !== "pending",
+      onClick: () => {
+        if (selectedRow) void onSubmitDispatch(selectedRow);
+      },
+    },
+    {
+      key: "receipt",
+      label: "回执",
+      description: "模拟网关回执推进指令状态",
+      disabled: (ctx) =>
+        ctx.selectedRowKeys.length !== 1 ||
+        busy ||
+        !["sent", "executing", "timeout"].includes(selectedRow?.status ?? ""),
+      onClick: () => {
+        if (selectedRow) {
+          const timeout = selectedRow.status === "timeout";
+          const successAllowed = ["pod_move", "ptl_light_off"].includes(selectedRow.task_type);
+          setReceiptOutcome(timeout ? (successAllowed ? "success" : "fail") : "start");
+          setReceiptError("");
+          receiptDialog.openWith(selectedRow);
+        }
+      },
+    },
     {
       key: "resend",
       label: "重发",
@@ -138,15 +182,43 @@ export function M1DeviceDashboardPage() {
       label: "跳过确认",
       description: "现场已人工完成，凭证据补录账务",
       disabled: (ctx) =>
-        ctx.selectedRowKeys.length !== 1 || busy || selectedRow?.status === "succeeded",
+        ctx.selectedRowKeys.length !== 1 ||
+        busy ||
+        !["sent", "executing", "timeout", "failed"].includes(selectedRow?.status ?? ""),
       onClick: () => {
         if (selectedRow) {
           setReason("");
+          setSkipQty("");
           skipDialog.openWith(selectedRow);
         }
       },
     },
   ];
+
+  async function onSubmitDispatch(target: WcsTask) {
+    try {
+      await dispatchMutation.mutateAsync(target.id);
+      setNotice({ kind: "success", text: "指令已派发" });
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "派发失败" });
+    }
+  }
+
+  async function onSubmitReceipt() {
+    const target = receiptDialog.target;
+    if (!target) return;
+    try {
+      await receiptMutation.mutateAsync({
+        id: target.id,
+        outcome: receiptOutcome,
+        errorCode: receiptOutcome === "fail" ? receiptError.trim() || undefined : undefined,
+      });
+      setNotice({ kind: "success", text: "模拟回执已处理" });
+      receiptDialog.close();
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "回执失败" });
+    }
+  }
 
   async function onSubmitResend() {
     const target = resendDialog.target;
@@ -176,7 +248,12 @@ export function M1DeviceDashboardPage() {
     const target = skipDialog.target;
     if (!target) return;
     try {
-      await confirmSkipMutation.mutateAsync({ id: target.id, reason });
+      const qty = skipQty.trim() ? Number(skipQty) : undefined;
+      await confirmSkipMutation.mutateAsync({
+        id: target.id,
+        reason,
+        qty: Number.isFinite(qty) ? qty : undefined,
+      });
       setNotice({ kind: "success", text: "已跳过确认并补录账务" });
       skipDialog.close();
     } catch (error) {
@@ -217,6 +294,39 @@ export function M1DeviceDashboardPage() {
       }}
       dialogs={
         <>
+          <Dialog open={receiptDialog.open} onOpenChange={(open) => !busy && receiptDialog.setOpen(open)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>模拟回执</DialogTitle>
+                <DialogDescription>开始仅用于已下发/执行中；超时任务请选成功或失败。成功仅适用于搬运/灭灯。</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3">
+                <label className="text-sm">
+                  回执结果
+                  <select
+                    className="mt-1 w-full rounded border px-2 py-1"
+                    value={receiptOutcome}
+                    onChange={(event) => setReceiptOutcome(event.target.value)}
+                  >
+                    <option value="start" disabled={receiptDialog.target?.status === "timeout"}>开始</option>
+                    <option value="success" disabled={!successReceiptAllowed}>成功</option>
+                    <option value="fail">失败</option>
+                  </select>
+                </label>
+                {receiptOutcome === "fail" ? (
+                  <label className="text-sm">
+                    设备错误码
+                    <Input value={receiptError} onChange={(event) => setReceiptError(event.target.value)} className="mt-1" />
+                  </label>
+                ) : null}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => receiptDialog.close()} disabled={busy}>取消</Button>
+                <Button type="button" onClick={() => void onSubmitReceipt()} disabled={busy}>提交回执</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={resendDialog.open} onOpenChange={(open) => !busy && resendDialog.setOpen(open)}>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -259,12 +369,22 @@ export function M1DeviceDashboardPage() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>跳过确认</DialogTitle>
-                <DialogDescription>现场已人工完成时凭证据补录账务，已成功任务不可再确认。</DialogDescription>
+                <DialogDescription>仅已下发/执行中/超时/失败任务可跳过。入库上架或补货请填写数量作为补录证据。</DialogDescription>
               </DialogHeader>
               <div className="grid gap-3">
                 <label className="text-sm">
                   确认原因
                   <Input value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1" />
+                </label>
+                <label className="text-sm">
+                  补录数量
+                  <Input
+                    type="number"
+                    min={0}
+                    value={skipQty}
+                    onChange={(event) => setSkipQty(event.target.value)}
+                    className="mt-1"
+                  />
                 </label>
               </div>
               <DialogFooter>

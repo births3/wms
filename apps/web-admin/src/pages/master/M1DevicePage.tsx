@@ -91,9 +91,13 @@ export function M1DevicePage() {
   const unbindDialog = useDialogState<Device>();
   const [unbindReason, setUnbindReason] = React.useState("");
   const [form, setForm] = React.useState<RegisterForm>(emptyForm());
-  const effectiveQueryFields = queryFields.map((field) => field.key === "warehouse_id"
-    ? { ...field, options: warehouses.map((warehouse) => ({ label: `${warehouse.code} · ${warehouse.name}`, value: warehouse.id })) }
-    : field);
+  const warehouseField = queryFields.find((field) => field.key === "warehouse_id");
+  if (warehouseField) {
+    warehouseField.options = warehouses.map((warehouse) => ({
+      label: `${warehouse.code} · ${warehouse.name}`,
+      value: warehouse.id,
+    }));
+  }
   const [bindForm, setBindForm] = React.useState({
     location_id: "",
     binding_role: "ptl_light",
