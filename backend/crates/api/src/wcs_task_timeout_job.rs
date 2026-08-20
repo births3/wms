@@ -34,6 +34,19 @@ pub fn spawn(pool: PgPool) {
                     error!(?error, "孤儿事件扫描失败");
                 }
             }
+            match service.run_marker_scan().await {
+                Ok(count) => {
+                    if count > 0 {
+                        info!(
+                            inconsistent_marker_count = count,
+                            "AGV 不可达标记一致性扫描完成"
+                        );
+                    }
+                }
+                Err(error) => {
+                    error!(?error, "AGV 不可达标记扫描失败");
+                }
+            }
         }
     });
 }

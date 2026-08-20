@@ -15,6 +15,7 @@ use crate::{
 fn map_fill_error(error: ReplenishmentError) -> Wave4RepositoryError {
     match error {
         ReplenishmentError::Database(error) => Wave4RepositoryError::Database(error.to_string()),
+        ReplenishmentError::LocationUnreachable => Wave4RepositoryError::LocationUnreachable,
         ReplenishmentError::PermissionDenied
         | ReplenishmentError::StrategyInvalid
         | ReplenishmentError::ScopeNotFound

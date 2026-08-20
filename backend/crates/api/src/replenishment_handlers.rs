@@ -539,6 +539,11 @@ impl IntoResponse for ReplenishmentHandlerError {
                 "M3_REPLENISH_PUTAWAY_BLOCKED",
                 "补货目标上架校验未通过",
             ),
+            Self::Service(ReplenishmentError::LocationUnreachable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_UNREACHABLE",
+                "格口处于 AGV 搬运不可达期",
+            ),
             Self::Service(ReplenishmentError::IdempotencyConflict) => (
                 StatusCode::CONFLICT,
                 "M3_REPLENISH_IDEMPOTENCY_CONFLICT",

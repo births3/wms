@@ -519,6 +519,7 @@ use wms_domain::{
         DeviceBindingResponse,
         DeviceDashboardSummary,
         DeviceEventLog,
+        DeviceRecentEvent,
         DeviceEventRequest,
         DeviceResponse,
         RegisterDeviceRequest,

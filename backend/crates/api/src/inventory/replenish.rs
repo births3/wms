@@ -10,6 +10,7 @@ pub enum InventoryReplenishError {
     Insufficient,
     NotFound,
     InvalidQuantity,
+    LocationUnreachable,
     Database(String),
 }
 
@@ -192,6 +193,15 @@ pub async fn confirm_replenish_in_tx(
 ) -> Result<(), InventoryReplenishError> {
     if qty <= Quantity::ZERO {
         return Err(InventoryReplenishError::InvalidQuantity);
+    }
+    if crate::inventory::batch_location_unreachable_in_tx(tx, owner_id, source_batch_id)
+        .await
+        .map_err(|error| InventoryReplenishError::Database(error.to_string()))?
+        || crate::inventory::batch_location_unreachable_in_tx(tx, owner_id, target_batch_id)
+            .await
+            .map_err(|error| InventoryReplenishError::Database(error.to_string()))?
+    {
+        return Err(InventoryReplenishError::LocationUnreachable);
     }
 
     let source_ok = sqlx::query_scalar::<_, Quantity>(

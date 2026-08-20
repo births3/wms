@@ -250,6 +250,11 @@ impl IntoResponse for Wave3HandlerError {
             | Wave3HandlerError::Repository(Wave3RepositoryError::PendingErpCancel) => {
                 (StatusCode::CONFLICT, "W3-409", "资源重复")
             }
+            Wave3HandlerError::Repository(Wave3RepositoryError::LocationUnreachable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_UNREACHABLE",
+                "格口处于 AGV 搬运不可达期",
+            ),
             Wave3HandlerError::Repository(Wave3RepositoryError::LpnMixDenied) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "M2_LPN_MIX_DENIED",

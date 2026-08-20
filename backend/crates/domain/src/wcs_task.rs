@@ -26,6 +26,16 @@ pub fn is_terminal(status: &str) -> bool {
     matches!(status, "succeeded" | "failed")
 }
 
+/// 人工重发（规格 §10.5）：仅 failed / timeout 可重置重试重新入队。
+pub fn resend_allowed(status: &str) -> bool {
+    matches!(status, "failed" | "timeout")
+}
+
+/// 跳过确认（规格 §10.5）：已落账 succeeded 不可再补录。
+pub fn confirm_skip_allowed(status: &str) -> bool {
+    status != "succeeded"
+}
+
 /// DWS 称重校验：pass=true 且重量在预估 ±20% 内（规格 §10.2）。
 pub fn dws_result_passes(pass: bool, weight_g: i64, expected_weight_g: i64) -> bool {
     if !pass || expected_weight_g <= 0 {
@@ -97,6 +107,23 @@ mod tests {
         assert!(!retry_allowed("pending"));
         assert!(!retry_allowed("succeeded"));
         assert!(!retry_allowed("failed"));
+    }
+
+    #[test]
+    fn resend_only_from_failed_or_timeout() {
+        assert!(resend_allowed("failed"));
+        assert!(resend_allowed("timeout"));
+        assert!(!resend_allowed("pending"));
+        assert!(!resend_allowed("sent"));
+        assert!(!resend_allowed("succeeded"));
+    }
+
+    #[test]
+    fn confirm_skip_blocks_already_settled() {
+        assert!(confirm_skip_allowed("failed"));
+        assert!(confirm_skip_allowed("timeout"));
+        assert!(confirm_skip_allowed("executing"));
+        assert!(!confirm_skip_allowed("succeeded"));
     }
 
     #[test]

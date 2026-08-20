@@ -11,7 +11,6 @@ use uuid::Uuid;
 
 use crate::auth::AuthContext;
 use crate::device_platform_error::DevicePlatformHandlerError;
-use crate::device_service::DeviceError;
 use crate::wcs_task_service::{
     ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
     DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse, WcsTaskService,
@@ -44,6 +43,8 @@ pub fn wcs_task_router(state: WcsTaskAppState) -> Router {
             post(confirm_skip_handler),
         )
         .route("/api/v1/iot-devices/:id/events", post(device_event_handler))
+        .route("/api/v1/iot-events", get(list_events_handler))
+        .route("/api/v1/device-dashboard", get(dashboard_handler))
         .with_state(state)
 }
 
@@ -95,10 +96,13 @@ async fn create_task_handler(
 ) -> Result<(StatusCode, Json<WcsTaskResponse>), DevicePlatformHandlerError> {
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
-    Ok((
-        StatusCode::CREATED,
-        Json(state.service.create_task(&ctx, req, &key).await?),
-    ))
+    let created = state.service.create_task(&ctx, req, &key).await?;
+    let status = if created.created {
+        StatusCode::CREATED
+    } else {
+        StatusCode::OK
+    };
+    Ok((status, Json(created.task)))
 }
 
 async fn list_tasks_handler(

@@ -100,6 +100,7 @@ pub enum Wave3RepositoryError {
     ActiveMonitoring,
     DuplicateTraceCode,
     InvalidLocation,
+    LocationUnreachable,
     LpnNotFound,
     LpnMixDenied,
     LpnNotUsable,

@@ -92,6 +92,11 @@ impl IntoResponse for StockAdjustmentHandlerError {
                 "SA_QTY_EXCEEDED",
                 "报损数量超过可用库存",
             ),
+            Self::StockAdjustment(StockAdjustmentError::LocationUnreachable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_UNREACHABLE",
+                "格口处于 AGV 搬运不可达期",
+            ),
             Self::StockAdjustment(StockAdjustmentError::InvalidPutawayTarget) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "SA_PUTAWAY_TARGET_INVALID",

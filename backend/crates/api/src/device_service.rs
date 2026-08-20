@@ -6,12 +6,12 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::audit::{append_event, AuditWriteRequest};
+use crate::audit::{append_event_in_tx, AuditWriteRequest};
 use crate::auth::AuthContext;
 use crate::device_repository::{
     find_active_binding, find_device_by_code, get_binding, get_device, insert_binding,
     insert_device, insert_event_log, list_devices, list_stale_online_devices, mark_offline,
-    soft_unbind, touch_heartbeat, update_device, DeviceRow,
+    touch_heartbeat, DeviceRow,
 };
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
@@ -38,6 +38,7 @@ pub enum DeviceError {
     PodMoveActive,
     EventTaskMismatch,
     LocationUnreachable,
+    NumberingUnavailable,
     Database(String),
 }
 
@@ -56,6 +57,19 @@ pub struct DeviceResponse {
     pub online_status: String,
     pub last_heartbeat_at: Option<chrono::DateTime<chrono::Utc>>,
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bindings: Vec<DeviceBindingResponse>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent_events: Vec<DeviceRecentEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct DeviceRecentEvent {
+    pub id: Uuid,
+    pub event_type: String,
+    pub task_id: Option<Uuid>,
+    pub payload: serde_json::Value,
+    pub received_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl From<DeviceRow> for DeviceResponse {
@@ -74,6 +88,8 @@ impl From<DeviceRow> for DeviceResponse {
             online_status: row.online_status,
             last_heartbeat_at: row.last_heartbeat_at,
             enabled: row.enabled,
+            bindings: Vec::new(),
+            recent_events: Vec::new(),
         }
     }
 }
@@ -162,15 +178,8 @@ impl DeviceService {
         Self { pool }
     }
 
-    /// 心跳超时阈值（秒）：配置键 device.heartbeat_timeout_secs（env DEVICE_HEARTBEAT_TIMEOUT_SECS），
-    /// 默认 90（规格 §10.5）。
-    pub fn heartbeat_timeout_secs(registry: &crate::feature_flags::FeatureFlagRegistry) -> i64 {
-        if let Ok(value) = std::env::var("DEVICE_HEARTBEAT_TIMEOUT_SECS") {
-            if let Ok(secs) = value.parse::<i64>() {
-                return secs;
-            }
-        }
-        let _ = registry;
+    /// 心跳超时阈值（秒）：规格 §10.5 默认 90。
+    pub fn heartbeat_timeout_secs() -> i64 {
         HEARTBEAT_TIMEOUT_SECS
     }
 
@@ -248,6 +257,8 @@ impl DeviceService {
             online_status: "offline".into(),
             last_heartbeat_at: None,
             enabled: true,
+            bindings: Vec::new(),
+            recent_events: Vec::new(),
         };
         idempotency::store_success_with_status(
             &mut tx,
@@ -261,6 +272,19 @@ impl DeviceService {
             &id.to_string(),
             &response,
             now,
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+        append_event_in_tx(
+            &mut tx,
+            &AuditWriteRequest::from_auth_context(
+                ctx,
+                "register_device",
+                "M1",
+                "iot_device",
+                id.to_string(),
+                None,
+            ),
         )
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
@@ -290,7 +314,21 @@ impl DeviceService {
         let row = get_device(&self.pool, ctx.owner_id, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
-        Ok(row.into())
+        let mut response = DeviceResponse::from(row);
+        response.bindings =
+            crate::device_repository::list_bindings_for_device(&self.pool, ctx.owner_id, id)
+                .await?
+                .into_iter()
+                .map(DeviceBindingResponse::from)
+                .collect();
+        response.recent_events = crate::device_repository::list_recent_events_for_device(
+            &self.pool,
+            ctx.owner_id,
+            id,
+            20,
+        )
+        .await?;
+        Ok(response)
     }
 
     pub async fn update(
@@ -310,8 +348,10 @@ impl DeviceService {
                 return Err(DeviceError::DuplicateCode);
             }
         }
-        update_device(
-            &self.pool,
+        let now = Utc::now();
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        crate::device_repository::update_device_in_tx(
+            &mut tx,
             ctx.owner_id,
             id,
             req.device_code.as_deref(),
@@ -321,18 +361,14 @@ impl DeviceService {
             req.port,
             req.extra_config.as_ref(),
             req.enabled,
-            Utc::now(),
+            now,
         )
         .await?;
-        // 停用设备视为 disabled 在线态
         if req.enabled == Some(false) && existing.online_status == "online" {
-            mark_offline(&self.pool, id, Utc::now()).await?;
+            crate::device_repository::mark_offline_in_tx(&mut tx, id, now).await?;
         }
-        let row = get_device(&self.pool, ctx.owner_id, id)
-            .await?
-            .ok_or(DeviceError::NotFound)?;
-        append_event(
-            &self.pool,
+        append_event_in_tx(
+            &mut tx,
             &AuditWriteRequest::from_auth_context(
                 ctx,
                 "update_device",
@@ -344,6 +380,10 @@ impl DeviceService {
         )
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+        tx.commit().await.map_err(db_err)?;
+        let row = get_device(&self.pool, ctx.owner_id, id)
+            .await?
+            .ok_or(DeviceError::NotFound)?;
         Ok(row.into())
     }
 
@@ -463,9 +503,8 @@ impl DeviceService {
         )
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
-        tx.commit().await.map_err(db_err)?;
-        append_event(
-            &self.pool,
+        append_event_in_tx(
+            &mut tx,
             &AuditWriteRequest::from_auth_context(
                 ctx,
                 "bind_device_location",
@@ -477,6 +516,7 @@ impl DeviceService {
         )
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+        tx.commit().await.map_err(db_err)?;
         Ok(response)
     }
 
@@ -492,9 +532,11 @@ impl DeviceService {
         if binding.valid_to.is_some() {
             return Err(DeviceError::BindNotFound);
         }
-        soft_unbind(&self.pool, ctx.owner_id, id, Utc::now()).await?;
-        append_event(
-            &self.pool,
+        let now = Utc::now();
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        crate::device_repository::soft_unbind_in_tx(&mut tx, ctx.owner_id, id, now).await?;
+        append_event_in_tx(
+            &mut tx,
             &AuditWriteRequest::from_auth_context(
                 ctx,
                 "unbind_device_location",
@@ -506,6 +548,7 @@ impl DeviceService {
         )
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+        tx.commit().await.map_err(db_err)?;
         Ok(())
     }
 

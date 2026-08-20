@@ -21,6 +21,46 @@ pub use replenish::{
 };
 pub(crate) use stock_adjustment::add_for_stock_surplus_in_tx;
 
+pub(crate) async fn location_is_unreachable_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    location_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT agv_unreachable_at IS NOT NULL
+          FROM warehouse_locations
+         WHERE owner_id = $1 AND id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(location_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .unwrap_or(false))
+}
+
+pub(crate) async fn batch_location_unreachable_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    batch_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT wl.agv_unreachable_at IS NOT NULL
+          FROM inventory_batches b
+          JOIN warehouse_locations wl
+            ON wl.id = b.location_id AND wl.owner_id = b.owner_id
+         WHERE b.owner_id = $1 AND b.id = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(batch_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .unwrap_or(false))
+}
+
 pub const STATUS_QUALIFIED: &str = "qualified";
 pub const STATUS_QUARANTINED: &str = "quarantined";
 pub const STATUS_UNQUALIFIED: &str = "unqualified";
@@ -673,6 +713,9 @@ pub(crate) async fn confirm_putaway_in_tx(
     let Some(batch_id) = batch_id else {
         return Ok(false);
     };
+    if location_is_unreachable_in_tx(tx, owner_id, location_id).await? {
+        return Ok(false);
+    }
     let updated = sqlx::query(
         r#"
         UPDATE inventory_batches

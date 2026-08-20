@@ -7,7 +7,7 @@ use tracing::{error, info};
 
 use crate::device_service::DeviceService;
 
-pub fn spawn(pool: PgPool, registry: crate::feature_flags::FeatureFlagRegistry) {
+pub fn spawn(pool: PgPool, _registry: crate::feature_flags::FeatureFlagRegistry) {
     tokio::spawn(async move {
         let service = DeviceService::new(pool);
         let mut interval = tokio::time::interval(Duration::from_secs(30));
@@ -15,7 +15,7 @@ pub fn spawn(pool: PgPool, registry: crate::feature_flags::FeatureFlagRegistry) 
         loop {
             interval.tick().await;
             match service
-                .run_heartbeat_scan_with_timeout(DeviceService::heartbeat_timeout_secs(&registry))
+                .run_heartbeat_scan_with_timeout(DeviceService::heartbeat_timeout_secs())
                 .await
             {
                 Ok(count) => {

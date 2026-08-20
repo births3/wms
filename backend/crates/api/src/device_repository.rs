@@ -148,50 +148,6 @@ pub(crate) async fn list_devices(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
-pub(crate) async fn update_device(
-    pool: &PgPool,
-    warehouse_id: Uuid,
-    id: Uuid,
-    device_code: Option<&str>,
-    vendor: Option<&str>,
-    model: Option<&str>,
-    ip_address: Option<&str>,
-    port: Option<i32>,
-    extra_config: Option<&Value>,
-    enabled: Option<bool>,
-    now: DateTime<Utc>,
-) -> Result<(), DeviceError> {
-    sqlx::query(
-        r#"
-        UPDATE iot_devices
-           SET device_code = COALESCE($2, device_code),
-               vendor = COALESCE($3, vendor),
-               model = COALESCE($4, model),
-               ip_address = COALESCE($5, ip_address),
-               port = COALESCE($6, port),
-               extra_config = COALESCE($7, extra_config),
-               enabled = COALESCE($8, enabled),
-               updated_at = $9
-         WHERE warehouse_id = $1
-           AND id = $10
-        "#,
-    )
-    .bind(warehouse_id)
-    .bind(device_code)
-    .bind(vendor)
-    .bind(model)
-    .bind(ip_address)
-    .bind(port)
-    .bind(extra_config)
-    .bind(enabled)
-    .bind(now)
-    .bind(id)
-    .execute(pool)
-    .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?;
-    Ok(())
-}
-
 pub(crate) async fn touch_heartbeat(
     pool: &PgPool,
     warehouse_id: Uuid,
@@ -332,28 +288,6 @@ pub(crate) async fn get_binding(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
-pub(crate) async fn soft_unbind(
-    pool: &PgPool,
-    warehouse_id: Uuid,
-    id: Uuid,
-    now: DateTime<Utc>,
-) -> Result<(), DeviceError> {
-    sqlx::query(
-        r#"
-        UPDATE location_device_bindings
-           SET valid_to = $3, updated_at = $3
-         WHERE warehouse_id = $1 AND id = $2
-        "#,
-    )
-    .bind(warehouse_id)
-    .bind(id)
-    .bind(now)
-    .execute(pool)
-    .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?;
-    Ok(())
-}
-
 pub(crate) async fn list_stale_online_devices(
     pool: &PgPool,
     heartbeat_timeout: chrono::Duration,
@@ -372,6 +306,148 @@ pub(crate) async fn list_stale_online_devices(
     .fetch_all(pool)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
+pub(crate) async fn list_bindings_for_device(
+    pool: &PgPool,
+    warehouse_id: Uuid,
+    device_id: Uuid,
+) -> Result<Vec<BindingRow>, DeviceError> {
+    sqlx::query_as::<_, BindingRow>(
+        r#"
+        SELECT id, warehouse_id, location_id, device_id, binding_role, point_address,
+               valid_from, valid_to
+          FROM location_device_bindings
+         WHERE warehouse_id = $1 AND device_id = $2 AND valid_to IS NULL
+         ORDER BY valid_from DESC
+        "#,
+    )
+    .bind(warehouse_id)
+    .bind(device_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
+pub(crate) async fn list_recent_events_for_device(
+    pool: &PgPool,
+    warehouse_id: Uuid,
+    device_id: Uuid,
+    limit: i64,
+) -> Result<Vec<crate::device_service::DeviceRecentEvent>, DeviceError> {
+    let rows = sqlx::query_as::<_, (Uuid, String, Option<Uuid>, Value, DateTime<Utc>)>(
+        r#"
+        SELECT id, event_type, task_id, payload, received_at
+          FROM iot_event_logs
+         WHERE warehouse_id = $1 AND device_id = $2
+         ORDER BY received_at DESC
+         LIMIT $3
+        "#,
+    )
+    .bind(warehouse_id)
+    .bind(device_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, event_type, task_id, payload, received_at)| {
+            crate::device_service::DeviceRecentEvent {
+                id,
+                event_type,
+                task_id,
+                payload,
+                received_at,
+            }
+        })
+        .collect())
+}
+
+pub(crate) async fn update_device_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    warehouse_id: Uuid,
+    id: Uuid,
+    device_code: Option<&str>,
+    vendor: Option<&str>,
+    model: Option<&str>,
+    ip_address: Option<&str>,
+    port: Option<i32>,
+    extra_config: Option<&Value>,
+    enabled: Option<bool>,
+    now: DateTime<Utc>,
+) -> Result<(), DeviceError> {
+    sqlx::query(
+        r#"
+        UPDATE iot_devices
+           SET device_code = COALESCE($2, device_code),
+               vendor = COALESCE($3, vendor),
+               model = COALESCE($4, model),
+               ip_address = COALESCE($5, ip_address),
+               port = COALESCE($6, port),
+               extra_config = COALESCE($7, extra_config),
+               enabled = COALESCE($8, enabled),
+               updated_at = $9
+         WHERE warehouse_id = $1
+           AND id = $10
+        "#,
+    )
+    .bind(warehouse_id)
+    .bind(device_code)
+    .bind(vendor)
+    .bind(model)
+    .bind(ip_address)
+    .bind(port)
+    .bind(extra_config)
+    .bind(enabled)
+    .bind(now)
+    .bind(id)
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    Ok(())
+}
+
+pub(crate) async fn mark_offline_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<(), DeviceError> {
+    sqlx::query(
+        r#"
+        UPDATE iot_devices
+           SET online_status = 'offline', updated_at = $2
+         WHERE id = $1 AND online_status = 'online'
+        "#,
+    )
+    .bind(id)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    Ok(())
+}
+
+pub(crate) async fn soft_unbind_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    warehouse_id: Uuid,
+    id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<(), DeviceError> {
+    sqlx::query(
+        r#"
+        UPDATE location_device_bindings
+           SET valid_to = $3, updated_at = $3
+         WHERE warehouse_id = $1 AND id = $2
+        "#,
+    )
+    .bind(warehouse_id)
+    .bind(id)
+    .bind(now)
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    Ok(())
 }
 
 pub(crate) async fn mark_offline(

@@ -91,6 +91,11 @@ impl IntoResponse for Wave4HandlerError {
                 "H9_ROUTE_BINDING_UNAVAILABLE",
                 "送货地址没有唯一有效的线路绑定",
             ),
+            Self::Repository(Wave4RepositoryError::LocationUnreachable) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "M1_LOCATION_UNREACHABLE",
+                "格口处于 AGV 搬运不可达期",
+            ),
             Self::Repository(Wave4RepositoryError::EmptySelection)
             | Self::Repository(Wave4RepositoryError::BatchNotAffected(_))
             | Self::Repository(Wave4RepositoryError::InvalidQuantity)

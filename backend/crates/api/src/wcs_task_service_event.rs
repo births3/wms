@@ -14,12 +14,10 @@ use crate::wcs_task_repository::{
     TASK_COLUMNS,
 };
 use crate::wcs_task_service::{
-    DeviceEventRequest, WcsTaskService, PTL_DIFF_MAX_ABS, PTL_DIFF_RATIO, RETRY_BACKOFF_SECS,
-    TASK_TIMEOUT_SECS,
+    DeviceEventRequest, WcsTaskResponse, WcsTaskService, ORPHAN_WINDOW_SECS, PTL_DIFF_MAX_ABS,
+    PTL_DIFF_RATIO, RETRY_BACKOFF_SECS, TASK_TIMEOUT_SECS,
 };
 use wms_domain::{dws_result_passes, is_terminal, ptl_qty_diff_within_threshold, rfid_epcs_cover};
-
-const ORPHAN_WINDOW_SECS: i64 = 30;
 
 impl WcsTaskService {
     /// 事件处理（ptl_press / rfid_batch / dws_result / heartbeat）。
@@ -30,6 +28,12 @@ impl WcsTaskService {
         req: DeviceEventRequest,
     ) -> Result<(), DeviceError> {
         let now = Utc::now();
+        if req.event_type == "heartbeat" {
+            crate::device_service::DeviceService::new(self.pool.clone())
+                .heartbeat(ctx, device_id)
+                .await?;
+            return Ok(());
+        }
         let mut tx = self.pool.begin().await.map_err(db_err)?;
         insert_event_log(
             &mut tx,
@@ -49,12 +53,6 @@ impl WcsTaskService {
         tx.commit().await.map_err(db_err)?;
 
         match req.event_type.as_str() {
-            "heartbeat" => {
-                crate::device_service::DeviceService::new(self.pool.clone())
-                    .heartbeat(ctx, device_id)
-                    .await?;
-                Ok(())
-            }
             "ptl_press" => {
                 let task = if let Some(task_id) = req.task_id {
                     // 显式 task_id：校验设备/类型/库位归属（§10.2 事件-任务匹配）
@@ -266,7 +264,7 @@ impl WcsTaskService {
     }
 
     /// 校验通过 → 同事务账务确认（putaway 落账 +Δ）→ succeeded。
-    async fn confirm_and_settle(
+    pub(crate) async fn confirm_and_settle(
         &self,
         owner_id: Uuid,
         task_id: Uuid,
@@ -296,6 +294,40 @@ impl WcsTaskService {
         // 账务确认与状态推进同一事务（I7）：落账走既有 inventory 上下文命令（§9），
         // 状态推进走 transition_in_tx；任一失败整体回滚，业务账不回。
         let mut tx = self.pool.begin().await.map_err(db_err)?;
+        if ref_type == "replenish" && settled_qty > 0 {
+            let source_batch_id = task
+                .payload
+                .get("source_batch_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            let target_batch_id = task
+                .payload
+                .get("target_batch_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| Uuid::parse_str(s).ok());
+            if let (Some(source_batch_id), Some(target_batch_id)) =
+                (source_batch_id, target_batch_id)
+            {
+                crate::inventory::confirm_replenish_in_tx(
+                    &mut tx,
+                    task.owner_id,
+                    source_batch_id,
+                    target_batch_id,
+                    wms_domain::Quantity::from(settled_qty),
+                    task.id,
+                    "device_platform",
+                    "system",
+                    now,
+                )
+                .await
+                .map_err(|error| match error {
+                    crate::inventory::InventoryReplenishError::LocationUnreachable => {
+                        DeviceError::LocationUnreachable
+                    }
+                    other => DeviceError::Database(format!("{other:?}")),
+                })?;
+            }
+        }
         if ref_type == "putaway" && settled_qty > 0 {
             let product_id = task
                 .payload
@@ -433,6 +465,16 @@ impl WcsTaskService {
             if task.status == "pending" {
                 continue; // 未派发任务不参与超时重试
             }
+            let device_enabled: bool =
+                sqlx::query_scalar("SELECT enabled FROM iot_devices WHERE id = $1")
+                    .bind(task.device_id)
+                    .fetch_optional(&self.pool)
+                    .await
+                    .map_err(|error| DeviceError::Database(error.to_string()))?
+                    .unwrap_or(false);
+            if !device_enabled {
+                continue; // I10：停用设备停止重试，停滞告警由下方 stalled 扫描发出
+            }
             // §10.5：先置 timeout 中间态，再按退避与重试计数决定去向
             let current = if task.status != "timeout" {
                 transition(
@@ -514,7 +556,6 @@ impl WcsTaskService {
             SELECT {TASK_COLUMNS}
               FROM wcs_tasks
              WHERE status IN ('pending', 'sent', 'executing', 'timeout')
-               AND updated_at < $1 - make_interval(secs => 300)
                AND NOT EXISTS (
                     SELECT 1 FROM iot_devices
                      WHERE iot_devices.id = wcs_tasks.device_id
@@ -522,7 +563,6 @@ impl WcsTaskService {
                )
             "#
         ))
-        .bind(now)
         .fetch_all(&self.pool)
         .await
         .map_err(|error| DeviceError::Database(error.to_string()))?;
@@ -572,6 +612,120 @@ impl WcsTaskService {
             count += 1;
         }
         Ok(count)
+    }
+
+    pub(crate) async fn claim_pending_press(
+        &self,
+        ctx: &AuthContext,
+        task: &WcsTaskResponse,
+    ) -> Result<(), DeviceError> {
+        let pending = crate::wcs_task_repository::list_pending_press_in_window(
+            &self.pool,
+            task.device_id,
+            task.location_id,
+            ORPHAN_WINDOW_SECS,
+            Utc::now(),
+        )
+        .await?;
+        let Some((_event_id, _location_id, payload)) = pending.into_iter().next() else {
+            return Ok(());
+        };
+        let pressed = payload
+            .get("press_qty")
+            .and_then(|value| value.as_i64())
+            .unwrap_or(0);
+        self.dispatch(ctx, task.id).await?;
+        self.confirm_and_settle(ctx.owner_id, task.id, pressed, Utc::now())
+            .await
+    }
+
+    pub(crate) async fn publish_task_failed(
+        &self,
+        task: &WcsTaskRow,
+        now: chrono::DateTime<Utc>,
+    ) -> Result<(), DeviceError> {
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        publish_event_in_tx(
+            &mut tx,
+            task.owner_id,
+            &format!("wcs_task_failed:{}", task.id),
+            "business.wcs_task_failed",
+            "M1",
+            "wcs_task",
+            &task.id.to_string(),
+            json!({
+                "task_no": task.task_no,
+                "task_type": task.task_type,
+                "retry_count": task.retry_count
+            }),
+            now,
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+        tx.commit().await.map_err(db_err)
+    }
+
+    pub async fn list_events(
+        &self,
+        ctx: &AuthContext,
+        device_id: Option<Uuid>,
+        event_type: Option<String>,
+        limit: Option<i64>,
+    ) -> Result<Vec<crate::wcs_task_service::DeviceEventLog>, DeviceError> {
+        let rows = crate::wcs_task_repository::list_events(
+            &self.pool,
+            ctx.owner_id,
+            device_id,
+            event_type.as_deref(),
+            limit.unwrap_or(50).clamp(1, 500),
+        )
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(id, device_id, event_type, task_id, payload, received_at)| {
+                    crate::wcs_task_service::DeviceEventLog {
+                        id,
+                        device_id,
+                        event_type,
+                        task_id,
+                        payload,
+                        received_at,
+                    }
+                },
+            )
+            .collect())
+    }
+
+    pub async fn dashboard_summary(
+        &self,
+        ctx: &AuthContext,
+    ) -> Result<crate::wcs_task_service::DeviceDashboardSummary, DeviceError> {
+        let (total, online, offline, failed, timeout, pending) =
+            crate::wcs_task_repository::device_dashboard_summary(&self.pool, ctx.owner_id).await?;
+        let affected_location_ids =
+            crate::wcs_task_repository::list_affected_location_ids(&self.pool, ctx.owner_id)
+                .await?;
+        Ok(crate::wcs_task_service::DeviceDashboardSummary {
+            total_devices: total,
+            online_devices: online,
+            offline_devices: offline,
+            failed_tasks: failed,
+            timeout_tasks: timeout,
+            pending_tasks: pending,
+            affected_location_ids,
+        })
+    }
+
+    pub async fn get(
+        &self,
+        ctx: &AuthContext,
+        task_id: Uuid,
+    ) -> Result<crate::wcs_task_service::WcsTaskResponse, DeviceError> {
+        let row = get_task(&self.pool, ctx.owner_id, task_id)
+            .await?
+            .ok_or(DeviceError::TaskNotFound)?;
+        Ok(row.into())
     }
 }
 

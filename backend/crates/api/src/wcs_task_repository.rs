@@ -251,6 +251,15 @@ pub(crate) async fn list_orphan_press_events(
          WHERE event_type = 'ptl_press'
            AND task_id IS NULL
            AND received_at < $1 - make_interval(secs => $2)
+           AND NOT EXISTS (
+                SELECT 1 FROM wcs_tasks
+                 WHERE wcs_tasks.owner_id = iot_event_logs.warehouse_id
+                   AND wcs_tasks.device_id = iot_event_logs.device_id
+                   AND wcs_tasks.task_type = 'ptl_light_on'
+                   AND wcs_tasks.status = 'succeeded'
+                   AND wcs_tasks.created_at >= iot_event_logs.received_at
+                   AND wcs_tasks.created_at <= iot_event_logs.received_at + make_interval(secs => $2)
+           )
         "#,
     )
     .bind(now)
@@ -262,52 +271,6 @@ pub(crate) async fn list_orphan_press_events(
 }
 
 /// AGV 格口不可达标记：按货架编码置位/清除（pod_move executing 置位，终态清除）。
-pub(crate) async fn set_pod_unreachable(
-    pool: &PgPool,
-    owner_id: Uuid,
-    pod_code: &str,
-    ts: DateTime<Utc>,
-) -> Result<u64, DeviceError> {
-    let affected = sqlx::query(
-        r#"
-        UPDATE warehouse_locations
-           SET agv_unreachable_at = $3, updated_at = $3
-         WHERE owner_id = $1 AND agv_pod_code = $2
-        "#,
-    )
-    .bind(owner_id)
-    .bind(pod_code)
-    .bind(ts)
-    .execute(pool)
-    .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?
-    .rows_affected();
-    Ok(affected)
-}
-
-pub(crate) async fn clear_pod_unreachable(
-    pool: &PgPool,
-    owner_id: Uuid,
-    pod_code: &str,
-    ts: DateTime<Utc>,
-) -> Result<u64, DeviceError> {
-    let affected = sqlx::query(
-        r#"
-        UPDATE warehouse_locations
-           SET agv_unreachable_at = NULL, updated_at = $3
-         WHERE owner_id = $1 AND agv_pod_code = $2
-        "#,
-    )
-    .bind(owner_id)
-    .bind(pod_code)
-    .bind(ts)
-    .execute(pool)
-    .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?
-    .rows_affected();
-    Ok(affected)
-}
-
 /// 格口不可达校验（I5）：库位存在且不可达标记非空 → 阻断。
 pub(crate) async fn location_is_unreachable(
     pool: &PgPool,
@@ -329,24 +292,96 @@ pub(crate) async fn location_is_unreachable(
     Ok(unreachable.unwrap_or(false))
 }
 
-pub(crate) async fn link_event_to_task(
-    pool: &PgPool,
-    event_id: Uuid,
-    task_id: Uuid,
-) -> Result<(), DeviceError> {
-    sqlx::query(
+pub(crate) async fn set_pod_unreachable_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    pod_code: &str,
+    ts: DateTime<Utc>,
+) -> Result<u64, DeviceError> {
+    let affected = sqlx::query(
         r#"
-        UPDATE iot_event_logs
-           SET task_id = $2
-         WHERE id = $1 AND task_id IS NULL
+        UPDATE warehouse_locations
+           SET agv_unreachable_at = $3, updated_at = $3
+         WHERE owner_id = $1 AND agv_pod_code = $2
         "#,
     )
-    .bind(event_id)
-    .bind(task_id)
-    .execute(pool)
+    .bind(owner_id)
+    .bind(pod_code)
+    .bind(ts)
+    .execute(&mut **tx)
     .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?;
-    Ok(())
+    .map_err(|error| DeviceError::Database(error.to_string()))?
+    .rows_affected();
+    Ok(affected)
+}
+
+pub(crate) async fn clear_pod_unreachable_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    pod_code: &str,
+    ts: DateTime<Utc>,
+) -> Result<u64, DeviceError> {
+    let affected = sqlx::query(
+        r#"
+        UPDATE warehouse_locations
+           SET agv_unreachable_at = NULL, updated_at = $3
+         WHERE owner_id = $1 AND agv_pod_code = $2
+        "#,
+    )
+    .bind(owner_id)
+    .bind(pod_code)
+    .bind(ts)
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?
+    .rows_affected();
+    Ok(affected)
+}
+
+/// 窗口内未认领的 ptl_press（task_id 为空且未超窗），供任务到达后认领。
+pub(crate) async fn list_pending_press_in_window(
+    pool: &PgPool,
+    device_id: Uuid,
+    location_id: Option<Uuid>,
+    window_secs: i64,
+    now: DateTime<Utc>,
+) -> Result<Vec<(Uuid, Option<Uuid>, Value)>, DeviceError> {
+    sqlx::query_as::<_, (Uuid, Option<Uuid>, Value)>(
+        r#"
+        SELECT id, location_id, payload
+          FROM iot_event_logs
+         WHERE event_type = 'ptl_press'
+           AND task_id IS NULL
+           AND device_id = $1
+           AND ($2::uuid IS NULL OR location_id = $2)
+           AND received_at >= $3 - make_interval(secs => $4)
+         ORDER BY received_at
+        "#,
+    )
+    .bind(device_id)
+    .bind(location_id)
+    .bind(now)
+    .bind(window_secs)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
+pub(crate) async fn list_affected_location_ids(
+    pool: &PgPool,
+    owner_id: Uuid,
+) -> Result<Vec<Uuid>, DeviceError> {
+    sqlx::query_scalar(
+        r#"
+        SELECT id FROM warehouse_locations
+         WHERE owner_id = $1 AND agv_unreachable_at IS NOT NULL
+         ORDER BY location_code
+        "#,
+    )
+    .bind(owner_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
 /// 同事务状态推进（账务与状态必须同一事务，I7）。
@@ -456,15 +491,16 @@ pub(crate) async fn list_events(
 pub(crate) async fn device_dashboard_summary(
     pool: &PgPool,
     owner_id: Uuid,
-) -> Result<(i64, i64, i64, i64, i64), DeviceError> {
-    let row = sqlx::query_as::<_, (i64, i64, i64, i64, i64)>(
+) -> Result<(i64, i64, i64, i64, i64, i64), DeviceError> {
+    let row = sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64)>(
         r#"
         SELECT
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1) AS total_devices,
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'online') AS online_devices,
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'offline') AS offline_devices,
             (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status = 'failed') AS failed_tasks,
-            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status = 'timeout') AS timeout_tasks
+            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status = 'timeout') AS timeout_tasks,
+            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $1 AND status IN ('pending', 'sent', 'executing')) AS pending_tasks
         "#,
     )
     .bind(owner_id)

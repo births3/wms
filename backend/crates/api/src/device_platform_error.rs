@@ -112,6 +112,11 @@ impl IntoResponse for DevicePlatformHandlerError {
                     "M1_LOCATION_UNREACHABLE",
                     "格口处于 AGV 搬运不可达期",
                 ),
+                DeviceError::NumberingUnavailable => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_NUMBERING_UNAVAILABLE",
+                    "wcs_task 无可用编号规则",
+                ),
                 DeviceError::Database(_) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "M1_DEVICE_INTERNAL",

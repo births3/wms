@@ -89,6 +89,19 @@ impl PgWave3Repository {
         if batch.location_id == req.to_location_id {
             return Err(Wave3RepositoryError::InvalidLocation);
         }
+        if crate::inventory::location_is_unreachable_in_tx(&mut tx, ctx.owner_id, batch.location_id)
+            .await
+            .map_err(map_db_error)?
+            || crate::inventory::location_is_unreachable_in_tx(
+                &mut tx,
+                ctx.owner_id,
+                req.to_location_id,
+            )
+            .await
+            .map_err(map_db_error)?
+        {
+            return Err(Wave3RepositoryError::LocationUnreachable);
+        }
 
         let (to_zone_temp, to_quality_color, to_max_volume, to_used_volume, to_max_sku): (
             String,

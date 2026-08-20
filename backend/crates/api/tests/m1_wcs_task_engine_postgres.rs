@@ -129,8 +129,88 @@ async fn gwt9_create_task_idempotent(pool: PgPool) {
         Some("task-1"),
     )
     .await;
-    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(status, StatusCode::OK, "同键重放应 200: {replay}");
     assert_eq!(first["id"], replay["id"], "幂等重放应返回同一任务");
+}
+
+async fn get_json(router: &axum::Router, path: &str) -> (StatusCode, Value) {
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(path)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn dashboard_and_event_routes_are_mounted(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let _device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let router = combined_router(pool, &c).await;
+
+    let (status, body) = get_json(&router, "/api/v1/device-dashboard").await;
+    assert_eq!(status, StatusCode::OK, "大盘应挂路由: {body}");
+    assert!(body["total_devices"].as_i64().unwrap_or(0) >= 1);
+    assert!(body.get("affected_location_ids").is_some());
+
+    let (status, body) = get_json(&router, "/api/v1/iot-events").await;
+    assert_eq!(status, StatusCode::OK, "事件流应挂路由: {body}");
+    assert!(body.as_array().is_some());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn gwt15_press_claimed_when_task_arrives_in_window(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let c = ctx(owner_id);
+    let device_id = seed_device(&pool, owner_id, "ptl_light").await;
+    let router = combined_router(pool.clone(), &c).await;
+    let location_id = Uuid::new_v4();
+
+    let (status, _) = post_json(
+        &router,
+        &c,
+        &format!("/api/v1/iot-devices/{device_id}/events"),
+        json!({"event_type": "ptl_press", "location_id": location_id, "payload": {"press_qty": 2}}),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    let (status, created) = post_json(
+        &router,
+        &c,
+        "/api/v1/wcs-tasks",
+        json!({
+            "task_type": "ptl_light_on",
+            "device_id": device_id,
+            "location_id": location_id,
+            "payload": {"qty": 2, "location_id": location_id}
+        }),
+        Some("claim-1"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let service = WcsTaskService::new(pool);
+    let task = service
+        .get(
+            &c,
+            Uuid::parse_str(created["id"].as_str().unwrap()).unwrap(),
+        )
+        .await
+        .expect("load claimed task");
+    assert_eq!(task.status, "succeeded", "窗口内任务到达应认领拍灯并落账");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

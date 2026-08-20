@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
-    device_service::{DeviceService, RegisterDeviceRequest},
+    device_service::{DeviceError, DeviceService, RegisterDeviceRequest},
     wcs_task_service::{CreateWcsTaskRequest, DeviceEventRequest, WcsTaskService},
 };
 
@@ -362,7 +362,10 @@ async fn gwt16_17_18_pod_move_unreachable_cycle(pool: PgPool) {
             },
         )
         .await;
-    assert!(blocked.is_err(), "不可达期间落账应被阻断");
+    assert!(
+        matches!(blocked, Err(DeviceError::LocationUnreachable)),
+        "不可达期间落账应 422 M1_LOCATION_UNREACHABLE: {blocked:?}"
+    );
 
     // GWT 18：pod_move 全程不落库存账；succeeded 后标记清除、恢复可用
     let before: sqlx::types::Decimal = sqlx::query_scalar(

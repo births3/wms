@@ -100,6 +100,7 @@ pub enum Wave4RepositoryError {
     ReviewValidation(ReviewValidationError),
     ShipmentValidation(ShipOutboundValidationError),
     InvalidQuantity,
+    LocationUnreachable,
     DocumentNumbering(String),
     InvalidTraceabilityEvent,
     IdempotencyConflict,
@@ -516,6 +517,12 @@ async fn deduct_inventory_for_outbound(
         let Some((batch_id, available_qty)) = row else {
             return Err(Wave4RepositoryError::InvalidQuantity);
         };
+        if crate::inventory::batch_location_unreachable_in_tx(tx, owner_id, batch_id)
+            .await
+            .map_err(map_db_error)?
+        {
+            return Err(Wave4RepositoryError::LocationUnreachable);
+        }
         let deducted = available_qty.min(remaining);
         sqlx::query(
             r#"

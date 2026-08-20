@@ -54,6 +54,7 @@ pub enum ReplenishmentError {
     SourceUnavailable,
     NumberingUnavailable,
     PutawayBlocked,
+    LocationUnreachable,
     ClaimConflict,
     QtyExceeded,
     SourceMismatch,
@@ -633,6 +634,9 @@ pub(crate) fn map_inventory_replenish_error(
             ReplenishmentError::QtyExceeded
         }
         crate::inventory::InventoryReplenishError::NotFound => ReplenishmentError::PutawayBlocked,
+        crate::inventory::InventoryReplenishError::LocationUnreachable => {
+            ReplenishmentError::LocationUnreachable
+        }
     }
 }
 

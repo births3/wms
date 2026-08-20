@@ -33,6 +33,7 @@ pub enum StockAdjustmentError {
     InvalidRequest,
     InvalidStatus { expected: String, actual: String },
     QuantityExceeded,
+    LocationUnreachable,
     InvalidPutawayTarget,
     MissingSecondOperator,
     SameOperator,
@@ -552,6 +553,16 @@ impl PgStockAdjustmentRepository {
             || ("报损报溢单", before.id.to_string()),
             |id| ("质量联系单", id.clone()),
         );
+        if crate::inventory::batch_location_unreachable_in_tx(
+            &mut tx,
+            ctx.owner_id,
+            before.batch_id,
+        )
+        .await
+        .map_err(map_database_error)?
+        {
+            return Err(StockAdjustmentError::LocationUnreachable);
+        }
         crate::inventory::deduct_for_stock_loss_in_tx(
             &mut tx,
             ctx.owner_id,

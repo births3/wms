@@ -1002,6 +1002,12 @@ async fn consume_inventory_allocation_for_outbound(
     }
 
     for allocation in allocations {
+        if crate::inventory::batch_location_unreachable_in_tx(tx, owner_id, allocation.batch_id)
+            .await
+            .map_err(map_db_error)?
+        {
+            return Err(Wave4RepositoryError::LocationUnreachable);
+        }
         let updated = sqlx::query(
             r#"
             UPDATE inventory_batches

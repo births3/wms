@@ -108,6 +108,15 @@ async fn gwt1_register_device_returns_201_offline(pool: PgPool) {
     assert_eq!(body["device_type"], "ptl_light");
     assert_eq!(body["online_status"], "offline");
     assert_eq!(body["enabled"], true);
+
+    let audits: i64 = sqlx::query_scalar(
+        r#"SELECT count(*) FROM audit_event WHERE action = 'register_device' AND resource_id = $1"#,
+    )
+    .bind(body["id"].as_str().unwrap())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(audits, 1, "注册应同事务写 H2 审计");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
