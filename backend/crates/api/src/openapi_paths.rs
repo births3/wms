@@ -28,7 +28,7 @@ pub use crate::tms_plus::{
 };
 pub use crate::wcs_task_service::{
     ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
-    DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse,
+    DeviceEventRequest, ReceiptRequest, ResendRequest, VoidRequest, WcsTaskResponse,
 };
 #[allow(unused_imports)]
 pub use wms_domain::{

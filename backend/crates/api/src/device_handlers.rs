@@ -1,7 +1,10 @@
 //! T02：设备中台 HTTP 层（注册/列表/详情/维护/心跳/绑定/解绑）。
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{
+        rejection::{JsonRejection, PathRejection, QueryRejection},
+        Path, Query, State,
+    },
     http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
@@ -69,8 +72,9 @@ async fn register_device_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
     headers: HeaderMap,
-    Json(req): Json<RegisterDeviceRequest>,
+    request: Result<Json<RegisterDeviceRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<DeviceResponse>), DevicePlatformHandlerError> {
+    let Json(req) = request?;
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok((
@@ -82,13 +86,15 @@ async fn register_device_handler(
 async fn list_devices_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
-    Query(query): Query<DeviceListQuery>,
+    request: Result<Query<DeviceListQuery>, QueryRejection>,
 ) -> Result<Json<Vec<DeviceResponse>>, DevicePlatformHandlerError> {
+    let Query(query) = request?;
     require_monitor(&ctx)?;
     Ok(Json(
         state
             .service
             .list(
+                &ctx,
                 query.warehouse_id,
                 query.device_type,
                 query.online_status,
@@ -101,8 +107,9 @@ async fn list_devices_handler(
 async fn get_device_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
-    Path(id): Path<Uuid>,
+    request: Result<Path<Uuid>, PathRejection>,
 ) -> Result<Json<DeviceResponse>, DevicePlatformHandlerError> {
+    let Path(id) = request?;
     require_monitor(&ctx)?;
     Ok(Json(state.service.get(&ctx, id).await?))
 }
@@ -110,10 +117,12 @@ async fn get_device_handler(
 async fn update_device_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
-    Path(id): Path<Uuid>,
+    path: Result<Path<Uuid>, PathRejection>,
     headers: HeaderMap,
-    Json(req): Json<UpdateDeviceRequest>,
+    request: Result<Json<UpdateDeviceRequest>, JsonRejection>,
 ) -> Result<Json<DeviceResponse>, DevicePlatformHandlerError> {
+    let Path(id) = path?;
+    let Json(req) = request?;
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok(Json(state.service.update(&ctx, id, req, &key).await?))
@@ -122,9 +131,10 @@ async fn update_device_handler(
 async fn heartbeat_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
-    Path(id): Path<Uuid>,
+    request: Result<Path<Uuid>, PathRejection>,
     headers: HeaderMap,
 ) -> Result<Json<DeviceResponse>, DevicePlatformHandlerError> {
+    let Path(id) = request?;
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok(Json(state.service.heartbeat(&ctx, id, &key).await?))
@@ -134,8 +144,9 @@ async fn bind_device_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
     headers: HeaderMap,
-    Json(req): Json<BindDeviceRequest>,
+    request: Result<Json<BindDeviceRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<DeviceBindingResponse>), DevicePlatformHandlerError> {
+    let Json(req) = request?;
     require_bind_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok((
@@ -147,10 +158,12 @@ async fn bind_device_handler(
 async fn unbind_device_handler(
     ctx: AuthContext,
     State(state): State<DeviceAppState>,
-    Path(id): Path<Uuid>,
+    path: Result<Path<Uuid>, PathRejection>,
     headers: HeaderMap,
-    Json(req): Json<UnbindRequest>,
+    request: Result<Json<UnbindRequest>, JsonRejection>,
 ) -> Result<StatusCode, DevicePlatformHandlerError> {
+    let Path(id) = path?;
+    let Json(req) = request?;
     require_bind_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     state.service.unbind(&ctx, id, req, &key).await?;

@@ -8,16 +8,16 @@ use uuid::Uuid;
 
 use crate::audit::{append_event_in_tx, AuditWriteRequest};
 use crate::device_repository::get_device;
-use crate::device_service::DeviceError;
+use crate::device_service::{ensure_warehouse_access, DeviceError};
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
 use crate::operation_context::OperationContext as AuthContext;
 use crate::wcs_task_repository::{
     clear_pod_unreachable_in_tx, find_active_pod_move, find_active_task_by_device_location,
-    find_task_by_idempotency, get_task, insert_task, list_tasks, set_pod_unreachable_in_tx,
-    transition, transition_in_tx, TaskTransition, WcsTaskRow,
+    find_task_by_idempotency, get_task, insert_task, list_tasks, transition_in_tx, TaskTransition,
+    WcsTaskRow,
 };
-use wms_domain::{can_transition, is_terminal, resend_allowed};
+use wms_domain::resend_allowed;
 
 pub(crate) const TASK_TIMEOUT_SECS: i64 = 120;
 pub(crate) const ORPHAN_WINDOW_SECS: i64 = 30;
@@ -106,6 +106,13 @@ pub struct ConfirmSkipRequest {
     pub reason: String,
     pub qty: Option<i64>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ReceiptRequest {
+    pub outcome: String,
+    #[serde(default)]
+    pub error_code: Option<String>,
+}
 #[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct DeviceEventLog {
     pub id: Uuid,
@@ -150,6 +157,20 @@ impl WcsTaskService {
         Self { pool }
     }
 
+    pub(crate) async fn ensure_task_warehouse_access(
+        &self,
+        ctx: &AuthContext,
+        task_id: Uuid,
+    ) -> Result<(), DeviceError> {
+        let task = get_task(&self.pool, ctx.owner_id, task_id)
+            .await?
+            .ok_or(DeviceError::TaskNotFound)?;
+        let device = get_device(&self.pool, task.device_id)
+            .await?
+            .ok_or(DeviceError::NotFound)?;
+        ensure_warehouse_access(ctx, device.warehouse_id)
+    }
+
     /// 指令生成（幂等）：校验设备可用 → M-CG 编号 → pending 插入。
     pub async fn create_task(
         &self,
@@ -160,11 +181,19 @@ impl WcsTaskService {
         let device = get_device(&self.pool, req.device_id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        ensure_warehouse_access(ctx, device.warehouse_id)?;
         if !device.enabled {
             return Err(DeviceError::Disabled);
         }
-        if req.task_type == "sorter_divert" {
-            // §2.2：sorter_divert 仅登记类型不派发
+        let required_device_type = match req.task_type.as_str() {
+            "pod_move" => "agv",
+            "ptl_light_on" | "ptl_light_off" => "ptl_light",
+            "dws_weigh" => "dws",
+            "rfid_scan" => "rfid_antenna",
+            // §2.2：sorter_divert 仅登记类型不派发；未知类型同样拒绝。
+            _ => return Err(DeviceError::TypeInvalid),
+        };
+        if device.device_type != required_device_type {
             return Err(DeviceError::TypeInvalid);
         }
         let now = Utc::now();
@@ -194,8 +223,15 @@ impl WcsTaskService {
         if let Some(existing) =
             find_task_by_idempotency(&self.pool, ctx.owner_id, idempotency_key).await?
         {
+            if existing.error_code.as_deref() == Some("M1_PTL_QTY_DIFF_EXCEEDED") {
+                return Err(DeviceError::PtQtyDiffExceeded);
+            }
+            let response = WcsTaskResponse::from(existing);
+            if response.task_type == "ptl_light_on" {
+                self.claim_pending_press(ctx, &response).await?;
+            }
             return Ok(CreatedWcsTask {
-                task: existing.into(),
+                task: response,
                 created: false,
             });
         }
@@ -304,7 +340,21 @@ impl WcsTaskService {
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
         if req.task_type == "ptl_light_on" {
-            self.claim_pending_press(ctx, &response).await?;
+            if let Err(error) = self.claim_pending_press(ctx, &response).await {
+                let mut compensation = self.pool.begin().await.map_err(db_err)?;
+                idempotency::delete_response(
+                    &mut compensation,
+                    ctx.owner_id,
+                    idempotency_key,
+                    &hash,
+                    "POST",
+                    "/api/v1/wcs-tasks",
+                )
+                .await
+                .map_err(idempotency_err)?;
+                compensation.commit().await.map_err(db_err)?;
+                return Err(error);
+            }
         }
         Ok(CreatedWcsTask {
             task: response,
@@ -340,180 +390,6 @@ impl WcsTaskService {
                 other => DeviceError::Database(format!("{other:?}")),
             })?;
         Ok(mutation.value.generated_no)
-    }
-
-    /// 模拟网关派发：pending → sent（写 sent_at）。
-    pub async fn dispatch(
-        &self,
-        ctx: &AuthContext,
-        task_id: Uuid,
-    ) -> Result<WcsTaskResponse, DeviceError> {
-        let now = Utc::now();
-        let task = get_task(&self.pool, ctx.owner_id, task_id)
-            .await?
-            .ok_or(DeviceError::TaskNotFound)?;
-        if task.status != "pending" {
-            return Err(DeviceError::TaskStateInvalid);
-        }
-        let row = transition(
-            &self.pool,
-            TaskTransition {
-                owner_id: task.owner_id,
-                id: task_id,
-                from_statuses: &["pending"],
-                to: "sent",
-                retry_count: None,
-                error_code: None,
-                error_message: None,
-                ack_payload: None,
-                sent_at: Some(now),
-                finished_at: None,
-                expected_version: task.version,
-                now,
-            },
-        )
-        .await?
-        .ok_or(DeviceError::TaskStateInvalid)?;
-        Ok(row.into())
-    }
-
-    /// 模拟网关同步回执：start → executing；success → 校验+落账 → succeeded；fail → 重试/耗尽。
-    pub async fn apply_receipt(
-        &self,
-        ctx: &AuthContext,
-        task_id: Uuid,
-        outcome: &str,
-        error_code: Option<&str>,
-    ) -> Result<WcsTaskResponse, DeviceError> {
-        let now = Utc::now();
-        let task = get_task(&self.pool, ctx.owner_id, task_id)
-            .await?
-            .ok_or(DeviceError::TaskNotFound)?;
-        match outcome {
-            "start" => {
-                if !can_transition(&task.status, "executing") {
-                    return Err(DeviceError::TaskStateInvalid);
-                }
-                let mut tx = self.pool.begin().await.map_err(db_err)?;
-                if task.task_type == "pod_move" {
-                    let pod_code = task
-                        .payload
-                        .get("pod_code")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    if !pod_code.is_empty() {
-                        set_pod_unreachable_in_tx(&mut tx, task.owner_id, pod_code, now).await?;
-                    }
-                }
-                let row = transition_in_tx(
-                    &mut tx,
-                    TaskTransition {
-                        owner_id: task.owner_id,
-                        id: task_id,
-                        from_statuses: &["sent", "timeout"],
-                        to: "executing",
-                        retry_count: None,
-                        error_code: None,
-                        error_message: None,
-                        ack_payload: None,
-                        sent_at: None,
-                        finished_at: None,
-                        expected_version: task.version,
-                        now,
-                    },
-                )
-                .await?
-                .ok_or(DeviceError::TaskStateInvalid)?;
-                tx.commit().await.map_err(db_err)?;
-                Ok(row.into())
-            }
-            "success" => {
-                if is_terminal(&task.status) {
-                    // I6：终态重复回执幂等忽略，返回当前任务
-                    return Ok(task.into());
-                }
-                if !can_transition(&task.status, "succeeded") {
-                    return Err(DeviceError::TaskStateInvalid);
-                }
-                let mut tx = self.pool.begin().await.map_err(db_err)?;
-                if task.task_type == "pod_move" {
-                    let pod_code = task
-                        .payload
-                        .get("pod_code")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    if !pod_code.is_empty() {
-                        clear_pod_unreachable_in_tx(&mut tx, task.owner_id, pod_code, now).await?;
-                    }
-                }
-                let row = transition_in_tx(
-                    &mut tx,
-                    TaskTransition {
-                        owner_id: task.owner_id,
-                        id: task_id,
-                        from_statuses: &["sent", "executing", "timeout"],
-                        to: "succeeded",
-                        retry_count: None,
-                        error_code: None,
-                        error_message: None,
-                        ack_payload: Some(json!({"outcome": "success"})),
-                        sent_at: Some(now),
-                        finished_at: None,
-                        expected_version: task.version,
-                        now,
-                    },
-                )
-                .await?
-                .ok_or(DeviceError::TaskStateInvalid)?;
-                tx.commit().await.map_err(db_err)?;
-                Ok(row.into())
-            }
-            "fail" => {
-                let exhausted = task.retry_count >= task.max_retries;
-                let mut tx = self.pool.begin().await.map_err(db_err)?;
-                if exhausted && task.task_type == "pod_move" {
-                    let pod_code = task
-                        .payload
-                        .get("pod_code")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    if !pod_code.is_empty() {
-                        clear_pod_unreachable_in_tx(&mut tx, task.owner_id, pod_code, now).await?;
-                    }
-                }
-                let to = if exhausted { "failed" } else { "sent" };
-                let new_retry = if exhausted {
-                    task.retry_count
-                } else {
-                    task.retry_count + 1
-                };
-                let row = transition_in_tx(
-                    &mut tx,
-                    TaskTransition {
-                        owner_id: task.owner_id,
-                        id: task_id,
-                        from_statuses: &["sent", "executing", "timeout"],
-                        to: to,
-                        retry_count: Some(new_retry),
-                        error_code: error_code,
-                        error_message: Some("设备侧失败回执"),
-                        ack_payload: Some(json!({"outcome": "failed", "error_code": error_code})),
-                        sent_at: if exhausted { None } else { Some(now) },
-                        finished_at: if exhausted { Some(now) } else { None },
-                        expected_version: task.version,
-                        now,
-                    },
-                )
-                .await?
-                .ok_or(DeviceError::TaskStateInvalid)?;
-                tx.commit().await.map_err(db_err)?;
-                if exhausted {
-                    self.publish_task_failed(&row, now).await?;
-                }
-                Ok(row.into())
-            }
-            _ => Err(DeviceError::TaskStateInvalid),
-        }
     }
 
     /// 标记一致性扫描：活跃 pod_move 无标记 / 有标记无活跃任务 → H4 agv_marker_inconsistent。
@@ -585,6 +461,7 @@ impl WcsTaskService {
         reason: String,
         idempotency_key: &str,
     ) -> Result<WcsTaskResponse, DeviceError> {
+        self.ensure_task_warehouse_access(ctx, task_id).await?;
         let now = Utc::now();
         let path = format!("/api/v1/wcs-tasks/{task_id}/resend");
         let hash = idempotency::request_hash(&json!({"task_id": task_id, "reason": &reason}))
@@ -672,6 +549,7 @@ impl WcsTaskService {
         req: VoidRequest,
         idempotency_key: &str,
     ) -> Result<WcsTaskResponse, DeviceError> {
+        self.ensure_task_warehouse_access(ctx, task_id).await?;
         let now = Utc::now();
         let path = format!("/api/v1/wcs-tasks/{task_id}/void");
         let hash = idempotency::request_hash(&json!({"task_id": task_id, "request": &req}))
@@ -772,6 +650,7 @@ impl WcsTaskService {
             ctx.owner_id,
             status.as_deref(),
             task_type.as_deref(),
+            ctx.warehouse_scope,
         )
         .await?;
         Ok(rows.into_iter().map(WcsTaskResponse::from).collect())

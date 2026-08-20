@@ -122,11 +122,27 @@ pub(crate) async fn get_task(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
+pub(crate) async fn get_task_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    id: Uuid,
+) -> Result<Option<WcsTaskRow>, DeviceError> {
+    sqlx::query_as::<_, WcsTaskRow>(&format!(
+        "SELECT {TASK_COLUMNS} FROM wcs_tasks WHERE owner_id = $1 AND id = $2 FOR UPDATE"
+    ))
+    .bind(owner_id)
+    .bind(id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
 pub(crate) async fn list_tasks(
     pool: &PgPool,
     owner_id: Uuid,
     status: Option<&str>,
     task_type: Option<&str>,
+    warehouse_scope: Option<Uuid>,
 ) -> Result<Vec<WcsTaskRow>, DeviceError> {
     sqlx::query_as::<_, WcsTaskRow>(&format!(
         r#"
@@ -135,12 +151,22 @@ pub(crate) async fn list_tasks(
          WHERE owner_id = $1
            AND ($2::text IS NULL OR status = $2)
            AND ($3::text IS NULL OR task_type = $3)
+           AND (
+                $4::uuid IS NULL
+                OR EXISTS (
+                    SELECT 1
+                      FROM iot_devices
+                     WHERE iot_devices.id = wcs_tasks.device_id
+                       AND iot_devices.warehouse_id = $4
+                )
+           )
          ORDER BY created_at DESC
         "#
     ))
     .bind(owner_id)
     .bind(status)
     .bind(task_type)
+    .bind(warehouse_scope)
     .fetch_all(pool)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))
@@ -290,10 +316,16 @@ pub(crate) async fn list_orphan_press_events(
            AND received_at < $1 - make_interval(secs => $2)
            AND NOT EXISTS (
                 SELECT 1 FROM wcs_tasks
-                 WHERE wcs_tasks.owner_id = iot_event_logs.warehouse_id
-                   AND wcs_tasks.device_id = iot_event_logs.device_id
+                 WHERE wcs_tasks.device_id = iot_event_logs.device_id
+                   -- 孤儿扫描是仓库级审计：事件没有 owner_id，不能把 warehouse_id
+                   -- 当作 owner_id；只接受具备有效货主归属的任务，再按设备/库位/窗口关联。
+                   AND wcs_tasks.owner_id IS NOT NULL
                    AND wcs_tasks.task_type = 'ptl_light_on'
                    AND wcs_tasks.status = 'succeeded'
+                   AND (
+                        iot_event_logs.location_id IS NULL
+                        OR wcs_tasks.location_id = iot_event_logs.location_id
+                   )
                    AND wcs_tasks.created_at >= iot_event_logs.received_at
                    AND wcs_tasks.created_at <= iot_event_logs.received_at + make_interval(secs => $2)
            )
@@ -392,6 +424,19 @@ pub(crate) async fn list_pending_press_in_window(
            AND device_id = $1
            AND ($2::uuid IS NULL OR location_id = $2)
            AND received_at >= $3 - make_interval(secs => $4)
+           AND NOT EXISTS (
+                SELECT 1 FROM wcs_tasks
+                 WHERE wcs_tasks.owner_id IS NOT NULL
+                   AND wcs_tasks.device_id = iot_event_logs.device_id
+                   AND wcs_tasks.task_type = 'ptl_light_on'
+                   AND wcs_tasks.status IN ('succeeded', 'failed')
+                   AND (
+                        iot_event_logs.location_id IS NULL
+                        OR wcs_tasks.location_id = iot_event_logs.location_id
+                   )
+                   AND wcs_tasks.created_at >= iot_event_logs.received_at
+                   AND wcs_tasks.created_at <= iot_event_logs.received_at + make_interval(secs => $4)
+           )
          ORDER BY received_at
         "#,
     )
@@ -407,15 +452,19 @@ pub(crate) async fn list_pending_press_in_window(
 pub(crate) async fn list_affected_location_ids(
     pool: &PgPool,
     owner_id: Uuid,
+    warehouse_id: Uuid,
 ) -> Result<Vec<Uuid>, DeviceError> {
     sqlx::query_scalar(
         r#"
         SELECT id FROM warehouse_locations
-         WHERE owner_id = $1 AND agv_unreachable_at IS NOT NULL
+         WHERE owner_id = $1
+           AND warehouse_id = $2
+           AND agv_unreachable_at IS NOT NULL
          ORDER BY location_code
         "#,
     )
     .bind(owner_id)
+    .bind(warehouse_id)
     .fetch_all(pool)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))
@@ -536,9 +585,13 @@ pub(crate) async fn device_dashboard_summary(
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1) AS total_devices,
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'online') AS online_devices,
             (SELECT count(*) FROM iot_devices WHERE warehouse_id = $1 AND online_status = 'offline') AS offline_devices,
-            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $2 AND status = 'failed') AS failed_tasks,
-            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $2 AND status = 'timeout') AS timeout_tasks,
-            (SELECT count(*) FROM wcs_tasks WHERE owner_id = $2 AND status IN ('pending', 'sent', 'executing')) AS pending_tasks
+            (SELECT count(*) FROM wcs_tasks t JOIN iot_devices d ON d.id = t.device_id
+              WHERE t.owner_id = $2 AND d.warehouse_id = $1 AND t.status = 'failed') AS failed_tasks,
+            (SELECT count(*) FROM wcs_tasks t JOIN iot_devices d ON d.id = t.device_id
+              WHERE t.owner_id = $2 AND d.warehouse_id = $1 AND t.status = 'timeout') AS timeout_tasks,
+            (SELECT count(*) FROM wcs_tasks t JOIN iot_devices d ON d.id = t.device_id
+              WHERE t.owner_id = $2 AND d.warehouse_id = $1
+                AND t.status IN ('pending', 'sent', 'executing')) AS pending_tasks
         "#,
     )
     .bind(warehouse_id)

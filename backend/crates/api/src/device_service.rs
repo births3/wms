@@ -9,8 +9,8 @@ use uuid::Uuid;
 use crate::audit::{append_event_in_tx, AuditDiff, AuditWriteRequest};
 use crate::device_repository::{
     find_active_binding, find_device_by_code, get_binding, get_device, insert_binding,
-    insert_device, insert_event_log, list_devices, list_stale_online_devices, mark_offline,
-    touch_heartbeat, DeviceRow,
+    insert_device, insert_event_log, list_devices, list_stale_online_devices,
+    location_belongs_to_warehouse, mark_offline_in_tx, touch_heartbeat_in_tx, DeviceRow,
 };
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
@@ -29,6 +29,7 @@ pub enum DeviceError {
     Offline,
     BindConflict,
     BindDeviceMismatch,
+    BindLocationMismatch,
     BindNotFound,
     TaskNotFound,
     TaskStateInvalid,
@@ -41,6 +42,7 @@ pub enum DeviceError {
     NumberingUnavailable,
     VersionConflict,
     IdempotencyConflict,
+    WarehouseForbidden,
     Database(String),
 }
 
@@ -195,6 +197,7 @@ impl DeviceService {
         req: RegisterDeviceRequest,
         idempotency_key: &str,
     ) -> Result<DeviceResponse, DeviceError> {
+        ensure_warehouse_access(ctx, req.warehouse_id)?;
         if !DEVICE_TYPES.contains(&req.device_type.as_str()) {
             return Err(DeviceError::TypeInvalid);
         }
@@ -301,11 +304,13 @@ impl DeviceService {
 
     pub async fn list(
         &self,
+        ctx: &AuthContext,
         warehouse_id: Uuid,
         device_type: Option<String>,
         online_status: Option<String>,
         enabled: Option<bool>,
     ) -> Result<Vec<DeviceResponse>, DeviceError> {
+        ensure_warehouse_access(ctx, warehouse_id)?;
         let rows = list_devices(
             &self.pool,
             warehouse_id,
@@ -317,10 +322,11 @@ impl DeviceService {
         Ok(rows.into_iter().map(DeviceResponse::from).collect())
     }
 
-    pub async fn get(&self, _ctx: &AuthContext, id: Uuid) -> Result<DeviceResponse, DeviceError> {
+    pub async fn get(&self, ctx: &AuthContext, id: Uuid) -> Result<DeviceResponse, DeviceError> {
         let row = get_device(&self.pool, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        ensure_warehouse_access(ctx, row.warehouse_id)?;
         let warehouse_id = row.warehouse_id;
         let mut response = DeviceResponse::from(row);
         response.bindings =
@@ -371,6 +377,7 @@ impl DeviceService {
         let existing = get_device(&self.pool, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        ensure_warehouse_access(ctx, existing.warehouse_id)?;
         if let Some(device_code) = req.device_code.as_deref() {
             if find_device_by_code(&self.pool, existing.warehouse_id, device_code)
                 .await?
@@ -462,9 +469,10 @@ impl DeviceService {
         {
             return Ok(replay);
         }
-        let row = touch_heartbeat(&self.pool, id, now)
+        let row = touch_heartbeat_in_tx(&mut tx, id, now)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        ensure_warehouse_access(ctx, row.warehouse_id)?;
         insert_event_log(
             &mut tx,
             Uuid::new_v4(),
@@ -508,6 +516,7 @@ impl DeviceService {
         let device = get_device(&self.pool, req.device_id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        ensure_warehouse_access(ctx, device.warehouse_id)?;
         let device_type_matches = match req.binding_role.as_str() {
             "ptl_light" => device.device_type == "ptl_light",
             "rfid_antenna" => device.device_type == "rfid_antenna",
@@ -522,16 +531,8 @@ impl DeviceService {
         if device.online_status == "offline" {
             return Err(DeviceError::Offline);
         }
-        if find_active_binding(
-            &self.pool,
-            device.warehouse_id,
-            req.location_id,
-            &req.binding_role,
-        )
-        .await?
-        .is_some()
-        {
-            return Err(DeviceError::BindConflict);
+        if !location_belongs_to_warehouse(&self.pool, req.location_id, device.warehouse_id).await? {
+            return Err(DeviceError::BindLocationMismatch);
         }
         let now = Utc::now();
         let hash = idempotency::request_hash(&req)
@@ -542,7 +543,7 @@ impl DeviceService {
             .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         if let Some(replay) = idempotency::replay(
             &mut tx,
-            device.warehouse_id,
+            ctx.owner_id,
             idempotency_key,
             &hash,
             "POST",
@@ -554,11 +555,22 @@ impl DeviceService {
         {
             return Ok(replay);
         }
+        if find_active_binding(
+            &self.pool,
+            device.warehouse_id,
+            req.location_id,
+            &req.binding_role,
+        )
+        .await?
+        .is_some()
+        {
+            return Err(DeviceError::BindConflict);
+        }
         let id = Uuid::new_v4();
         insert_binding(
             &mut tx,
             id,
-            ctx.owner_id,
+            device.warehouse_id,
             req.location_id,
             req.device_id,
             &req.binding_role,
@@ -647,6 +659,7 @@ impl DeviceService {
         let binding = get_binding(&self.pool, id)
             .await?
             .ok_or(DeviceError::BindNotFound)?;
+        ensure_warehouse_access(ctx, binding.warehouse_id)?;
         if binding.valid_to.is_some() {
             return Err(DeviceError::BindNotFound);
         }
@@ -701,9 +714,9 @@ impl DeviceService {
         let stale = list_stale_online_devices(&self.pool, timeout, now).await?;
         let mut count = 0usize;
         for device in &stale {
-            mark_offline(&self.pool, device.id, now).await?;
-            // H4 离线告警（business.device_offline）
             let mut tx = self.pool.begin().await.map_err(db_err)?;
+            mark_offline_in_tx(&mut tx, device.id, now).await?;
+            // H4 离线告警（business.device_offline）与离线状态同事务。
             publish_event_in_tx(
                 &mut tx,
                 device.warehouse_id,
@@ -730,6 +743,20 @@ impl DeviceService {
 
 fn db_err(error: sqlx::Error) -> DeviceError {
     DeviceError::Database(error.to_string())
+}
+
+pub(crate) fn ensure_warehouse_access(
+    ctx: &AuthContext,
+    warehouse_id: Uuid,
+) -> Result<(), DeviceError> {
+    if ctx
+        .warehouse_scope
+        .is_some_and(|allowed| allowed != warehouse_id)
+    {
+        Err(DeviceError::WarehouseForbidden)
+    } else {
+        Ok(())
+    }
 }
 
 fn idempotency_err(error: idempotency::IdempotencyError) -> DeviceError {

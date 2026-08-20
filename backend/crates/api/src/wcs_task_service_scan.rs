@@ -5,10 +5,11 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::auth::AuthContext;
-use crate::device_service::DeviceError;
+use crate::device_service::{ensure_warehouse_access, DeviceError};
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::wcs_task_repository::{
-    get_task, list_orphan_press_events, transition, TaskTransition, WcsTaskRow, TASK_COLUMNS,
+    get_task, list_orphan_press_events, transition, transition_in_tx, TaskTransition, WcsTaskRow,
+    TASK_COLUMNS,
 };
 use crate::wcs_task_service::{
     DeviceDashboardSummary, DeviceEventLog, WcsTaskResponse, WcsTaskService, ORPHAN_WINDOW_SECS,
@@ -83,8 +84,9 @@ impl WcsTaskService {
             };
             let exhausted = current.retry_count >= current.max_retries;
             if exhausted {
-                let row = transition(
-                    &self.pool,
+                let mut tx = self.pool.begin().await.map_err(db_err)?;
+                let row = transition_in_tx(
+                    &mut tx,
                     TaskTransition {
                         owner_id: current.owner_id,
                         id: current.id,
@@ -102,7 +104,8 @@ impl WcsTaskService {
                 )
                 .await?
                 .ok_or(DeviceError::TaskStateInvalid)?;
-                self.publish_task_failed(&row, now).await?;
+                self.publish_task_failed_in_tx(&mut tx, &row, now).await?;
+                tx.commit().await.map_err(db_err)?;
             } else {
                 let backoff = RETRY_BACKOFF_SECS
                     .get(current.retry_count as usize)
@@ -194,16 +197,16 @@ impl WcsTaskService {
         Ok(count)
     }
 
-    pub(crate) async fn publish_task_failed(
+    async fn publish_task_failed_in_tx(
         &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         task: &WcsTaskRow,
         now: chrono::DateTime<Utc>,
     ) -> Result<(), DeviceError> {
-        let mut tx = self.pool.begin().await.map_err(db_err)?;
         publish_event_in_tx(
-            &mut tx,
+            tx,
             task.owner_id,
-            &format!("wcs_task_failed:{}", task.id),
+            &format!("wcs_task_failed:{}:v{}", task.id, task.version),
             "business.wcs_task_failed",
             "M1",
             "wcs_task",
@@ -216,17 +219,19 @@ impl WcsTaskService {
             now,
         )
         .await
-        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
-        tx.commit().await.map_err(db_err)
+        .map(|_| ())
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))
     }
 
     pub async fn list_events(
         &self,
+        ctx: &AuthContext,
         warehouse_id: Uuid,
         device_id: Option<Uuid>,
         event_type: Option<String>,
         limit: Option<i64>,
     ) -> Result<Vec<DeviceEventLog>, DeviceError> {
+        ensure_warehouse_access(ctx, warehouse_id)?;
         let rows = crate::wcs_task_repository::list_events(
             &self.pool,
             warehouse_id,
@@ -255,6 +260,7 @@ impl WcsTaskService {
         ctx: &AuthContext,
         warehouse_id: Uuid,
     ) -> Result<DeviceDashboardSummary, DeviceError> {
+        ensure_warehouse_access(ctx, warehouse_id)?;
         let (total, online, offline, failed, timeout, pending) =
             crate::wcs_task_repository::device_dashboard_summary(
                 &self.pool,
@@ -262,9 +268,12 @@ impl WcsTaskService {
                 ctx.owner_id,
             )
             .await?;
-        let affected_location_ids =
-            crate::wcs_task_repository::list_affected_location_ids(&self.pool, ctx.owner_id)
-                .await?;
+        let affected_location_ids = crate::wcs_task_repository::list_affected_location_ids(
+            &self.pool,
+            ctx.owner_id,
+            warehouse_id,
+        )
+        .await?;
         Ok(DeviceDashboardSummary {
             total_devices: total,
             online_devices: online,
@@ -281,6 +290,7 @@ impl WcsTaskService {
         ctx: &AuthContext,
         task_id: Uuid,
     ) -> Result<WcsTaskResponse, DeviceError> {
+        self.ensure_task_warehouse_access(ctx, task_id).await?;
         let row = get_task(&self.pool, ctx.owner_id, task_id)
             .await?
             .ok_or(DeviceError::TaskNotFound)?;

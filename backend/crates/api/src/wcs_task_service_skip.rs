@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::audit::{append_event_in_tx, AuditWriteRequest};
 use crate::auth::AuthContext;
 use crate::device_service::DeviceError;
+use crate::h2_lifecycle::publish_event_in_tx;
 use crate::idempotency;
 use crate::wcs_task_repository::{
     clear_pod_unreachable_in_tx, get_task, location_is_unreachable, transition_in_tx,
@@ -16,7 +17,7 @@ use crate::wcs_task_repository::{
 use crate::wcs_task_service::{
     idempotency_err, ConfirmSkipRequest, WcsTaskResponse, WcsTaskService,
 };
-use wms_domain::confirm_skip_allowed;
+use wms_domain::{confirm_skip_allowed, ErrorResponse};
 
 impl WcsTaskService {
     /// 跳过确认（§10.5）：现场已人工完成，凭证据补录账务并置 succeeded。
@@ -27,6 +28,7 @@ impl WcsTaskService {
         req: ConfirmSkipRequest,
         idempotency_key: &str,
     ) -> Result<WcsTaskResponse, DeviceError> {
+        self.ensure_task_warehouse_access(ctx, task_id).await?;
         let now = Utc::now();
         let path = format!("/api/v1/wcs-tasks/{task_id}/confirm-skip");
         let hash = idempotency::request_hash(&serde_json::json!({
@@ -43,7 +45,7 @@ impl WcsTaskService {
         )
         .await
         .map_err(idempotency_err)?;
-        if let Some(replay) = idempotency::replay(
+        if let Some((status_code, response_body)) = idempotency::replay_value(
             &mut tx,
             ctx.owner_id,
             idempotency_key,
@@ -55,7 +57,14 @@ impl WcsTaskService {
         .await
         .map_err(idempotency_err)?
         {
-            return Ok(replay);
+            if status_code == 422
+                && response_body.get("code").and_then(|value| value.as_str())
+                    == Some("M1_EVENT_TASK_MISMATCH")
+            {
+                return Err(DeviceError::EventTaskMismatch);
+            }
+            return serde_json::from_value(response_body)
+                .map_err(|error| DeviceError::Database(error.to_string()));
         }
         let task = get_task(&self.pool, ctx.owner_id, task_id)
             .await?
@@ -118,8 +127,17 @@ impl WcsTaskService {
                     })?;
                 }
                 _ => {
-                    mark_skip_putaway_failed(&mut tx, &task, now, "跳过确认缺少补货落账证据")
-                        .await?;
+                    mark_skip_putaway_failed(
+                        &mut tx,
+                        ctx,
+                        &task,
+                        now,
+                        "跳过确认缺少补货落账证据",
+                        idempotency_key,
+                        &hash,
+                        &path,
+                    )
+                    .await?;
                     tx.commit().await.map_err(db_err)?;
                     return Err(DeviceError::EventTaskMismatch);
                 }
@@ -152,13 +170,33 @@ impl WcsTaskService {
                     .await
                     .map_err(|error| DeviceError::Database(error.to_string()))?;
                     if !settled {
-                        mark_skip_putaway_failed(&mut tx, &task, now, "跳过确认落账失败").await?;
+                        mark_skip_putaway_failed(
+                            &mut tx,
+                            ctx,
+                            &task,
+                            now,
+                            "跳过确认落账失败",
+                            idempotency_key,
+                            &hash,
+                            &path,
+                        )
+                        .await?;
                         tx.commit().await.map_err(db_err)?;
                         return Err(DeviceError::EventTaskMismatch);
                     }
                 }
                 _ => {
-                    mark_skip_putaway_failed(&mut tx, &task, now, "跳过确认缺少落账证据").await?;
+                    mark_skip_putaway_failed(
+                        &mut tx,
+                        ctx,
+                        &task,
+                        now,
+                        "跳过确认缺少落账证据",
+                        idempotency_key,
+                        &hash,
+                        &path,
+                    )
+                    .await?;
                     tx.commit().await.map_err(db_err)?;
                     return Err(DeviceError::EventTaskMismatch);
                 }
@@ -222,13 +260,18 @@ impl WcsTaskService {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn mark_skip_putaway_failed(
     tx: &mut Transaction<'_, Postgres>,
+    ctx: &AuthContext,
     task: &WcsTaskRow,
     now: DateTime<Utc>,
     message: &str,
+    idempotency_key: &str,
+    request_hash: &str,
+    path: &str,
 ) -> Result<(), DeviceError> {
-    transition_in_tx(
+    let failed = transition_in_tx(
         tx,
         TaskTransition {
             owner_id: task.owner_id,
@@ -247,6 +290,60 @@ async fn mark_skip_putaway_failed(
     )
     .await?
     .ok_or(DeviceError::TaskStateInvalid)?;
+    let error_response = ErrorResponse {
+        code: "M1_EVENT_TASK_MISMATCH".into(),
+        message: "设备事件与指令任务不匹配".into(),
+        severity: "error".into(),
+        details: json!({}),
+        trace_id: "unavailable".into(),
+        retry_hint: None,
+    };
+    idempotency::store_success_with_status(
+        tx,
+        ctx.owner_id,
+        idempotency_key,
+        request_hash,
+        "POST",
+        path,
+        422,
+        "wcs_task",
+        &task.id.to_string(),
+        &error_response,
+        now,
+    )
+    .await
+    .map_err(idempotency_err)?;
+    append_event_in_tx(
+        tx,
+        &AuditWriteRequest::from_auth_context(
+            ctx,
+            "confirm_skip_wcs_task_failed",
+            "M1",
+            "wcs_task",
+            task.id.to_string(),
+            None,
+        ),
+    )
+    .await
+    .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
+    publish_event_in_tx(
+        tx,
+        task.owner_id,
+        &format!("wcs_task_failed:{}:v{}", failed.id, failed.version),
+        "business.wcs_task_failed",
+        "M1",
+        "wcs_task",
+        &task.id.to_string(),
+        json!({
+            "task_no": failed.task_no,
+            "task_type": failed.task_type,
+            "retry_count": failed.retry_count,
+            "reason": message,
+        }),
+        now,
+    )
+    .await
+    .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
     Ok(())
 }
 

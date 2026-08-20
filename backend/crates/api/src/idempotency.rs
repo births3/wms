@@ -48,9 +48,27 @@ pub(crate) async fn replay<T: DeserializeOwned>(
     path: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<T>, IdempotencyError> {
-    let row: Option<(String, String, String, Value, DateTime<Utc>)> = sqlx::query_as(
+    replay_value(tx, owner_id, key, request_hash, method, path, now)
+        .await?
+        .map(|(_, response_body)| {
+            serde_json::from_value(response_body)
+                .map_err(|error| IdempotencyError::Serialize(error.to_string()))
+        })
+        .transpose()
+}
+
+pub(crate) async fn replay_value(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    method: &str,
+    path: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<(i32, Value)>, IdempotencyError> {
+    let row: Option<(String, String, String, i32, Value, DateTime<Utc>)> = sqlx::query_as(
         r#"
-        SELECT request_hash, method, path, response_body, expires_at
+        SELECT request_hash, method, path, status_code, response_body, expires_at
           FROM idempotency_request
          WHERE owner_id = $1 AND idempotency_key = $2
          FOR UPDATE
@@ -61,7 +79,9 @@ pub(crate) async fn replay<T: DeserializeOwned>(
     .fetch_optional(&mut **tx)
     .await
     .map_err(IdempotencyError::Database)?;
-    let Some((stored_hash, stored_method, stored_path, response_body, expires_at)) = row else {
+    let Some((stored_hash, stored_method, stored_path, status_code, response_body, expires_at)) =
+        row
+    else {
         return Ok(None);
     };
     if expires_at <= now {
@@ -76,9 +96,7 @@ pub(crate) async fn replay<T: DeserializeOwned>(
     if stored_hash != request_hash || stored_method != method || stored_path != path {
         return Err(IdempotencyError::Conflict);
     }
-    serde_json::from_value(response_body)
-        .map(Some)
-        .map_err(|error| IdempotencyError::Serialize(error.to_string()))
+    Ok(Some((status_code, response_body)))
 }
 
 /// 兼容尚未携带路由元数据的旧调用方；新写入路径应使用 [`replay`]。
@@ -220,6 +238,35 @@ pub(crate) async fn update_response<T: Serialize>(
     .bind(key)
     .bind(request_hash)
     .bind(response_body)
+    .execute(&mut **tx)
+    .await
+    .map_err(IdempotencyError::Database)?;
+    Ok(())
+}
+
+pub(crate) async fn delete_response(
+    tx: &mut Transaction<'_, Postgres>,
+    owner_id: Uuid,
+    key: &str,
+    request_hash: &str,
+    method: &str,
+    path: &str,
+) -> Result<(), IdempotencyError> {
+    sqlx::query(
+        r#"
+        DELETE FROM idempotency_request
+         WHERE owner_id = $1
+           AND idempotency_key = $2
+           AND request_hash = $3
+           AND method = $4
+           AND path = $5
+        "#,
+    )
+    .bind(owner_id)
+    .bind(key)
+    .bind(request_hash)
+    .bind(method)
+    .bind(path)
     .execute(&mut **tx)
     .await
     .map_err(IdempotencyError::Database)?;

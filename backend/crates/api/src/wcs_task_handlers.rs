@@ -1,7 +1,10 @@
 //! T03：指令任务 HTTP 层（事件上报 / 任务列表 / 重发 / 作废）。
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{
+        rejection::{JsonRejection, PathRejection, QueryRejection},
+        Path, Query, State,
+    },
     http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
@@ -15,7 +18,8 @@ use crate::device_platform_error::{
 };
 use crate::wcs_task_service::{
     ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
-    DeviceEventRequest, ResendRequest, VoidRequest, WcsTaskResponse, WcsTaskService,
+    DeviceEventRequest, ReceiptRequest, ResendRequest, VoidRequest, WcsTaskResponse,
+    WcsTaskService,
 };
 
 #[derive(Clone)]
@@ -39,6 +43,11 @@ pub fn wcs_task_router(state: WcsTaskAppState) -> Router {
         )
         .route("/api/v1/wcs-tasks/:id", get(get_task_handler))
         .route("/api/v1/wcs-tasks/:id/resend", post(resend_task_handler))
+        .route(
+            "/api/v1/wcs-tasks/:id/dispatch",
+            post(dispatch_task_handler),
+        )
+        .route("/api/v1/wcs-tasks/:id/receipt", post(receipt_task_handler))
         .route("/api/v1/wcs-tasks/:id/void", post(void_task_handler))
         .route(
             "/api/v1/wcs-tasks/:id/confirm-skip",
@@ -77,8 +86,9 @@ pub struct DashboardQuery {
 async fn dashboard_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Query(query): Query<DashboardQuery>,
+    request: Result<Query<DashboardQuery>, QueryRejection>,
 ) -> Result<Json<DeviceDashboardSummary>, DevicePlatformHandlerError> {
+    let Query(query) = request?;
     require_monitor(&ctx)?;
     Ok(Json(
         state
@@ -91,13 +101,15 @@ async fn dashboard_handler(
 async fn list_events_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Query(query): Query<EventListQuery>,
+    request: Result<Query<EventListQuery>, QueryRejection>,
 ) -> Result<Json<Vec<DeviceEventLog>>, DevicePlatformHandlerError> {
+    let Query(query) = request?;
     require_monitor(&ctx)?;
     Ok(Json(
         state
             .service
             .list_events(
+                &ctx,
                 query.warehouse_id,
                 query.device_id,
                 query.event_type,
@@ -111,8 +123,9 @@ async fn create_task_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
     headers: HeaderMap,
-    Json(req): Json<CreateWcsTaskRequest>,
+    request: Result<Json<CreateWcsTaskRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<WcsTaskResponse>), DevicePlatformHandlerError> {
+    let Json(req) = request?;
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     let created = state.service.create_task(&ctx, req, &key).await?;
@@ -127,8 +140,9 @@ async fn create_task_handler(
 async fn list_tasks_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Query(query): Query<TaskListQuery>,
+    request: Result<Query<TaskListQuery>, QueryRejection>,
 ) -> Result<Json<Vec<WcsTaskResponse>>, DevicePlatformHandlerError> {
+    let Query(query) = request?;
     require_monitor(&ctx)?;
     Ok(Json(
         state
@@ -141,8 +155,9 @@ async fn list_tasks_handler(
 async fn get_task_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Path(id): Path<Uuid>,
+    request: Result<Path<Uuid>, PathRejection>,
 ) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
+    let Path(id) = request?;
     require_monitor(&ctx)?;
     Ok(Json(state.service.get(&ctx, id).await?))
 }
@@ -150,10 +165,12 @@ async fn get_task_handler(
 async fn resend_task_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Path(id): Path<Uuid>,
+    path: Result<Path<Uuid>, PathRejection>,
     headers: HeaderMap,
-    Json(req): Json<ResendRequest>,
+    request: Result<Json<ResendRequest>, JsonRejection>,
 ) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
+    let Path(id) = path?;
+    let Json(req) = request?;
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok(Json(
@@ -164,13 +181,46 @@ async fn resend_task_handler(
     ))
 }
 
+async fn dispatch_task_handler(
+    ctx: AuthContext,
+    State(state): State<WcsTaskAppState>,
+    request: Result<Path<Uuid>, PathRejection>,
+    headers: HeaderMap,
+) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
+    let Path(id) = request?;
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(state.service.dispatch_command(&ctx, id, &key).await?))
+}
+
+async fn receipt_task_handler(
+    ctx: AuthContext,
+    State(state): State<WcsTaskAppState>,
+    path: Result<Path<Uuid>, PathRejection>,
+    headers: HeaderMap,
+    request: Result<Json<ReceiptRequest>, JsonRejection>,
+) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
+    let Path(id) = path?;
+    let Json(req) = request?;
+    require_manage(&ctx)?;
+    let key = idempotency_key(&headers)?;
+    Ok(Json(
+        state
+            .service
+            .apply_receipt_command(&ctx, id, req, &key)
+            .await?,
+    ))
+}
+
 async fn void_task_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Path(id): Path<Uuid>,
+    path: Result<Path<Uuid>, PathRejection>,
     headers: HeaderMap,
-    Json(req): Json<VoidRequest>,
+    request: Result<Json<VoidRequest>, JsonRejection>,
 ) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
+    let Path(id) = path?;
+    let Json(req) = request?;
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok(Json(state.service.void(&ctx, id, req, &key).await?))
@@ -179,10 +229,12 @@ async fn void_task_handler(
 async fn confirm_skip_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Path(id): Path<Uuid>,
+    path: Result<Path<Uuid>, PathRejection>,
     headers: HeaderMap,
-    Json(req): Json<ConfirmSkipRequest>,
+    request: Result<Json<ConfirmSkipRequest>, JsonRejection>,
 ) -> Result<Json<WcsTaskResponse>, DevicePlatformHandlerError> {
+    let Path(id) = path?;
+    let Json(req) = request?;
     require_manage(&ctx)?;
     let key = idempotency_key(&headers)?;
     Ok(Json(state.service.confirm_skip(&ctx, id, req, &key).await?))
@@ -191,12 +243,17 @@ async fn confirm_skip_handler(
 async fn device_event_handler(
     ctx: AuthContext,
     State(state): State<WcsTaskAppState>,
-    Path(id): Path<Uuid>,
+    path: Result<Path<Uuid>, PathRejection>,
     headers: HeaderMap,
-    Json(req): Json<DeviceEventRequest>,
+    request: Result<Json<DeviceEventRequest>, JsonRejection>,
 ) -> Result<StatusCode, DevicePlatformHandlerError> {
+    let Path(id) = path?;
+    let Json(req) = request?;
     require_manage(&ctx)?;
-    let _key = idempotency_key(&headers)?;
-    state.service.handle_event(&ctx, id, req).await?;
+    let key = idempotency_key(&headers)?;
+    state
+        .service
+        .handle_event_command(&ctx, id, req, &key)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -144,8 +144,8 @@ pub(crate) async fn list_devices(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
-pub(crate) async fn touch_heartbeat(
-    pool: &PgPool,
+pub(crate) async fn touch_heartbeat_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<Option<DeviceRow>, DeviceError> {
@@ -161,9 +161,45 @@ pub(crate) async fn touch_heartbeat(
     ))
     .bind(id)
     .bind(now)
-    .fetch_optional(pool)
+    .fetch_optional(&mut **tx)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
+pub(crate) async fn location_belongs_to_warehouse(
+    pool: &PgPool,
+    location_id: Uuid,
+    warehouse_id: Uuid,
+) -> Result<bool, DeviceError> {
+    sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+              FROM warehouse_locations location
+              JOIN warehouses warehouse
+                ON warehouse.id = location.warehouse_id
+               AND warehouse.owner_id = location.owner_id
+             WHERE location.id = $1
+               AND location.warehouse_id = $2
+        )
+        "#,
+    )
+    .bind(location_id)
+    .bind(warehouse_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
+}
+
+pub(crate) async fn get_device_dispatch_status_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+) -> Result<Option<(bool, String)>, DeviceError> {
+    sqlx::query_as("SELECT enabled, online_status FROM iot_devices WHERE id = $1 FOR SHARE")
+        .bind(id)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
 pub(crate) async fn insert_event_log(
@@ -199,6 +235,34 @@ pub(crate) async fn insert_event_log(
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))?;
     Ok(inserted.rows_affected() == 1)
+}
+
+pub(crate) async fn get_event_replay_identity(
+    pool: &PgPool,
+    id: Uuid,
+) -> Result<
+    Option<(
+        Uuid,
+        Uuid,
+        String,
+        Option<Uuid>,
+        Option<Uuid>,
+        Value,
+        DateTime<Utc>,
+    )>,
+    DeviceError,
+> {
+    sqlx::query_as(
+        r#"
+        SELECT warehouse_id, device_id, event_type, task_id, location_id, payload, received_at
+          FROM iot_event_logs
+         WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
 pub(crate) async fn insert_binding(
@@ -443,26 +507,6 @@ pub(crate) async fn soft_unbind_in_tx(
     .bind(id)
     .bind(now)
     .execute(&mut **tx)
-    .await
-    .map_err(|error| DeviceError::Database(error.to_string()))?;
-    Ok(())
-}
-
-pub(crate) async fn mark_offline(
-    pool: &PgPool,
-    id: Uuid,
-    now: DateTime<Utc>,
-) -> Result<(), DeviceError> {
-    sqlx::query(
-        r#"
-        UPDATE iot_devices
-           SET online_status = 'offline', updated_at = $2
-         WHERE id = $1 AND online_status = 'online'
-        "#,
-    )
-    .bind(id)
-    .bind(now)
-    .execute(pool)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))?;
     Ok(())

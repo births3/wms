@@ -1,16 +1,18 @@
 //! T03：指令任务事件处理（ptl_press / rfid_batch / dws_result / 孤儿窗口）。
 
 use chrono::Utc;
-use serde_json::json;
+use serde_json::{json, Value};
+use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::auth::AuthContext;
-use crate::device_repository::insert_event_log;
-use crate::device_service::DeviceError;
+use crate::device_repository::{get_event_replay_identity, insert_event_log};
+use crate::device_service::{ensure_warehouse_access, DeviceError};
 use crate::h2_lifecycle::publish_event_in_tx;
+use crate::idempotency;
 use crate::wcs_task_repository::{
-    find_active_task_by_device_location, get_task, location_is_unreachable, transition,
-    transition_in_tx, TaskTransition, WcsTaskRow,
+    find_active_task_by_device_location, get_task, location_is_unreachable, transition_in_tx,
+    TaskTransition, WcsTaskRow,
 };
 use crate::wcs_task_service::{
     CreateWcsTaskRequest, DeviceEventRequest, WcsTaskResponse, WcsTaskService, ORPHAN_WINDOW_SECS,
@@ -19,6 +21,54 @@ use crate::wcs_task_service::{
 use wms_domain::{dws_result_passes, is_terminal, ptl_qty_diff_within_threshold, rfid_epcs_cover};
 
 impl WcsTaskService {
+    pub async fn handle_event_command(
+        &self,
+        ctx: &AuthContext,
+        device_id: Uuid,
+        req: DeviceEventRequest,
+        idempotency_key: &str,
+    ) -> Result<(), DeviceError> {
+        let now = Utc::now();
+        let path = format!("/api/v1/iot-devices/{device_id}/events");
+        let hash = idempotency::request_hash(&json!({"device_id": device_id, "request": &req}))
+            .map_err(crate::wcs_task_service::idempotency_err)?;
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        idempotency::lock_key(&mut tx, "iot_device_event", ctx.owner_id, idempotency_key)
+            .await
+            .map_err(crate::wcs_task_service::idempotency_err)?;
+        if idempotency::replay::<serde_json::Value>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            now,
+        )
+        .await
+        .map_err(crate::wcs_task_service::idempotency_err)?
+        .is_some()
+        {
+            return Ok(());
+        }
+        self.handle_event(ctx, device_id, req).await?;
+        idempotency::store_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &hash,
+            "POST",
+            &path,
+            "iot_event_log",
+            &device_id.to_string(),
+            &json!({}),
+            now,
+        )
+        .await
+        .map_err(crate::wcs_task_service::idempotency_err)?;
+        tx.commit().await.map_err(db_err)
+    }
+
     /// 事件处理（ptl_press / rfid_batch / dws_result / heartbeat）。
     pub async fn handle_event(
         &self,
@@ -26,10 +76,22 @@ impl WcsTaskService {
         device_id: Uuid,
         req: DeviceEventRequest,
     ) -> Result<(), DeviceError> {
+        self.handle_event_with_claim(ctx, device_id, req, false)
+            .await
+    }
+
+    async fn handle_event_with_claim(
+        &self,
+        ctx: &AuthContext,
+        device_id: Uuid,
+        req: DeviceEventRequest,
+        allow_pending_ptl_claim: bool,
+    ) -> Result<(), DeviceError> {
         let now = Utc::now();
         let device = crate::device_repository::get_device(&self.pool, device_id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        ensure_warehouse_access(ctx, device.warehouse_id)?;
         let mut tx = self.pool.begin().await.map_err(db_err)?;
         let inserted = insert_event_log(
             &mut tx,
@@ -47,16 +109,38 @@ impl WcsTaskService {
             now,
         )
         .await?;
-        tx.commit().await.map_err(db_err)?;
+        // 事件审计可能已在上一次尝试中提交，而业务处理因瞬时错误未完成。
+        // 因此重复 event_id 仍进入幂等业务处理；终态守卫保证不会重复落账。
         if !inserted {
-            return Ok(());
+            let stored = get_event_replay_identity(&self.pool, req.event_id)
+                .await?
+                .ok_or(DeviceError::EventTaskMismatch)?;
+            let now_within_claim_window =
+                stored.6 <= now && stored.6 >= now - chrono::Duration::seconds(ORPHAN_WINDOW_SECS);
+            let task_identity_matches = stored.3 == req.task_id
+                || (allow_pending_ptl_claim
+                    && stored.2 == "ptl_press"
+                    && stored.3.is_none()
+                    && req.task_id.is_some()
+                    && now_within_claim_window);
+            let same_event = stored.0 == device.warehouse_id
+                && stored.1 == device_id
+                && stored.2 == req.event_type
+                && task_identity_matches
+                && stored.4 == req.location_id
+                && stored.5 == req.payload;
+            if !same_event {
+                return Err(DeviceError::EventTaskMismatch);
+            }
         }
         if req.event_type == "heartbeat" {
-            crate::device_repository::touch_heartbeat(&self.pool, device_id, now)
+            crate::device_repository::touch_heartbeat_in_tx(&mut tx, device_id, now)
                 .await?
                 .ok_or(DeviceError::NotFound)?;
+            tx.commit().await.map_err(db_err)?;
             return Ok(());
         }
+        tx.commit().await.map_err(db_err)?;
 
         match req.event_type.as_str() {
             "ptl_press" => {
@@ -87,9 +171,11 @@ impl WcsTaskService {
                 };
                 match task {
                     Some(task) => {
-                        if task.status == "succeeded" {
-                            // 重复拍灯幂等；补发可能失败的灭灯收尾。
-                            self.enqueue_ptl_light_off(ctx, &task).await?;
+                        if is_terminal(&task.status) {
+                            if task.status == "succeeded" {
+                                // 重复拍灯幂等；补发可能失败的灭灯收尾。
+                                self.enqueue_ptl_light_off(ctx, &task).await?;
+                            }
                             return Ok(());
                         }
                         if !wms_domain::retry_allowed(&task.status) {
@@ -133,26 +219,14 @@ impl WcsTaskService {
                             PTL_DIFF_MAX_ABS,
                         ) {
                             // 超阈值：任务回 failed，不落账（GWT 14 在 T04 细化，此处直接阻断）
-                            let row = transition(
-                                &self.pool,
-                                TaskTransition {
-                                    owner_id: ctx.owner_id,
-                                    id: task.id,
-                                    from_statuses: &["sent", "executing", "timeout"],
-                                    to: "failed",
-                                    retry_count: None,
-                                    error_code: Some("M1_PTL_QTY_DIFF_EXCEEDED"),
-                                    error_message: Some("拍灯数量差异超阈值"),
-                                    ack_payload: Some(json!({"pressed_qty": pressed})),
-                                    sent_at: None,
-                                    finished_at: Some(now),
-                                    expected_version: task.version,
-                                    now,
-                                },
+                            self.fail_task_with_event(
+                                &task,
+                                "M1_PTL_QTY_DIFF_EXCEEDED",
+                                "拍灯数量差异超阈值",
+                                json!({"pressed_qty": pressed}),
+                                now,
                             )
-                            .await?
-                            .ok_or(DeviceError::TaskStateInvalid)?;
-                            self.publish_task_failed(&row, now).await?;
+                            .await?;
                             return Err(DeviceError::PtQtyDiffExceeded);
                         }
                         self.confirm_and_settle(ctx, task.id, pressed, now).await
@@ -168,8 +242,11 @@ impl WcsTaskService {
                 let task = get_task(&self.pool, ctx.owner_id, task_id)
                     .await?
                     .ok_or(DeviceError::TaskNotFound)?;
-                if task.task_type != "dws_weigh" || is_terminal(&task.status) {
+                if task.task_type != "dws_weigh" || task.device_id != device_id {
                     return Err(DeviceError::EventTaskMismatch);
+                }
+                if is_terminal(&task.status) {
+                    return Ok(());
                 }
                 let pass = req
                     .payload
@@ -189,26 +266,14 @@ impl WcsTaskService {
                 if dws_result_passes(pass, weight, expected) {
                     self.confirm_and_settle(ctx, task.id, 0, now).await
                 } else {
-                    let row = transition(
-                        &self.pool,
-                        TaskTransition {
-                            owner_id: task.owner_id,
-                            id: task.id,
-                            from_statuses: &["sent", "executing", "timeout"],
-                            to: "failed",
-                            retry_count: None,
-                            error_code: Some("M1_EVENT_TASK_MISMATCH"),
-                            error_message: Some("DWS 校验未通过"),
-                            ack_payload: Some(json!({"pass": pass, "weight_g": weight})),
-                            sent_at: None,
-                            finished_at: Some(now),
-                            expected_version: task.version,
-                            now,
-                        },
+                    self.fail_task_with_event(
+                        &task,
+                        "M1_EVENT_TASK_MISMATCH",
+                        "DWS 校验未通过",
+                        json!({"pass": pass, "weight_g": weight}),
+                        now,
                     )
-                    .await?
-                    .ok_or(DeviceError::TaskStateInvalid)?;
-                    self.publish_task_failed(&row, now).await?;
+                    .await?;
                     Err(DeviceError::EventTaskMismatch)
                 }
             }
@@ -217,8 +282,11 @@ impl WcsTaskService {
                 let task = get_task(&self.pool, ctx.owner_id, task_id)
                     .await?
                     .ok_or(DeviceError::TaskNotFound)?;
-                if task.task_type != "rfid_scan" || is_terminal(&task.status) {
+                if task.task_type != "rfid_scan" || task.device_id != device_id {
                     return Err(DeviceError::EventTaskMismatch);
+                }
+                if is_terminal(&task.status) {
+                    return Ok(());
                 }
                 let target: Vec<String> = task
                     .payload
@@ -243,26 +311,14 @@ impl WcsTaskService {
                 if rfid_epcs_cover(&target, &scanned) {
                     self.confirm_and_settle(ctx, task.id, 0, now).await
                 } else {
-                    let row = transition(
-                        &self.pool,
-                        TaskTransition {
-                            owner_id: task.owner_id,
-                            id: task.id,
-                            from_statuses: &["sent", "executing", "timeout"],
-                            to: "failed",
-                            retry_count: None,
-                            error_code: Some("M1_EVENT_TASK_MISMATCH"),
-                            error_message: Some("RFID EPC 集合未覆盖目标"),
-                            ack_payload: Some(json!({"scanned_epcs": scanned.len()})),
-                            sent_at: None,
-                            finished_at: Some(now),
-                            expected_version: task.version,
-                            now,
-                        },
+                    self.fail_task_with_event(
+                        &task,
+                        "M1_EVENT_TASK_MISMATCH",
+                        "RFID EPC 集合未覆盖目标",
+                        json!({"scanned_epcs": scanned.len()}),
+                        now,
                     )
-                    .await?
-                    .ok_or(DeviceError::TaskStateInvalid)?;
-                    self.publish_task_failed(&row, now).await?;
+                    .await?;
                     Err(DeviceError::EventTaskMismatch)
                 }
             }
@@ -356,8 +412,8 @@ impl WcsTaskService {
                     )
                     .await?
                     .ok_or(DeviceError::TaskStateInvalid)?;
+                    publish_task_failed_in_tx(&mut tx, &row, now).await?;
                     tx.commit().await.map_err(db_err)?;
-                    self.publish_task_failed(&row, now).await?;
                     return Err(DeviceError::EventTaskMismatch);
                 }
             }
@@ -409,8 +465,8 @@ impl WcsTaskService {
                         )
                         .await?
                         .ok_or(DeviceError::TaskStateInvalid)?;
+                        publish_task_failed_in_tx(&mut tx, &row, now).await?;
                         tx.commit().await.map_err(db_err)?;
-                        self.publish_task_failed(&row, now).await?;
                         return Err(DeviceError::EventTaskMismatch);
                     }
                 }
@@ -435,8 +491,8 @@ impl WcsTaskService {
                     )
                     .await?
                     .ok_or(DeviceError::TaskStateInvalid)?;
+                    publish_task_failed_in_tx(&mut tx, &row, now).await?;
                     tx.commit().await.map_err(db_err)?;
-                    self.publish_task_failed(&row, now).await?;
                     return Err(DeviceError::EventTaskMismatch);
                 }
             }
@@ -507,6 +563,39 @@ impl WcsTaskService {
         Ok(())
     }
 
+    async fn fail_task_with_event(
+        &self,
+        task: &WcsTaskRow,
+        error_code: &str,
+        error_message: &str,
+        ack_payload: Value,
+        now: chrono::DateTime<Utc>,
+    ) -> Result<WcsTaskRow, DeviceError> {
+        let mut tx = self.pool.begin().await.map_err(db_err)?;
+        let row = transition_in_tx(
+            &mut tx,
+            TaskTransition {
+                owner_id: task.owner_id,
+                id: task.id,
+                from_statuses: &["sent", "executing", "timeout"],
+                to: "failed",
+                retry_count: None,
+                error_code: Some(error_code),
+                error_message: Some(error_message),
+                ack_payload: Some(ack_payload),
+                sent_at: None,
+                finished_at: Some(now),
+                expected_version: task.version,
+                now,
+            },
+        )
+        .await?
+        .ok_or(DeviceError::TaskStateInvalid)?;
+        publish_task_failed_in_tx(&mut tx, &row, now).await?;
+        tx.commit().await.map_err(db_err)?;
+        Ok(row)
+    }
+
     pub(crate) async fn claim_pending_press(
         &self,
         ctx: &AuthContext,
@@ -520,17 +609,51 @@ impl WcsTaskService {
             Utc::now(),
         )
         .await?;
-        let Some((_event_id, _location_id, payload)) = pending.into_iter().next() else {
+        let Some((event_id, location_id, payload)) = pending.into_iter().next() else {
             return Ok(());
         };
-        let pressed = payload
-            .get("press_qty")
-            .and_then(|value| value.as_i64())
-            .unwrap_or(0);
-        self.dispatch(ctx, task.id).await?;
-        self.confirm_and_settle(ctx, task.id, pressed, Utc::now())
-            .await
+        if task.status == "pending" {
+            self.dispatch(ctx, task.id).await?;
+        }
+        Box::pin(self.handle_event_with_claim(
+            ctx,
+            task.device_id,
+            DeviceEventRequest {
+                event_id,
+                event_type: "ptl_press".into(),
+                task_id: Some(task.id),
+                location_id,
+                payload,
+            },
+            true,
+        ))
+        .await
     }
+}
+
+async fn publish_task_failed_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    task: &WcsTaskRow,
+    now: chrono::DateTime<Utc>,
+) -> Result<(), DeviceError> {
+    publish_event_in_tx(
+        tx,
+        task.owner_id,
+        &format!("wcs_task_failed:{}:v{}", task.id, task.version),
+        "business.wcs_task_failed",
+        "M1",
+        "wcs_task",
+        &task.id.to_string(),
+        json!({
+            "task_no": task.task_no,
+            "task_type": task.task_type,
+            "retry_count": task.retry_count
+        }),
+        now,
+    )
+    .await
+    .map(|_| ())
+    .map_err(|error| DeviceError::Database(format!("{error:?}")))
 }
 
 fn db_err(error: sqlx::Error) -> DeviceError {

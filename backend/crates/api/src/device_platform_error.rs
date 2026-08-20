@@ -1,10 +1,12 @@
 //! 设备中台统一 HTTP 错误（单一 IntoResponse 来源；设备与指令两路由共用）。
 
 use axum::{
+    extract::rejection::{JsonRejection, PathRejection, QueryRejection},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
+use wms_domain::ErrorResponse;
 
 use crate::auth::AuthContext;
 use crate::device_service::DeviceError;
@@ -12,12 +14,31 @@ use crate::device_service::DeviceError;
 pub enum DevicePlatformHandlerError {
     PermissionDenied,
     MissingIdempotencyKey,
+    InvalidRequest,
     Service(DeviceError),
 }
 
 impl From<DeviceError> for DevicePlatformHandlerError {
     fn from(error: DeviceError) -> Self {
         DevicePlatformHandlerError::Service(error)
+    }
+}
+
+impl From<JsonRejection> for DevicePlatformHandlerError {
+    fn from(_: JsonRejection) -> Self {
+        Self::InvalidRequest
+    }
+}
+
+impl From<PathRejection> for DevicePlatformHandlerError {
+    fn from(_: PathRejection) -> Self {
+        Self::InvalidRequest
+    }
+}
+
+impl From<QueryRejection> for DevicePlatformHandlerError {
+    fn from(_: QueryRejection) -> Self {
+        Self::InvalidRequest
     }
 }
 
@@ -33,6 +54,11 @@ impl IntoResponse for DevicePlatformHandlerError {
                 StatusCode::BAD_REQUEST,
                 "M1_DEVICE_MISSING_IDEMPOTENCY_KEY",
                 "缺少 Idempotency-Key",
+            ),
+            DevicePlatformHandlerError::InvalidRequest => (
+                StatusCode::BAD_REQUEST,
+                "M1_DEVICE_INVALID_REQUEST",
+                "请求路径、查询参数或 JSON 正文非法",
             ),
             DevicePlatformHandlerError::Service(error) => match error {
                 DeviceError::DuplicateCode => (
@@ -67,6 +93,11 @@ impl IntoResponse for DevicePlatformHandlerError {
                     StatusCode::UNPROCESSABLE_ENTITY,
                     "M1_BIND_DEVICE_MISMATCH",
                     "绑定角色与设备类型不匹配",
+                ),
+                DeviceError::BindLocationMismatch => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "M1_BIND_LOCATION_MISMATCH",
+                    "库位不存在或不属于设备所在仓库",
                 ),
                 DeviceError::BindNotFound => (
                     StatusCode::NOT_FOUND,
@@ -128,6 +159,11 @@ impl IntoResponse for DevicePlatformHandlerError {
                     "M1_WCS_TASK_IDEMPOTENCY_CONFLICT",
                     "幂等键已用于不同请求",
                 ),
+                DeviceError::WarehouseForbidden => (
+                    StatusCode::FORBIDDEN,
+                    "M1_DEVICE_PERMISSION_DENIED",
+                    "设备中台仓库权限不足",
+                ),
                 DeviceError::Database(_) => (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "M1_DEVICE_INTERNAL",
@@ -137,10 +173,15 @@ impl IntoResponse for DevicePlatformHandlerError {
         };
         (
             status,
-            Json(serde_json::json!({
-                "code": code,
-                "message": message,
-            })),
+            Json(ErrorResponse {
+                code: code.into(),
+                message: message.into(),
+                severity: "error".into(),
+                details: serde_json::json!({}),
+                trace_id: "unavailable".into(),
+                retry_hint: (status == StatusCode::INTERNAL_SERVER_ERROR)
+                    .then(|| "请稍后重试；若持续失败请联系系统管理员".into()),
+            }),
         )
             .into_response()
     }
