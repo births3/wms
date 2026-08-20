@@ -10,11 +10,12 @@ use crate::device_service::DeviceError;
 use crate::h2_lifecycle::publish_event_in_tx;
 use crate::wcs_task_repository::{
     find_active_task_by_device_location, get_task, list_orphan_press_events,
-    location_is_unreachable, transition, transition_in_tx, WcsTaskRow,
+    location_is_unreachable, transition, transition_in_tx, TaskTransition, WcsTaskRow,
+    TASK_COLUMNS,
 };
 use crate::wcs_task_service::{
     DeviceEventRequest, WcsTaskService, PTL_DIFF_MAX_ABS, PTL_DIFF_RATIO, RETRY_BACKOFF_SECS,
-    TASK_COLUMNS, TASK_TIMEOUT_SECS,
+    TASK_TIMEOUT_SECS,
 };
 use wms_domain::{dws_result_passes, is_terminal, ptl_qty_diff_within_threshold, rfid_epcs_cover};
 
@@ -128,18 +129,20 @@ impl WcsTaskService {
                             // 超阈值：任务回 failed，不落账（GWT 14 在 T04 细化，此处直接阻断）
                             let row = transition(
                                 &self.pool,
-                                ctx.owner_id,
-                                task.id,
-                                &["sent", "executing", "timeout"],
-                                "failed",
-                                None,
-                                Some("M1_PTL_QTY_DIFF_EXCEEDED"),
-                                Some("拍灯数量差异超阈值"),
-                                Some(json!({"pressed_qty": pressed})),
-                                None,
-                                Some(now),
-                                task.version,
-                                now,
+                                TaskTransition {
+                                    owner_id: ctx.owner_id,
+                                    id: task.id,
+                                    from_statuses: &["sent", "executing", "timeout"],
+                                    to: "failed",
+                                    retry_count: None,
+                                    error_code: Some("M1_PTL_QTY_DIFF_EXCEEDED"),
+                                    error_message: Some("拍灯数量差异超阈值"),
+                                    ack_payload: Some(json!({"pressed_qty": pressed})),
+                                    sent_at: None,
+                                    finished_at: Some(now),
+                                    expected_version: task.version,
+                                    now,
+                                },
                             )
                             .await?
                             .ok_or(DeviceError::TaskStateInvalid)?;
@@ -183,18 +186,20 @@ impl WcsTaskService {
                 } else {
                     let row = transition(
                         &self.pool,
-                        task.owner_id,
-                        task.id,
-                        &["sent", "executing", "timeout"],
-                        "failed",
-                        None,
-                        Some("M1_EVENT_TASK_MISMATCH"),
-                        Some("DWS 校验未通过"),
-                        Some(json!({"pass": pass, "weight_g": weight})),
-                        None,
-                        Some(now),
-                        task.version,
-                        now,
+                        TaskTransition {
+                            owner_id: task.owner_id,
+                            id: task.id,
+                            from_statuses: &["sent", "executing", "timeout"],
+                            to: "failed",
+                            retry_count: None,
+                            error_code: Some("M1_EVENT_TASK_MISMATCH"),
+                            error_message: Some("DWS 校验未通过"),
+                            ack_payload: Some(json!({"pass": pass, "weight_g": weight})),
+                            sent_at: None,
+                            finished_at: Some(now),
+                            expected_version: task.version,
+                            now,
+                        },
                     )
                     .await?
                     .ok_or(DeviceError::TaskStateInvalid)?;
@@ -235,18 +240,20 @@ impl WcsTaskService {
                 } else {
                     let row = transition(
                         &self.pool,
-                        task.owner_id,
-                        task.id,
-                        &["sent", "executing", "timeout"],
-                        "failed",
-                        None,
-                        Some("M1_EVENT_TASK_MISMATCH"),
-                        Some("RFID EPC 集合未覆盖目标"),
-                        Some(json!({"scanned_epcs": scanned.len()})),
-                        None,
-                        Some(now),
-                        task.version,
-                        now,
+                        TaskTransition {
+                            owner_id: task.owner_id,
+                            id: task.id,
+                            from_statuses: &["sent", "executing", "timeout"],
+                            to: "failed",
+                            retry_count: None,
+                            error_code: Some("M1_EVENT_TASK_MISMATCH"),
+                            error_message: Some("RFID EPC 集合未覆盖目标"),
+                            ack_payload: Some(json!({"scanned_epcs": scanned.len()})),
+                            sent_at: None,
+                            finished_at: Some(now),
+                            expected_version: task.version,
+                            now,
+                        },
                     )
                     .await?
                     .ok_or(DeviceError::TaskStateInvalid)?;
@@ -319,18 +326,20 @@ impl WcsTaskService {
                         // 无库存行/数量非法：落账失败 → 任务 failed 不回账
                         let row = transition_in_tx(
                             &mut tx,
-                            task.owner_id,
-                            task.id,
-                            &["sent", "executing", "timeout"],
-                            "failed",
-                            None,
-                            Some("M1_EVENT_TASK_MISMATCH"),
-                            Some("落账目标库存行不存在"),
-                            Some(json!({"settled_qty": settled_qty})),
-                            None,
-                            Some(now),
-                            task.version,
-                            now,
+                            TaskTransition {
+                                owner_id: task.owner_id,
+                                id: task.id,
+                                from_statuses: &["sent", "executing", "timeout"],
+                                to: "failed",
+                                retry_count: None,
+                                error_code: Some("M1_EVENT_TASK_MISMATCH"),
+                                error_message: Some("落账目标库存行不存在"),
+                                ack_payload: Some(json!({"settled_qty": settled_qty})),
+                                sent_at: None,
+                                finished_at: Some(now),
+                                expected_version: task.version,
+                                now,
+                            },
                         )
                         .await?
                         .ok_or(DeviceError::TaskStateInvalid)?;
@@ -343,18 +352,20 @@ impl WcsTaskService {
                     // payload 缺少商品/库位：任务 failed 不回账
                     let row = transition_in_tx(
                         &mut tx,
-                        task.owner_id,
-                        task.id,
-                        &["sent", "executing", "timeout"],
-                        "failed",
-                        None,
-                        Some("M1_EVENT_TASK_MISMATCH"),
-                        Some("落账 payload 缺少 product_id/location_id"),
-                        Some(json!({"settled_qty": settled_qty})),
-                        None,
-                        Some(now),
-                        task.version,
-                        now,
+                        TaskTransition {
+                            owner_id: task.owner_id,
+                            id: task.id,
+                            from_statuses: &["sent", "executing", "timeout"],
+                            to: "failed",
+                            retry_count: None,
+                            error_code: Some("M1_EVENT_TASK_MISMATCH"),
+                            error_message: Some("落账 payload 缺少 product_id/location_id"),
+                            ack_payload: Some(json!({"settled_qty": settled_qty})),
+                            sent_at: None,
+                            finished_at: Some(now),
+                            expected_version: task.version,
+                            now,
+                        },
                     )
                     .await?
                     .ok_or(DeviceError::TaskStateInvalid)?;
@@ -366,18 +377,20 @@ impl WcsTaskService {
         }
         transition_in_tx(
             &mut tx,
-            task.owner_id,
-            task.id,
-            &["sent", "executing", "timeout"],
-            "succeeded",
-            None,
-            None,
-            None,
-            Some(json!({"settled_qty": settled_qty})),
-            None,
-            Some(now),
-            task.version,
-            now,
+            TaskTransition {
+                owner_id: task.owner_id,
+                id: task.id,
+                from_statuses: &["sent", "executing", "timeout"],
+                to: "succeeded",
+                retry_count: None,
+                error_code: None,
+                error_message: None,
+                ack_payload: Some(json!({"settled_qty": settled_qty})),
+                sent_at: None,
+                finished_at: Some(now),
+                expected_version: task.version,
+                now,
+            },
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
@@ -424,18 +437,20 @@ impl WcsTaskService {
             let current = if task.status != "timeout" {
                 transition(
                     &self.pool,
-                    task.owner_id,
-                    task.id,
-                    &["sent", "executing"],
-                    "timeout",
-                    None,
-                    None,
-                    Some("超时未收到终态回执"),
-                    None,
-                    None,
-                    None,
-                    task.version,
-                    now,
+                    TaskTransition {
+                        owner_id: task.owner_id,
+                        id: task.id,
+                        from_statuses: &["sent", "executing"],
+                        to: "timeout",
+                        retry_count: None,
+                        error_code: None,
+                        error_message: Some("超时未收到终态回执"),
+                        ack_payload: None,
+                        sent_at: None,
+                        finished_at: None,
+                        expected_version: task.version,
+                        now,
+                    },
                 )
                 .await?
                 .ok_or(DeviceError::TaskStateInvalid)?
@@ -446,18 +461,20 @@ impl WcsTaskService {
             if exhausted {
                 let row = transition(
                     &self.pool,
-                    current.owner_id,
-                    current.id,
-                    &["sent", "executing", "timeout"],
-                    "failed",
-                    None,
-                    Some("M1_WCS_TASK_RETRY_EXHAUSTED"),
-                    Some("超时重试耗尽"),
-                    None,
-                    None,
-                    Some(now),
-                    current.version,
-                    now,
+                    TaskTransition {
+                        owner_id: current.owner_id,
+                        id: current.id,
+                        from_statuses: &["sent", "executing", "timeout"],
+                        to: "failed",
+                        retry_count: None,
+                        error_code: Some("M1_WCS_TASK_RETRY_EXHAUSTED"),
+                        error_message: Some("超时重试耗尽"),
+                        ack_payload: None,
+                        sent_at: None,
+                        finished_at: Some(now),
+                        expected_version: current.version,
+                        now,
+                    },
                 )
                 .await?
                 .ok_or(DeviceError::TaskStateInvalid)?;
@@ -471,18 +488,20 @@ impl WcsTaskService {
                 if eligible {
                     transition(
                         &self.pool,
-                        current.owner_id,
-                        current.id,
-                        &["sent", "executing", "timeout"],
-                        "sent",
-                        Some(current.retry_count + 1),
-                        None,
-                        Some("超时重试"),
-                        None,
-                        Some(now),
-                        None,
-                        current.version,
-                        now,
+                        TaskTransition {
+                            owner_id: current.owner_id,
+                            id: current.id,
+                            from_statuses: &["sent", "executing", "timeout"],
+                            to: "sent",
+                            retry_count: Some(current.retry_count + 1),
+                            error_code: None,
+                            error_message: Some("超时重试"),
+                            ack_payload: None,
+                            sent_at: Some(now),
+                            finished_at: None,
+                            expected_version: current.version,
+                            now,
+                        },
                     )
                     .await?;
                 }

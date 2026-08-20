@@ -29,7 +29,7 @@ pub fn is_terminal(status: &str) -> bool {
 /// DWS 称重校验：pass=true 且重量在预估 ±20% 内（规格 §10.2）。
 pub fn dws_result_passes(pass: bool, weight_g: i64, expected_weight_g: i64) -> bool {
     if !pass || expected_weight_g <= 0 {
-        return pass && expected_weight_g > 0;
+        return false;
     }
     let diff = (weight_g - expected_weight_g).abs();
     let threshold = expected_weight_g / 5; // ±20%

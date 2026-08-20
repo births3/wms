@@ -32,7 +32,7 @@ pub struct WcsTaskRow {
     pub updated_at: DateTime<Utc>,
 }
 
-const TASK_COLUMNS: &str = "id, owner_id, task_no, task_type, device_id, location_id, \
+pub(crate) const TASK_COLUMNS: &str = "id, owner_id, task_no, task_type, device_id, location_id, \
      business_ref_type, business_ref_no, payload, status, ack_payload, error_code, \
      error_message, retry_count, max_retries, idempotency_key, sent_at, finished_at, \
      created_by, version, updated_at";
@@ -134,23 +134,41 @@ pub(crate) async fn list_tasks(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
+/// 状态推进参数（收敛 13 个位置参数）。
+pub(crate) struct TaskTransition<'a> {
+    pub owner_id: Uuid,
+    pub id: Uuid,
+    pub from_statuses: &'a [&'a str],
+    pub to: &'a str,
+    pub retry_count: Option<i32>,
+    pub error_code: Option<&'a str>,
+    pub error_message: Option<&'a str>,
+    pub ack_payload: Option<Value>,
+    pub sent_at: Option<DateTime<Utc>>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub expected_version: i64,
+    pub now: DateTime<Utc>,
+}
+
 /// 乐观锁状态推进：仅允许从 from_statuses 迁移，version 不匹配则失败。
-#[allow(clippy::too_many_arguments)]
 pub(crate) async fn transition(
     pool: &PgPool,
-    owner_id: Uuid,
-    id: Uuid,
-    from_statuses: &[&str],
-    to: &str,
-    retry_count: Option<i32>,
-    error_code: Option<&str>,
-    error_message: Option<&str>,
-    ack_payload: Option<Value>,
-    sent_at: Option<DateTime<Utc>>,
-    finished_at: Option<DateTime<Utc>>,
-    expected_version: i64,
-    now: DateTime<Utc>,
+    t: TaskTransition<'_>,
 ) -> Result<Option<WcsTaskRow>, DeviceError> {
+    let TaskTransition {
+        owner_id,
+        id,
+        from_statuses,
+        to,
+        retry_count,
+        error_code,
+        error_message,
+        ack_payload,
+        sent_at,
+        finished_at,
+        expected_version,
+        now,
+    } = t;
     let result = sqlx::query_as::<_, WcsTaskRow>(&format!(
         r#"
         UPDATE wcs_tasks
@@ -188,7 +206,6 @@ pub(crate) async fn transition(
     Ok(result)
 }
 
-/// 按设备+库位找未终态指定类型任务（PTL 亮灯互斥 / 事件认领）。
 pub(crate) async fn find_active_task_by_device_location(
     pool: &PgPool,
     owner_id: Uuid,
@@ -332,23 +349,25 @@ pub(crate) async fn link_event_to_task(
     Ok(())
 }
 
-/// 同事务状态推进（账务与状态必须同一事务，I7）。签名与 transition 一致。
-#[allow(clippy::too_many_arguments)]
+/// 同事务状态推进（账务与状态必须同一事务，I7）。
 pub(crate) async fn transition_in_tx(
     tx: &mut Transaction<'_, Postgres>,
-    owner_id: Uuid,
-    id: Uuid,
-    from_statuses: &[&str],
-    to: &str,
-    retry_count: Option<i32>,
-    error_code: Option<&str>,
-    error_message: Option<&str>,
-    ack_payload: Option<Value>,
-    sent_at: Option<DateTime<Utc>>,
-    finished_at: Option<DateTime<Utc>>,
-    expected_version: i64,
-    now: DateTime<Utc>,
+    t: TaskTransition<'_>,
 ) -> Result<Option<WcsTaskRow>, DeviceError> {
+    let TaskTransition {
+        owner_id,
+        id,
+        from_statuses,
+        to,
+        retry_count,
+        error_code,
+        error_message,
+        ack_payload,
+        sent_at,
+        finished_at,
+        expected_version,
+        now,
+    } = t;
     let result = sqlx::query_as::<_, WcsTaskRow>(&format!(
         r#"
         UPDATE wcs_tasks
@@ -386,7 +405,6 @@ pub(crate) async fn transition_in_tx(
     Ok(result)
 }
 
-/// 事件流查询（只读）：按设备/类型/时间窗倒序。
 pub(crate) async fn list_events(
     pool: &PgPool,
     warehouse_id: Uuid,

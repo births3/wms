@@ -378,7 +378,10 @@ async fn gwt21_retry_exhausted_then_resend_void(pool: PgPool) {
     assert_eq!(events, 1, "耗尽应写 H4 wcs_task_failed");
 
     // 人工重发 → sent 且 retry_count 归零
-    let resend = service.resend(&c, task_id).await.unwrap();
+    let resend = service
+        .resend(&c, task_id, "测试重发".into())
+        .await
+        .unwrap();
     assert_eq!(resend.status, "sent");
     assert_eq!(resend.retry_count, 0);
 

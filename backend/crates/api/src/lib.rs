@@ -32,6 +32,7 @@ pub mod config_center;
 pub mod deploy_audit;
 pub mod device_handlers;
 pub mod device_heartbeat_job;
+pub mod device_platform_error;
 pub mod device_repository;
 pub mod device_service;
 pub mod dock_appointment_handlers;

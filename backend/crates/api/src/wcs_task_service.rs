@@ -15,7 +15,7 @@ use crate::idempotency;
 use crate::wcs_task_repository::{
     clear_pod_unreachable, find_active_task_by_device_location, find_task_by_idempotency, get_task,
     insert_task, list_tasks, location_is_unreachable, set_pod_unreachable, transition,
-    transition_in_tx, WcsTaskRow,
+    transition_in_tx, TaskTransition, WcsTaskRow, TASK_COLUMNS,
 };
 use wms_domain::{can_transition, is_terminal};
 
@@ -24,11 +24,6 @@ const ORPHAN_WINDOW_SECS: i64 = 30;
 pub(crate) const PTL_DIFF_RATIO: f64 = 0.2;
 pub(crate) const PTL_DIFF_MAX_ABS: i64 = 10;
 pub(crate) const RETRY_BACKOFF_SECS: [i64; 3] = [60, 300, 900];
-pub(crate) const TASK_COLUMNS: &str = "id, owner_id, task_no, task_type, device_id, location_id, \
-     business_ref_type, business_ref_no, payload, status, ack_payload, error_code, \
-     error_message, retry_count, max_retries, idempotency_key, sent_at, finished_at, \
-     created_by, version, updated_at";
-
 #[derive(Debug, Clone, Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct WcsTaskResponse {
     pub id: Uuid,
@@ -315,18 +310,20 @@ impl WcsTaskService {
         }
         let row = transition(
             &self.pool,
-            task.owner_id,
-            task_id,
-            &["pending"],
-            "sent",
-            None,
-            None,
-            None,
-            None,
-            Some(now),
-            None,
-            task.version,
-            now,
+            TaskTransition {
+                owner_id: task.owner_id,
+                id: task_id,
+                from_statuses: &["pending"],
+                to: "sent",
+                retry_count: None,
+                error_code: None,
+                error_message: None,
+                ack_payload: None,
+                sent_at: Some(now),
+                finished_at: None,
+                expected_version: task.version,
+                now,
+            },
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
@@ -362,18 +359,20 @@ impl WcsTaskService {
                 }
                 let row = transition(
                     &self.pool,
-                    task.owner_id,
-                    task_id,
-                    &["sent", "timeout"],
-                    "executing",
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    task.version,
-                    now,
+                    TaskTransition {
+                        owner_id: task.owner_id,
+                        id: task_id,
+                        from_statuses: &["sent", "timeout"],
+                        to: "executing",
+                        retry_count: None,
+                        error_code: None,
+                        error_message: None,
+                        ack_payload: None,
+                        sent_at: None,
+                        finished_at: None,
+                        expected_version: task.version,
+                        now,
+                    },
                 )
                 .await?
                 .ok_or(DeviceError::TaskStateInvalid)?;
@@ -399,18 +398,20 @@ impl WcsTaskService {
                 }
                 let row = transition(
                     &self.pool,
-                    task.owner_id,
-                    task_id,
-                    &["sent", "executing", "timeout"],
-                    "succeeded",
-                    None,
-                    None,
-                    None,
-                    Some(json!({"outcome": "success"})),
-                    Some(now),
-                    None,
-                    task.version,
-                    now,
+                    TaskTransition {
+                        owner_id: task.owner_id,
+                        id: task_id,
+                        from_statuses: &["sent", "executing", "timeout"],
+                        to: "succeeded",
+                        retry_count: None,
+                        error_code: None,
+                        error_message: None,
+                        ack_payload: Some(json!({"outcome": "success"})),
+                        sent_at: Some(now),
+                        finished_at: None,
+                        expected_version: task.version,
+                        now,
+                    },
                 )
                 .await?
                 .ok_or(DeviceError::TaskStateInvalid)?;
@@ -436,18 +437,20 @@ impl WcsTaskService {
                 };
                 let row = transition(
                     &self.pool,
-                    task.owner_id,
-                    task_id,
-                    &["sent", "executing", "timeout"],
-                    to,
-                    Some(new_retry),
-                    error_code,
-                    Some("设备侧失败回执"),
-                    Some(json!({"outcome": "failed", "error_code": error_code})),
-                    if exhausted { None } else { Some(now) },
-                    if exhausted { Some(now) } else { None },
-                    task.version,
-                    now,
+                    TaskTransition {
+                        owner_id: task.owner_id,
+                        id: task_id,
+                        from_statuses: &["sent", "executing", "timeout"],
+                        to: to,
+                        retry_count: Some(new_retry),
+                        error_code: error_code,
+                        error_message: Some("设备侧失败回执"),
+                        ack_payload: Some(json!({"outcome": "failed", "error_code": error_code})),
+                        sent_at: if exhausted { None } else { Some(now) },
+                        finished_at: if exhausted { Some(now) } else { None },
+                        expected_version: task.version,
+                        now,
+                    },
                 )
                 .await?
                 .ok_or(DeviceError::TaskStateInvalid)?;
@@ -520,11 +523,12 @@ impl WcsTaskService {
         Ok(total)
     }
 
-    /// 人工重发（仅 failed / timeout）：重置 retry_count 重新入队。
+    /// 人工重发（仅 failed / timeout）：重置 retry_count 重新入队（原因记入 ack_payload）。
     pub async fn resend(
         &self,
         ctx: &AuthContext,
         task_id: Uuid,
+        reason: String,
     ) -> Result<WcsTaskResponse, DeviceError> {
         let now = Utc::now();
         let task = get_task(&self.pool, ctx.owner_id, task_id)
@@ -535,18 +539,20 @@ impl WcsTaskService {
         }
         let row = transition(
             &self.pool,
-            task.owner_id,
-            task_id,
-            &["failed", "timeout"],
-            "sent",
-            Some(0),
-            None,
-            Some("人工重发"),
-            None,
-            Some(now),
-            None,
-            task.version,
-            now,
+            TaskTransition {
+                owner_id: task.owner_id,
+                id: task_id,
+                from_statuses: &["failed", "timeout"],
+                to: "sent",
+                retry_count: Some(0),
+                error_code: None,
+                error_message: Some("人工重发"),
+                ack_payload: None,
+                sent_at: Some(now),
+                finished_at: None,
+                expected_version: task.version,
+                now,
+            },
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
@@ -579,18 +585,20 @@ impl WcsTaskService {
         }
         let row = transition(
             &self.pool,
-            task.owner_id,
-            task_id,
-            &["pending", "sent", "executing", "timeout", "failed"],
-            "failed",
-            None,
-            Some("M1_WCS_TASK_VOID"),
-            Some(&req.reason),
-            Some(json!({"voided": true, "reason": req.reason})),
-            None,
-            Some(now),
-            task.version,
-            now,
+            TaskTransition {
+                owner_id: task.owner_id,
+                id: task_id,
+                from_statuses: &["pending", "sent", "executing", "timeout", "failed"],
+                to: "failed",
+                retry_count: None,
+                error_code: Some("M1_WCS_TASK_VOID"),
+                error_message: Some(&req.reason),
+                ack_payload: Some(json!({"voided": true, "reason": req.reason})),
+                sent_at: None,
+                finished_at: Some(now),
+                expected_version: task.version,
+                now,
+            },
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
@@ -664,22 +672,24 @@ impl WcsTaskService {
         }
         let row = transition_in_tx(
             &mut tx,
-            task.owner_id,
-            task.id,
-            &["sent", "executing", "timeout", "failed"],
-            "succeeded",
-            None,
-            None,
-            None,
-            Some(json!({
-                "settled_by_skip": true,
-                "operator_id": ctx.user_id,
-                "operator_name": ctx.actor_name
-            })),
-            None,
-            Some(now),
-            task.version,
-            now,
+            TaskTransition {
+                owner_id: task.owner_id,
+                id: task.id,
+                from_statuses: &["sent", "executing", "timeout", "failed"],
+                to: "succeeded",
+                retry_count: None,
+                error_code: None,
+                error_message: None,
+                ack_payload: Some(json!({
+                    "settled_by_skip": true,
+                    "operator_id": ctx.user_id,
+                    "operator_name": ctx.actor_name
+                })),
+                sent_at: None,
+                finished_at: Some(now),
+                expected_version: task.version,
+                now,
+            },
         )
         .await?
         .ok_or(DeviceError::TaskStateInvalid)?;
