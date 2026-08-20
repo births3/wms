@@ -18,6 +18,8 @@ import {
 import { usePageQueryState } from "@/lib/use-page-query-state";
 import { useDialogState } from "@/lib/use-dialog-state";
 import {
+  useConfirmSkipWcsTaskMutation,
+  useDeviceDashboardQuery,
   useResendWcsTaskMutation,
   useVoidWcsTaskMutation,
   useWcsTasksQuery,
@@ -60,17 +62,21 @@ export function M1DeviceDashboardPage() {
   const { draftQuery, setDraftQuery, appliedQuery, applyQuery, resetQuery } =
     usePageQueryState<QueryValue>(() => defaultQuery, normalizeQuery);
   const listQuery = useWcsTasksQuery(appliedQuery);
+  const dashboardQuery = useDeviceDashboardQuery();
   const resendMutation = useResendWcsTaskMutation();
   const voidMutation = useVoidWcsTaskMutation();
+  const confirmSkipMutation = useConfirmSkipWcsTaskMutation();
   const [selected, setSelected] = React.useState<string[]>([]);
   const resendDialog = useDialogState<WcsTask>();
   const voidDialog = useDialogState<WcsTask>();
+  const skipDialog = useDialogState<WcsTask>();
   const [reason, setReason] = React.useState("");
   const [notice, setNotice] = React.useState<Notice>(null);
 
   const rows = listQuery.data ?? [];
   const selectedRow = rows.find((row) => row.id === selected[0]);
-  const busy = resendMutation.isPending || voidMutation.isPending;
+  const busy = resendMutation.isPending || voidMutation.isPending || confirmSkipMutation.isPending;
+  const summary = dashboardQuery.data;
 
   const columns: DataGridColumn<WcsTask>[] = [
     { key: "task_no", header: "任务号", width: 180, sortable: true, filterValue: (row) => row.task_no, copyValue: (row) => row.task_no },
@@ -111,6 +117,19 @@ export function M1DeviceDashboardPage() {
         }
       },
     },
+    {
+      key: "confirm-skip",
+      label: "跳过确认",
+      description: "现场已人工完成，凭证据补录账务",
+      disabled: (ctx) =>
+        ctx.selectedRowKeys.length !== 1 || busy || selectedRow?.status === "succeeded",
+      onClick: () => {
+        if (selectedRow) {
+          setReason("");
+          skipDialog.openWith(selectedRow);
+        }
+      },
+    },
   ];
 
   async function onSubmitResend() {
@@ -137,10 +156,30 @@ export function M1DeviceDashboardPage() {
     }
   }
 
+  async function onSubmitSkip() {
+    const target = skipDialog.target;
+    if (!target) return;
+    try {
+      await confirmSkipMutation.mutateAsync({ id: target.id, reason });
+      setNotice({ kind: "success", text: "已跳过确认并补录账务" });
+      skipDialog.close();
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "跳过确认失败" });
+    }
+  }
+
   return (
     <ListPageTemplate
       data-testid="m1-device-dashboard-page"
-      notice={notice}
+      notice={
+        notice ??
+        (summary
+          ? {
+              kind: "success" as const,
+              text: `在线 ${summary.online_devices}/${summary.total_devices} · 待作业 ${summary.pending_tasks} · 失败 ${summary.failed_tasks} · 超时 ${summary.timeout_tasks} · 受影响库位 ${summary.affected_location_ids.length}`,
+            }
+          : null)
+      }
       queryFields={queryFields}
       coreQueryFieldKeys={defaultVisibleFieldKeys}
       queryValue={draftQuery}
@@ -196,6 +235,25 @@ export function M1DeviceDashboardPage() {
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => voidDialog.close()} disabled={busy}>取消</Button>
                 <Button type="button" variant="destructive" onClick={() => void onSubmitVoid()} disabled={busy || !reason}>作废</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={skipDialog.open} onOpenChange={(open) => !busy && skipDialog.setOpen(open)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>跳过确认</DialogTitle>
+                <DialogDescription>现场已人工完成时凭证据补录账务，已成功任务不可再确认。</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3">
+                <label className="text-sm">
+                  确认原因
+                  <Input value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1" />
+                </label>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => skipDialog.close()} disabled={busy}>取消</Button>
+                <Button type="button" onClick={() => void onSubmitSkip()} disabled={busy || !reason}>跳过确认</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

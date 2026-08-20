@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 
 export type Device = components["schemas"]["DeviceResponse"];
 export type WcsTask = components["schemas"]["WcsTaskResponse"];
+export type DeviceDashboardSummary = components["schemas"]["DeviceDashboardSummary"];
 export type RegisterDeviceRequest = components["schemas"]["RegisterDeviceRequest"];
 export type BindDeviceRequest = components["schemas"]["BindDeviceRequest"];
 
@@ -124,6 +125,16 @@ export function useWcsTasksQuery(filters?: WcsTaskListQuery) {
   });
 }
 
+export function useDeviceDashboardQuery() {
+  return useQuery<DeviceDashboardSummary, ApiError>({
+    queryKey: ["device", "dashboard"],
+    queryFn: async () => {
+      const result = await api.GET("/api/v1/device-dashboard");
+      return requireData(result.data, result.error, result.response.status, "设备大盘加载失败");
+    },
+  });
+}
+
 export function useResendWcsTaskMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -133,6 +144,22 @@ export function useResendWcsTaskMutation() {
         body: { reason },
       });
       return requireData(result.data, result.error, result.response.status, "任务重发失败");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: wcsTasksQueryKey });
+    },
+  });
+}
+
+export function useConfirmSkipWcsTaskMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const result = await api.POST("/api/v1/wcs-tasks/{id}/confirm-skip", {
+        params: { path: { id } },
+        body: { reason },
+      });
+      return requireData(result.data, result.error, result.response.status, "跳过确认失败");
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: wcsTasksQueryKey });

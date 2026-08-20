@@ -287,7 +287,7 @@ export function M1DevicePage() {
       </Dialog>
 
       {notice && (
-        <div className={`rounded border p-2 text-sm ${notice.kind === "success" ? "border-emerald-600/40 text-emerald-700 dark:text-emerald-300" : "border-destructive/40 text-destructive"}`}>
+        <div className={`rounded border p-2 text-sm ${notice.kind === "success" ? "border-wms-success/30 bg-wms-success/10 text-wms-success" : "border-destructive/40 text-destructive"}`}>
           {notice.text}
         </div>
       )}

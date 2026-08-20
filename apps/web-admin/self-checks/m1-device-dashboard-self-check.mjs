@@ -25,9 +25,12 @@ assert.match(page, /指令类型/, "固定列应含指令类型");
 assert.match(page, /重试次数/, "固定列应含重试次数");
 assert.match(page, /重发/, "私有动作应含重发");
 assert.match(page, /作废/, "私有动作应含作废");
+assert.match(page, /跳过确认/, "私有动作应含跳过确认");
 assert.doesNotMatch(queries, /\bfetch\s*\(/, "指令查询必须统一使用生成的 api-client");
 assert.match(queries, /api\.GET\("\/api\/v1\/wcs-tasks"/, "列表必须使用指令任务列表 API");
+assert.match(queries, /api\.GET\("\/api\/v1\/device-dashboard"/, "大盘必须使用设备大盘 API");
 assert.match(queries, /api\.POST\("\/api\/v1\/wcs-tasks\/\{id\}\/resend"/, "重发必须使用重发 API");
 assert.match(queries, /api\.POST\("\/api\/v1\/wcs-tasks\/\{id\}\/void"/, "作废必须使用作废 API");
+assert.match(queries, /api\.POST\("\/api\/v1\/wcs-tasks\/\{id\}\/confirm-skip"/, "跳过确认必须使用 confirm-skip API");
 
 console.log("m1 device dashboard self-check passed");
