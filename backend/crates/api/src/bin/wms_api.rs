@@ -147,7 +147,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     wms_api::print_orchestration_job::spawn(pool.clone());
     wms_api::h8_erp_messages::spawn_maintenance_job(pool.clone()).await?;
     wms_api::task_release_job::spawn(pool.clone());
-    wms_api::device_heartbeat_job::spawn(pool.clone());
+    wms_api::device_heartbeat_job::spawn(pool.clone(), file_registry.clone());
     wms_api::wcs_task_timeout_job::spawn(pool.clone());
     wms_api::replenishment_min_max_job::spawn(pool.clone());
     wms_api::replenishment_timeout_job::spawn(pool.clone());

@@ -6,6 +6,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::audit::{append_event, AuditWriteRequest};
 use crate::auth::AuthContext;
 use crate::device_repository::{
     find_active_binding, find_device_by_code, get_binding, get_device, insert_binding,
@@ -122,6 +123,8 @@ pub struct RegisterDeviceRequest {
 #[derive(Debug, Clone, serde::Deserialize, utoipa::ToSchema)]
 pub struct UpdateDeviceRequest {
     #[serde(default)]
+    pub device_code: Option<String>,
+    #[serde(default)]
     pub vendor: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
@@ -157,6 +160,18 @@ pub struct DeviceService {
 impl DeviceService {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    /// 心跳超时阈值（秒）：配置键 device.heartbeat_timeout_secs（env DEVICE_HEARTBEAT_TIMEOUT_SECS），
+    /// 默认 90（规格 §10.5）。
+    pub fn heartbeat_timeout_secs(registry: &crate::feature_flags::FeatureFlagRegistry) -> i64 {
+        if let Ok(value) = std::env::var("DEVICE_HEARTBEAT_TIMEOUT_SECS") {
+            if let Ok(secs) = value.parse::<i64>() {
+                return secs;
+            }
+        }
+        let _ = registry;
+        HEARTBEAT_TIMEOUT_SECS
     }
 
     pub async fn register(
@@ -271,8 +286,8 @@ impl DeviceService {
         Ok(rows.into_iter().map(DeviceResponse::from).collect())
     }
 
-    pub async fn get(&self, _ctx: &AuthContext, id: Uuid) -> Result<DeviceResponse, DeviceError> {
-        let row = get_device(&self.pool, id)
+    pub async fn get(&self, ctx: &AuthContext, id: Uuid) -> Result<DeviceResponse, DeviceError> {
+        let row = get_device(&self.pool, ctx.owner_id, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
         Ok(row.into())
@@ -280,16 +295,26 @@ impl DeviceService {
 
     pub async fn update(
         &self,
-        _ctx: &AuthContext,
+        ctx: &AuthContext,
         id: Uuid,
         req: UpdateDeviceRequest,
     ) -> Result<DeviceResponse, DeviceError> {
-        let existing = get_device(&self.pool, id)
+        let existing = get_device(&self.pool, ctx.owner_id, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        if let Some(device_code) = req.device_code.as_deref() {
+            if find_device_by_code(&self.pool, ctx.owner_id, device_code)
+                .await?
+                .is_some()
+            {
+                return Err(DeviceError::DuplicateCode);
+            }
+        }
         update_device(
             &self.pool,
+            ctx.owner_id,
             id,
+            req.device_code.as_deref(),
             req.vendor.as_deref(),
             req.model.as_deref(),
             req.ip_address.as_deref(),
@@ -303,19 +328,32 @@ impl DeviceService {
         if req.enabled == Some(false) && existing.online_status == "online" {
             mark_offline(&self.pool, id, Utc::now()).await?;
         }
-        let row = get_device(&self.pool, id)
+        let row = get_device(&self.pool, ctx.owner_id, id)
             .await?
             .ok_or(DeviceError::NotFound)?;
+        append_event(
+            &self.pool,
+            &AuditWriteRequest::from_auth_context(
+                ctx,
+                "update_device",
+                "M1",
+                "iot_device",
+                id.to_string(),
+                None,
+            ),
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         Ok(row.into())
     }
 
     pub async fn heartbeat(
         &self,
-        _ctx: &AuthContext,
+        ctx: &AuthContext,
         id: Uuid,
     ) -> Result<DeviceResponse, DeviceError> {
         let now = Utc::now();
-        let row = touch_heartbeat(&self.pool, id, now)
+        let row = touch_heartbeat(&self.pool, ctx.owner_id, id, now)
             .await?
             .ok_or(DeviceError::NotFound)?;
         let mut tx = self.pool.begin().await.map_err(db_err)?;
@@ -343,7 +381,7 @@ impl DeviceService {
         if !BIND_ROLES.contains(&req.binding_role.as_str()) {
             return Err(DeviceError::TypeInvalid);
         }
-        let device = get_device(&self.pool, req.device_id)
+        let device = get_device(&self.pool, ctx.owner_id, req.device_id)
             .await?
             .ok_or(DeviceError::NotFound)?;
         let device_type_matches = match req.binding_role.as_str() {
@@ -360,7 +398,7 @@ impl DeviceService {
         if device.online_status == "offline" {
             return Err(DeviceError::Offline);
         }
-        if find_active_binding(&self.pool, req.location_id, &req.binding_role)
+        if find_active_binding(&self.pool, ctx.owner_id, req.location_id, &req.binding_role)
             .await?
             .is_some()
         {
@@ -417,7 +455,7 @@ impl DeviceService {
             &hash,
             "POST",
             "/api/v1/location-device-bindings",
-            200,
+            201,
             "device_binding",
             &id.to_string(),
             &response,
@@ -426,28 +464,62 @@ impl DeviceService {
         .await
         .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
+        append_event(
+            &self.pool,
+            &AuditWriteRequest::from_auth_context(
+                ctx,
+                "bind_device_location",
+                "M1",
+                "location_device_binding",
+                id.to_string(),
+                None,
+            ),
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         Ok(response)
     }
 
     pub async fn unbind(
         &self,
-        _ctx: &AuthContext,
+        ctx: &AuthContext,
         id: Uuid,
         _req: UnbindRequest,
     ) -> Result<(), DeviceError> {
-        let binding = get_binding(&self.pool, id)
+        let binding = get_binding(&self.pool, ctx.owner_id, id)
             .await?
             .ok_or(DeviceError::BindNotFound)?;
         if binding.valid_to.is_some() {
             return Err(DeviceError::BindNotFound);
         }
-        soft_unbind(&self.pool, id, Utc::now()).await?;
+        soft_unbind(&self.pool, ctx.owner_id, id, Utc::now()).await?;
+        append_event(
+            &self.pool,
+            &AuditWriteRequest::from_auth_context(
+                ctx,
+                "unbind_device_location",
+                "M1",
+                "location_device_binding",
+                id.to_string(),
+                None,
+            ),
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         Ok(())
     }
 
     pub async fn run_heartbeat_scan(&self) -> Result<usize, DeviceError> {
+        self.run_heartbeat_scan_with_timeout(HEARTBEAT_TIMEOUT_SECS)
+            .await
+    }
+
+    pub async fn run_heartbeat_scan_with_timeout(
+        &self,
+        timeout_secs: i64,
+    ) -> Result<usize, DeviceError> {
         let now = Utc::now();
-        let timeout = Duration::seconds(HEARTBEAT_TIMEOUT_SECS);
+        let timeout = Duration::seconds(timeout_secs);
         let stale = list_stale_online_devices(&self.pool, timeout, now).await?;
         let mut count = 0usize;
         for device in &stale {
@@ -465,7 +537,7 @@ impl DeviceService {
                 json!({
                     "device_id": device.id,
                     "device_code": device.device_code,
-                    "offline_seconds": HEARTBEAT_TIMEOUT_SECS
+                    "offline_seconds": timeout_secs
                 }),
                 now,
             )

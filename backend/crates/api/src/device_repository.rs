@@ -106,10 +106,15 @@ pub(crate) async fn find_device_by_code(
     .map_err(|error| DeviceError::Database(error.to_string()))
 }
 
-pub(crate) async fn get_device(pool: &PgPool, id: Uuid) -> Result<Option<DeviceRow>, DeviceError> {
+pub(crate) async fn get_device(
+    pool: &PgPool,
+    warehouse_id: Uuid,
+    id: Uuid,
+) -> Result<Option<DeviceRow>, DeviceError> {
     sqlx::query_as::<_, DeviceRow>(&format!(
-        "SELECT {DEVICE_COLUMNS} FROM iot_devices WHERE id = $1"
+        "SELECT {DEVICE_COLUMNS} FROM iot_devices WHERE warehouse_id = $1 AND id = $2"
     ))
+    .bind(warehouse_id)
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -145,7 +150,9 @@ pub(crate) async fn list_devices(
 
 pub(crate) async fn update_device(
     pool: &PgPool,
+    warehouse_id: Uuid,
     id: Uuid,
+    device_code: Option<&str>,
     vendor: Option<&str>,
     model: Option<&str>,
     ip_address: Option<&str>,
@@ -157,17 +164,20 @@ pub(crate) async fn update_device(
     sqlx::query(
         r#"
         UPDATE iot_devices
-           SET vendor = COALESCE($2, vendor),
-               model = COALESCE($3, model),
-               ip_address = COALESCE($4, ip_address),
-               port = COALESCE($5, port),
-               extra_config = COALESCE($6, extra_config),
-               enabled = COALESCE($7, enabled),
-               updated_at = $8
-         WHERE id = $1
+           SET device_code = COALESCE($2, device_code),
+               vendor = COALESCE($3, vendor),
+               model = COALESCE($4, model),
+               ip_address = COALESCE($5, ip_address),
+               port = COALESCE($6, port),
+               extra_config = COALESCE($7, extra_config),
+               enabled = COALESCE($8, enabled),
+               updated_at = $9
+         WHERE warehouse_id = $1
+           AND id = $10
         "#,
     )
-    .bind(id)
+    .bind(warehouse_id)
+    .bind(device_code)
     .bind(vendor)
     .bind(model)
     .bind(ip_address)
@@ -175,6 +185,7 @@ pub(crate) async fn update_device(
     .bind(extra_config)
     .bind(enabled)
     .bind(now)
+    .bind(id)
     .execute(pool)
     .await
     .map_err(|error| DeviceError::Database(error.to_string()))?;
@@ -183,19 +194,22 @@ pub(crate) async fn update_device(
 
 pub(crate) async fn touch_heartbeat(
     pool: &PgPool,
+    warehouse_id: Uuid,
     id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<Option<DeviceRow>, DeviceError> {
     sqlx::query_as::<_, DeviceRow>(&format!(
         r#"
         UPDATE iot_devices
-           SET last_heartbeat_at = $2,
+           SET last_heartbeat_at = $3,
                online_status = CASE WHEN enabled THEN 'online' ELSE 'disabled' END,
-               updated_at = $2
-         WHERE id = $1
+               updated_at = $3
+         WHERE warehouse_id = $1
+           AND id = $2
          RETURNING {DEVICE_COLUMNS}
         "#
     ))
+    .bind(warehouse_id)
     .bind(id)
     .bind(now)
     .fetch_optional(pool)
@@ -278,6 +292,7 @@ pub(crate) async fn insert_binding(
 
 pub(crate) async fn find_active_binding(
     pool: &PgPool,
+    warehouse_id: Uuid,
     location_id: Uuid,
     binding_role: &str,
 ) -> Result<Option<BindingRow>, DeviceError> {
@@ -286,9 +301,10 @@ pub(crate) async fn find_active_binding(
         SELECT id, warehouse_id, location_id, device_id, binding_role, point_address,
                valid_from, valid_to
           FROM location_device_bindings
-         WHERE location_id = $1 AND binding_role = $2 AND valid_to IS NULL
+         WHERE warehouse_id = $1 AND location_id = $2 AND binding_role = $3 AND valid_to IS NULL
         "#,
     )
+    .bind(warehouse_id)
     .bind(location_id)
     .bind(binding_role)
     .fetch_optional(pool)
@@ -298,6 +314,7 @@ pub(crate) async fn find_active_binding(
 
 pub(crate) async fn get_binding(
     pool: &PgPool,
+    warehouse_id: Uuid,
     id: Uuid,
 ) -> Result<Option<BindingRow>, DeviceError> {
     sqlx::query_as::<_, BindingRow>(
@@ -305,9 +322,10 @@ pub(crate) async fn get_binding(
         SELECT id, warehouse_id, location_id, device_id, binding_role, point_address,
                valid_from, valid_to
           FROM location_device_bindings
-         WHERE id = $1
+         WHERE warehouse_id = $1 AND id = $2
         "#,
     )
+    .bind(warehouse_id)
     .bind(id)
     .fetch_optional(pool)
     .await
@@ -316,16 +334,18 @@ pub(crate) async fn get_binding(
 
 pub(crate) async fn soft_unbind(
     pool: &PgPool,
+    warehouse_id: Uuid,
     id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<(), DeviceError> {
     sqlx::query(
         r#"
         UPDATE location_device_bindings
-           SET valid_to = $2, updated_at = $2
-         WHERE id = $1
+           SET valid_to = $3, updated_at = $3
+         WHERE warehouse_id = $1 AND id = $2
         "#,
     )
+    .bind(warehouse_id)
     .bind(id)
     .bind(now)
     .execute(pool)
