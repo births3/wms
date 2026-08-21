@@ -1,7 +1,16 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use chrono::{NaiveDate, Utc};
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::wave3_repository::PgWave3Repository;
-use wms_api::{audit::AuditWriteRequest, auth::AuthContext};
+use wms_api::{
+    audit::AuditWriteRequest,
+    auth::AuthContext,
+    wave3_handlers::{wave3_router, Wave3AppState},
+};
 use wms_domain::{
     ChangeInventoryStatusRequest, HandleInventoryAlertRequest, InventoryAbcQuery,
     InventoryAlertQuery, OverrideInventoryAbcRequest, RecomputeInventoryAbcRequest,
@@ -489,4 +498,73 @@ async fn generate_maintenance_tasks_for_near_expiry_batches(pool: sqlx::PgPool) 
     .expect("maintenance generation audit should query");
     assert_eq!(generation_audit_count, 1);
     assert!(!tasks.is_empty());
+}
+
+async fn forbidden_m3_ops(
+    pool: sqlx::PgPool,
+    method: &str,
+    uri: String,
+    permissions: &[&str],
+    body: String,
+) {
+    let app = wave3_router(Wave3AppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", "application/json")
+        .header("idempotency-key", "m3-ops-forbidden")
+        .body(Body::from(body))
+        .expect("m3 ops request should build");
+    request.extensions_mut().insert(AuthContext {
+        permissions: permissions
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
+        ..ctx(Uuid::new_v4())
+    });
+    let response = app
+        .oneshot(request)
+        .await
+        .expect("m3 ops route should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn relocate_http_requires_relocation_write_permission(pool: sqlx::PgPool) {
+    let batch_id = Uuid::new_v4();
+    let to_location_id = Uuid::new_v4();
+    forbidden_m3_ops(
+        pool,
+        "POST",
+        "/api/v1/inventory/relocations".to_string(),
+        &["m3.read"],
+        format!(
+            r#"{{"batch_id":"{batch_id}","qty":"1","to_location_id":"{to_location_id}","to_location_code":"A01-01-01-02"}}"#
+        ),
+    )
+    .await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn abc_write_http_requires_abc_write_permission(pool: sqlx::PgPool) {
+    forbidden_m3_ops(
+        pool,
+        "POST",
+        "/api/v1/inventory/abc".to_string(),
+        &["m3.abc.read", "m3.read"],
+        r#"{"period_days":30}"#.to_string(),
+    )
+    .await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn alert_handle_http_requires_alert_write_permission(pool: sqlx::PgPool) {
+    forbidden_m3_ops(
+        pool,
+        "POST",
+        format!("/api/v1/inventory/alerts/{}/handle", Uuid::new_v4()),
+        &["m3.alert.read", "m3.read"],
+        r#"{"lifecycle_status":"handled"}"#.to_string(),
+    )
+    .await;
 }

@@ -1,6 +1,12 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use chrono::{Duration, NaiveDate, Utc};
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::auth::AuthContext;
+use wms_api::wave3_handlers::{wave3_router, Wave3AppState};
 use wms_api::wave3_repository::PgWave3Repository;
 use wms_domain::LocationHistoryQuery;
 
@@ -131,4 +137,23 @@ async fn location_history_requires_location_code(pool: sqlx::PgPool) {
         error,
         wms_api::wave3_repository::Wave3RepositoryError::InvalidLocation
     ));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn location_history_http_requires_m3_read_or_write(pool: sqlx::PgPool) {
+    let app = wave3_router(Wave3AppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .method("GET")
+        .uri("/api/v1/inventory/locations/history?location_code=A01-01-01-01")
+        .body(Body::empty())
+        .expect("location history request should build");
+    request.extensions_mut().insert(AuthContext {
+        permissions: vec!["m2.write".to_string()],
+        ..ctx(Uuid::new_v4())
+    });
+    let response = app
+        .oneshot(request)
+        .await
+        .expect("location history should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
