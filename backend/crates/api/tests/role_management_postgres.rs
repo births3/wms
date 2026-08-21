@@ -698,3 +698,32 @@ async fn user_creation_is_owner_scoped_idempotent_atomic_and_audited(pool: PgPoo
         .expect("duplicate user response");
     assert_eq!(duplicate.status(), StatusCode::CONFLICT);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn role_write_rejects_missing_manage_permission(pool: PgPool) {
+    std::env::set_var("WMS_JWT_SECRET", "role-test-secret");
+    let (owner, _other, admin, _token) = seed(&pool).await;
+    let store = std::sync::Arc::new(MemoryRevocations::default());
+    let app = role_management_router(RoleManagementState::new(pool, store.clone()))
+        .layer(auth_runtime_layer(AuthRuntimePolicy::strict(store)));
+    let claims = build_access_claims(
+        admin,
+        owner,
+        "无角色管理权限",
+        vec!["m2.receive".into()],
+        "forbidden-jti",
+        chrono::Utc::now(),
+    );
+    let token = encode_access_token(&claims, "role-test-secret").expect("token");
+    let response = app
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/auth/roles".into(),
+            &token,
+            Some("create-forbidden"),
+            serde_json::json!({"role_code":"forbidden","role_name":"不应创建","data_scope":"warehouse","parent_role_id":null}),
+        ))
+        .await
+        .expect("forbidden create response");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
