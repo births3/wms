@@ -454,4 +454,36 @@ mod tests {
 
         assert!(ensure_scope_query(&ctx, &connector, "x_wmsinter_GoodsInfo", None).is_err());
     }
+
+    #[tokio::test]
+    async fn list_connectors_requires_interface_table_read() {
+        use axum::extract::State;
+
+        use crate::{
+            auth::{AuthContext, AuthError},
+            h8_erp_connectors::H8ErpConnectorAppState,
+            h8_erp_interface_tables::error::H8InterfaceTableHandlerError,
+        };
+
+        let connectors = H8ErpConnectorAppState::with_memory();
+        let state = crate::h8_erp_interface_tables::state::H8ErpInterfaceTableAppState::with_memory(
+            connectors.repository,
+        );
+        let ctx = AuthContext {
+            user_id: Uuid::new_v4(),
+            owner_id: Uuid::new_v4(),
+            actor_name: "h8-adv".to_string(),
+            permissions: vec![],
+            jti: Uuid::new_v4().to_string(),
+            warehouse_scope: None,
+        };
+        let error = super::list_connectors(ctx, State(state))
+            .await
+            .expect_err("missing read permission should fail");
+        assert!(matches!(
+            error,
+            H8InterfaceTableHandlerError::Auth(AuthError::PermissionDenied(permission))
+                if permission == "h8.erp_interface_table.read"
+        ));
+    }
 }
