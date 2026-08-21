@@ -70,9 +70,10 @@ def test_module_completion_rejects_deferred_stories():
         ],
     }
 
-    assert check_module_completion(matrix, "M2") == [
-        Issue("US-M2-002", "module_completion", "模块 M2 仍有延期故事: 收货"),
-    ]
+    assert (
+        Issue("US-M2-002", "module_completion", "模块 M2 仍有延期故事: 收货")
+        in check_module_completion(matrix, "M2")
+    )
 
 
 def test_quality_matrix_rejects_non_strict_dimension_status():

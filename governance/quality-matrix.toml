@@ -150,6 +150,11 @@ title = "系统字典中心"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "config_rule", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/adversarial_catalog_postgres.rs::rejects_cross_owner_dictionary_write_without_leaking_override" },
+  { id = "A2", test = "backend/crates/api/src/system_dictionary_handlers.rs::write_handler_checks_permission_before_idempotency_or_database" },
+  { id = "A4", test = "backend/crates/api/tests/adversarial_catalog_postgres.rs::dictionary_override_replays_same_key_and_rejects_payload_conflict" },
+]
 frontend_pages = ["m1-system-dictionary"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 e2e_checks = ["just web-admin-m1-real-e2e"]
@@ -190,6 +195,11 @@ title = "Token 失效与登出"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["write", "api_change", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/auth.rs::jwt_claims_decode_to_owner_scoped_auth_context" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A4", test = "backend/crates/api/src/auth.rs::logout_decoder_accepts_expired_signed_token_for_idempotence" },
+]
 frontend_pages = ["h1-session-management"]
 e2e_checks = [
   "node apps/web-admin/self-checks/h1-session-page-self-check.mjs",
@@ -249,6 +259,11 @@ title = "API Key 生命周期管理"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["write", "api_change", "frontend_interaction", "integration"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/auth.rs::jwt_claims_decode_to_owner_scoped_auth_context" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A4", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit" },
+]
 frontend_pages = ["h1-api-keys"]
 navigation_checks = ["node apps/web-admin/self-checks/h1-api-key-slice-self-check.mjs"]
 e2e_checks = [
@@ -304,6 +319,11 @@ title = "仓库与库位管理"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "api_change", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/system_dictionary_postgres.rs::document_type_impact_preview_counts_owner_scoped_m2_and_m4_references" },
+  { id = "A3", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::update_rejects_invalid_status" },
+  { id = "A4", test = "backend/crates/api/tests/system_dictionary_postgres.rs::special_drug_category_write_replays_once_and_is_queryable_with_one_audit" },
+]
 frontend_pages = ["m1-warehouses", "m1-zones", "m1-locations"]
 navigation_checks = [
   "node apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs",
@@ -380,6 +400,12 @@ title = "容器（LPN）管理"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "api_change", "frontend_interaction", "concurrent_resource"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::putaway_rejects_unusable_status_cross_location_and_other_owner" },
+  { id = "A3", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::update_rejects_invalid_status" },
+  { id = "A4", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::create_replays_same_idempotency_key_without_second_row" },
+  { id = "A7", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::concurrent_same_sku_batch_putaway_adds_qty" },
+]
 frontend_pages = ["m1-lpn-containers"]
 navigation_checks = ["node apps/web-admin/self-checks/m1-lpn-container-navigation-self-check.mjs"]
 e2e_checks = ["just web-admin-m1-real-e2e"]
@@ -448,6 +474,10 @@ title = "实时库存查询"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["read_only", "api_change", "frontend_interaction", "integration"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_expiry_isolation_postgres.rs::expired_batches_are_isolated_idempotently_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
+]
 frontend_pages = ["m3-batches"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
@@ -512,6 +542,10 @@ title = "库位历史追踪"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["read_only", "api_change", "frontend_interaction", "integration"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_location_history_postgres.rs::location_history_is_owner_scoped_and_filters_by_location_code" },
+  { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
+]
 frontend_pages = ["m3-location-history"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-location-history-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
@@ -578,6 +612,11 @@ title = "批次与效期管理"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["write", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_expiry_isolation_postgres.rs::expired_batches_are_isolated_idempotently_and_owner_scoped" },
+  { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_recall_postgres.rs::quality_recall_marks_batch_isolated_and_replays_idempotently" },
+]
 frontend_pages = ["m3-batches"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
 e2e_checks = [
@@ -642,6 +681,12 @@ title = "库存状态管理"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["write", "config_rule", "frontend_interaction", "integration"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_status_allocation_postgres.rs::inventory_quality_status_dictionary_prefers_owner_override_without_cross_owner_reads" },
+  { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
+  { id = "A6", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_submission_rejects_expired_and_unqualified_batches" },
+]
 frontend_pages = ["m3-batches", "m3-status-config"]
 navigation_checks = [
   "node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs",
@@ -703,6 +748,11 @@ title = "库存预警"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["read_only", "write", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::near_expiry_alerts_and_lifecycle_are_owner_scoped" },
+  { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
+]
 api_paths = [
   "GET /api/v1/inventory/alerts",
   "POST /api/v1/inventory/alerts/{id}/handle",
@@ -749,6 +799,12 @@ title = "ABC 分类管理"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "config_rule", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::near_expiry_alerts_and_lifecycle_are_owner_scoped" },
+  { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
+  { id = "A6", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_submission_rejects_expired_and_unqualified_batches" },
+]
 api_paths = [
   "GET /api/v1/inventory/abc",
   "POST /api/v1/inventory/abc",
@@ -794,6 +850,11 @@ title = "在库养护"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["read_only", "write", "api_change", "integration", "audit_compliance", "runtime_guard", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_tasks_and_records_are_owner_scoped_and_written_atomically" },
+  { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
+]
 frontend_pages = ["m3-maintenance"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
@@ -847,6 +908,14 @@ title = "库存盘点"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "api_change", "inventory_change", "concurrent_resource", "audit_compliance", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_inventory_count_postgres.rs::inventory_count_is_owner_scoped_and_blocks_new_allocations" },
+  { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_inventory_count_postgres.rs::inventory_count_blind_submission_approves_atomic_adjustment_and_replays" },
+  { id = "A5", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::relocate_inventory_moves_qty_atomically_and_rejects_quarantined" },
+  { id = "A6", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_submission_rejects_expired_and_unqualified_batches" },
+  { id = "A7", test = "backend/crates/api/tests/phase1_quality_lock_move_concurrency_postgres.rs::test_concurrent_distinct_keys_serialized_by_for_update_row_lock" },
+]
 frontend_pages = ["m3-counts"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
@@ -900,6 +969,14 @@ title = "库内移库"
 module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "inventory_change", "concurrent_resource", "audit_compliance", "integration", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::near_expiry_alerts_and_lifecycle_are_owner_scoped" },
+  { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
+  { id = "A5", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::relocate_inventory_moves_qty_atomically_and_rejects_quarantined" },
+  { id = "A6", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_submission_rejects_expired_and_unqualified_batches" },
+  { id = "A7", test = "backend/crates/api/tests/phase1_quality_lock_move_concurrency_postgres.rs::test_concurrent_distinct_keys_serialized_by_for_update_row_lock" },
+]
 frontend_pages = ["m3-relocations"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-ops-pages-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m3-real"]
@@ -948,6 +1025,12 @@ title = "设备中台（AGV/PTL/DWS/RFID）"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-device-platform.md"
 types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/system_dictionary_postgres.rs::document_type_impact_preview_counts_owner_scoped_m2_and_m4_references" },
+  { id = "A3", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::update_rejects_invalid_status" },
+  { id = "A4", test = "backend/crates/api/tests/m1_device_lifecycle_postgres.rs::gwt9_idempotent_register_replays" },
+  { id = "A7", test = "backend/crates/api/tests/m1_wcs_task_engine_postgres.rs::concurrent_ptl_light_on_keeps_one_active_task" },
+]
 dimensions = { requirement = "verified", fields = "verified", frontend = "verified", api = "verified", backend = "verified", database = "verified", security = "verified", audit = "verified", tests = "verified", evidence = "verified", docs = "verified", governance = "verified" }
 tests = { required_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"], covered_layers = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"] }
 test_checks = [
@@ -1039,6 +1122,11 @@ title = "用户登录与 token 签发（PC 密码登录切片）"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["write", "api_change", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/auth.rs::jwt_claims_decode_to_owner_scoped_auth_context" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A4", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit" },
+]
 frontend_pages = []
 api_paths = [
   "POST /api/v1/auth/login",
@@ -1069,6 +1157,11 @@ title = "角色与权限管理"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["write", "api_change", "frontend_interaction", "config_rule"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/role_management_postgres.rs::user_creation_is_owner_scoped_idempotent_atomic_and_audited" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A4", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit" },
+]
 frontend_pages = ["h1-role-permission"]
 e2e_checks = [
   "node apps/web-admin/self-checks/h1-role-permission-slice-self-check.mjs",
@@ -1130,6 +1223,10 @@ title = "API 鉴权中间件"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["read_only", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/auth.rs::jwt_claims_decode_to_owner_scoped_auth_context" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+]
 frontend_pages = []
 api_paths = []
 
@@ -1161,6 +1258,10 @@ title = "多货主数据隔离（AuthContext 切片）"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["read_only", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/auth.rs::jwt_claims_decode_to_owner_scoped_auth_context" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+]
 frontend_pages = []
 api_paths = []
 
@@ -1215,6 +1316,10 @@ title = "审计事件统一记录（同步 append-only 切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/audit_postgres.rs::export_events_walks_all_matching_pages_without_cross_owner_rows" },
+  { id = "A4", test = "backend/crates/api/tests/h2_lifecycle_postgres.rs::event_bus_acknowledges_and_replays_deliveries" },
+]
 frontend_pages = []
 api_paths = []
 
@@ -1263,6 +1368,9 @@ title = "append-only 不变量保护"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/audit_postgres.rs::export_events_walks_all_matching_pages_without_cross_owner_rows" },
+]
 frontend_pages = []
 api_paths = []
 
@@ -1294,6 +1402,10 @@ title = "审计数据归档与保留（后端归档运行切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/audit_postgres.rs::export_events_walks_all_matching_pages_without_cross_owner_rows" },
+  { id = "A4", test = "backend/crates/api/tests/h2_lifecycle_postgres.rs::event_bus_acknowledges_and_replays_deliveries" },
+]
 frontend_pages = []
 api_paths = [
   "GET /api/v1/audit/archive/partitions",
@@ -1327,6 +1439,10 @@ title = "事件总线（DB outbox 与订阅投递切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/audit_postgres.rs::export_events_walks_all_matching_pages_without_cross_owner_rows" },
+  { id = "A4", test = "backend/crates/api/tests/h2_lifecycle_postgres.rs::event_bus_acknowledges_and_replays_deliveries" },
+]
 frontend_pages = []
 api_paths = [
   "GET /api/v1/event-bus/deliveries/pending",
@@ -1361,6 +1477,10 @@ title = "业务数据生命周期归档（后端策略与计划切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "config_rule", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/audit_postgres.rs::export_events_walks_all_matching_pages_without_cross_owner_rows" },
+  { id = "A4", test = "backend/crates/api/tests/h2_lifecycle_postgres.rs::event_bus_acknowledges_and_replays_deliveries" },
+]
 frontend_pages = []
 api_paths = [
   "GET /api/v1/business-retention/policies",
@@ -1456,6 +1576,10 @@ title = "API 限流与熔断"
 module = "H3"
 story_file = "docs/domain/user-stories-h3-contract.md"
 types = ["api_change", "runtime_guard", "config_rule", "audit_compliance"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/src/openapi_tests.rs::h6_openapi_declares_permission_denied_responses" },
+  { id = "A4", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit" },
+]
 frontend_pages = []
 api_paths = ["GET /api/v1/resilience/status", "GET /metrics"]
 test_checks = [
@@ -1680,6 +1804,9 @@ title = "状态机定义注册与转换校验"
 module = "H6"
 story_file = "docs/domain/user-stories-h6-state-machine.md"
 types = ["read_only", "api_change", "config_rule"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/src/openapi_tests.rs::h6_openapi_declares_permission_denied_responses" },
+]
 frontend_pages = []
 api_paths = [
   "GET /api/v1/state-machines",
@@ -1715,6 +1842,10 @@ title = "M4 出库状态执行切片"
 module = "H6"
 story_file = "docs/domain/user-stories-h6-state-machine.md"
 types = ["write", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/src/openapi_tests.rs::h6_openapi_declares_permission_denied_responses" },
+  { id = "A4", test = "backend/crates/api/tests/wave4_postgres/review.rs::outbound_complete_pick_review_ship_replays_and_deducts_inventory" },
+]
 frontend_pages = []
 api_paths = []
 database_objects = [
@@ -1770,6 +1901,10 @@ title = "打印模板类型字典"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "config_rule", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/system_dictionary_postgres.rs::document_type_impact_preview_counts_owner_scoped_m2_and_m4_references" },
+  { id = "A4", test = "backend/crates/api/tests/system_dictionary_postgres.rs::special_drug_category_write_replays_once_and_is_queryable_with_one_audit" },
+]
 frontend_pages = ["m1-system-dictionary", "h9-print-templates"]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
@@ -1822,6 +1957,10 @@ title = "字段库生成与字段元数据维护"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/h9_print_suite_postgres.rs::print_suite_test_lifecycle_replays_audits_and_rejects_rewrite" },
+]
 frontend_pages = ["h9-print-templates"]
 api_paths = [
   "GET /api/v1/print-templates/field-libraries",
@@ -1877,6 +2016,10 @@ title = "模板设计与版本管理"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/h9_print_suite_postgres.rs::print_suite_test_lifecycle_replays_audits_and_rejects_rewrite" },
+]
 frontend_pages = ["h9-print-templates"]
 api_paths = [
   "GET /api/v1/print-templates/templates",
@@ -1937,6 +2080,10 @@ title = "预览与浏览器打印"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "frontend_interaction", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/h9_print_suite_postgres.rs::print_suite_test_lifecycle_replays_audits_and_rejects_rewrite" },
+]
 frontend_pages = ["m2-receiving", "m2-inspecting"]
 api_paths = [
   "POST /api/v1/print-templates/preview",
@@ -1993,6 +2140,10 @@ title = "业务模块接入规则"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "frontend_interaction", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres/business_integration.rs::template_resolution_uses_explicit_owner_global_order_without_cross_owner_fallback" },
+  { id = "A4", test = "backend/crates/api/tests/h9_print_suite_postgres.rs::print_suite_test_lifecycle_replays_audits_and_rejects_rewrite" },
+]
 frontend_pages = [
   "m2-receiving",
   "m2-inspecting",
@@ -2068,6 +2219,11 @@ title = "随货同行单归集与截单"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/h9_print_orchestration_postgres.rs::manual_cutoff_freezes_one_boundary_numbers_audits_and_replays" },
+  { id = "A7", test = "backend/crates/api/tests/h9_print_orchestration_postgres.rs::scheduled_cutoff_uses_exception_time_and_concurrent_runs_create_one_group" },
+]
 frontend_pages = ["h9-delivery-note-aggregation"]
 navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
 api_paths = [
@@ -2146,6 +2302,10 @@ title = "归集维度规则配置"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/h9_aggregation_rule_postgres.rs::aggregation_rule_test_lifecycle_replays_audits_and_rejects_rewrite" },
+]
 frontend_pages = ["h9-delivery-note-aggregation"]
 navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
 api_paths = [
@@ -2212,6 +2372,11 @@ title = "打印组套配置与就绪策略"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/h9_print_suite_postgres.rs::print_suite_test_lifecycle_replays_audits_and_rejects_rewrite" },
+  { id = "A7", test = "backend/crates/api/tests/h9_print_orchestration_postgres.rs::scheduled_cutoff_uses_exception_time_and_concurrent_runs_create_one_group" },
+]
 frontend_pages = ["h9-delivery-note-aggregation"]
 navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
 api_paths = [
@@ -2289,6 +2454,10 @@ title = "分类 PDF 渲染与留存"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "integration", "api_change", "frontend_interaction", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/h9_print_suite_postgres/category_pdf.rs::failed_render_retries_same_instance_output_and_idempotency_key" },
+]
 frontend_pages = ["h9-delivery-note-aggregation"]
 navigation_checks = ["node apps/web-admin/self-checks/h9-delivery-note-aggregation-self-check.mjs"]
 api_paths = [
@@ -2916,6 +3085,11 @@ title = "告警定义注册"
 module = "AL"
 story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "config_rule", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/alert_definition_postgres.rs::alert_code_is_unique_per_owner_but_reusable_across_owners" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A6", test = "backend/crates/api/tests/alert_definition_postgres.rs::gsp_forced_alert_cannot_be_created_or_updated_as_disableable" },
+]
 frontend_pages = ["hal-alert-definitions"]
 navigation_checks = ["node apps/web-admin/self-checks/hal-alert-definition-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:hal-real"]
@@ -3036,6 +3210,11 @@ title = "告警升级机制"
 module = "AL"
 story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "config_rule", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/alert_definition_change_postgres.rs::approved_change_is_idempotent_owner_scoped_and_audited" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A6", test = "backend/crates/api/tests/alert_definition_change_postgres.rs::forced_alert_disable_rolls_back_mql_and_h4_approval" },
+]
 frontend_pages = ["hal-alert-escalations"]
 navigation_checks = ["node apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:hal-real"]
@@ -3105,6 +3284,10 @@ title = "告警看板与统计"
 module = "AL"
 story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/alert_definition_change_postgres.rs::approved_change_is_idempotent_owner_scoped_and_audited" },
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+]
 frontend_pages = ["hal-alert-dashboard"]
 navigation_checks = ["node apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:hal-real"]
@@ -3188,6 +3371,10 @@ title = "月台档案管理"
 module = "DOCK"
 story_file = "docs/domain/user-stories-h-dock-management.md"
 types = ["write", "api_change", "frontend_interaction", "integration"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/dock_postgres.rs::dock_appointments_rejects_cross_owner_warehouse_fk" },
+  { id = "A4", test = "backend/crates/api/src/dock_handlers.rs::idempotency_key_must_be_present_and_non_empty" },
+]
 frontend_pages = ["dock-management"]
 navigation_checks = ["node apps/web-admin/self-checks/m1-dock-management-navigation-self-check.mjs"]
 e2e_checks = ["just web-admin-m1-real-e2e"]
@@ -4275,6 +4462,11 @@ title = "WMS 入库资料录入与药检单复用"
 module = "DI"
 story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
 types = ["write", "api_change", "config_rule", "integration", "frontend_interaction", "critical_path", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/h_file_attachment_postgres.rs::attachment_upload_confirm_download_is_owner_scoped_idempotent_and_audited" },
+  { id = "A4", test = "backend/crates/api/tests/drug_inspection_openapi_contract.rs::drug_inspection_routes_publish_security_idempotency_and_error_contracts" },
+  { id = "A6", test = "backend/crates/api/tests/drug_inspection_acceptance_postgres.rs::acceptance_warns_or_blocks_missing_and_rejects_unqualified_without_blocking_copy_failure" },
+]
 frontend_pages = ["m2-inbound-documents", "m-di-platforms"]
 navigation_checks = [
   "node apps/web-admin/self-checks/m2-inbound-documents-page-self-check.mjs",
@@ -4383,6 +4575,11 @@ title = "药检单独立审核、版本与客户分发副本"
 module = "DI"
 story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
 types = ["write", "api_change", "frontend_interaction", "critical_path", "concurrent_resource", "audit_compliance", "monitoring"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/h_file_attachment_postgres.rs::attachment_upload_confirm_download_is_owner_scoped_idempotent_and_audited" },
+  { id = "A4", test = "backend/crates/customer-portal-api/tests/customer_portal_postgres.rs::projection_replay_is_idempotent_and_failures_enter_dead_letter" },
+  { id = "A6", test = "backend/crates/api/tests/drug_inspection_acceptance_postgres.rs::acceptance_warns_or_blocks_missing_and_rejects_unqualified_without_blocking_copy_failure" },
+]
 frontend_pages = ["m-di-review", "m-di-stamp"]
 navigation_checks = ["node apps/web-admin/self-checks/mdi-document-workflow-self-check.mjs"]
 e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-web-admin-mdi-real-config.ts"]
@@ -4484,6 +4681,10 @@ title = "独立客户药检单平台"
 module = "DI"
 story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "integration", "permission", "audit_compliance", "monitoring"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/h_file_attachment_postgres.rs::attachment_upload_confirm_download_is_owner_scoped_idempotent_and_audited" },
+  { id = "A4", test = "backend/crates/customer-portal-api/tests/customer_portal_postgres.rs::projection_replay_is_idempotent_and_failures_enter_dead_letter" },
+]
 frontend_pages = []
 e2e_checks = ["pnpm --dir prototypes exec playwright test --config=playwright-customer-portal-real-config.ts"]
 e2e_screenshots = [
@@ -4598,6 +4799,11 @@ title = "药检单有效性与质量联动"
 module = "DI"
 story_file = "docs/domain/user-stories-mdi-drug-inspection.md"
 types = ["write", "api_change", "config_rule", "integration", "inventory_change", "frontend_interaction", "critical_path", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/h_file_attachment_postgres.rs::attachment_upload_confirm_download_is_owner_scoped_idempotent_and_audited" },
+  { id = "A4", test = "backend/crates/customer-portal-api/tests/customer_portal_postgres.rs::projection_replay_is_idempotent_and_failures_enter_dead_letter" },
+  { id = "A6", test = "backend/crates/api/tests/drug_inspection_acceptance_postgres.rs::acceptance_warns_or_blocks_missing_and_rejects_unqualified_without_blocking_copy_failure" },
+]
 frontend_pages = ["m2-inspecting", "m3-batches", "m4-review"]
 navigation_checks = [
   "node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs",
@@ -4889,6 +5095,12 @@ title = "定时对账任务"
 module = "RC"
 story_file = "docs/domain/user-stories-mrc-reconciliation.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A3", test = "backend/crates/api/tests/reconciliation_scheduler_postgres.rs::database_rejects_illegal_claim_failure_pairs_and_status_shapes" },
+  { id = "A4", test = "backend/crates/api/tests/reconciliation_postgres.rs::reconciliation_compares_persists_notifies_audits_and_replays" },
+  { id = "A6", test = "backend/crates/api/tests/reconciliation_scheduler_postgres.rs::service_workers_claim_once_renew_and_take_over_expired_lease" },
+]
 frontend_pages = ["mrc-reconciliation"]
 e2e_checks = ["just web-admin-mrc-real-e2e"]
 e2e_screenshots = [
@@ -4943,6 +5155,10 @@ title = "差异处理"
 module = "RC"
 story_file = "docs/domain/user-stories-mrc-reconciliation.md"
 types = ["write", "inventory_change", "api_change", "frontend_interaction", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/route_auth_smoke.rs::protected_routes_reject_unauthenticated_http_requests" },
+  { id = "A4", test = "backend/crates/api/tests/reconciliation_postgres.rs::reconciliation_compares_persists_notifies_audits_and_replays" },
+]
 frontend_pages = ["mrc-reconciliation"]
 e2e_checks = ["just web-admin-mrc-real-e2e"]
 e2e_screenshots = [
@@ -5166,6 +5382,11 @@ title = "任务类型配置"
 module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_defaults_are_extensible_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/src/task_type_handlers.rs::idempotency_header_is_required" },
+  { id = "A6", test = "backend/crates/api/tests/task_engine_postgres.rs::assignment_rejects_expired_or_full_worker_qualification" },
+]
 frontend_pages = ["mte-task-types"]
 navigation_checks = ["node apps/web-admin/self-checks/te-task-type-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real"]
@@ -5226,6 +5447,11 @@ title = "任务组与人员资格"
 module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_defaults_are_extensible_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/task_engine_postgres.rs::task_main_chain_enforces_qualification_state_machine_and_idempotency" },
+  { id = "A6", test = "backend/crates/api/tests/task_engine_postgres.rs::assignment_rejects_expired_or_full_worker_qualification" },
+]
 frontend_pages = ["mte-task-groups"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real --grep '任务组和调度'"]
@@ -5306,6 +5532,11 @@ title = "任务优先级规则"
 module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_defaults_are_extensible_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/task_engine_postgres.rs::task_main_chain_enforces_qualification_state_machine_and_idempotency" },
+  { id = "A6", test = "backend/crates/api/tests/task_engine_postgres.rs::assignment_rejects_expired_or_full_worker_qualification" },
+]
 frontend_pages = ["mte-task-types", "mte-task-dispatch"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real"]
@@ -5396,6 +5627,11 @@ title = "任务释放控制"
 module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change", "runtime_guard", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_defaults_are_extensible_and_owner_scoped" },
+  { id = "A4", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_route_persists_configuration_and_rejects_missing_idempotency" },
+  { id = "A6", test = "backend/crates/api/tests/task_engine_postgres.rs::assignment_rejects_expired_or_full_worker_qualification" },
+]
 frontend_pages = ["mte-task-types", "mte-task-dispatch"]
 navigation_checks = ["node apps/web-admin/self-checks/mte-task-execution-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:mte-real"]
@@ -5911,6 +6147,10 @@ types = [
   "integration",
   "runtime_guard",
   "audit_compliance",
+]
+adversarial_checks = [
+  { id = "A4", test = "backend/crates/api/tests/h8_inbound_outbound_order_postgres.rs::outbound_order_rest_maps_persists_and_replays_one_business_resource" },
+  { id = "A8", test = "backend/crates/api/src/h8_erp_messages/outbound_lifecycle_tests.rs::rest_business_receipt_rejects_another_connector_api_key" },
 ]
 frontend_pages = ["h8-erp-interface-tables"]
 navigation_checks = [

@@ -1,0 +1,94 @@
+# 功能模块对抗测试攻击类。
+# 不新增 ADR-0006 测试层；A1-A8 映射到既有 L4 / L6 / L8 / L11。
+# T1 不要求故事填写 adversarial_checks；--complete-module 才按 types 推导并检查覆盖。
+
+[classes.A1]
+name = "跨货主 IDOR"
+layers = ["L8"]
+summary = "用货主 A 的身份读或改货主 B 的资源，必须 403/404，B 侧零变更。"
+
+[classes.A2]
+name = "缺权限"
+layers = ["L8"]
+summary = "已登录但无权限码，或未认证请求，必须 401/403，不落业务行。"
+
+[classes.A3]
+name = "非法状态跳转"
+layers = ["L4"]
+summary = "完成、作废、草稿等非法前置状态下的写操作必须拒绝，状态机原地。"
+
+[classes.A4]
+name = "幂等重放与键冲突"
+layers = ["L11"]
+summary = "同键同载荷重放不双写；同键不同载荷必须冲突拒绝。"
+
+[classes.A5]
+name = "数量或标识篡改"
+layers = ["L4", "L5"]
+summary = "负数量、超计划、改锁定批号必须拒绝，库存与审计一致。"
+
+[classes.A6]
+name = "GSP 与受控配置绕过"
+layers = ["L4"]
+summary = "过期批、温区错配、特药无双人、关闭不可禁用规则或自由文本绕过字典必须拒绝。"
+
+[classes.A7]
+name = "并发双花"
+layers = ["L6"]
+summary = "同库位或同批次并发写最多一笔成功，无超卖。"
+
+[classes.A8]
+name = "伪造外部回执或离线重放"
+layers = ["L4"]
+summary = "无有效派发的回执、过期离线包、他方连接器回执必须失败并审计。"
+
+[required_by_type.read_only]
+classes = ["A1", "A2"]
+
+[required_by_type.write]
+classes = ["A1", "A2", "A3", "A4"]
+
+[required_by_type.inventory_change]
+classes = ["A1", "A2", "A3", "A4", "A5", "A6"]
+
+[required_by_type.concurrent_resource]
+classes = ["A1", "A2", "A3", "A4", "A5", "A7"]
+
+[required_by_type.critical_path]
+classes = ["A1", "A2", "A3", "A4", "A5", "A6", "A7"]
+
+[required_by_type.config_rule]
+classes = ["A1", "A2", "A6"]
+
+[required_by_type.audit_compliance]
+classes = ["A1", "A2"]
+
+[required_by_type.integration]
+classes = ["A1", "A4", "A8"]
+
+[required_by_type.permission]
+classes = ["A1", "A2"]
+
+[required_by_type.runtime_guard]
+classes = ["A1", "A2", "A4"]
+
+[required_by_type.pda_runtime]
+classes = ["A1", "A2", "A4", "A8"]
+
+[required_by_type.hardware_runtime]
+classes = ["A1", "A2", "A4", "A8"]
+
+[required_by_type.external_runtime]
+classes = ["A1", "A2", "A4", "A8"]
+
+[required_by_type.offline_sync]
+classes = ["A4", "A8"]
+
+[required_by_type.api_change]
+classes = []
+
+[required_by_type.frontend_interaction]
+classes = []
+
+[required_by_type.monitoring]
+classes = []

@@ -28,7 +28,9 @@ except ModuleNotFoundError:
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
+ADVERSARIAL_CATALOG = REPO_ROOT / "governance" / "adversarial-catalog.toml"
 DOC = REPO_ROOT / "docs" / "governance" / "quality-matrix.md"
+_ADVERSARIAL_CATALOG_CACHE: dict[str, Any] | None = None
 OPENAPI_JSON = REPO_ROOT / "shared" / "openapi" / "openapi.json"
 OPENAPI_YAML_FILES = [
     REPO_ROOT / "shared" / "openapi" / "customer-portal-openapi.yaml",
@@ -231,9 +233,93 @@ def derive_acceptance_level(types: list[str]) -> str:
     return "S1"
 
 
+def load_adversarial_catalog() -> dict[str, Any]:
+    global _ADVERSARIAL_CATALOG_CACHE
+    if _ADVERSARIAL_CATALOG_CACHE is None:
+        _ADVERSARIAL_CATALOG_CACHE = toml.loads(ADVERSARIAL_CATALOG.read_text(encoding="utf-8"))
+    return _ADVERSARIAL_CATALOG_CACHE
+
+
+def derive_required_attack_classes(types: list[str]) -> list[str]:
+    """由故事类型并集推导对抗攻击类；不新增 L12。"""
+    required_by_type = load_adversarial_catalog().get("required_by_type", {})
+    classes: set[str] = set()
+    for story_type in types:
+        entry = required_by_type.get(story_type, {})
+        if not isinstance(entry, dict):
+            continue
+        values = entry.get("classes", [])
+        if isinstance(values, list):
+            classes.update(str(item) for item in values if item)
+    return sorted(classes)
+
+
+def _adversarial_test_error(spec: str) -> str | None:
+    match = re.fullmatch(r"(?P<path>.+\.rs)::(?P<name>[A-Za-z0-9_]+)", spec)
+    if not match:
+        return f"adversarial_checks.test 格式必须是 'path.rs::fn_name': {spec}"
+    rel_path = match.group("path")
+    path = REPO_ROOT / rel_path
+    if not path.is_file():
+        return f"对抗测试文件不存在: {rel_path}"
+    name = match.group("name")
+    if not re.search(rf"(?m)(?:async\s+)?fn\s+{re.escape(name)}\s*\(", path.read_text(encoding="utf-8")):
+        return f"对抗测试函数不存在: {spec}"
+    return None
+
+
+def check_adversarial_checks(story: dict[str, Any], *, require_coverage: bool) -> list[Issue]:
+    """T1 只校验已填写的条目；模块验收才要求 types 推导的攻击类齐全。"""
+    story_id = str(story.get("id", "<missing>"))
+    types = story.get("types", [])
+    required = derive_required_attack_classes(
+        [item for item in types if isinstance(item, str)] if isinstance(types, list) else []
+    )
+    checks = story.get("adversarial_checks")
+    issues: list[Issue] = []
+    if checks is None:
+        if require_coverage and required:
+            issues.append(
+                Issue(story_id, "adversarial", f"模块验收缺少攻击类: {', '.join(required)}")
+            )
+        return issues
+    if not isinstance(checks, list) or not checks:
+        return [Issue(story_id, "adversarial", "adversarial_checks 必须是非空对象数组")]
+
+    known_classes = {
+        key
+        for key in (load_adversarial_catalog().get("classes") or {})
+        if isinstance(key, str)
+    }
+    declared: set[str] = set()
+    for item in checks:
+        if not isinstance(item, dict):
+            issues.append(Issue(story_id, "adversarial", "adversarial_checks 每项必须是对象"))
+            continue
+        attack_id = item.get("id")
+        test = item.get("test")
+        if not isinstance(attack_id, str) or attack_id not in known_classes:
+            issues.append(Issue(story_id, "adversarial", f"未知攻击类: {attack_id}"))
+            continue
+        declared.add(attack_id)
+        if not isinstance(test, str) or not test.strip():
+            issues.append(Issue(story_id, "adversarial", f"{attack_id} 缺少 test"))
+            continue
+        error = _adversarial_test_error(test.strip())
+        if error:
+            issues.append(Issue(story_id, "adversarial", error))
+    if require_coverage:
+        missing = [item for item in required if item not in declared]
+        if missing:
+            issues.append(
+                Issue(story_id, "adversarial", f"模块验收缺少攻击类: {', '.join(missing)}")
+            )
+    return issues
+
+
 def check_module_completion(matrix: dict[str, Any], module: str) -> list[Issue]:
-    """模块完成要求该模块不存在延期故事。"""
-    return [
+    """模块完成要求无延期故事，且已完成写故事覆盖对抗攻击类。"""
+    issues = [
         Issue(
             str(story.get("id", "<missing>")),
             "module_completion",
@@ -242,6 +328,10 @@ def check_module_completion(matrix: dict[str, Any], module: str) -> list[Issue]:
         for story in matrix.get("deferred_stories", [])
         if isinstance(story, dict) and story.get("module") == module
     ]
+    for story in matrix.get("stories", []):
+        if isinstance(story, dict) and story.get("module") == module:
+            issues.extend(check_adversarial_checks(story, require_coverage=True))
+    return issues
 
 
 def check_deferred_story(story: dict[str, Any]) -> list[Issue]:
@@ -468,6 +558,7 @@ def check_story(story: dict[str, Any], *, story_files: set[str], openapi_paths: 
             issues.append(Issue(story_id, "api", f"OpenAPI 缺少 operation: {operation}"))
 
     issues.extend(check_e2e_checks(story, verified=True))
+    issues.extend(check_adversarial_checks(story, require_coverage=False))
 
     navigation_checks = story.get("navigation_checks")
     if navigation_checks is None:
@@ -599,6 +690,7 @@ def build_markdown(matrix: dict[str, Any]) -> str:
         "- 强门禁范围：M1、M2、M3、M4 和已进入执行的 H 层横向能力。",
         "- 状态只允许 `verified` 或 `not_applicable`；不适用必须在事实源写原因。",
         "- S2 测试层由故事类型自动推导。",
+        "- 对抗攻击类 A1-A8 由故事类型推导，映射 L4/L6/L8/L11；T1 不强制填写，`--complete-module` 才检查覆盖。",
         "- 验收深度由故事类型自动推导：S1 查询/展示，S2 普通写操作，S3 库存/并发/关键路径/GSP，S4 PDA/离线/硬件/外部系统/发布。",
         "",
         "## 状态摘要",
