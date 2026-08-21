@@ -482,6 +482,8 @@ story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["read_only", "api_change", "frontend_interaction", "integration"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/m3_expiry_isolation_postgres.rs::inventory_query_combines_filters_without_cross_owner_rows" },
+  { id = "A2", test = "backend/crates/api/tests/m3_expiry_isolation_postgres.rs::inventory_query_http_requires_m3_read_or_write" },
+  { id = "A4", test = "backend/crates/api/tests/m3_expiry_isolation_postgres.rs::expired_batches_are_isolated_idempotently_and_owner_scoped" },
 ]
 frontend_pages = ["m3-batches"]
 navigation_checks = ["node apps/web-admin/self-checks/m3-batch-management-slice-self-check.mjs"]
@@ -617,6 +619,7 @@ module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["write", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
 adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_expiry_isolation_postgres.rs::expired_batches_are_isolated_idempotently_and_owner_scoped" },
   { id = "A4", test = "backend/crates/api/tests/m3_recall_postgres.rs::quality_recall_marks_batch_isolated_and_replays_idempotently" },
 ]
 frontend_pages = ["m3-batches"]
@@ -844,6 +847,7 @@ story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["read_only", "write", "api_change", "integration", "audit_compliance", "runtime_guard", "frontend_interaction"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_tasks_and_records_are_owner_scoped_and_written_atomically" },
+  { id = "A2", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_generate_http_requires_write_permission" },
   { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
 ]
 frontend_pages = ["m3-maintenance"]
@@ -901,6 +905,7 @@ story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "api_change", "inventory_change", "concurrent_resource", "audit_compliance", "frontend_interaction"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/m3_inventory_count_postgres.rs::inventory_count_is_owner_scoped_and_blocks_new_allocations" },
+  { id = "A2", test = "backend/crates/api/tests/m3_inventory_count_postgres.rs::inventory_count_http_write_requires_count_permission" },
   { id = "A4", test = "backend/crates/api/tests/m3_inventory_count_postgres.rs::inventory_count_blind_submission_approves_atomic_adjustment_and_replays" },
 ]
 frontend_pages = ["m3-counts"]
@@ -1008,7 +1013,9 @@ module = "M1"
 story_file = "docs/domain/user-stories-m1-device-platform.md"
 types = ["write", "api_change", "frontend_interaction", "concurrent_resource", "audit_compliance"]
 adversarial_checks = [
+  { id = "A3", test = "backend/crates/api/tests/m1_device_lifecycle_postgres.rs::gwt6_bind_offline_device_blocked" },
   { id = "A4", test = "backend/crates/api/tests/m1_device_lifecycle_postgres.rs::gwt9_idempotent_register_replays" },
+  { id = "A5", test = "backend/crates/api/tests/m1_device_lifecycle_postgres.rs::gwt3_invalid_device_type_rejected" },
   { id = "A7", test = "backend/crates/api/tests/m1_wcs_task_engine_postgres.rs::concurrent_ptl_light_on_keeps_one_active_task" },
 ]
 dimensions = { requirement = "verified", fields = "verified", frontend = "verified", api = "verified", backend = "verified", database = "verified", security = "verified", audit = "verified", tests = "verified", evidence = "verified", docs = "verified", governance = "verified" }
@@ -1134,6 +1141,8 @@ story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["write", "api_change", "frontend_interaction", "config_rule"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/role_management_postgres.rs::user_creation_is_owner_scoped_idempotent_atomic_and_audited" },
+  { id = "A2", test = "backend/crates/api/tests/role_management_postgres.rs::role_write_rejects_missing_manage_permission" },
+  { id = "A4", test = "backend/crates/api/tests/role_management_postgres.rs::role_writes_are_tenant_safe_atomic_idempotent_audited_and_revoke_tokens" },
 ]
 frontend_pages = ["h1-role-permission"]
 e2e_checks = [
@@ -1295,6 +1304,7 @@ story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "audit_compliance"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/audit_postgres.rs::export_events_walks_all_matching_pages_without_cross_owner_rows" },
+  { id = "A4", test = "backend/crates/api/tests/audit_postgres.rs::append_event_and_seal_chain_use_real_postgres" },
 ]
 frontend_pages = []
 api_paths = []
@@ -1377,7 +1387,12 @@ title = "审计数据归档与保留（后端归档运行切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "audit_compliance"]
+adversarial_checks = [
+  { id = "A4", test = "backend/crates/api/tests/h2_lifecycle_postgres.rs::audit_archive_cycle_is_idempotent_and_audited" },
+]
 frontend_pages = []
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h2_lifecycle_postgres"]
+evidence_refs = ["backend/crates/api/tests/h2_lifecycle_postgres.rs"]
 api_paths = [
   "GET /api/v1/audit/archive/partitions",
   "POST /api/v1/audit/archive/runs",
@@ -1410,7 +1425,12 @@ title = "事件总线（DB outbox 与订阅投递切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A4", test = "backend/crates/api/tests/h2_lifecycle_postgres.rs::event_bus_acknowledges_and_replays_deliveries" },
+]
 frontend_pages = []
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h2_lifecycle_postgres"]
+evidence_refs = ["backend/crates/api/tests/h2_lifecycle_postgres.rs"]
 api_paths = [
   "GET /api/v1/event-bus/deliveries/pending",
   "POST /api/v1/event-bus/deliveries/{delivery_id}/ack",
@@ -1444,7 +1464,12 @@ title = "业务数据生命周期归档（后端策略与计划切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "config_rule", "audit_compliance"]
+adversarial_checks = [
+  { id = "A6", test = "backend/crates/api/tests/h2_lifecycle_postgres.rs::business_retention_policy_plans_archive_without_delete" },
+]
 frontend_pages = []
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h2_lifecycle_postgres"]
+evidence_refs = ["backend/crates/api/tests/h2_lifecycle_postgres.rs"]
 api_paths = [
   "GET /api/v1/business-retention/policies",
   "POST /api/v1/business-retention/jobs",
@@ -2184,6 +2209,8 @@ module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "critical_path", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/h9_print_orchestration_postgres.rs::manual_cutoff_http_requires_orchestration_write_permission" },
+  { id = "A3", test = "backend/crates/api/tests/h9_print_orchestration_postgres.rs::manual_cutoff_rejects_mixed_address_before_allocating_a_number" },
   { id = "A4", test = "backend/crates/api/tests/h9_print_orchestration_postgres.rs::manual_cutoff_freezes_one_boundary_numbers_audits_and_replays" },
   { id = "A7", test = "backend/crates/api/tests/h9_print_orchestration_postgres.rs::scheduled_cutoff_uses_exception_time_and_concurrent_runs_create_one_group" },
 ]
@@ -3167,6 +3194,10 @@ title = "告警升级机制"
 module = "AL"
 story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "config_rule", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A4", test = "backend/crates/api/tests/alert_escalation_postgres.rs::upsert_alert_escalation_rule_limits_levels_and_job_escalates_once_then_stops_after_ack" },
+  { id = "A6", test = "backend/crates/api/tests/alert_escalation_postgres.rs::l3_repeats_every_24_hours_and_empty_off_hours_route_falls_back_to_system_admin" },
+]
 frontend_pages = ["hal-alert-escalations"]
 navigation_checks = ["node apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:hal-real"]
@@ -3236,6 +3267,10 @@ title = "告警看板与统计"
 module = "AL"
 story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "integration", "audit_compliance"]
+adversarial_checks = [
+  { id = "A4", test = "backend/crates/api/tests/alert_dashboard_postgres.rs::queued_large_export_generates_at_most_100k_and_emails_download_link" },
+  { id = "A6", test = "backend/crates/api/tests/alert_dashboard_postgres.rs::dashboard_statistics_gsp_report_and_excel_pdf_exports_are_audited" },
+]
 frontend_pages = ["hal-alert-dashboard"]
 navigation_checks = ["node apps/web-admin/self-checks/hal-alert-runtime-slice-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:hal-real"]
@@ -5036,6 +5071,7 @@ module = "RC"
 story_file = "docs/domain/user-stories-mrc-reconciliation.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "integration", "runtime_guard", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/reconciliation_postgres.rs::reconciliation_http_enforces_permissions_and_rule_contract" },
   { id = "A3", test = "backend/crates/api/tests/reconciliation_scheduler_postgres.rs::database_rejects_illegal_claim_failure_pairs_and_status_shapes" },
   { id = "A4", test = "backend/crates/api/tests/reconciliation_postgres.rs::reconciliation_compares_persists_notifies_audits_and_replays" },
 ]
@@ -5094,6 +5130,7 @@ module = "RC"
 story_file = "docs/domain/user-stories-mrc-reconciliation.md"
 types = ["write", "inventory_change", "api_change", "frontend_interaction", "integration", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/reconciliation_postgres.rs::reconciliation_http_enforces_permissions_and_rule_contract" },
   { id = "A4", test = "backend/crates/api/tests/reconciliation_postgres.rs::reconciliation_compares_persists_notifies_audits_and_replays" },
 ]
 frontend_pages = ["mrc-reconciliation"]
@@ -5385,6 +5422,7 @@ module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
 adversarial_checks = [
+  { id = "A3", test = "backend/crates/api/tests/task_engine_postgres.rs::task_main_chain_enforces_qualification_state_machine_and_idempotency" },
   { id = "A4", test = "backend/crates/api/tests/task_engine_postgres.rs::task_main_chain_enforces_qualification_state_machine_and_idempotency" },
   { id = "A6", test = "backend/crates/api/tests/task_engine_postgres.rs::assignment_rejects_expired_or_full_worker_qualification" },
 ]
@@ -6080,6 +6118,10 @@ types = [
   "integration",
   "runtime_guard",
   "audit_compliance",
+]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/h8_erp_interface_tables/handlers.rs::owner_wide_table_rejects_connector_warehouse_whitelist_it_cannot_enforce" },
+  { id = "A2", test = "backend/crates/api/src/h8_erp_interface_tables/handlers.rs::list_connectors_requires_interface_table_read" },
 ]
 frontend_pages = ["h8-erp-interface-tables"]
 navigation_checks = [
