@@ -505,6 +505,14 @@ def dimension_status(story: dict[str, Any], dimension: str) -> str | None:
     return None
 
 
+def is_runtime_screenshot_ref(value: str) -> bool:
+    """gitignore 的 Playwright 截图产物，T1 不查磁盘是否存在。"""
+    normalized = value.replace("\\", "/")
+    if not normalized.endswith(".png"):
+        return False
+    return normalized.startswith("artifacts/") or "/.e2e-artifacts/" in f"/{normalized}"
+
+
 def check_evidence_profiles(
     matrix: dict[str, Any], stories: list[dict[str, Any]], *, repo_root: Path = REPO_ROOT
 ) -> list[Issue]:
@@ -525,7 +533,11 @@ def check_evidence_profiles(
                 issues.append(Issue(story_id, "evidence", f"evidence_profiles.{module}.{field} 必须是非空字符串数组"))
         for field in ("backend_files", "evidence_refs"):
             for value in profile.get(field, []) if isinstance(profile.get(field), list) else []:
-                if isinstance(value, str) and not (repo_root / value).exists():
+                if not isinstance(value, str):
+                    continue
+                if field == "evidence_refs" and is_runtime_screenshot_ref(value):
+                    continue
+                if not (repo_root / value).exists():
                     issues.append(Issue(story_id, "evidence", f"证据文件不存在: {value}"))
     return issues
 

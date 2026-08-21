@@ -87,7 +87,7 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 
 - `frontend_pages` 声明的页面必须同时出现在 `apps/web-admin/src/App.tsx` 的 `menuSections`、`defaultMenuTree`、`renderAdminView` 可达路由和 `apps/web-admin/dev-mocks/admin-menu-dev-mock.ts` 已发布菜单种子中。
 - 带 `frontend_interaction` 且声明了 `frontend_pages` 的故事，必须在质量矩阵写 `e2e_checks`；页面级 self-check 只证明静态接线，不能替代真实浏览器验收。
-- `governance/menu-e2e-screenshot-policy.toml` 基线外的新增菜单页必须写真实 Playwright 命令和 `e2e_screenshots = [{ page, spec, screenshot }]`，同时把 spec 与 `artifacts/screenshot-portal/real-web/**/*.png` 产物路径放入 `evidence_refs`；运行 E2E 生成截图后才能标记页面闭环。
+- `governance/menu-e2e-screenshot-policy.toml` 基线外的新增菜单页必须写真实 Playwright 命令和 `e2e_screenshots = [{ page, spec, screenshot }]`，同时把 spec 与 `artifacts/screenshot-portal/real-web/**/*.png` 产物路径放入 `evidence_refs`。T1 不把这些 PNG 是否已生成当作硬门禁；页面闭环仍要求真实 E2E 命令和 spec 可解析。
 - `legacy_pages` 只允许覆盖规则启用前页面，不能因本轮实现扩大；补齐历史页面证据时从基线移除。
 - 页面级 self-check 至少覆盖菜单入口、默认菜单树、已发布菜单 dev mock、路由渲染、公共查询 / 表格组件、真实后端或 dev mock 数据入口，防止“菜单有了但页面不可达 / Dev mock route not found / 没有可运行证据”。
 

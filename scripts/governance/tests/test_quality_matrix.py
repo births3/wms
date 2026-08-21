@@ -351,6 +351,37 @@ def test_verified_story_requires_module_evidence_profile(tmp_path):
     assert check_evidence_profiles(matrix, stories, repo_root=tmp_path) == []
 
 
+def test_evidence_profiles_do_not_gate_missing_runtime_screenshots(tmp_path):
+    """gitignore 的 E2E 截图产物不是 T1 存在性门禁；源码证据仍要在磁盘上。"""
+    from check_quality_matrix import check_evidence_profiles
+
+    source = tmp_path / "handler.rs"
+    source.write_text("handler", encoding="utf-8")
+    stories = [{"id": "US-RC-001", "module": "RC"}]
+    matrix = {
+        "evidence_profiles": {
+            "RC": {
+                "backend_files": ["handler.rs"],
+                "database_objects": ["reconciliation_runs"],
+                "test_checks": ["cargo test -p wms-api --test reconciliation_postgres"],
+                "evidence_refs": [
+                    "handler.rs",
+                    "artifacts/screenshot-portal/real-web/mrc-reconciliation/difference-list.png",
+                    "apps/web-admin/.e2e-artifacts/m1-real/screenshots/docks-imported.png",
+                ],
+            }
+        }
+    }
+    assert check_evidence_profiles(matrix, stories, repo_root=tmp_path) == []
+
+    matrix["evidence_profiles"]["RC"]["evidence_refs"] = [
+        "handler.rs",
+        "missing-source.rs",
+    ]
+    issues = check_evidence_profiles(matrix, stories, repo_root=tmp_path)
+    assert [issue.message for issue in issues] == ["证据文件不存在: missing-source.rs"]
+
+
 def test_quality_matrix_real_e2e_resolves_package_script_config_and_spec(tmp_path):
     from check_quality_matrix import check_e2e_checks
 
