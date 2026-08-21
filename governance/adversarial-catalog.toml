@@ -64,7 +64,7 @@ classes = ["A1", "A2", "A6"]
 classes = ["A1", "A2"]
 
 [required_by_type.integration]
-classes = ["A1", "A4", "A8"]
+classes = ["A1", "A4"]
 
 [required_by_type.permission]
 classes = ["A1", "A2"]

@@ -263,8 +263,13 @@ def _adversarial_test_error(spec: str) -> str | None:
     if not path.is_file():
         return f"对抗测试文件不存在: {rel_path}"
     name = match.group("name")
-    if not re.search(rf"(?m)(?:async\s+)?fn\s+{re.escape(name)}\s*\(", path.read_text(encoding="utf-8")):
-        return f"对抗测试函数不存在: {spec}"
+    text = path.read_text(encoding="utf-8")
+    if not re.search(
+        rf"#\[(?:sqlx::test|tokio::test|test)[^\]]*\]\s*(?:async\s+)?fn\s+{re.escape(name)}\s*\(",
+        text,
+        flags=re.S,
+    ):
+        return f"对抗测试必须指向带 #[test]/#[tokio::test]/#[sqlx::test] 的函数: {spec}"
     return None
 
 

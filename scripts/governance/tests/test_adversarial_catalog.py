@@ -37,6 +37,13 @@ def test_api_change_only_does_not_require_adversarial_classes():
     assert derive_required_attack_classes(["api_change"]) == []
 
 
+def test_integration_does_not_require_forged_receipt_class():
+    from check_quality_matrix import derive_required_attack_classes
+
+    assert derive_required_attack_classes(["read_only", "integration"]) == ["A1", "A2", "A4"]
+    assert "A8" not in derive_required_attack_classes(["write", "integration"])
+
+
 def test_t1_does_not_require_adversarial_checks_on_write_stories():
     from check_quality_matrix import check_story
 
@@ -111,6 +118,25 @@ def test_t1_rejects_malformed_or_missing_adversarial_test_target():
     messages = {issue.message for issue in issues}
     assert Issue("US-M1-011", "adversarial", "未知攻击类: A9") in issues
     assert any("对抗测试文件不存在" in message for message in messages)
+
+
+def test_t1_rejects_helper_function_as_adversarial_evidence():
+    from check_quality_matrix import check_adversarial_checks
+
+    issues = check_adversarial_checks(
+        {
+            "id": "US-M1-011",
+            "types": ["write"],
+            "adversarial_checks": [
+                {
+                    "id": "A1",
+                    "test": "backend/crates/api/tests/support/adversarial.rs::ctx_with_permissions",
+                }
+            ],
+        },
+        require_coverage=False,
+    )
+    assert any("必须指向带" in issue.message for issue in issues)
 
 
 def test_complete_module_requires_declared_attack_classes():
