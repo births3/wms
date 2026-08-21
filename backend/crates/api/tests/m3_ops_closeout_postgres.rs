@@ -5,7 +5,7 @@ use axum::{
 use chrono::{NaiveDate, Utc};
 use tower::ServiceExt;
 use uuid::Uuid;
-use wms_api::wave3_repository::PgWave3Repository;
+use wms_api::wave3_repository::{PgWave3Repository, Wave3RepositoryError};
 use wms_api::{
     audit::AuditWriteRequest,
     auth::AuthContext,
@@ -530,6 +530,133 @@ async fn forbidden_m3_ops(
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn relocate_rejects_cross_owner_batch(pool: sqlx::PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let from_id = Uuid::new_v4();
+    let to_id = Uuid::new_v4();
+    let batch_id = Uuid::new_v4();
+    seed_location(&pool, owner_id, from_id, "A01-02-01-01").await;
+    seed_location(&pool, owner_id, to_id, "A01-02-01-02").await;
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_batches (
+            id, owner_id, product_code, batch_no, production_date, expiry_date,
+            qty_on_hand, qty_frozen, status, location_id, location_code
+        ) VALUES ($1,$2,'P-REL-X','B-REL-X',$3,$4,20,0,'qualified',$5,'A01-02-01-01')
+        "#,
+    )
+    .bind(batch_id)
+    .bind(owner_id)
+    .bind(NaiveDate::from_ymd_opt(2026, 1, 1).expect("production date"))
+    .bind(NaiveDate::from_ymd_opt(2028, 1, 1).expect("expiry date"))
+    .bind(from_id)
+    .execute(&pool)
+    .await
+    .expect("batch");
+
+    let repository = PgWave3Repository::new(pool.clone());
+    let blocked = repository
+        .relocate_inventory_with_audit(
+            &ctx(other_owner_id),
+            RelocateInventoryRequest {
+                batch_id,
+                qty: 1.into(),
+                to_location_id: to_id,
+                to_location_code: "A01-02-01-02".to_string(),
+                relocation_mode: None,
+                lpn_code: None,
+                reason: None,
+            },
+            Utc::now(),
+            "idem-relocate-cross-owner",
+            None,
+        )
+        .await;
+    assert_eq!(
+        blocked.expect_err("cross-owner relocate must fail"),
+        Wave3RepositoryError::NotFound
+    );
+    let qty: i64 =
+        sqlx::query_scalar("SELECT qty_on_hand::BIGINT FROM inventory_batches WHERE id = $1")
+            .bind(batch_id)
+            .fetch_one(&pool)
+            .await
+            .expect("qty should query");
+    assert_eq!(qty, 20);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn abc_classifications_are_owner_scoped_and_reject_unknown_class(pool: sqlx::PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let batch_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_batches (
+            id, owner_id, product_code, batch_no, production_date, expiry_date,
+            qty_on_hand, qty_frozen, status, location_id, location_code
+        ) VALUES ($1,$2,'P-ABC-X','B-ABC-X',$3,$4,100,0,'qualified',$5,'L-ABC-X')
+        "#,
+    )
+    .bind(batch_id)
+    .bind(owner_id)
+    .bind(NaiveDate::from_ymd_opt(2026, 1, 1).expect("production date"))
+    .bind(NaiveDate::from_ymd_opt(2028, 1, 1).expect("expiry date"))
+    .bind(Uuid::new_v4())
+    .execute(&pool)
+    .await
+    .expect("batch");
+    sqlx::query(
+        r#"
+        INSERT INTO inventory_movements (
+            id, owner_id, batch_id, movement_type, qty_delta,
+            source_document_type, source_document_id, occurred_at
+        ) VALUES ($1,$2,$3,'outbound_ship',-50,'outbound_order',$4,now())
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(batch_id)
+    .bind(Uuid::new_v4())
+    .execute(&pool)
+    .await
+    .expect("movement");
+
+    let repository = PgWave3Repository::new(pool.clone());
+    repository
+        .recompute_abc_classifications(
+            &ctx(owner_id),
+            RecomputeInventoryAbcRequest {
+                period_days: Some(30),
+            },
+            Utc::now(),
+        )
+        .await
+        .expect("recompute");
+    let other = repository
+        .list_abc_classifications(&ctx(other_owner_id), &InventoryAbcQuery::default())
+        .await
+        .expect("other owner list");
+    assert!(other.data.is_empty());
+    let blocked = repository
+        .override_abc_classification(
+            &ctx(owner_id),
+            OverrideInventoryAbcRequest {
+                product_code: "P-ABC-X".to_string(),
+                abc_class: "Z".to_string(),
+                reason: "非法分类".to_string(),
+            },
+            Utc::now(),
+        )
+        .await;
+    assert_eq!(
+        blocked.expect_err("unknown ABC class must fail"),
+        Wave3RepositoryError::InvalidReason
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn relocate_http_requires_relocation_write_permission(pool: sqlx::PgPool) {
     let batch_id = Uuid::new_v4();
     let to_location_id = Uuid::new_v4();
@@ -565,6 +692,21 @@ async fn alert_handle_http_requires_alert_write_permission(pool: sqlx::PgPool) {
         format!("/api/v1/inventory/alerts/{}/handle", Uuid::new_v4()),
         &["m3.alert.read", "m3.read"],
         r#"{"lifecycle_status":"handled"}"#.to_string(),
+    )
+    .await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn status_change_http_requires_m3_write_permission(pool: sqlx::PgPool) {
+    let batch_id = Uuid::new_v4();
+    forbidden_m3_ops(
+        pool,
+        "POST",
+        "/api/v1/inventory/batches/status".to_string(),
+        &["m3.read"],
+        format!(
+            r#"{{"batch_id":"{batch_id}","target_status":"quarantined","reason":"隔离","approval_source":"质量联系单","approval_id":"QL-ADV"}}"#
+        ),
     )
     .await;
 }
