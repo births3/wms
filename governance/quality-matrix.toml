@@ -153,7 +153,9 @@ types = ["write", "config_rule", "frontend_interaction"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/adversarial_catalog_postgres.rs::rejects_cross_owner_dictionary_write_without_leaking_override" },
   { id = "A2", test = "backend/crates/api/src/system_dictionary_handlers.rs::write_handler_checks_permission_before_idempotency_or_database" },
+  { id = "A3", test = "backend/crates/api/tests/system_dictionary_postgres.rs::document_type_rejects_invalid_params" },
   { id = "A4", test = "backend/crates/api/tests/adversarial_catalog_postgres.rs::dictionary_override_replays_same_key_and_rejects_payload_conflict" },
+  { id = "A6", test = "backend/crates/api/tests/system_dictionary_postgres.rs::special_drug_category_presets_expose_compliance_defaults" },
 ]
 frontend_pages = ["m1-system-dictionary"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
@@ -171,6 +173,7 @@ evidence_refs = [
   "artifacts/screenshot-portal/real-web/m1-system-dictionary/dictionary.png",
   "backend/crates/api/tests/adversarial_catalog_postgres.rs",
   "backend/crates/api/src/system_dictionary_handlers.rs",
+  "backend/crates/api/tests/system_dictionary_postgres.rs",
 ]
 
 [stories.dimensions]
@@ -261,6 +264,8 @@ module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["write", "api_change", "frontend_interaction", "integration"]
 adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_authentication_uses_postgres_failures_rate_limit_owner_and_scope" },
+  { id = "A2", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_rejects_invalid_scope_expiry_and_non_admin" },
   { id = "A4", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit" },
 ]
 frontend_pages = ["h1-api-keys"]
@@ -404,6 +409,7 @@ adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::putaway_rejects_unusable_status_cross_location_and_other_owner" },
   { id = "A3", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::update_rejects_invalid_status" },
   { id = "A4", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::create_replays_same_idempotency_key_without_second_row" },
+  { id = "A5", test = "backend/crates/api/tests/m1_lpn_container_crud_postgres.rs::batch_create_rejects_invalid_count" },
   { id = "A7", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::concurrent_same_sku_batch_putaway_adds_qty" },
 ]
 frontend_pages = ["m1-lpn-containers"]
@@ -1758,7 +1764,9 @@ module = "H6"
 story_file = "docs/domain/user-stories-h6-state-machine.md"
 types = ["read_only", "api_change", "config_rule"]
 adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/h6_state_machine_postgres.rs::h6_catalog_has_no_owner_private_machines" },
   { id = "A2", test = "backend/crates/api/tests/h6_state_machine_postgres.rs::h6_permission_is_granted_only_to_seeded_system_admin_role" },
+  { id = "A6", test = "backend/crates/api/tests/h6_state_machine_postgres.rs::h6_transition_validation_rejects_illegal_skip" },
 ]
 frontend_pages = []
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h6_state_machine_postgres"]
@@ -1799,6 +1807,8 @@ story_file = "docs/domain/user-stories-h6-state-machine.md"
 types = ["write", "integration", "audit_compliance"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/wave4_postgres.rs::outbound_order_reads_are_owner_scoped_filterable_and_include_lines" },
+  { id = "A2", test = "backend/crates/api/src/wave4_handlers.rs::outbound_write_handler_requires_m4_permission_before_postgres" },
+  { id = "A3", test = "backend/crates/api/src/outbound_state_rules.rs::validates_the_short_pick_branch_and_rejects_skips" },
   { id = "A4", test = "backend/crates/api/tests/wave4_postgres.rs::traceability_outbound_report_persists_pending_replay_queue_and_audits" },
 ]
 frontend_pages = []
@@ -1812,12 +1822,14 @@ database_objects = [
 ]
 test_checks = [
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib outbound_state_rules",
+  "cargo test --manifest-path backend/Cargo.toml -p wms-api --lib wave4_handlers",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test h6_wave4_state_contract_postgres -- --test-threads=1",
   "cargo test --manifest-path backend/Cargo.toml -p wms-api --test wave4_postgres -- --test-threads=1",
 ]
 evidence_refs = [
   "docs/domain/user-stories-h6-state-machine.md",
   "backend/crates/api/src/state_machine.rs",
+  "backend/crates/api/src/wave4_handlers.rs",
   "backend/crates/api/src/outbound_state_rules.rs",
   "backend/crates/api/src/wave4_repository_part1.rs",
   "backend/crates/api/src/wave4_repository_part2.rs",
@@ -1856,6 +1868,12 @@ title = "打印模板类型字典"
 module = "H9"
 story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "config_rule", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/system_dictionary_postgres.rs::owner_dictionary_item_overrides_global_and_disable_hides_it" },
+  { id = "A2", test = "backend/crates/api/tests/print_template_postgres.rs::template_http_separates_write_publish_and_enabled_permissions" },
+  { id = "A4", test = "backend/crates/api/tests/system_dictionary_postgres.rs::print_template_type_create_update_disable_are_idempotent_and_audited" },
+  { id = "A6", test = "backend/crates/api/tests/print_template_postgres.rs::disabled_print_template_type_rejects_new_template" },
+]
 frontend_pages = ["m1-system-dictionary", "h9-print-templates"]
 api_paths = [
   "GET /api/v1/system-dictionaries/{dict_code}/items",
@@ -1910,6 +1928,8 @@ story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A2", test = "backend/crates/api/tests/print_template_postgres.rs::template_http_separates_write_publish_and_enabled_permissions" },
+  { id = "A4", test = "backend/crates/api/tests/print_template_postgres.rs::published_field_library_versions_are_immutable_idempotent_and_audited" },
 ]
 frontend_pages = ["h9-print-templates"]
 api_paths = [
@@ -1968,6 +1988,9 @@ story_file = "docs/domain/user-stories-h9-print-template.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A2", test = "backend/crates/api/tests/print_template_postgres.rs::template_http_separates_write_publish_and_enabled_permissions" },
+  { id = "A4", test = "backend/crates/api/tests/print_template_postgres.rs::hiprint_template_publish_preview_and_print_are_versioned_idempotent_and_owner_scoped" },
+  { id = "A6", test = "backend/crates/api/tests/print_template_postgres.rs::disabled_print_template_type_rejects_new_template" },
 ]
 frontend_pages = ["h9-print-templates"]
 api_paths = [
@@ -3020,6 +3043,8 @@ story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "config_rule", "integration", "audit_compliance"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/alert_definition_postgres.rs::alert_code_is_unique_per_owner_but_reusable_across_owners" },
+  { id = "A3", test = "backend/crates/api/tests/alert_definition_postgres.rs::alert_definition_delete_is_rejected_when_trigger_history_exists" },
+  { id = "A4", test = "backend/crates/api/tests/alert_definition_postgres.rs::gsp_seed_covers_existing_and_new_owners_idempotently" },
   { id = "A6", test = "backend/crates/api/tests/alert_definition_postgres.rs::gsp_forced_alert_cannot_be_created_or_updated_as_disableable" },
 ]
 frontend_pages = ["hal-alert-definitions"]
@@ -3296,6 +3321,8 @@ story_file = "docs/domain/user-stories-h-dock-management.md"
 types = ["write", "api_change", "frontend_interaction", "integration"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/dock_postgres.rs::dock_appointments_rejects_cross_owner_warehouse_fk" },
+  { id = "A2", test = "backend/crates/api/tests/dock_postgres.rs::dock_manage_is_granted_only_to_warehouse_manager_and_system_admin" },
+  { id = "A3", test = "backend/crates/api/tests/dock_postgres.rs::dock_appointments_requires_active_status_unique_per_owner_document" },
   { id = "A4", test = "backend/crates/api/src/dock_handlers.rs::idempotency_key_must_be_present_and_non_empty" },
 ]
 frontend_pages = ["dock-management"]
@@ -5294,6 +5321,7 @@ story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_defaults_are_extensible_and_owner_scoped" },
+  { id = "A2", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_route_rejects_missing_write_permission" },
   { id = "A4", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_route_persists_configuration_and_rejects_missing_idempotency" },
 ]
 frontend_pages = ["mte-task-types"]
