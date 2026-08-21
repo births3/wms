@@ -48,7 +48,7 @@
 6. PostgreSQL 表、约束、索引、迁移和货主隔离完成。
 7. 写操作具备权限、幂等、审计和适用的并发控制。
 8. 故事类型推导的 L1-L11 测试层全部覆盖。
-9. 数据写入故事有真实 PostgreSQL 测试；有页面的故事有真实数据 E2E。写故事迁入 `stories` 后，模块验收还要求 `adversarial_checks` 覆盖 `governance/adversarial-catalog.toml` 按 `types` 推导的 A1–A8；不新增故事类型或 L12。T1 不把该字段当作硬门禁。
+9. 数据写入故事有真实 PostgreSQL 测试；有页面的故事有真实数据 E2E。写故事迁入 `stories` 后，模块验收还要求 `adversarial_checks` 覆盖 `governance/adversarial-catalog.toml` 按 `types` 推导的 A1–A8；条目必须指向本故事测试函数，禁止借用其他故事覆盖。不新增故事类型或 L12。T1 不把该字段当作硬门禁，但已填写时必须是真实 `#[test]`。
 10. 十二个质量维度全部为 `verified` 或有理由的 `not_applicable`。
 11. 模块严格范围检查通过。
 12. 不存在 mock 替代生产实现、无效按钮或只登记未实现。
