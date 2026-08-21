@@ -1,9 +1,15 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use chrono::{NaiveDate, TimeZone, Utc};
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
     inventory::{STATUS_QUALIFIED, STATUS_UNQUALIFIED},
+    wave3_handlers::{wave3_router, Wave3AppState},
     wave3_repository::PgWave3Repository,
 };
 use wms_domain::InventoryBatchQuery;
@@ -614,4 +620,25 @@ async fn inventory_query_filters_production_and_created_date_ranges(pool: PgPool
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, target_id);
     assert_eq!(rows[0].owner_id, owner_id);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn inventory_query_http_requires_m3_read_or_write(pool: PgPool) {
+    let app = wave3_router(Wave3AppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .method("GET")
+        .uri("/api/v1/inventory/batches")
+        .body(Body::empty())
+        .expect("inventory query request should build");
+    request
+        .extensions_mut()
+        .insert(AuthContext {
+            permissions: vec!["m2.write".to_string()],
+            ..ctx(Uuid::new_v4())
+        });
+    let response = app
+        .oneshot(request)
+        .await
+        .expect("inventory query should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }

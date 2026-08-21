@@ -1,9 +1,15 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use chrono::{NaiveDate, Utc};
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::{
     audit::AuditWriteRequest,
     auth::AuthContext,
+    wave3_handlers::{wave3_router, Wave3AppState},
     wave3_repository::{PgWave3Repository, Wave3RepositoryError},
 };
 use wms_domain::{CreateMaintenanceRecordRequest, MaintenanceRecordQuery, MaintenanceTaskQuery};
@@ -380,4 +386,25 @@ async fn maintenance_abnormal_isolates_batch_and_writes_notification(pool: PgPoo
     .await
     .expect("notification count");
     assert_eq!(notify, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn maintenance_generate_http_requires_write_permission(pool: PgPool) {
+    let app = wave3_router(Wave3AppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .method("POST")
+        .uri("/api/v1/inventory/maintenance/tasks/generate")
+        .header("content-type", "application/json")
+        .header("idempotency-key", "m3-maint-forbidden")
+        .body(Body::from("{}"))
+        .expect("maintenance generate request should build");
+    request.extensions_mut().insert(AuthContext {
+        permissions: vec!["m3.read".to_string()],
+        ..ctx(Uuid::new_v4())
+    });
+    let response = app
+        .oneshot(request)
+        .await
+        .expect("maintenance generate should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
