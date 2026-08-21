@@ -2761,7 +2761,7 @@ id = "US-M2-002"
 title = "PDA/PC Web 收货"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-asn.md"
-types = ["write", "inventory_change", "frontend_interaction", "critical_path", "integration", "pda_runtime", "hardware_runtime"]
+types = ["write", "frontend_interaction", "critical_path", "integration", "pda_runtime", "hardware_runtime"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_actions_reject_cross_owner_order_and_draft_receive" },
   { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_write_http_requires_m2_write_permission" },
@@ -2778,6 +2778,7 @@ e2e_screenshots = [
 ]
 api_paths = [
   "POST /api/v1/inbound/receiving-orders/{id}/receive",
+  "POST /api/v1/inbound/receiving-orders/{id}/reject",
 ]
 test_checks = [
   "CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --manifest-path backend/Cargo.toml -p wms-api sales_return_batch_rejections_must_close_to_receipt_rejected_quantity --lib",

@@ -165,7 +165,7 @@ PC Web 端支持 M2 收货、验收、上架三步，但不新增业务流程、
 | 新建 ASN | US-M2-001 | 已覆盖：收货页页头按钮 | 已覆盖：新建 ASN 弹窗 | 已接 `POST /api/v1/inbound/receiving-orders` | 部分覆盖 | 可继续完善字段持久化 |
 | 收货提交 | US-M2-002 | 已覆盖：行内“收货”按钮 | 已覆盖：收货弹窗 | 已接 `POST /api/v1/inbound/receiving-orders/{id}/receive` | 部分覆盖：数量闭合已接，扩展字段待补 | 可用但未完全满足 GSP 字段持久化 |
 | 部分拒收 | US-M2-002 / US-M2-006 | 部分覆盖：进入“收货”弹窗填写拒收数量 | 部分覆盖：只有拒收合计和异常备注 | 已接 `rejected_qty` 合计 | 部分覆盖：未形成异常处理闭环 | 缺销退批号级拒收明细和异常闭环 |
-| 整单拒收 | US-M2-002 / US-M2-006 | 缺失：无行内“拒收”按钮 | 缺失：无整单拒收弹窗 | 缺失：无独立 reject / exception 契约；复用 receive 不能表达关闭状态 | 缺失：当前 receive 成功后进入验收中 | 必须补 |
+| 整单拒收 | US-M2-002 / US-M2-006 | 已覆盖：行内拒收 | 已覆盖：整单拒收弹窗 | 已接 `POST /api/v1/inbound/receiving-orders/{id}/reject` | 已覆盖：一条 receipt + `closed_rejected` | 收货节点主链归 002（澄清 #113）；异常分类 / M-QL / H4 / 统计归 006 |
 | 上报收货异常 | US-M2-006 | 缺失 | 缺失 | 缺失 | 缺失：无异常记录、通知、主管处理闭环 | 必须补 |
 | 验收提交 | US-M2-003 | 已覆盖：验收页行内“验收”按钮 | 已覆盖：验收弹窗 | 已接 `inspect` | 部分覆盖：质量核对明细待补 | 可继续完善 |
 | 双人签字 | US-M2-004 | 已覆盖：验收页行内“双人签字”按钮 | 已覆盖：双人签字弹窗 | 已接 `sign` | 部分覆盖：规则命中字段待补 | 可继续完善 |
@@ -177,9 +177,8 @@ PC Web 端支持 M2 收货、验收、上架三步，但不新增业务流程、
 
 | 状态流转 | 需求来源 | 触发动作 | 前端覆盖 | 后端覆盖 | 当前结论 |
 |---|---|---|---|---|---|
-| 待收货 → 收货中 | US-M2-002 | PDA / PC Web 开始收货 | 部分覆盖：打开收货弹窗 | 待确认：当前后端主要校验 `released` 后提交 | 需要后端状态口径对齐 |
-| 收货中 → 验收中 | US-M2-002 | 收货提交 | 已覆盖 | 已覆盖：receive 后更新为 `inspecting` | 可用 |
-| 收货中 → 已关闭(拒收) | US-M2-002 / US-M2-006 | 整单拒收 | 缺失 | 缺失：receive 不会关闭拒收 | 必须补 |
+| 待收货 → 验收中 | US-M2-002 | 收货提交 | 已覆盖 | 已覆盖：`released` → `inspecting` | 可用。不持久化「收货中」（澄清 #112）；打开弹窗不是状态迁移 |
+| 待收货 → 已关闭(拒收) | US-M2-002 | 整单拒收 | 已覆盖 | 已覆盖：`reject` → `closed_rejected` | 可用 |
 | 验收中 → 档案补录中 | US-M2-001 跨故事约束 | 验收触发档案补录 | 缺失 | 缺失 | 后续补 |
 | 验收中 → 上架中 | US-M2-004 | 双人签字完成 | 已覆盖 | 已覆盖 | 可用 |
 | 上架中 → 已完成 | US-M2-005 | 全部上架完成 | 已覆盖 | 已覆盖 | 可用 |
@@ -194,7 +193,7 @@ PC Web 端支持 M2 收货、验收、上架三步，但不新增业务流程、
 | 收货首屏 | US-M2-002 | `artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-current.png` | 已有页面可达性验证 | 已覆盖 |
 | 收货详情弹窗 | US-M2-002 | `artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-detail-current.png` | 已验证详情层级和字段布局 | 已覆盖 |
 | 收货弹窗 | US-M2-002 | `artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-dialog-current.png` | 已验证基础表单和冷链字段显隐 | 部分覆盖 |
-| 整单拒收弹窗 | US-M2-002 / US-M2-006 | 缺失 | 缺失 | 必须补 |
+| 整单拒收弹窗 | US-M2-002 | 质量矩阵 US-M2-006 evidence 已登记拒收弹窗截图 | 已有独立拒收弹窗与 `reject` 提交 | 收货节点主链可用；006 异常闭环仍延期 |
 | 上报异常弹窗 | US-M2-006 | 缺失 | 缺失 | 必须补 |
 | 销退批号级拒收明细 | US-M2-002 / US-M2-006 | 缺失 | 缺失 | 必须补 |
 | 验收弹窗 | US-M2-003 | `artifacts/screenshot-portal/real-web/m2-inbound/m2-inspecting-dialog-current.png` | 已有基础验证 | 部分覆盖 |
