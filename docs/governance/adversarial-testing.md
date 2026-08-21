@@ -36,7 +36,7 @@ adversarial_checks = [
 ]
 ```
 
-`test` 必须是仓库内 `path.rs::fn_name`，函数名要能在该文件搜到。T1 只在字段已填写时校验路径；缺字段不失败。
+`test` 必须是仓库内 `path.rs::fn_name`，且是带 `#[test]` / `#[tokio::test]` / `#[sqlx::test]` 的函数。T1 在字段已填写时还要求该文件属于本故事的 `evidence_refs` 或 `test_checks`（含 `--test <crate>` 目录）；缺字段不失败。
 
 ## 测试夹具
 
