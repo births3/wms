@@ -2762,6 +2762,9 @@ title = "PDA/PC Web 收货"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-asn.md"
 types = ["write", "inventory_change", "frontend_interaction", "critical_path", "integration", "pda_runtime", "hardware_runtime"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_write_http_requires_m2_write_permission" },
+]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["pnpm --dir apps/web-admin run test:e2e:shell-dev"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -2782,6 +2785,7 @@ reason = "PC 数量闭环、GSP 现场字段录入与详情回读、第二收货
 owner = "M2 入库模块负责人"
 resume_when = "强制超温稳定性报告附件（H-FILE），完成收货节点双人策略、追溯码/LPN、PDA 离线冲突链及真机验收后重新执行完整故事验收。"
 evidence_refs = [
+  "backend/crates/api/tests/m2_adversarial_postgres.rs",
   "docs/reviews/m2-overall-review-2026-07-18.md",
   "backend/crates/domain/src/operations.rs",
   "backend/crates/api/src/wave3_repository/receiving_validation.rs",
@@ -2809,6 +2813,11 @@ title = "创建 ASN（采购入库通知）"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-asn.md"
 types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "external_runtime"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m2_asn_reference_validation_postgres.rs::create_asn_rejects_inactive_supplier_and_cross_owner_product" },
+  { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_write_http_requires_m2_write_permission" },
+  { id = "A6", test = "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs::create_asn_rejects_expired_supplier_qualification" },
+]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -2841,6 +2850,7 @@ evidence_refs = [
   "backend/crates/api/src/api_key_auth.rs",
   "backend/crates/api/tests/api_key_postgres.rs",
   "backend/crates/api/tests/m2_asn_reference_validation_postgres.rs",
+  "backend/crates/api/tests/m2_adversarial_postgres.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
   "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
@@ -2859,6 +2869,10 @@ title = "PDA/PC Web 验收"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
 types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "pda_runtime", "hardware_runtime", "external_runtime"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_write_http_requires_m2_write_permission" },
+  { id = "A3", test = "backend/crates/api/tests/m2_deferred_closeout_postgres.rs::inspection_uses_actual_receipt_quantity_and_blocks_early_signature" },
+]
 frontend_pages = ["m2-inspecting"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -2889,6 +2903,7 @@ evidence_refs = [
   "backend/crates/api/src/inbound.rs",
   "backend/crates/api/src/wave3_repository_part2.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/m2_adversarial_postgres.rs",
   "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
@@ -2906,6 +2921,11 @@ title = "双人验收签字"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
 types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "critical_path", "pda_runtime", "external_runtime"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_write_http_requires_m2_write_permission" },
+  { id = "A3", test = "backend/crates/api/tests/m2_deferred_closeout_postgres.rs::inspection_uses_actual_receipt_quantity_and_blocks_early_signature" },
+  { id = "A4", test = "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs::inspect_and_sign_receiving_order_replay_without_duplicate_audit" },
+]
 frontend_pages = ["m2-inspecting"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 api_paths = ["GET /api/v1/m-vr/dual-person-policy", "POST /api/v1/inbound/receiving-orders/{id}/sign"]
@@ -2925,6 +2945,7 @@ evidence_refs = [
   "backend/crates/api/src/wave3_repository_part2.rs",
   "backend/crates/api/src/dual_person_policy.rs",
   "backend/crates/api/tests/m2_deferred_closeout_postgres.rs",
+  "backend/crates/api/tests/m2_adversarial_postgres.rs",
   "backend/crates/api/tests/wave3_evidence_receiving_postgres.rs",
   "apps/web-admin/src/pages/inbound/M2InboundPage.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
@@ -2941,6 +2962,12 @@ title = "PDA/PC Web 智能上架"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
 types = ["read_only", "write", "api_change", "integration", "inventory_change", "concurrent_resource", "runtime_guard", "audit_compliance", "pda_runtime", "hardware_runtime", "external_runtime"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m2_smart_putaway_postgres.rs::smart_putaway_rejects_cross_owner_invalid_state_and_invalid_quantity" },
+  { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::putaway_http_requires_putaway_write_permission" },
+  { id = "A3", test = "backend/crates/api/tests/m2_smart_putaway_postgres.rs::smart_putaway_rejects_cross_owner_invalid_state_and_invalid_quantity" },
+  { id = "A5", test = "backend/crates/api/tests/m2_smart_putaway_postgres.rs::smart_putaway_rejects_cross_owner_invalid_state_and_invalid_quantity" },
+]
 frontend_pages = ["m2-putaway"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 api_paths = [
@@ -2974,6 +3001,7 @@ evidence_refs = [
   "backend/crates/api/src/m2_putaway.rs",
   "backend/crates/api/src/wave3_repository/putaway.rs",
   "backend/crates/api/tests/m2_smart_putaway_postgres.rs",
+  "backend/crates/api/tests/m2_adversarial_postgres.rs",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "prototypes/e2e/web-admin-m2-real.spec.ts",
   "artifacts/screenshot-portal/real-web/m2-inbound/putaway-recommendations.png",
@@ -2989,6 +3017,10 @@ title = "收货异常处理"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
 types = ["write", "api_change", "frontend_interaction", "audit_compliance", "integration", "inventory_change", "external_runtime"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_write_http_requires_m2_write_permission" },
+  { id = "A4", test = "backend/crates/api/tests/wave3_postgres/wave3_postgres_part2.rs::receiving_order_reject_closes_order_and_replays_idempotently" },
+]
 frontend_pages = ["m2-receiving"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-inbound-page-helpers-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -3010,6 +3042,8 @@ evidence_refs = [
   "backend/crates/api/src/wave3_repository_part1.rs",
   "backend/crates/api/src/wave3_repository/receiving_read.rs",
   "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
+  "backend/crates/api/tests/m2_adversarial_postgres.rs",
+  "backend/crates/api/tests/wave3_postgres/wave3_postgres_part2.rs",
   "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
   "apps/web-admin/src/pages/inbound/M2InboundDialogs.tsx",
   "artifacts/screenshot-portal/real-web/m2-inbound/m2-receiving-reject-dialog-current.png",
@@ -3063,6 +3097,10 @@ title = "上架策略配置"
 module = "M2"
 story_file = "docs/domain/user-stories-m2-inbound-verify.md"
 types = ["read_only", "write", "api_change", "config_rule", "frontend_interaction", "integration", "external_runtime"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs::putaway_strategy_rejects_foreign_warehouse_binding" },
+  { id = "A2", test = "backend/crates/api/tests/m2_adversarial_postgres.rs::putaway_http_requires_putaway_write_permission" },
+]
 frontend_pages = ["m2-putaway-strategy"]
 navigation_checks = ["node apps/web-admin/self-checks/m2-putaway-strategy-self-check.mjs"]
 e2e_checks = ["pnpm --dir apps/web-admin run test:e2e:m2-real"]
@@ -3090,6 +3128,7 @@ evidence_refs = [
   "backend/crates/api/src/wave3_repository/putaway.rs",
   "backend/crates/api/src/wave3_handlers/receiving_handlers.rs",
   "backend/crates/api/tests/m2_deferred_closeout/closeout_actions.rs",
+  "backend/crates/api/tests/m2_adversarial_postgres.rs",
   "apps/web-admin/src/pages/inbound/M2PutawayStrategyPage.tsx",
   "apps/web-admin/src/features/inbound/putaway-strategy-queries.ts",
   "apps/web-admin/src/app-shell/AdminViewRenderer.tsx",
