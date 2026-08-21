@@ -175,6 +175,63 @@ async fn list_events_filters_product_and_batch_from_diff_values(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn audit_event_rejects_update_and_delete_and_stays_owner_scoped(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let mut first = audit_request("ITEM-APPEND-ONLY", "create", None);
+    first.owner_id = owner_id;
+    append_event(&pool, &first)
+        .await
+        .expect("owner audit event should insert");
+    let mut other = audit_request("ITEM-OTHER", "create", None);
+    other.owner_id = other_owner_id;
+    append_event(&pool, &other)
+        .await
+        .expect("other owner audit event should insert");
+
+    let listed = list_events(
+        &pool,
+        &AuditEventQuery {
+            owner_id,
+            resource_type: Some("audit_test_item".to_string()),
+            action: None,
+            resource_id: None,
+            product_code: None,
+            batch_no: None,
+            actor_id: None,
+            from: None,
+            to: None,
+            cursor: None,
+            limit: 20,
+        },
+    )
+    .await
+    .expect("owner-scoped list should succeed");
+    assert_eq!(listed.events.len(), 1);
+    assert_eq!(listed.events[0].owner_id, owner_id);
+    assert_eq!(listed.events[0].resource_id, "ITEM-APPEND-ONLY");
+
+    let update_result =
+        sqlx::query("UPDATE audit_event SET action = 'tampered' WHERE owner_id = $1")
+            .bind(owner_id)
+            .execute(&pool)
+            .await;
+    assert!(
+        update_result.is_err(),
+        "audit_event append-only invariant must reject UPDATE"
+    );
+
+    let delete_result = sqlx::query("DELETE FROM audit_event WHERE owner_id = $1")
+        .bind(owner_id)
+        .execute(&pool)
+        .await;
+    assert!(
+        delete_result.is_err(),
+        "audit_event append-only invariant must reject DELETE"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn export_events_walks_all_matching_pages_without_cross_owner_rows(pool: PgPool) {
     let owner_id = Uuid::new_v4();
     let other_owner_id = Uuid::new_v4();
