@@ -269,6 +269,7 @@ def check_deferred_story(story: dict[str, Any]) -> list[Issue]:
         for story_type in sorted(set(types) - set(STORY_TYPE_LAYERS))
     ]
     issues.extend(check_e2e_checks(story, verified=False))
+    issues.extend(check_adversarial_checks(story, require_coverage=False))
     return issues
 
 

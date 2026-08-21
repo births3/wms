@@ -186,6 +186,36 @@ def test_t1_rejects_helper_function_as_adversarial_evidence():
     assert any("必须指向带" in issue.message for issue in issues)
 
 
+def test_deferred_story_validates_filled_adversarial_checks_without_requiring_coverage():
+    from check_quality_matrix import check_deferred_story
+
+    issues = check_deferred_story(
+        {
+            "id": "US-M2-001",
+            "types": ["write"],
+            "evidence_refs": ["backend/crates/api/tests/m2_adversarial_postgres.rs"],
+            "adversarial_checks": [
+                {
+                    "id": "A2",
+                    "test": "backend/crates/api/tests/m2_adversarial_postgres.rs::inbound_write_http_requires_m2_write_permission",
+                }
+            ],
+        }
+    )
+    assert not any(issue.dimension == "adversarial" for issue in issues)
+
+    missing_file = check_deferred_story(
+        {
+            "id": "US-M2-001",
+            "types": ["write"],
+            "adversarial_checks": [
+                {"id": "A2", "test": "backend/crates/api/tests/missing.rs::no_such_fn"}
+            ],
+        }
+    )
+    assert any("对抗测试文件不存在" in issue.message for issue in missing_file)
+
+
 def test_complete_module_requires_declared_attack_classes():
     from check_quality_matrix import check_module_completion
 
