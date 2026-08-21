@@ -1,8 +1,15 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use chrono::Utc;
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::{
     audit::AuditWriteRequest,
+    auth::AuthContext,
+    lpn_container_handlers::{lpn_container_router, LpnContainerAppState},
     lpn_container_repository::{LpnContainerRepositoryError, PgLpnContainerRepository},
     wave3_repository::{PgWave3Repository, Wave3RepositoryError},
 };
@@ -661,4 +668,27 @@ async fn putaway_rejects_second_lpn_on_same_sku_batch_location(pool: PgPool) {
         putaway_count(&pool, fixture.owner_id, fixture.order_id).await,
         1
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn lpn_create_http_requires_master_data_write_permission(pool: PgPool) {
+    let app = lpn_container_router(LpnContainerAppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .method("POST")
+        .uri("/api/v1/master-data/lpn-containers")
+        .header("content-type", "application/json")
+        .header("idempotency-key", "lpn-create-forbidden")
+        .body(Body::from(
+            serde_json::json!({ "container_type": LPN_CONTAINER_TYPE_PALLET }).to_string(),
+        ))
+        .expect("lpn create request should build");
+    request.extensions_mut().insert(AuthContext {
+        permissions: vec!["m1.master_data.read".to_string()],
+        ..ctx(Uuid::new_v4())
+    });
+    let response = app
+        .oneshot(request)
+        .await
+        .expect("lpn create should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
