@@ -202,6 +202,8 @@ story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["write", "api_change", "frontend_interaction"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/src/auth.rs::jwt_claims_decode_to_owner_scoped_auth_context" },
+  { id = "A2", test = "backend/crates/api/tests/auth_session_postgres.rs::only_session_admin_can_kick_another_user" },
+  { id = "A3", test = "backend/crates/api/tests/auth_session_postgres.rs::password_change_and_disable_revoke_all_user_tokens" },
   { id = "A4", test = "backend/crates/api/src/auth.rs::logout_decoder_accepts_expired_signed_token_for_idempotence" },
 ]
 frontend_pages = ["h1-session-management"]
@@ -266,6 +268,7 @@ types = ["write", "api_change", "frontend_interaction", "integration"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_authentication_uses_postgres_failures_rate_limit_owner_and_scope" },
   { id = "A2", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_rejects_invalid_scope_expiry_and_non_admin" },
+  { id = "A3", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_authentication_uses_postgres_failures_rate_limit_owner_and_scope" },
   { id = "A4", test = "backend/crates/api/tests/api_key_postgres.rs::api_key_lifecycle_uses_hash_once_idempotency_rotation_revoke_and_audit" },
 ]
 frontend_pages = ["h1-api-keys"]
@@ -411,6 +414,7 @@ adversarial_checks = [
   { id = "A4", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::create_replays_same_idempotency_key_without_second_row" },
   { id = "A5", test = "backend/crates/api/tests/m1_lpn_container_crud_postgres.rs::batch_create_rejects_invalid_count" },
   { id = "A7", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::concurrent_same_sku_batch_putaway_adds_qty" },
+  { id = "A2", test = "backend/crates/api/tests/m1_lpn_container_postgres.rs::lpn_create_http_requires_master_data_write_permission" },
 ]
 frontend_pages = ["m1-lpn-containers"]
 navigation_checks = ["node apps/web-admin/self-checks/m1-lpn-container-navigation-self-check.mjs"]
@@ -689,7 +693,10 @@ story_file = "docs/domain/user-stories-m3-inventory-query.md"
 types = ["write", "config_rule", "frontend_interaction", "integration"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/m3_status_allocation_postgres.rs::inventory_quality_status_dictionary_prefers_owner_override_without_cross_owner_reads" },
+  { id = "A2", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::status_change_http_requires_m3_write_permission" },
   { id = "A3", test = "backend/crates/api/tests/m3_status_transition_config_postgres.rs::status_transition_config_rejects_unknown_status_and_empty_sources" },
+  { id = "A4", test = "backend/crates/api/tests/m3_status_allocation_postgres.rs::legal_inventory_status_change_is_audited_and_idempotent" },
+  { id = "A6", test = "backend/crates/api/tests/m3_status_allocation_postgres.rs::quarantined_inventory_is_not_allocated_to_outbound_wave" },
 ]
 frontend_pages = ["m3-batches", "m3-status-config"]
 navigation_checks = [
@@ -803,7 +810,10 @@ module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "config_rule", "integration", "audit_compliance"]
 adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::abc_classifications_are_owner_scoped_and_reject_unknown_class" },
   { id = "A2", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::abc_write_http_requires_abc_write_permission" },
+  { id = "A3", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::abc_classifications_are_owner_scoped_and_reject_unknown_class" },
+  { id = "A6", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::abc_classifications_are_owner_scoped_and_reject_unknown_class" },
 ]
 api_paths = [
   "GET /api/v1/inventory/abc",
@@ -853,6 +863,7 @@ types = ["read_only", "write", "api_change", "integration", "audit_compliance", 
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_tasks_and_records_are_owner_scoped_and_written_atomically" },
   { id = "A2", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_generate_http_requires_write_permission" },
+  { id = "A3", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::maintenance_submission_rejects_expired_and_unqualified_batches" },
   { id = "A4", test = "backend/crates/api/tests/m3_maintenance_postgres.rs::duplicate_maintenance_submission_replays_without_second_record_or_audit" },
 ]
 frontend_pages = ["m3-maintenance"]
@@ -967,6 +978,7 @@ module = "M3"
 story_file = "docs/domain/user-stories-m3-inventory-operation.md"
 types = ["write", "inventory_change", "concurrent_resource", "audit_compliance", "integration", "frontend_interaction"]
 adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::relocate_rejects_cross_owner_batch" },
   { id = "A2", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::relocate_http_requires_relocation_write_permission" },
   { id = "A3", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::relocate_inventory_moves_qty_atomically_and_rejects_quarantined" },
   { id = "A4", test = "backend/crates/api/tests/m3_ops_closeout_postgres.rs::relocate_inventory_moves_qty_atomically_and_rejects_quarantined" },
@@ -2339,6 +2351,8 @@ module = "H9"
 story_file = "docs/domain/user-stories-h9-print-orchestration.md"
 types = ["write", "config_rule", "api_change", "frontend_interaction", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/h9_aggregation_rule_postgres.rs::aggregation_rule_http_requires_orchestration_write_permission" },
+  { id = "A3", test = "backend/crates/api/tests/h9_aggregation_rule_postgres.rs::aggregation_rule_test_lifecycle_replays_audits_and_rejects_rewrite" },
   { id = "A4", test = "backend/crates/api/tests/h9_aggregation_rule_postgres.rs::aggregation_rule_test_lifecycle_replays_audits_and_rejects_rewrite" },
 ]
 frontend_pages = ["h9-delivery-note-aggregation"]
@@ -3121,6 +3135,7 @@ story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "config_rule", "integration", "audit_compliance"]
 adversarial_checks = [
   { id = "A1", test = "backend/crates/api/tests/alert_definition_postgres.rs::alert_code_is_unique_per_owner_but_reusable_across_owners" },
+  { id = "A2", test = "backend/crates/api/tests/alert_definition_postgres.rs::alert_definition_http_requires_read_permission" },
   { id = "A3", test = "backend/crates/api/tests/alert_definition_postgres.rs::alert_definition_delete_is_rejected_when_trigger_history_exists" },
   { id = "A4", test = "backend/crates/api/tests/alert_definition_postgres.rs::gsp_seed_covers_existing_and_new_owners_idempotently" },
   { id = "A6", test = "backend/crates/api/tests/alert_definition_postgres.rs::gsp_forced_alert_cannot_be_created_or_updated_as_disableable" },
@@ -3246,6 +3261,7 @@ module = "AL"
 story_file = "docs/domain/user-stories-h-alert.md"
 types = ["read_only", "write", "api_change", "frontend_interaction", "config_rule", "integration", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/alert_escalation_postgres.rs::alert_escalation_http_requires_read_permission" },
   { id = "A4", test = "backend/crates/api/tests/alert_escalation_postgres.rs::upsert_alert_escalation_rule_limits_levels_and_job_escalates_once_then_stops_after_ack" },
   { id = "A6", test = "backend/crates/api/tests/alert_escalation_postgres.rs::l3_repeats_every_24_hours_and_empty_off_hours_route_falls_back_to_system_admin" },
 ]
@@ -5478,6 +5494,7 @@ module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/task_engine_postgres/routes.rs::task_routes_require_idempotency_and_expose_worker_queue" },
   { id = "A3", test = "backend/crates/api/tests/task_engine_postgres.rs::task_main_chain_enforces_qualification_state_machine_and_idempotency" },
   { id = "A4", test = "backend/crates/api/tests/task_engine_postgres.rs::task_main_chain_enforces_qualification_state_machine_and_idempotency" },
   { id = "A6", test = "backend/crates/api/tests/task_engine_postgres.rs::assignment_rejects_expired_or_full_worker_qualification" },
@@ -5563,6 +5580,8 @@ module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/task_engine_postgres/routes.rs::task_routes_require_idempotency_and_expose_worker_queue" },
+  { id = "A3", test = "backend/crates/api/tests/task_engine_postgres/routes.rs::task_routes_require_idempotency_and_expose_worker_queue" },
   { id = "A4", test = "backend/crates/api/tests/task_engine_postgres.rs::task_main_chain_enforces_qualification_state_machine_and_idempotency" },
   { id = "A6", test = "backend/crates/api/tests/task_engine_postgres.rs::assignment_rejects_expired_or_full_worker_qualification" },
 ]
@@ -5657,6 +5676,8 @@ module = "TE"
 story_file = "docs/domain/user-stories-mte-task-engine.md"
 types = ["write", "config_rule", "frontend_interaction", "api_change", "runtime_guard", "audit_compliance"]
 adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/task_engine_postgres/release_routes.rs::release_route_enforces_condition_permission_and_idempotency" },
+  { id = "A3", test = "backend/crates/api/tests/task_engine_postgres/release_routes.rs::release_route_enforces_condition_permission_and_idempotency" },
   { id = "A4", test = "backend/crates/api/tests/task_type_postgres.rs::task_type_route_persists_configuration_and_rejects_missing_idempotency" },
 ]
 frontend_pages = ["mte-task-types", "mte-task-dispatch"]
