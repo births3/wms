@@ -340,3 +340,37 @@ async fn task_type_route_persists_configuration_and_rejects_missing_idempotency(
         .expect("missing key route should respond");
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn task_type_route_rejects_missing_write_permission(pool: PgPool) {
+    let owner_id = Uuid::new_v4();
+    seed_owner(&pool, owner_id).await;
+    std::env::set_var(JWT_SECRET_ENV, "test-secret");
+    let claims = build_access_claims(
+        Uuid::new_v4(),
+        owner_id,
+        "task-type-forbidden",
+        vec!["mte.task_type.read".to_string()],
+        Uuid::new_v4().to_string(),
+        Utc::now(),
+    );
+    let token = encode_access_token(&claims, "test-secret").expect("test token should encode");
+    let app = task_type_router(TaskTypeAppState::with_postgres(pool)).layer(
+        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
+    );
+
+    let response = app
+        .oneshot(
+            Request::put("/api/v1/task-engine/task-types/urgent_pick")
+                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .header("content-type", "application/json")
+                .header("Idempotency-Key", "task-type-forbidden")
+                .body(Body::from(
+                    serde_json::to_string(&request()).expect("request should serialize"),
+                ))
+                .expect("forbidden task type request should build"),
+        )
+        .await
+        .expect("forbidden task type route should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
