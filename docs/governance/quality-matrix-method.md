@@ -7,6 +7,7 @@
 ## 事实源
 
 - 机器事实源：`governance/quality-matrix.toml`。
+- 对抗攻击类：`governance/adversarial-catalog.toml`，说明见 [adversarial-testing.md](adversarial-testing.md)。
 - 展示页：`docs/governance/quality-matrix.md`，由脚本生成，不手工修改。
 - 检查脚本：`scripts/governance/check_quality_matrix.py`。
 
@@ -47,7 +48,7 @@
 6. PostgreSQL 表、约束、索引、迁移和货主隔离完成。
 7. 写操作具备权限、幂等、审计和适用的并发控制。
 8. 故事类型推导的 L1-L11 测试层全部覆盖。
-9. 数据写入故事有真实 PostgreSQL 测试；有页面的故事有真实数据 E2E。
+9. 数据写入故事有真实 PostgreSQL 测试；有页面的故事有真实数据 E2E。写故事迁入 `stories` 后，模块验收还要求 `adversarial_checks` 覆盖 `governance/adversarial-catalog.toml` 按 `types` 推导的 A1–A8；不新增故事类型或 L12。T1 不把该字段当作硬门禁。
 10. 十二个质量维度全部为 `verified` 或有理由的 `not_applicable`。
 11. 模块严格范围检查通过。
 12. 不存在 mock 替代生产实现、无效按钮或只登记未实现。
@@ -60,7 +61,7 @@
 
 ### 模块级
 
-模块验收必须同时满足：模块内无延期故事；菜单、页面、API、后端和数据库形成完整业务链；正常、拒绝、撤销、重复提交、越权和跨货主路径按适用范围通过；字段矩阵、状态机和审计一致；真实 E2E 覆盖主要流程；质量矩阵、OpenAPI、范围和治理检查通过。
+模块验收必须同时满足：模块内无延期故事；菜单、页面、API、后端和数据库形成完整业务链；正常、拒绝、撤销、重复提交、越权和跨货主路径按适用范围通过，并在 `adversarial_checks` 中指向对应 postgres / 单元测试；字段矩阵、状态机和审计一致；真实 E2E 覆盖主要流程；质量矩阵、OpenAPI、范围和治理检查通过。
 
 使用以下命令验收，延期故事未清零时硬失败：
 

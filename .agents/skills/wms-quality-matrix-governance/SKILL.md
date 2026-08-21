@@ -11,10 +11,13 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 
 - `AGENTS.md`
 - `docs/governance/quality-matrix-method.md`
+- `docs/governance/adversarial-testing.md`
+- `governance/adversarial-catalog.toml`
 - `.agents/skills/wms-loop-engineering/SKILL.md`
 - `.agents/skills/wms-execution-retrospective/SKILL.md`
 - `docs/agent-loop-engineering.md`
 - `governance/quality-matrix.toml`
+- `governance/adversarial-catalog.toml`
 - 目标故事文件、页面文件、OpenAPI path 或后端模块
 
 ## 固定事实源
@@ -59,7 +62,7 @@ description: WMS 全链路质量矩阵治理技能。用户要求建立或维护
 ## 验收退出条件
 
 - 故事完成：十二维度闭环，故事类型推导的测试层全部覆盖；写入故事必须有真实 PostgreSQL 测试，有页面必须有真实数据 E2E。
-- 模块完成：运行 `check_quality_matrix.py --complete-module <模块>`，该模块仍有任一 `deferred_stories` 时禁止宣称完成。
+- 模块完成：运行 `check_quality_matrix.py --complete-module <模块>`，该模块仍有任一 `deferred_stories` 时禁止宣称完成；已完成写故事还必须覆盖 `governance/adversarial-catalog.toml` 推导的 A1–A8（T1 不强制）。目录说明见 `docs/governance/adversarial-testing.md`。
 - 发布完成：PDA、硬件、外部系统、性能和灰度发布必须使用真实环境证据，不能以 mock、localhost 或静态文件替代。
 - 验收深度按故事类型自动取最高层级：S1 查询展示、S2 普通写入、S3 库存/并发/关键路径、S4 PDA/硬件/外部系统/发布；不得手工降级。
 

@@ -58,6 +58,7 @@
 | [agent-loop-engineering.md](agent-loop-engineering.md) | AI 闭环执行规范，定义目标、检查、反馈和停止条件 |
 | [agent-knowledge-graph.md](agent-knowledge-graph.md) | 动态项目图谱、业务域图、变更影响图和可视化入口 |
 | [governance.md](governance.md) | 治理体系、提交规范、分层门禁和验证分级 |
+| [governance/adversarial-testing.md](governance/adversarial-testing.md) | 功能模块对抗测试目录（A1–A8）与模块验收检查 |
 | [coding-standards.md](coding-standards.md) | 代码书写规范 |
 | [frontend-coding-standards.md](frontend-coding-standards.md) | 前端编码规范 |
 | [requirements-traceability-matrix.md](requirements-traceability-matrix.md) | 项目级 RTM 标准，覆盖故事、前端、后端、测试和合规风险矩阵 |
