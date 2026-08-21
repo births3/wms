@@ -120,6 +120,53 @@ def test_t1_rejects_malformed_or_missing_adversarial_test_target():
     assert any("对抗测试文件不存在" in message for message in messages)
 
 
+def test_t1_accepts_adversarial_test_owned_by_integration_crate():
+    from check_quality_matrix import check_adversarial_checks
+
+    assert (
+        check_adversarial_checks(
+            {
+                "id": "US-M1-004",
+                "types": ["write"],
+                "test_checks": [
+                    "cargo test --manifest-path backend/Cargo.toml -p wms-api --test master_data_postgres"
+                ],
+                "adversarial_checks": [
+                    {
+                        "id": "A2",
+                        "test": "backend/crates/api/tests/master_data_postgres/m1_permission_defaults.rs::m1_warehouse_reads_require_master_data_read_permission",
+                    }
+                ],
+            },
+            require_coverage=False,
+        )
+        == []
+    )
+
+
+def test_t1_rejects_adversarial_test_from_another_story():
+    from check_quality_matrix import check_adversarial_checks
+
+    issues = check_adversarial_checks(
+        {
+            "id": "US-H1-005",
+            "types": ["write"],
+            "evidence_refs": ["backend/crates/api/tests/auth_session_postgres.rs"],
+            "test_checks": [
+                "cargo test --manifest-path backend/Cargo.toml -p wms-api --test auth_session_postgres"
+            ],
+            "adversarial_checks": [
+                {
+                    "id": "A1",
+                    "test": "backend/crates/api/tests/stock_adjustment_postgres.rs::cross_owner_cannot_read_stock_loss_order",
+                }
+            ],
+        },
+        require_coverage=False,
+    )
+    assert any("未进入本故事 evidence_refs 或 test_checks" in issue.message for issue in issues)
+
+
 def test_t1_rejects_helper_function_as_adversarial_evidence():
     from check_quality_matrix import check_adversarial_checks
 

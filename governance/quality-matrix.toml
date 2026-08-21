@@ -318,6 +318,12 @@ title = "仓库与库位管理"
 module = "M1"
 story_file = "docs/domain/user-stories-m1-master-data-warehouse.md"
 types = ["write", "api_change", "frontend_interaction"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/master_data_postgres/master_data_postgres_part3.rs::warehouse_zone_location_routes_persist_update_disable_and_isolate_owner" },
+  { id = "A2", test = "backend/crates/api/tests/master_data_postgres/m1_permission_defaults.rs::m1_warehouse_reads_require_master_data_read_permission" },
+  { id = "A3", test = "backend/crates/api/tests/master_data_postgres/m1_location_disable_guard.rs::location_with_stock_cannot_be_disabled" },
+  { id = "A4", test = "backend/crates/api/tests/master_data_postgres/master_data_postgres_part3.rs::warehouse_zone_create_replays_idempotency_key_and_rejects_changed_request" },
+]
 frontend_pages = ["m1-warehouses", "m1-zones", "m1-locations"]
 navigation_checks = [
   "node apps/web-admin/self-checks/m1-product-source-actions-self-check.mjs",
@@ -1184,8 +1190,14 @@ title = "API 鉴权中间件"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["read_only", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/auth.rs::auth_context_rejects_cross_owner_access" },
+  { id = "A2", test = "backend/crates/api/src/auth.rs::auth_context_rejects_cross_owner_access" },
+]
 frontend_pages = []
 api_paths = []
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --lib auth"]
+evidence_refs = ["backend/crates/api/src/auth.rs"]
 
 [stories.dimensions]
 requirement = "verified"
@@ -1215,8 +1227,14 @@ title = "多货主数据隔离（AuthContext 切片）"
 module = "H1"
 story_file = "docs/domain/user-stories-h1-auth-tenant.md"
 types = ["read_only", "api_change"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/src/auth.rs::auth_context_rejects_cross_owner_access" },
+  { id = "A2", test = "backend/crates/api/src/auth.rs::auth_context_rejects_cross_owner_access" },
+]
 frontend_pages = []
 api_paths = []
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --lib auth"]
+evidence_refs = ["backend/crates/api/src/auth.rs"]
 
 [stories.dimensions]
 requirement = "verified"
@@ -1269,8 +1287,13 @@ title = "审计事件统一记录（同步 append-only 切片）"
 module = "H2"
 story_file = "docs/domain/user-stories-h2-audit-trail.md"
 types = ["write", "audit_compliance"]
+adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/audit_postgres.rs::export_events_walks_all_matching_pages_without_cross_owner_rows" },
+]
 frontend_pages = []
 api_paths = []
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test audit_postgres"]
+evidence_refs = ["backend/crates/api/tests/audit_postgres.rs"]
 
 [stories.dimensions]
 requirement = "verified"
@@ -1734,7 +1757,12 @@ title = "状态机定义注册与转换校验"
 module = "H6"
 story_file = "docs/domain/user-stories-h6-state-machine.md"
 types = ["read_only", "api_change", "config_rule"]
+adversarial_checks = [
+  { id = "A2", test = "backend/crates/api/tests/h6_state_machine_postgres.rs::h6_permission_is_granted_only_to_seeded_system_admin_role" },
+]
 frontend_pages = []
+test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test h6_state_machine_postgres"]
+evidence_refs = ["backend/crates/api/tests/h6_state_machine_postgres.rs"]
 api_paths = [
   "GET /api/v1/state-machines",
   "GET /api/v1/state-machines/{machine_code}",
@@ -1770,6 +1798,7 @@ module = "H6"
 story_file = "docs/domain/user-stories-h6-state-machine.md"
 types = ["write", "integration", "audit_compliance"]
 adversarial_checks = [
+  { id = "A1", test = "backend/crates/api/tests/wave4_postgres.rs::outbound_order_reads_are_owner_scoped_filterable_and_include_lines" },
   { id = "A4", test = "backend/crates/api/tests/wave4_postgres.rs::traceability_outbound_report_persists_pending_replay_queue_and_audits" },
 ]
 frontend_pages = []

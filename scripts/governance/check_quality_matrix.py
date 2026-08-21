@@ -30,7 +30,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
 ADVERSARIAL_CATALOG = REPO_ROOT / "governance" / "adversarial-catalog.toml"
 DOC = REPO_ROOT / "docs" / "governance" / "quality-matrix.md"
-_ADVERSARIAL_CATALOG_CACHE: dict[str, Any] | None = None
 OPENAPI_JSON = REPO_ROOT / "shared" / "openapi" / "openapi.json"
 OPENAPI_YAML_FILES = [
     REPO_ROOT / "shared" / "openapi" / "customer-portal-openapi.yaml",
@@ -156,6 +155,13 @@ class Issue:
     message: str
 
 
+from _quality_matrix_adversarial import check_adversarial_checks  # noqa: E402
+from _quality_matrix_adversarial import (  # noqa: E402,F401
+    derive_required_attack_classes,
+    load_adversarial_catalog,
+)
+
+
 def rel(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
 
@@ -231,95 +237,6 @@ def derive_acceptance_level(types: list[str]) -> str:
     if "write" in type_set or "integration" in type_set:
         return "S2"
     return "S1"
-
-
-def load_adversarial_catalog() -> dict[str, Any]:
-    global _ADVERSARIAL_CATALOG_CACHE
-    if _ADVERSARIAL_CATALOG_CACHE is None:
-        _ADVERSARIAL_CATALOG_CACHE = toml.loads(ADVERSARIAL_CATALOG.read_text(encoding="utf-8"))
-    return _ADVERSARIAL_CATALOG_CACHE
-
-
-def derive_required_attack_classes(types: list[str]) -> list[str]:
-    """由故事类型并集推导对抗攻击类；不新增 L12。"""
-    required_by_type = load_adversarial_catalog().get("required_by_type", {})
-    classes: set[str] = set()
-    for story_type in types:
-        entry = required_by_type.get(story_type, {})
-        if not isinstance(entry, dict):
-            continue
-        values = entry.get("classes", [])
-        if isinstance(values, list):
-            classes.update(str(item) for item in values if item)
-    return sorted(classes)
-
-
-def _adversarial_test_error(spec: str) -> str | None:
-    match = re.fullmatch(r"(?P<path>.+\.rs)::(?P<name>[A-Za-z0-9_]+)", spec)
-    if not match:
-        return f"adversarial_checks.test 格式必须是 'path.rs::fn_name': {spec}"
-    rel_path = match.group("path")
-    path = REPO_ROOT / rel_path
-    if not path.is_file():
-        return f"对抗测试文件不存在: {rel_path}"
-    name = match.group("name")
-    text = path.read_text(encoding="utf-8")
-    if not re.search(
-        rf"#\[(?:sqlx::test|tokio::test|test)[^\]]*\]\s*(?:async\s+)?fn\s+{re.escape(name)}\s*\(",
-        text,
-        flags=re.S,
-    ):
-        return f"对抗测试必须指向带 #[test]/#[tokio::test]/#[sqlx::test] 的函数: {spec}"
-    return None
-
-
-def check_adversarial_checks(story: dict[str, Any], *, require_coverage: bool) -> list[Issue]:
-    """T1 只校验已填写的条目；模块验收才要求 types 推导的攻击类齐全。"""
-    story_id = str(story.get("id", "<missing>"))
-    types = story.get("types", [])
-    required = derive_required_attack_classes(
-        [item for item in types if isinstance(item, str)] if isinstance(types, list) else []
-    )
-    checks = story.get("adversarial_checks")
-    issues: list[Issue] = []
-    if checks is None:
-        if require_coverage and required:
-            issues.append(
-                Issue(story_id, "adversarial", f"模块验收缺少攻击类: {', '.join(required)}")
-            )
-        return issues
-    if not isinstance(checks, list) or not checks:
-        return [Issue(story_id, "adversarial", "adversarial_checks 必须是非空对象数组")]
-
-    known_classes = {
-        key
-        for key in (load_adversarial_catalog().get("classes") or {})
-        if isinstance(key, str)
-    }
-    declared: set[str] = set()
-    for item in checks:
-        if not isinstance(item, dict):
-            issues.append(Issue(story_id, "adversarial", "adversarial_checks 每项必须是对象"))
-            continue
-        attack_id = item.get("id")
-        test = item.get("test")
-        if not isinstance(attack_id, str) or attack_id not in known_classes:
-            issues.append(Issue(story_id, "adversarial", f"未知攻击类: {attack_id}"))
-            continue
-        declared.add(attack_id)
-        if not isinstance(test, str) or not test.strip():
-            issues.append(Issue(story_id, "adversarial", f"{attack_id} 缺少 test"))
-            continue
-        error = _adversarial_test_error(test.strip())
-        if error:
-            issues.append(Issue(story_id, "adversarial", error))
-    if require_coverage:
-        missing = [item for item in required if item not in declared]
-        if missing:
-            issues.append(
-                Issue(story_id, "adversarial", f"模块验收缺少攻击类: {', '.join(missing)}")
-            )
-    return issues
 
 
 def check_module_completion(matrix: dict[str, Any], module: str) -> list[Issue]:
