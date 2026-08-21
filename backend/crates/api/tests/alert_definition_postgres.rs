@@ -1,7 +1,16 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use chrono::{TimeZone, Utc};
 use serde_json::json;
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
+use wms_api::{
+    alert_definition_handlers::{alert_definition_router, AlertDefinitionAppState},
+    auth::AuthContext,
+};
 
 async fn owner(pool: &PgPool) -> Uuid {
     let id = Uuid::new_v4();
@@ -179,4 +188,27 @@ async fn gsp_seed_covers_existing_and_new_owners_idempotently(pool: PgPool) {
             .await
             .expect("seed count should be queried");
     assert_eq!(count, 6);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn alert_definition_http_requires_read_permission(pool: PgPool) {
+    let app = alert_definition_router(AlertDefinitionAppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .method("GET")
+        .uri("/api/v1/alert-definitions")
+        .body(Body::empty())
+        .expect("alert definition list request should build");
+    request.extensions_mut().insert(AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: Uuid::new_v4(),
+        actor_name: "al-definition-forbidden".to_string(),
+        permissions: vec!["hal.alert-definition.write".to_string()],
+        jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
+    });
+    let response = app
+        .oneshot(request)
+        .await
+        .expect("alert definition list should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }

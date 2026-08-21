@@ -1,9 +1,16 @@
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+    Extension,
+};
 use chrono::{TimeZone, Utc};
 use sqlx::PgPool;
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::{
     auth::AuthContext,
     print_orchestration::{PrintOrchestrationError, PrintOrchestrationService},
+    print_orchestration_handlers::{print_orchestration_router, PrintOrchestrationAppState},
     wave4_repository::PgWave4Repository,
 };
 use wms_domain::{
@@ -471,6 +478,32 @@ async fn outbound_creation_persists_all_configurable_aggregation_fields(pool: Pg
             Some("THIRD_PARTY".to_string()),
         )
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn aggregation_rule_http_requires_orchestration_write_permission(pool: PgPool) {
+    let app = print_orchestration_router(PrintOrchestrationAppState::with_postgres(pool)).layer(
+        Extension(AuthContext {
+            permissions: vec!["h9.print_orchestration.read".to_string()],
+            ..ctx(Uuid::new_v4())
+        }),
+    );
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/print-orchestration/aggregation-rules/versions")
+                .header("content-type", "application/json")
+                .header("idempotency-key", "h9-rule-forbidden")
+                .body(Body::from(
+                    serde_json::to_string(&invoice_rule_request())
+                        .expect("aggregation draft should serialize"),
+                ))
+                .expect("request should build"),
+        )
+        .await
+        .expect("aggregation draft route should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 fn invoice_rule_request() -> CreateAggregationRuleDraftRequest {

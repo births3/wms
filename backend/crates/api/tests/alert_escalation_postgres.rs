@@ -1,13 +1,19 @@
 use std::sync::Arc;
 
+use axum::{
+    body::Body,
+    http::{Request, StatusCode},
+};
 use chrono::{Duration, TimeZone, Utc};
 use sqlx::PgPool;
 use tokio::sync::Mutex;
+use tower::ServiceExt;
 use uuid::Uuid;
 use wms_api::{
     alert_escalation::{
         run_escalations_once_with_provider, AlertEscalationError, PgAlertEscalationRepository,
     },
+    alert_escalation_handlers::{alert_escalation_router, AlertEscalationAppState},
     auth::AuthContext,
     wechat_notify_service::{WechatProvider, WechatProviderFuture, WechatProviderRequest},
 };
@@ -392,4 +398,27 @@ async fn seed_escalating_alert(
     .await
     .expect("escalating alert should seed");
     alert_id
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn alert_escalation_http_requires_read_permission(pool: PgPool) {
+    let app = alert_escalation_router(AlertEscalationAppState::with_postgres(pool));
+    let mut request = Request::builder()
+        .method("GET")
+        .uri("/api/v1/alert-escalation-rules")
+        .body(Body::empty())
+        .expect("escalation list request should build");
+    request.extensions_mut().insert(AuthContext {
+        user_id: Uuid::new_v4(),
+        owner_id: Uuid::new_v4(),
+        actor_name: "al-escalation-forbidden".to_string(),
+        permissions: vec!["hal.escalation.write".to_string()],
+        jti: Uuid::new_v4().to_string(),
+        warehouse_scope: None,
+    });
+    let response = app
+        .oneshot(request)
+        .await
+        .expect("escalation list should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }

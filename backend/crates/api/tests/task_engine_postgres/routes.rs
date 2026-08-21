@@ -142,6 +142,30 @@ async fn task_routes_require_idempotency_and_expose_worker_queue(pool: PgPool) {
         .expect("worker priority rule write should respond");
     assert_eq!(forbidden_priority_write.status(), StatusCode::FORBIDDEN);
 
+    let forbidden_group_write = app
+        .clone()
+        .oneshot(
+            Request::put("/api/v1/task-engine/task-groups/pick-forbidden")
+                .header(AUTHORIZATION, format!("Bearer {worker_token}"))
+                .header("content-type", "application/json")
+                .header("Idempotency-Key", "mte-api-group-worker")
+                .body(Body::from(
+                    serde_json::json!({
+                        "task_group_name": "无权限组",
+                        "warehouse_id": warehouse_id,
+                        "zone_ids": [],
+                        "task_type_codes": ["pick"],
+                        "member_user_ids": [worker_id],
+                        "enabled": true
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .expect("worker task group write should respond");
+    assert_eq!(forbidden_group_write.status(), StatusCode::FORBIDDEN);
+
     let invalid_priority = app
         .clone()
         .oneshot(
