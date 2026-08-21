@@ -2786,9 +2786,9 @@ test_checks = [
   "node apps/web-admin/self-checks/m2-inbound-detail-view-model-self-check.mjs",
   "pnpm --dir apps/web-admin exec tsc --noEmit",
 ]
-reason = "PC 数量闭环、GSP 现场字段录入与详情回读、第二收货员同人/资格校验、销售退货原批号数量和批号级拒收合计约束、cool/冷冻/冷藏温区校验与超温备注已有；但稳定性报告附件未强制、收货节点 M-VR 双人策略、追溯码/LPN、PDA 扫码离线重放及真机证据未闭环。"
+reason = "PC 数量闭环、GSP 现场字段、整单拒收主链、一 ASN 一 receipt、收货不写库存已有口径（澄清 #103-#113）；追溯码绑码、LPN 绑定、PDA 离线不是 002 完成条件。仍缺：超温继续强制 H-FILE 稳定性报告附件、收货节点 M-VR 双人策略（US-VR-006）。"
 owner = "M2 入库模块负责人"
-resume_when = "强制超温稳定性报告附件（H-FILE），完成收货节点双人策略、追溯码/LPN、PDA 离线冲突链及真机验收后重新执行完整故事验收。"
+resume_when = "强制超温稳定性报告附件（H-FILE）且收货节点双人策略（US-VR-006）fail-closed 可用后，按澄清 #103-#113 重新验收。不把追溯码绑码、LPN 绑定、PDA 离线重放作为 002 完成门槛。"
 evidence_refs = [
   "backend/crates/api/tests/m2_adversarial_postgres.rs",
   "backend/crates/api/tests/wave3_postgres/wave3_postgres_part2.rs",
