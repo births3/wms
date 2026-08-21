@@ -141,6 +141,94 @@ fn bearer(token: &str, uri: &str) -> Request<Body> {
         .expect("request should build")
 }
 
+async fn login_attempt(
+    app: &axum::Router,
+    owner_code: &str,
+    username: &str,
+    password: &str,
+) -> axum::response::Response {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/login")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&LoginRequest {
+                        owner_code: owner_code.to_string(),
+                        username: username.to_string(),
+                        password: password.to_string(),
+                    })
+                    .expect("login request should encode"),
+                ))
+                .expect("login request should build"),
+        )
+        .await
+        .expect("login should respond")
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn login_rejects_cross_owner_wrong_password_locked_and_disabled_accounts(pool: PgPool) {
+    std::env::set_var(JWT_SECRET_ENV, "session-test-secret");
+    let owner_id = Uuid::new_v4();
+    let other_owner_id = Uuid::new_v4();
+    let user_id = Uuid::new_v4();
+    seed_user(&pool, owner_id, user_id, "login-user").await;
+    sqlx::query("INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, $3)")
+        .bind(other_owner_id)
+        .bind(format!("OWNER-{other_owner_id}"))
+        .bind("对抗测试货主B")
+        .execute(&pool)
+        .await
+        .expect("other owner should insert");
+    let app = app(pool.clone(), Arc::new(MemoryRevocations::default()));
+    let owner_code = format!("OWNER-{owner_id}");
+
+    let cross_owner = login_attempt(
+        &app,
+        &format!("OWNER-{other_owner_id}"),
+        "login-user",
+        "CorrectHorse1!",
+    )
+    .await;
+    assert_eq!(cross_owner.status(), StatusCode::UNAUTHORIZED);
+
+    let wrong_password = login_attempt(&app, &owner_code, "login-user", "WrongPassword1").await;
+    assert_eq!(wrong_password.status(), StatusCode::UNAUTHORIZED);
+    for _ in 0..4 {
+        let replay = login_attempt(&app, &owner_code, "login-user", "WrongPassword1").await;
+        assert_eq!(replay.status(), StatusCode::UNAUTHORIZED);
+    }
+    let (failed_count, status): (i32, String) =
+        sqlx::query_as("SELECT failed_login_count, status FROM auth_users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(&pool)
+            .await
+            .expect("failed login counter should query");
+    assert_eq!(failed_count, 5);
+    assert_eq!(status, "locked");
+
+    let locked = login_attempt(&app, &owner_code, "login-user", "CorrectHorse1!").await;
+    assert_eq!(locked.status(), StatusCode::LOCKED);
+
+    sqlx::query(
+        "UPDATE auth_users SET status = 'disabled', locked_until = NULL, failed_login_count = 0 WHERE id = $1",
+    )
+    .bind(user_id)
+    .execute(&pool)
+    .await
+    .expect("user should disable");
+    let disabled = login_attempt(&app, &owner_code, "login-user", "CorrectHorse1!").await;
+    assert_eq!(disabled.status(), StatusCode::UNAUTHORIZED);
+
+    let sessions: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_sessions WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_one(&pool)
+        .await
+        .expect("session count should query");
+    assert_eq!(sessions, 0);
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn logout_is_idempotent_blacklists_token_and_writes_one_audit(pool: PgPool) {
     std::env::set_var(JWT_SECRET_ENV, "session-test-secret");
