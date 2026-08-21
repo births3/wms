@@ -14,13 +14,7 @@ async fn publish_template_for_scope(
     request.scope = scope;
     request.is_default = is_default;
     let draft = repo
-        .save_template(
-            pool,
-            auth,
-            request,
-            now,
-            &format!("{template_code}-save"),
-        )
+        .save_template(pool, auth, request, now, &format!("{template_code}-save"))
         .await
         .expect("template should save");
     repo.publish_template_draft(
@@ -321,6 +315,26 @@ async fn resolve_http_reports_unpublished_library_and_runtime_field_mismatch(poo
     );
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn resolve_http_requires_read_or_print_permission(pool: PgPool) {
+    let response = print_template_router(PrintTemplateAppState::with_postgres(pool))
+        .layer(Extension(ctx_with_permissions(
+            Uuid::new_v4(),
+            &["h9.print_template.write"],
+        )))
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/print-templates/resolve",
+            None,
+            json!({
+                "template_type_code": PRINT_TEMPLATE_TYPE_ASN,
+            }),
+        ))
+        .await
+        .expect("resolve route should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
+
 async fn seed_business_template(
     pool: &PgPool,
     actor_id: Uuid,
@@ -574,12 +588,10 @@ async fn six_business_template_types_resolve_preview_and_record_through_one_cont
         assert_eq!(printed.status(), StatusCode::OK, "{template_type}");
     }
 
-    let records: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM print_records WHERE owner_id = $1",
-    )
-    .bind(owner_id)
-    .fetch_one(&pool)
-    .await
-    .expect("business print records should count");
+    let records: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM print_records WHERE owner_id = $1")
+        .bind(owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("business print records should count");
     assert_eq!(records, 6);
 }

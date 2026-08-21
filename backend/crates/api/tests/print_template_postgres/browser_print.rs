@@ -40,7 +40,12 @@ async fn browser_print_masks_sensitive_data_and_counts_retries(pool: PgPool) {
             UpdatePrintFieldDefinitionRequest {
                 display_name: display_name.to_string(),
                 group_code: if table_detail { "detail" } else { "order" }.to_string(),
-                group_name: if table_detail { "明细信息" } else { "订单信息" }.to_string(),
+                group_name: if table_detail {
+                    "明细信息"
+                } else {
+                    "订单信息"
+                }
+                .to_string(),
                 description: display_name.to_string(),
                 example_value: None,
                 printable: true,
@@ -76,13 +81,7 @@ async fn browser_print_masks_sensitive_data_and_counts_retries(pool: PgPool) {
         required: true,
     });
     let saved = repo
-        .save_template(
-            &pool,
-            &auth,
-            request,
-            now,
-            "h9-browser-print-template-save",
-        )
+        .save_template(&pool, &auth, request, now, "h9-browser-print-template-save")
         .await
         .expect("template should save");
     let published = repo
@@ -159,7 +158,10 @@ async fn browser_print_masks_sensitive_data_and_counts_retries(pool: PgPool) {
         )
         .await
         .expect_err("failed print requires a reason");
-    assert!(matches!(missing_reason, wms_api::print_template::PrintTemplateError::InvalidRequest(_)));
+    assert!(matches!(
+        missing_reason,
+        wms_api::print_template::PrintTemplateError::InvalidRequest(_)
+    ));
 
     let mut retry_counts = Vec::new();
     for (index, (status, reason)) in [
@@ -197,4 +199,43 @@ async fn browser_print_masks_sensitive_data_and_counts_retries(pool: PgPool) {
         retry_counts.push(result.value.retry_count);
     }
     assert_eq!(retry_counts, vec![0, 1, 2]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn print_http_requires_print_permission_and_idempotency_key(pool: PgPool) {
+    let read_only = ctx_with_permissions(Uuid::new_v4(), &["h9.print_template.read"]);
+    let body = json!({
+        "template_type_code": PRINT_TEMPLATE_TYPE_ASN,
+        "business_module": "M2",
+        "business_document_type": "asn",
+        "business_document_id": "ASN-FORBIDDEN",
+        "data": {},
+        "status": "printed"
+    });
+    let forbidden = print_template_router(PrintTemplateAppState::with_postgres(pool.clone()))
+        .layer(Extension(read_only))
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/print-templates/print",
+            Some("h9-print-forbidden"),
+            body.clone(),
+        ))
+        .await
+        .expect("print route should respond");
+    assert_eq!(forbidden.status(), StatusCode::FORBIDDEN);
+
+    let missing_key = print_template_router(PrintTemplateAppState::with_postgres(pool))
+        .layer(Extension(ctx_with_permissions(
+            Uuid::new_v4(),
+            &["h9.print_template.print"],
+        )))
+        .oneshot(json_request(
+            "POST",
+            "/api/v1/print-templates/print",
+            None,
+            body,
+        ))
+        .await
+        .expect("print route should respond");
+    assert_eq!(missing_key.status(), StatusCode::BAD_REQUEST);
 }
