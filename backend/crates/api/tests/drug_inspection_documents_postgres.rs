@@ -868,3 +868,25 @@ async fn upstream_delivery_upload_versions_multiple_asns_atomically(pool: PgPool
     .expect("upstream delivery audit and idempotency evidence should query");
     assert_eq!(evidence, (2, 2));
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn review_http_requires_review_permission(pool: PgPool) {
+    let fixture = seed_fixture(&pool).await;
+    let app = drug_inspection_document_router(DrugInspectionDocumentAppState::with_postgres(pool));
+    let writer = context(
+        fixture.owner_id,
+        fixture.uploader_id,
+        &["m-di.document.read", "m-di.document.write"],
+    );
+    let response = app
+        .oneshot(json_request(
+            "GET",
+            "/api/v1/drug-inspection/review-queue",
+            writer,
+            None,
+            json!({}),
+        ))
+        .await
+        .expect("review queue should respond");
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+}
