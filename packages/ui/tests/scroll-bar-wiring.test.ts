@@ -35,7 +35,8 @@ assert.doesNotMatch(dataTableSource, /className="h-12"/);
 assert.doesNotMatch(dataTableSource, /calc\(100vh/);
 
 // DataTable：列表自管滚动结构 —— flex column 根 + 双轴滚动容器 + 常驻底部栏
-assert.match(dataTableSource, /flex min-h-0 flex-col/);
+// 类名间允许插入其他工具类（如 flex-1 / min-h-[380px]），只约束同一容器的关键布局语义
+assert.match(dataTableSource, /flex[^\n"]*min-h-0[^\n"]*flex-col/);
 assert.match(dataTableSource, /overflow-auto overscroll-contain/);
 assert.match(dataTableSource, /\[&::-webkit-scrollbar:horizontal\]:hidden/);
 assert.match(dataTableSource, /scrollbar-width:none/);
