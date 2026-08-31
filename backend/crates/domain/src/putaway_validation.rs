@@ -107,8 +107,7 @@ pub fn validate_category_zone(
     if arr.is_empty() {
         return true;
     }
-    arr.iter()
-        .any(|v| v.as_str().map_or(false, |c| c == product_category))
+    arr.iter().any(|v| v.as_str() == Some(product_category))
 }
 
 pub fn zone_treats_as_qualified(zone_quality_color: &str) -> bool {
