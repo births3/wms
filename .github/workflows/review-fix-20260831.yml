@@ -67,8 +67,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('backend/crates/api/tests/pda_consistency_repairs_postgres.rs')
-          text = path.read_text(encoding='utf-8')
+          consistency_test = Path('backend/crates/api/tests/pda_consistency_repairs_postgres.rs')
+          text = consistency_test.read_text(encoding='utf-8')
           replacements = {
               'assert_eq!(approval.6, server_now - Duration::minutes(3));': (
                   'assert_eq!(\n'
@@ -84,7 +84,28 @@ jobs:
               if text.count(old) != 1:
                   raise SystemExit(f'expected assertion not found exactly once: {old}')
               text = text.replace(old, new, 1)
-          path.write_text(text, encoding='utf-8')
+          consistency_test.write_text(text, encoding='utf-8')
+
+          # Phase 1 migrated the warehouse zone dictionary from `normal` to
+          # `normal_10_30`; keep the pre-existing PDA tests aligned with the
+          # actual database constraint instead of weakening the schema.
+          enhancement_test = Path('backend/crates/api/tests/pda_enhancements_postgres.rs')
+          text = enhancement_test.read_text(encoding='utf-8')
+          old = '"normal").await;'
+          if text.count(old) != 3:
+              raise SystemExit(f'expected three legacy temperature-zone fixtures, found {text.count(old)}')
+          text = text.replace(old, '"normal_10_30").await;')
+          enhancement_test.write_text(text, encoding='utf-8')
+
+          # The repaired batch-pick implementation no longer calls this line-level
+          # helper directly; remove the stale import so the final build is clean.
+          repository = Path('backend/crates/api/src/wave4_repository.rs')
+          text = repository.read_text(encoding='utf-8')
+          old = 'all_lines_reviewed_for_ship, short_pick_qty, status_after_pick, status_after_review,'
+          new = 'all_lines_reviewed_for_ship, status_after_pick, status_after_review,'
+          if text.count(old) != 1:
+              raise SystemExit('expected stale short_pick_qty import was not found exactly once')
+          repository.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
 
       - name: Format and whitespace checks
