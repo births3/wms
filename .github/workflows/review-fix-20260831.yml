@@ -67,6 +67,14 @@ jobs:
         run: |
           set -euo pipefail
           cargo fmt --manifest-path backend/Cargo.toml --all
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for path in [
+              Path('backend/crates/api/src/wave4_repository_actions.rs'),
+          ]:
+              path.write_text(path.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
+          PY
           git diff --check
 
       - name: Compile workspace
