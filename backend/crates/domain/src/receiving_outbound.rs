@@ -354,12 +354,66 @@ pub struct OutboundWaveListResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WavePickRouteStep {
+    pub step: u32,
+    pub location_code: String,
+    pub product_code: String,
+    pub product_name: String,
+    pub spec: Option<String>,
+    pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
+    pub planned_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub picked_qty: Quantity,
+    pub picking_category: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct WavePickSummary {
+    pub wave_id: Uuid,
+    pub wave_no: String,
+    pub total_lines: u32,
+    #[schema(value_type = String, format = "decimal")]
+    pub total_qty: Quantity,
+    pub picking_route: Vec<WavePickRouteStep>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompletePickTaskRequest {
     pub line_no: u32,
     #[schema(value_type = String, format = "decimal")]
     pub picked_qty: Quantity,
     pub exception_code: Option<String>,
     pub exception_note: Option<String>,
+    #[serde(default)]
+    pub operated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BatchCompletePickItem {
+    pub line_no: u32,
+    #[schema(value_type = String, format = "decimal")]
+    pub picked_qty: Quantity,
+    #[serde(default)]
+    pub trace_codes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BatchCompletePickTaskRequest {
+    pub order_id: Uuid,
+    #[serde(default)]
+    pub outbound_lpn: Option<String>,
+    pub items: Vec<BatchCompletePickItem>,
+    #[serde(default)]
+    pub operated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct BatchCompletePickTaskResponse {
+    pub order_id: Uuid,
+    pub completed_lines: u32,
+    pub outbound_lpn: Option<String>,
+    pub status: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

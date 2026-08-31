@@ -80,17 +80,25 @@ mod tests {
             _now: DateTime<Utc>,
             _idempotency_key: &'a str,
             audit: Option<AuditWriteRequest>,
-        ) -> crate::wave4_repository::ShipOutboundOrderFuture<'a> {
-            *self.audit.lock().expect("audit lock") = audit;
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<IdempotentMutation<OutboundOrder>, Wave4RepositoryError>,
+                    > + Send
+                    + 'a,
+            >,
+        > {
+            *self.audit.lock().expect("lock") = audit;
             Box::pin(async { Err(Wave4RepositoryError::NotFound) })
         }
     }
 
     #[tokio::test]
-    async fn wave4_shipping_service_builds_audit_and_delegates_to_port() {
-        let port = RecordingPort::default();
-        let audit = Arc::clone(&port.audit);
-        let service = Wave4ShippingService::new(Arc::new(port));
+    async fn ship_outbound_order_records_audit_metadata() {
+        let audit = Arc::new(Mutex::new(None));
+        let service = Wave4ShippingService::new(Arc::new(RecordingPort {
+            audit: Arc::clone(&audit),
+        }));
         let ctx = OperationContext {
             user_id: Uuid::new_v4(),
             owner_id: Uuid::new_v4(),

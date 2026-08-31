@@ -37,6 +37,20 @@ async fn get_outbound_wave_handler(
     ))
 }
 
+async fn get_wave_pick_summary_handler(
+    ctx: AuthContext,
+    State(state): State<Wave4AppState>,
+    Path(wave_id): Path<Uuid>,
+) -> Result<Json<wms_domain::WavePickSummary>, Wave4HandlerError> {
+    require_any_permission(&ctx, &[M4_READ_PERMISSION, "m4.write"])?;
+    Ok(Json(
+        state
+            .wave4_repository
+            .get_wave_pick_summary(&ctx, wave_id)
+            .await?,
+    ))
+}
+
 async fn release_outbound_wave_handler(
     ctx: AuthContext,
     State(state): State<Wave4AppState>,

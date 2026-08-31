@@ -235,4 +235,78 @@ impl PgWave4Repository {
         .map_err(map_db_error)?;
         Ok(map_outbound_wave(row, order_ids))
     }
+
+    pub async fn get_wave_pick_summary(
+        &self,
+        ctx: &AuthContext,
+        wave_id: Uuid,
+    ) -> Result<wms_domain::WavePickSummary, Wave4RepositoryError> {
+        let wave_row = sqlx::query_as::<_, OutboundWaveRow>(
+            r#"
+            SELECT id, owner_id, wave_no, status, created_at, updated_at
+              FROM outbound_waves
+             WHERE owner_id = $1 AND id = $2
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(wave_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(Wave4RepositoryError::NotFound)?;
+
+        let tasks = sqlx::query_as::<_, (i32, String, String, String, Option<String>, String, wms_domain::Quantity, wms_domain::Quantity, String)>(
+            r#"
+            SELECT
+                COALESCE(t.route_sequence, 1) AS step,
+                COALESCE(t.location_code, l.location_code, 'LOC-01') AS location_code,
+                COALESCE(t.product_code, l.product_code, '') AS product_code,
+                COALESCE(p.product_name, l.product_code, '') AS product_name,
+                p.specification AS spec,
+                COALESCE(t.batch_no, l.batch_no, '') AS batch_no,
+                COALESCE(t.planned_qty, l.planned_qty, 0) AS planned_qty,
+                COALESCE(l.picked_qty, 0) AS picked_qty,
+                COALESCE(t.status, 'pending') AS picking_category
+              FROM outbound_wave_orders wo
+              JOIN outbound_orders o ON o.id = wo.outbound_order_id AND o.owner_id = wo.owner_id
+              JOIN outbound_order_lines l ON l.outbound_order_id = o.id AND l.owner_id = o.owner_id
+              LEFT JOIN outbound_pick_tasks t ON t.outbound_order_id = o.id AND t.line_no = l.line_no AND t.owner_id = o.owner_id
+              LEFT JOIN products p ON p.product_code = l.product_code AND p.owner_id = l.owner_id
+             WHERE wo.owner_id = $1 AND wo.wave_id = $2
+             ORDER BY COALESCE(t.route_sequence, 1) ASC, l.line_no ASC
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(wave_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+
+        let total_lines = tasks.len() as u32;
+        let mut total_qty = wms_domain::Quantity::ZERO;
+        let mut picking_route = Vec::new();
+
+        for (idx, (_step, location_code, product_code, product_name, spec, batch_no, planned_qty, picked_qty, picking_category)) in tasks.into_iter().enumerate() {
+            total_qty += planned_qty;
+            picking_route.push(wms_domain::WavePickRouteStep {
+                step: (idx + 1) as u32,
+                location_code,
+                product_code,
+                product_name,
+                spec,
+                batch_no,
+                planned_qty,
+                picked_qty,
+                picking_category,
+            });
+        }
+
+        Ok(wms_domain::WavePickSummary {
+            wave_id: wave_row.id,
+            wave_no: wave_row.wave_no,
+            total_lines,
+            total_qty,
+            picking_route,
+        })
+    }
 }

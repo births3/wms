@@ -23,7 +23,7 @@ use wms_domain::{
 };
 
 use crate::{
-    audit::AuditWriteRequest,
+    audit::{AuditDiff, AuditWriteRequest},
     auth::{AuthContext, AuthError},
     replenishment_repository::PgReplenishmentRepository,
     replenishment_service::ReplenishmentService,
@@ -102,6 +102,10 @@ pub fn wave4_router(state: Wave4AppState) -> Router {
             get(get_outbound_wave_handler),
         )
         .route(
+            "/api/v1/outbound/waves/:wave_id/pick-summary",
+            get(get_wave_pick_summary_handler),
+        )
+        .route(
             "/api/v1/outbound/waves/:wave_id/cancel",
             post(cancel_outbound_wave_handler),
         )
@@ -112,6 +116,10 @@ pub fn wave4_router(state: Wave4AppState) -> Router {
         .route(
             "/api/v1/outbound/pick-tasks/:id/complete",
             post(complete_pick_task_handler),
+        )
+        .route(
+            "/api/v1/outbound/pick-tasks/batch-complete",
+            post(batch_complete_pick_tasks_handler),
         )
         .route(
             "/api/v1/outbound/orders/:id/review",

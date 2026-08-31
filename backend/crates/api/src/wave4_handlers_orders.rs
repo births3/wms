@@ -55,18 +55,54 @@ async fn complete_pick_task_handler(
 ) -> Result<Json<OutboundOrder>, Wave4HandlerError> {
     ctx.require_permission("m4.write")?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
-    let now = Utc::now();
+    let now = req.operated_at.unwrap_or_else(Utc::now);
+    let audit_diff = req.operated_at.map(|op_at| {
+        AuditDiff::compute(
+            serde_json::json!({}),
+            serde_json::json!({ "operated_at": op_at }),
+        )
+    });
     let audit = AuditWriteRequest::from_auth_context(
         &ctx,
         "complete_pick_task",
         "M4",
         "outbound_order",
         id.to_string(),
-        None,
+        audit_diff,
     );
     let outcome = state
         .wave4_repository
         .complete_pick_task(&ctx, id, req, now, &idempotency_key, Some(audit))
+        .await?;
+    Ok(Json(outcome.value))
+}
+
+async fn batch_complete_pick_tasks_handler(
+    ctx: AuthContext,
+    State(state): State<Wave4AppState>,
+    headers: HeaderMap,
+    Json(req): Json<wms_domain::BatchCompletePickTaskRequest>,
+) -> Result<Json<wms_domain::BatchCompletePickTaskResponse>, Wave4HandlerError> {
+    ctx.require_permission("m4.write")?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
+    let now = req.operated_at.unwrap_or_else(Utc::now);
+    let audit_diff = req.operated_at.map(|op_at| {
+        AuditDiff::compute(
+            serde_json::json!({}),
+            serde_json::json!({ "operated_at": op_at }),
+        )
+    });
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "batch_complete_pick_task",
+        "M4",
+        "outbound_order",
+        req.order_id.to_string(),
+        audit_diff,
+    );
+    let outcome = state
+        .wave4_repository
+        .batch_complete_pick_tasks(&ctx, req, now, &idempotency_key, Some(audit))
         .await?;
     Ok(Json(outcome.value))
 }
