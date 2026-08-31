@@ -542,37 +542,14 @@ pub fn new(pool: PgPool) -> Self {
         ctx: &AuthContext,
         tote_code: &str,
     ) -> Result<wms_domain::ToteStatusResponse, Wave5RepositoryError> {
-        let container = sqlx::query_as::<_, (Uuid, String, String)>(
-            r#"
-            SELECT id, lpn_code, status
-              FROM lpn_containers
-             WHERE owner_id = $1
-               AND lower(lpn_code) = lower($2)
-             LIMIT 1
-            "#,
-        )
-        .bind(ctx.owner_id)
-        .bind(tote_code.trim())
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(map_db_error)?;
-
-        let (status, current_order_id, loaded_sku_count) = if let Some((_id, _code, raw_status)) = container {
-            let mapped_status = match raw_status.as_str() {
-                "idle" => "AVAILABLE",
-                "in_use" => "IN_USE",
-                "in_transit" | "shipped" | "sealed" => "SEALED",
-                "disabled" => "DISABLED",
-                _ => "IN_USE",
-            };
-            let active_job: Option<(Uuid, i64)> = sqlx::query_as(
+        let (tote_id, canonical_code, raw_status): (Uuid, String, String) =
+            sqlx::query_as(
                 r#"
-                SELECT outbound_order_id, COALESCE(array_length(trace_codes, 1), 0)::BIGINT
-                  FROM packing_jobs
+                SELECT id, lpn_code, status
+                  FROM lpn_containers
                  WHERE owner_id = $1
-                   AND lower(outbound_lpn) = lower($2)
-                   AND status <> 'cancelled'
-                 ORDER BY created_at DESC
+                   AND lower(lpn_code) = lower($2)
+                   AND container_type = 'tote'
                  LIMIT 1
                 "#,
             )
@@ -580,19 +557,60 @@ pub fn new(pool: PgPool) -> Self {
             .bind(tote_code.trim())
             .fetch_optional(&self.pool)
             .await
-            .map_err(map_db_error)?;
+            .map_err(map_db_error)?
+            .ok_or(Wave5RepositoryError::NotFound)?;
 
-            if let Some((order_id, count)) = active_job {
-                (mapped_status.to_string(), Some(order_id), count as u32)
-            } else {
-                (mapped_status.to_string(), None, 0)
-            }
+        let status = match raw_status.as_str() {
+            "idle" => "AVAILABLE",
+            "in_use" => "IN_USE",
+            "in_transit" | "shipped" => "SEALED",
+            "disabled" => "DISABLED",
+            _ => "IN_USE",
+        }
+        .to_string();
+
+        let current_order_id = if raw_status == "in_use" {
+            sqlx::query_scalar(
+                r#"
+                SELECT outbound_order_id
+                  FROM outbound_pick_tote_bindings
+                 WHERE owner_id = $1
+                   AND tote_id = $2
+                   AND status = 'active'
+                 LIMIT 1
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(tote_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_db_error)?
         } else {
-            return Err(Wave5RepositoryError::NotFound);
+            None
+        };
+
+        let loaded_sku_count = if let Some(order_id) = current_order_id {
+            let count: i64 = sqlx::query_scalar(
+                r#"
+                SELECT COUNT(DISTINCT product_code)::BIGINT
+                  FROM outbound_order_lines
+                 WHERE owner_id = $1
+                   AND outbound_order_id = $2
+                   AND picked_qty > 0
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(order_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_db_error)?;
+            u32::try_from(count).map_err(|_| Wave5RepositoryError::InvalidInput)?
+        } else {
+            0
         };
 
         Ok(wms_domain::ToteStatusResponse {
-            tote_code: tote_code.trim().to_string(),
+            tote_code: canonical_code,
             status,
             current_order_id,
             loaded_sku_count,

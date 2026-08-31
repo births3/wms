@@ -176,7 +176,7 @@ async fn quick_spot_count_handler(
 ) -> Result<Json<wms_domain::QuickSpotCountResponse>, Wave3HandlerError> {
     require_any_permission(&ctx, &["m3.inventory_count.write", "m3.write"])?;
     let idempotency_key = super::idempotency_key_from_headers(&headers)?;
-    let now = req.operated_at.unwrap_or_else(Utc::now);
+    let now = Utc::now();
     let audit_diff = req.operated_at.map(|op_at| {
         AuditDiff::compute(
             serde_json::json!({}),

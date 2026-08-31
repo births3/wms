@@ -8,13 +8,14 @@ use wms_domain::{
 };
 
 use crate::{
-    audit::{append_event_in_tx, AuditWriteRequest},
+    audit::{append_event_in_tx, AuditDiff, AuditWriteRequest},
     operation_context::OperationContext as AuthContext,
 };
 
 use super::super::{
     lock_idempotency_key, map_db_error, replay_idempotency, request_hash,
-    store_idempotency_success, IdempotentMutation, PgWave3Repository, Wave3RepositoryError,
+    store_idempotency_success, validated_pda_operated_at, IdempotentMutation, PgWave3Repository,
+    Wave3RepositoryError,
 };
 
 impl PgWave3Repository {
@@ -26,6 +27,9 @@ impl PgWave3Repository {
         idempotency_key: &str,
         audit: Option<AuditWriteRequest>,
     ) -> Result<IdempotentMutation<QuickSpotCountResponse>, Wave3RepositoryError> {
+        if req.physical_qty < Quantity::ZERO {
+            return Err(Wave3RepositoryError::InvalidQuantity);
+        }
         let request_hash = request_hash(&json!({
             "action": "quick_spot_count",
             "request": &req,
@@ -41,8 +45,8 @@ impl PgWave3Repository {
                 replayed: true,
             });
         }
+        let operated_at = validated_pda_operated_at(req.operated_at, now)?;
 
-        // 1. Verify location exists
         let location = sqlx::query_as::<_, (Uuid, Uuid, Option<Uuid>)>(
             r#"
             SELECT id, warehouse_id, zone_id
@@ -60,28 +64,31 @@ impl PgWave3Repository {
 
         let (location_id, warehouse_id, zone_id) = location;
 
-        // 2. Query book qty
-        let book_batch = sqlx::query_as::<_, (Uuid, Quantity)>(
+        let book_rows = sqlx::query_as::<_, (Uuid, Quantity, String)>(
             r#"
-            SELECT id, COALESCE(qty_on_hand, 0)
+            SELECT id, COALESCE(qty_on_hand, 0), status
               FROM inventory_batches
              WHERE owner_id = $1
                AND location_id = $2
                AND lower(product_code) = lower($3)
                AND batch_no = $4
-             LIMIT 1
+             ORDER BY status, id
+             FOR UPDATE
             "#,
         )
         .bind(ctx.owner_id)
         .bind(location_id)
         .bind(req.product_code.trim())
         .bind(req.batch_no.trim())
-        .fetch_optional(&mut *tx)
+        .fetch_all(&mut *tx)
         .await
         .map_err(map_db_error)?;
 
-        let (batch_id, book_qty) = match book_batch {
-            Some((id, qty)) => (Some(id), qty),
+        if book_rows.len() > 1 {
+            return Err(Wave3RepositoryError::InvalidInventoryState);
+        }
+        let (batch_id, book_qty) = match book_rows.into_iter().next() {
+            Some((id, qty, _status)) => (Some(id), qty),
             None => (None, Quantity::ZERO),
         };
 
@@ -95,15 +102,28 @@ impl PgWave3Repository {
         } else {
             COUNT_STATUS_PENDING_APPROVAL
         };
+        let auto_approved = variance_type == VARIANCE_TYPE_MATCH;
+        let approved_by = auto_approved.then_some(ctx.user_id);
+        let approved_at = auto_approved.then_some(now);
+        let approval_source = auto_approved.then(|| "system_auto_match".to_string());
+        let approval_id = auto_approved.then(|| format!("quick-spot:{count_id}"));
+        let reason = req
+            .reason
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
 
         sqlx::query(
             r#"
             INSERT INTO inventory_counts (
                 id, owner_id, count_type, warehouse_id, zone_id, product_code,
-                status, started_at, created_by, created_at, updated_at
+                status, started_at, created_by, approved_by, approved_at,
+                approval_source, approval_id, reason, created_at, updated_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6,
-                $7, $8, $9, $8, $8
+                $7, $8, $9, $10, $11,
+                $12, $13, $14, $15, $15
             )
             "#,
         )
@@ -114,8 +134,14 @@ impl PgWave3Repository {
         .bind(zone_id)
         .bind(req.product_code.trim())
         .bind(count_status)
-        .bind(now)
+        .bind(operated_at)
         .bind(ctx.user_id)
+        .bind(approved_by)
+        .bind(approved_at)
+        .bind(&approval_source)
+        .bind(&approval_id)
+        .bind(&reason)
+        .bind(now)
         .execute(&mut *tx)
         .await
         .map_err(map_db_error)?;
@@ -172,7 +198,22 @@ impl PgWave3Repository {
         )
         .await?;
 
-        if let Some(audit) = audit {
+        if let Some(mut audit) = audit {
+            audit.diff = Some(AuditDiff::compute(
+                json!({}),
+                json!({
+                    "location_code": req.location_code.trim(),
+                    "product_code": req.product_code.trim(),
+                    "batch_no": req.batch_no.trim(),
+                    "book_qty": book_qty,
+                    "physical_qty": physical_qty,
+                    "variance_qty": variance_qty,
+                    "variance_type": response.variance_type,
+                    "count_status": count_status,
+                    "reason": reason,
+                    "operated_at": operated_at,
+                }),
+            ));
             append_event_in_tx(&mut tx, &audit)
                 .await
                 .map_err(|error| Wave3RepositoryError::Audit(format!("{error:?}")))?;

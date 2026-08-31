@@ -57,6 +57,7 @@ impl PgWave3Repository {
                 replayed: true,
             });
         }
+        let operated_at = validated_pda_operated_at(req.operated_at, now)?;
 
         let batch = sqlx::query_as::<_, InventoryBatchRow>(
             r#"
@@ -93,17 +94,41 @@ impl PgWave3Repository {
                 return Err(Wave3RepositoryError::InvalidLocation);
             }
         }
-        let to_location_id: Uuid = if let Some(loc_id) = req.to_location_id {
-            loc_id
-        } else {
-            sqlx::query_scalar(
+        let requested_to_code = req.to_location_code.trim();
+        let (to_location_id, to_location_code): (Uuid, String) = if let Some(loc_id) =
+            req.to_location_id
+        {
+            let resolved = sqlx::query_as::<_, (Uuid, String)>(
                 r#"
-                SELECT id FROM warehouse_locations
-                 WHERE owner_id = $1 AND lower(location_code) = lower($2)
-                "#,
+                    SELECT id, location_code
+                      FROM warehouse_locations
+                     WHERE owner_id = $1 AND id = $2
+                    "#,
             )
             .bind(ctx.owner_id)
-            .bind(req.to_location_code.trim())
+            .bind(loc_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(map_db_error)?
+            .ok_or(Wave3RepositoryError::InvalidLocation)?;
+            if !requested_to_code.is_empty() && !requested_to_code.eq_ignore_ascii_case(&resolved.1)
+            {
+                return Err(Wave3RepositoryError::InvalidLocation);
+            }
+            resolved
+        } else {
+            if requested_to_code.is_empty() {
+                return Err(Wave3RepositoryError::InvalidLocation);
+            }
+            sqlx::query_as::<_, (Uuid, String)>(
+                r#"
+                    SELECT id, location_code
+                      FROM warehouse_locations
+                     WHERE owner_id = $1 AND lower(location_code) = lower($2)
+                    "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(requested_to_code)
             .fetch_optional(&mut *tx)
             .await
             .map_err(map_db_error)?
@@ -223,7 +248,7 @@ impl PgWave3Repository {
             .bind(batch.id)
             .bind(ctx.owner_id)
             .bind(to_location_id)
-            .bind(&req.to_location_code)
+            .bind(&to_location_code)
             .bind(now)
             .execute(&mut *tx)
             .await
@@ -306,7 +331,7 @@ impl PgWave3Repository {
                     .bind(req.qty)
                     .bind(&batch.status)
                     .bind(to_location_id)
-                    .bind(&req.to_location_code)
+                    .bind(&to_location_code)
                     .bind(now)
                     .execute(&mut *tx)
                     .await
@@ -333,9 +358,9 @@ impl PgWave3Repository {
         .bind(batch.id)
         .bind(req.qty)
         .bind(relocation_id)
-        .bind(now)
+        .bind(operated_at)
         .bind(&batch.location_code)
-        .bind(&req.to_location_code)
+        .bind(&to_location_code)
         .bind(&req.lpn_code)
         .bind(ctx.user_id)
         .bind(&ctx.actor_name)
@@ -370,7 +395,7 @@ impl PgWave3Repository {
         .bind(batch.location_id)
         .bind(&batch.location_code)
         .bind(to_location_id)
-        .bind(&req.to_location_code)
+        .bind(&to_location_code)
         .bind(&mode)
         .bind(&req.lpn_code)
         .bind(&batch.status)

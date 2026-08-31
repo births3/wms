@@ -92,7 +92,7 @@ async fn relocate_inventory_handler(
         req.batch_id.to_string(),
         audit_diff,
     );
-    let now = req.operated_at.unwrap_or_else(Utc::now);
+    let now = Utc::now();
     let result = repository
         .relocate_inventory_with_audit(&ctx, req, now, &idempotency_key, Some(audit))
         .await?;
