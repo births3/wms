@@ -536,4 +536,66 @@ pub fn new(pool: PgPool) -> Self {
             replayed: false,
         })
     }
+
+    pub async fn get_tote_status(
+        &self,
+        ctx: &AuthContext,
+        tote_code: &str,
+    ) -> Result<wms_domain::ToteStatusResponse, Wave5RepositoryError> {
+        let container = sqlx::query_as::<_, (Uuid, String, String)>(
+            r#"
+            SELECT id, lpn_code, status
+              FROM lpn_containers
+             WHERE owner_id = $1
+               AND lower(lpn_code) = lower($2)
+             LIMIT 1
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(tote_code.trim())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+
+        let (status, current_order_id, loaded_sku_count) = if let Some((_id, _code, raw_status)) = container {
+            let mapped_status = match raw_status.as_str() {
+                "idle" => "AVAILABLE",
+                "in_use" => "IN_USE",
+                "in_transit" | "shipped" | "sealed" => "SEALED",
+                "disabled" => "DISABLED",
+                _ => "IN_USE",
+            };
+            let active_job: Option<(Uuid, i64)> = sqlx::query_as(
+                r#"
+                SELECT outbound_order_id, COALESCE(array_length(trace_codes, 1), 0)::BIGINT
+                  FROM packing_jobs
+                 WHERE owner_id = $1
+                   AND lower(outbound_lpn) = lower($2)
+                   AND status <> 'cancelled'
+                 ORDER BY created_at DESC
+                 LIMIT 1
+                "#,
+            )
+            .bind(ctx.owner_id)
+            .bind(tote_code.trim())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_db_error)?;
+
+            if let Some((order_id, count)) = active_job {
+                (mapped_status.to_string(), Some(order_id), count as u32)
+            } else {
+                (mapped_status.to_string(), None, 0)
+            }
+        } else {
+            return Err(Wave5RepositoryError::NotFound);
+        };
+
+        Ok(wms_domain::ToteStatusResponse {
+            tote_code: tote_code.trim().to_string(),
+            status,
+            current_order_id,
+            loaded_sku_count,
+        })
+    }
 }

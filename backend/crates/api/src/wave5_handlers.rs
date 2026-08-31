@@ -6,7 +6,7 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
@@ -118,6 +118,10 @@ pub fn wave5_router(state: Wave5AppState) -> Router {
             "/api/v1/packing/stations",
             post(create_packing_station_handler),
         )
+        .route(
+            "/api/v1/packing/totes/:tote_code/status",
+            get(get_tote_status_handler),
+        )
         .route("/api/v1/packing/jobs", post(create_pack_job_handler))
         .route(
             "/api/v1/packing/jobs/:id/weigh",
@@ -188,6 +192,19 @@ async fn create_packing_station_handler(
         .create_packing_station(&ctx, req, now, &idempotency_key, Some(audit))
         .await?;
     Ok(Json(outcome.value))
+}
+
+async fn get_tote_status_handler(
+    ctx: AuthContext,
+    State(state): State<Wave5AppState>,
+    Path(tote_code): Path<String>,
+) -> Result<Json<wms_domain::ToteStatusResponse>, Wave5HandlerError> {
+    ctx.require_any_permission(&["m-pk.write", "m4.read", "m1.read"])?;
+    let outcome = state
+        .wave5_repository
+        .get_tote_status(&ctx, &tote_code)
+        .await?;
+    Ok(Json(outcome))
 }
 
 async fn create_pack_job_handler(

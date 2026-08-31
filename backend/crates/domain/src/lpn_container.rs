@@ -66,6 +66,16 @@ pub struct LpnContainerListResponse {
     pub data: Vec<LpnContainer>,
 }
 
+/// 周转箱状态预检轻量响应。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ToteStatusResponse {
+    pub tote_code: String,
+    /// AVAILABLE 可用 | IN_USE 被占用 | SEALED 已封箱
+    pub status: String,
+    pub current_order_id: Option<Uuid>,
+    pub loaded_sku_count: u32,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct UnlockSkippedBatch {
     pub batch_id: Uuid,
