@@ -1,0 +1,78 @@
+name: t2-diagnostic
+
+"on":
+  pull_request:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: taiki-e/install-action@just
+      - name: Install dependencies
+        run: |
+          python3 -m pip install -r requirements-governance.txt
+          corepack enable
+          corepack prepare pnpm@11.5.2 --activate
+          pnpm install --frozen-lockfile
+      - name: T2 diff-driven governance
+        id: diff
+        env:
+          WMS_GOV_CONTEXT: pr
+          WMS_GOV_BASE: origin/main
+        run: python3 scripts/governance/task_check.py --tier T2 --strict
+      - name: T2 Rust clippy
+        id: clippy
+        if: ${{ always() }}
+        run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps -- -D warnings -A clippy::too-many-arguments
+      - name: T2 backend unit tests
+        id: backend_tests
+        if: ${{ always() }}
+        run: cargo test --manifest-path backend/Cargo.toml --workspace --lib
+      - name: T2 web-admin self-checks
+        id: web_checks
+        if: ${{ always() }}
+        run: pnpm --dir apps/web-admin run test:self-checks
+      - name: T2 JavaScript unit tests
+        id: js_tests
+        if: ${{ always() }}
+        run: |
+          node packages/ui/tests/dialog-dismiss.test.ts
+          node packages/ui/tests/data-grid-advanced-filters.test.ts
+          node packages/ui/tests/data-grid-filter-history.test.ts
+          node packages/ui/tests/data-grid-pagination-prefetch.test.ts
+          node packages/ui/tests/data-grid-views.test.ts
+          node packages/ui/tests/query-panel-quick-filters.test.ts
+          node packages/ui/tests/scroll-bar-math.test.ts
+          node packages/ui/tests/viewport-math.test.ts
+          node packages/ui/tests/scroll-bar-wiring.test.ts
+          node packages/ui/tests/table-row-background.test.ts
+          node packages/ui/tests/data-grid-layout-expand.test.ts
+          node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
+      - name: T2 TypeScript contracts
+        id: ts_contracts
+        if: ${{ always() }}
+        run: |
+          pnpm --dir apps/web-admin exec tsc --noEmit
+          pnpm --dir packages/api-client run typecheck
+      - name: T2 OpenAPI contracts
+        id: openapi
+        if: ${{ always() }}
+        run: |
+          cargo build --manifest-path backend/Cargo.toml --package openapi-export
+          python3 scripts/governance/check_openapi_in_sync.py --strict
+          python3 scripts/governance/validate_openapi_artifacts.py
+          python3 scripts/governance/check_openapi_contract.py
