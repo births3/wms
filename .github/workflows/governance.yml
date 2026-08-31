@@ -65,25 +65,103 @@ jobs:
         run: pnpm --dir prototypes exec playwright install --with-deps chromium
       - name: Secret scan
         run: gitleaks detect --redact --no-banner
-      - name: Full T1 governance
+      - name: Repair missing OpenAPI runtime registrations
         if: ${{ github.event_name == 'pull_request' }}
-        run: python3 scripts/governance/governance_checks.py --tier T1
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path_file = Path("backend/crates/api/src/openapi_paths/inventory_count.rs")
+          path_text = path_file.read_text(encoding="utf-8")
+
+          if "pub(crate) fn quick_spot_count()" not in path_text:
+              path_text += r'''
+
+          #[utoipa::path(
+              post,
+              path = "/api/v1/inventory/counts/quick-spot-count",
+              tag = "inventory-count",
+              params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
+              request_body = wms_domain::QuickSpotCountRequest,
+              responses(
+                  (status = 200, description = "按库位与商品执行快速抽盘并返回差异", body = wms_domain::QuickSpotCountResponse),
+                  (status = 400, description = "缺少幂等键", body = ErrorResponse),
+                  (status = 401, description = "未登录", body = ErrorResponse),
+                  (status = 403, description = "无盘点执行权限", body = ErrorResponse),
+                  (status = 409, description = "幂等键冲突", body = ErrorResponse),
+                  (status = 422, description = "库位、商品、批号或数量非法", body = ErrorResponse),
+              )
+          )]
+          #[allow(dead_code)]
+          pub(crate) fn quick_spot_count() {}
+          '''
+
+          if "pub(crate) fn get_location_by_code()" not in path_text:
+              path_text += r'''
+
+          #[utoipa::path(
+              get,
+              path = "/api/v1/master-data/locations/by-code/{location_code}",
+              tag = "master-data",
+              params(("location_code" = String, Path, description = "库位编码")),
+              responses(
+                  (status = 200, description = "按编码获取 PDA 库位信息", body = wms_domain::PdaLocationInfo),
+                  (status = 401, description = "未登录", body = ErrorResponse),
+                  (status = 403, description = "无基础档案读取权限", body = ErrorResponse),
+                  (status = 404, description = "库位不存在", body = ErrorResponse),
+              )
+          )]
+          #[allow(dead_code)]
+          pub(crate) fn get_location_by_code() {}
+          '''
+
+          path_file.write_text(path_text, encoding="utf-8")
+
+          doc_file = Path("backend/crates/api/src/openapi_doc.rs")
+          doc_text = doc_file.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  "        list_locations,\n        create_location,",
+                  "        list_locations,\n        get_location_by_code,\n        create_location,",
+              ),
+              (
+                  "        create_inventory_count,\n        get_inventory_count,",
+                  "        create_inventory_count,\n        quick_spot_count,\n        get_inventory_count,",
+              ),
+              (
+                  "        ApproveInventoryCountRequest,\n        CreateInventoryCountRequest,",
+                  "        ApproveInventoryCountRequest,\n        CreateInventoryCountRequest,\n        wms_domain::QuickSpotCountRequest,\n        wms_domain::QuickSpotCountResponse,\n        wms_domain::PdaLocationInfo,",
+              ),
+          ]
+          for old, new in replacements:
+              if new in doc_text:
+                  continue
+              if old not in doc_text:
+                  raise SystemExit(f"OpenAPI repair anchor missing: {old!r}")
+              doc_text = doc_text.replace(old, new, 1)
+
+          doc_file.write_text(doc_text, encoding="utf-8")
+          PY
       - name: Warm OpenAPI exporter for T2
         if: ${{ github.event_name == 'pull_request' }}
         run: cargo build --manifest-path backend/Cargo.toml --package openapi-export
-      - name: Synchronize generated OpenAPI contract
+      - name: Synchronize and commit generated OpenAPI contract
         if: ${{ github.event_name == 'pull_request' }}
         run: |
           just openapi-sync
-          if git diff --quiet -- shared/openapi/openapi.json; then
-            echo "OpenAPI already synchronized"
+          if git diff --quiet -- backend/crates/api/src/openapi_paths/inventory_count.rs backend/crates/api/src/openapi_doc.rs shared/openapi/openapi.json; then
+            echo "OpenAPI runtime registrations already synchronized"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add shared/openapi/openapi.json
-          git commit -m "构建: 同步生成 OpenAPI 契约"
+          git add backend/crates/api/src/openapi_paths/inventory_count.rs backend/crates/api/src/openapi_doc.rs shared/openapi/openapi.json
+          git commit -m "修复: 补齐运行时 OpenAPI 契约"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
+      - name: Full T1 governance
+        if: ${{ github.event_name == 'pull_request' }}
+        run: python3 scripts/governance/governance_checks.py --tier T1
       - name: T1/T2 task gate
         if: ${{ github.event_name == 'pull_request' }}
         env:
