@@ -186,6 +186,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
                 picked_qty: 8.into(),
                 exception_code: Some("SHORT_PICK".to_string()),
                 exception_note: Some("零拣位不足，等待补拣".to_string()),
+                operated_at: None,
             },
             now,
             "outbound-pick-short-1",
@@ -347,6 +348,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
         picked_qty: 10.into(),
         exception_code: None,
         exception_note: Some("补拣补齐".to_string()),
+        operated_at: None,
     };
     let replenished = repo
         .complete_pick_task(

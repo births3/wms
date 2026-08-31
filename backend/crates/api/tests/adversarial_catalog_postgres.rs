@@ -10,9 +10,9 @@ use wms_domain::{
     SystemDictionaryItem, UpsertSystemDictionaryItemRequest, SYSTEM_DICTIONARY_DOCUMENT_TYPE,
 };
 
-mod postgres_test_support;
 #[path = "support/adversarial.rs"]
 mod adversarial_support;
+mod postgres_test_support;
 
 use adversarial_support::{ctx_with_permissions, seed_owner_pair};
 use postgres_test_support::ensure_audit_partition;
@@ -129,24 +129,12 @@ async fn dictionary_override_replays_same_key_and_rejects_payload_conflict(pool:
     ensure_audit_partition(&pool, now).await;
     let ctx = write_ctx(pair.owner_a);
 
-    let created = upsert(
-        &repo,
-        &ctx,
-        "货主A幂等覆盖",
-        "adv-catalog-a4-same-key",
-        now,
-    )
-    .await
-    .expect("first dictionary write should save");
-    let replay = upsert(
-        &repo,
-        &ctx,
-        "货主A幂等覆盖",
-        "adv-catalog-a4-same-key",
-        now,
-    )
-    .await
-    .expect("same key same payload should replay");
+    let created = upsert(&repo, &ctx, "货主A幂等覆盖", "adv-catalog-a4-same-key", now)
+        .await
+        .expect("first dictionary write should save");
+    let replay = upsert(&repo, &ctx, "货主A幂等覆盖", "adv-catalog-a4-same-key", now)
+        .await
+        .expect("same key same payload should replay");
     assert_eq!(created.value.id, replay.value.id);
     assert!(replay.replayed);
 

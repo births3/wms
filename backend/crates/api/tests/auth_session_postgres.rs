@@ -114,7 +114,7 @@ async fn login(app: &axum::Router, owner_id: Uuid, username: &str) -> LoginRespo
                 .header("content-type", "application/json")
                 .body(Body::from(
                     serde_json::to_vec(&LoginRequest {
-                        owner_code: format!("OWNER-{owner_id}"),
+                        owner_code: Some(format!("OWNER-{owner_id}")),
                         username: username.to_string(),
                         password: "CorrectHorse1!".to_string(),
                     })
@@ -155,7 +155,7 @@ async fn login_attempt(
                 .header("content-type", "application/json")
                 .body(Body::from(
                     serde_json::to_vec(&LoginRequest {
-                        owner_code: owner_code.to_string(),
+                        owner_code: Some(owner_code.to_string()),
                         username: username.to_string(),
                         password: password.to_string(),
                     })

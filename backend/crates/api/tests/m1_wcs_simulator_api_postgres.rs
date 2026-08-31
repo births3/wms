@@ -166,9 +166,7 @@ async fn simulator_api_dispatches_and_applies_idempotent_receipts(pool: PgPool) 
     .await;
     assert_eq!(created_status, StatusCode::CREATED);
     assert_eq!(created["status"], "pending");
-    let task_id = created["id"]
-        .as_str()
-        .expect("created simulator task id");
+    let task_id = created["id"].as_str().expect("created simulator task id");
 
     let dispatch_path = format!("/api/v1/wcs-tasks/{task_id}/dispatch");
     let (dispatch_status, dispatched) =
@@ -263,9 +261,7 @@ async fn simulator_api_dispatches_and_applies_idempotent_receipts(pool: PgPool) 
         .expect("disable simulator device");
     let disabled_path = format!(
         "/api/v1/wcs-tasks/{}/dispatch",
-        pending["id"]
-            .as_str()
-            .expect("pending simulator task id")
+        pending["id"].as_str().expect("pending simulator task id")
     );
     let (disabled_status, disabled_body) = post_json(
         &router,

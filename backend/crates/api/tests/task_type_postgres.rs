@@ -355,9 +355,9 @@ async fn task_type_route_rejects_missing_write_permission(pool: PgPool) {
         Utc::now(),
     );
     let token = encode_access_token(&claims, "test-secret").expect("test token should encode");
-    let app = task_type_router(TaskTypeAppState::with_postgres(pool)).layer(
-        auth_runtime_layer(AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore))),
-    );
+    let app = task_type_router(TaskTypeAppState::with_postgres(pool)).layer(auth_runtime_layer(
+        AuthRuntimePolicy::new(Arc::new(AllowAllRevocationStore)),
+    ));
 
     let response = app
         .oneshot(
