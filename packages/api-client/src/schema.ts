@@ -2868,6 +2868,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/counts/quick-spot-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["quick_spot_count"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/counts/{id}": {
         parameters: {
             query?: never;
@@ -3326,6 +3342,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["batch_generate_locations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/master-data/locations/by-code/{location_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_location_by_code"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6997,6 +7029,8 @@ export interface components {
             exception_note?: string | null;
             /** Format: int32 */
             line_no: number;
+            /** Format: date-time */
+            operated_at?: string | null;
             /** Format: decimal */
             picked_qty: string;
         };
@@ -9789,8 +9823,8 @@ export interface components {
         };
         /** @description 登录请求。 */
         LoginRequest: {
-            /** @description 货主编码。 */
-            owner_code: string;
+            /** @description 货主编码（可选，未传时由系统根据账号绑定自动推导）。 */
+            owner_code?: string | null;
             /** @description 登录密码。 */
             password: string;
             /** @description 登录账号。 */
@@ -10102,6 +10136,23 @@ export interface components {
         PasswordChangeRequest: {
             current_password: string;
             new_password: string;
+        };
+        /** @description PDA 扫码查单库位轻量响应。 */
+        PdaLocationInfo: {
+            location_code: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: int64 */
+            max_volume_cm3: number;
+            mix_batch_policy: string;
+            mix_product_policy: string;
+            /** Format: int64 */
+            remaining_volume_cm3: number;
+            status: string;
+            temperature_zone: string;
+            /** Format: int64 */
+            used_volume_cm3: number;
+            zone_code: string;
         };
         PermissionListResponse: {
             items: components["schemas"]["PermissionResponse"][];
@@ -11003,6 +11054,30 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        /** @description 现场快速动盘请求。 */
+        QuickSpotCountRequest: {
+            batch_no: string;
+            location_code: string;
+            /** Format: date-time */
+            operated_at?: string | null;
+            /** Format: decimal */
+            physical_qty: string;
+            product_code: string;
+            reason?: string | null;
+        };
+        /** @description 现场快速动盘响应。 */
+        QuickSpotCountResponse: {
+            /** Format: decimal */
+            book_qty: string;
+            /** Format: uuid */
+            count_id: string;
+            /** Format: decimal */
+            physical_qty: string;
+            /** Format: decimal */
+            variance_qty: string;
+            /** @description 差异类型：MATCH 账实相符 | SHORTAGE 盘亏 | SURPLUS 盘盈 */
+            variance_type: string;
+        };
         ReassignReplenishmentTaskRequest: {
             /** Format: int64 */
             version: number;
@@ -11330,14 +11405,17 @@ export interface components {
         RelocateInventoryRequest: {
             /** Format: uuid */
             batch_id: string;
+            from_location_code?: string | null;
             lpn_code?: string | null;
+            /** Format: date-time */
+            operated_at?: string | null;
             /** Format: decimal */
             qty: string;
             reason?: string | null;
             relocation_mode?: string | null;
             to_location_code: string;
             /** Format: uuid */
-            to_location_id: string;
+            to_location_id?: string | null;
         };
         RenewReconciliationClaimRequest: {
             /** Format: uuid */
@@ -23564,6 +23642,78 @@ export interface operations {
             };
         };
     };
+    quick_spot_count: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 客户端生成的幂等键 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuickSpotCountRequest"];
+            };
+        };
+        responses: {
+            /** @description 按库位与商品执行快速抽盘并返回差异 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickSpotCountResponse"];
+                };
+            };
+            /** @description 缺少幂等键 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无盘点执行权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 幂等键冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 库位、商品、批号或数量非法 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_inventory_count: {
         parameters: {
             query?: never;
@@ -25876,6 +26026,56 @@ export interface operations {
             };
             /** @description 库位批量生成范围或规则非法 */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_location_by_code: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 库位编码 */
+                location_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 按编码获取 PDA 库位信息 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdaLocationInfo"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无基础档案读取权限 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 库位不存在 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
