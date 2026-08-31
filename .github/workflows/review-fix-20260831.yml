@@ -1,0 +1,114 @@
+name: Review Fix PDA Consistency
+
+on:
+  push:
+    branches:
+      - fix/review-20260831-pda-consistency
+
+permissions:
+  contents: write
+
+concurrency:
+  group: review-fix-20260831-pda-consistency
+  cancel-in-progress: false
+
+jobs:
+  repair-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[review-fix applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_PROFILE_TEST_INCREMENTAL: "false"
+
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/review-20260831-pda-consistency
+          fetch-depth: 0
+
+      - name: Prepare Rust formatter
+        run: rustup component add rustfmt
+
+      - name: Decode and apply reviewed repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/review-fix-payload-*.b64 | tr -d '\n' > /tmp/review-fix-payload.b64
+          python3 - <<'PY'
+          import base64
+          import gzip
+          from pathlib import Path
+
+          encoded = Path('/tmp/review-fix-payload.b64').read_text(encoding='utf-8').strip()
+          source = gzip.decompress(base64.b64decode(encoded))
+          Path('/tmp/review_fix_20260831.py').write_bytes(source)
+          PY
+          python3 /tmp/review_fix_20260831.py
+
+      - name: Format and whitespace checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path backend/Cargo.toml --all
+          git diff --check
+
+      - name: Compile workspace
+        run: cargo check --manifest-path backend/Cargo.toml --workspace --all-targets
+
+      - name: Run backend unit tests
+        run: cargo test --manifest-path backend/Cargo.toml -p wms-api --lib
+
+      - name: Run PDA consistency integration tests
+        run: >-
+          cargo test --manifest-path backend/Cargo.toml -p wms-api
+          --test pda_enhancements_postgres
+          --test pda_consistency_repairs_postgres
+
+      - name: Run governance Tier 1
+        run: python3 scripts/governance/governance_checks.py --tier T1
+
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "review-fix-bot"
+          git config user.email "review-fix-bot@users.noreply.github.com"
+          git add \
+            backend/crates/api/src/auth_repository.rs \
+            backend/crates/api/src/wave3_handlers/m3_ops.rs \
+            backend/crates/api/src/wave3_handlers/inventory_count.rs \
+            backend/crates/api/src/wave3_repository.rs \
+            backend/crates/api/src/wave3_repository/inventory_count/quick_spot.rs \
+            backend/crates/api/src/wave3_repository/relocation.rs \
+            backend/crates/api/src/wave4_handlers_orders.rs \
+            backend/crates/api/src/wave4_handler_error.rs \
+            backend/crates/api/src/wave4_repository.rs \
+            backend/crates/api/src/wave4_repository_part1.rs \
+            backend/crates/api/src/wave4_repository_actions.rs \
+            backend/crates/api/src/wave4_repository_pda.rs \
+            backend/crates/api/src/wave4_repository_waves.rs \
+            backend/crates/api/src/wave5_repository_part1.rs \
+            backend/crates/api/tests/pda_enhancements_postgres.rs \
+            backend/crates/api/tests/pda_consistency_repairs_postgres.rs \
+            backend/migrations/202608310001_pda_consistency_repairs.sql
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "修复(后端)：收口 PDA 作业一致性 [review-fix applied]"
+          git push origin HEAD:fix/review-20260831-pda-consistency
