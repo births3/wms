@@ -67,6 +67,9 @@ jobs:
       - name: Full T1 governance
         if: ${{ github.event_name == 'pull_request' }}
         run: python3 scripts/governance/governance_checks.py --tier T1
+      - name: Warm OpenAPI exporter for T2
+        if: ${{ github.event_name == 'pull_request' }}
+        run: cargo build --manifest-path backend/Cargo.toml --package openapi-export
       - name: T1/T2 task gate
         if: ${{ github.event_name == 'pull_request' }}
         env:
