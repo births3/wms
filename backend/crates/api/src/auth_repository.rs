@@ -72,7 +72,12 @@ impl AuthRepository {
                   JOIN auth_owners o
                     ON o.id = b.owner_id
                  WHERE lower(u.username) = lower($1)
-                 ORDER BY b.is_primary DESC, b.created_at ASC
+                   AND (
+                       SELECT COUNT(*)
+                         FROM auth_user_owner_bindings active_binding
+                        WHERE active_binding.user_id = u.id
+                          AND active_binding.is_active = true
+                   ) = 1
                  LIMIT 1
                 "#,
             )

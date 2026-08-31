@@ -55,7 +55,7 @@ async fn complete_pick_task_handler(
 ) -> Result<Json<OutboundOrder>, Wave4HandlerError> {
     ctx.require_permission("m4.write")?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
-    let now = req.operated_at.unwrap_or_else(Utc::now);
+    let now = Utc::now();
     let audit_diff = req.operated_at.map(|op_at| {
         AuditDiff::compute(
             serde_json::json!({}),
@@ -85,7 +85,7 @@ async fn batch_complete_pick_tasks_handler(
 ) -> Result<Json<wms_domain::BatchCompletePickTaskResponse>, Wave4HandlerError> {
     ctx.require_permission("m4.write")?;
     let idempotency_key = idempotency_key_from_headers(&headers)?;
-    let now = req.operated_at.unwrap_or_else(Utc::now);
+    let now = Utc::now();
     let audit_diff = req.operated_at.map(|op_at| {
         AuditDiff::compute(
             serde_json::json!({}),

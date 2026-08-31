@@ -26,7 +26,7 @@ use crate::{
     inventory::{STATUS_QUALIFIED, STATUS_QUARANTINED},
     operation_context::OperationContext as AuthContext,
     outbound::{
-        all_lines_reviewed_for_ship, short_pick_qty, status_after_pick, status_after_review,
+        all_lines_reviewed_for_ship, status_after_pick, status_after_review,
         OUTBOUND_STATUS_CONFIRMED, OUTBOUND_STATUS_IN_WAVE, OUTBOUND_STATUS_PENDING_VALIDATION,
         OUTBOUND_STATUS_REVIEWED, OUTBOUND_STATUS_REVIEWED_SHORT, OUTBOUND_STATUS_SHIPPED,
         OUTBOUND_STATUS_VALIDATION_EXCEPTION, OUTBOUND_STATUS_VOID_REQUESTED,
@@ -100,6 +100,8 @@ pub enum Wave4RepositoryError {
     ReviewValidation(ReviewValidationError),
     ShipmentValidation(ShipOutboundValidationError),
     InvalidQuantity,
+    AmbiguousPickTask,
+    InvalidOperationTime,
     LocationUnreachable,
     DocumentNumbering(String),
     InvalidTraceabilityEvent,
@@ -254,6 +256,7 @@ include!("wave4_repository_part2.rs");
 include!("wave4_repository_shipment.rs");
 include!("wave4_repository_waves.rs");
 include!("wave4_repository_actions.rs");
+include!("wave4_repository_pda.rs");
 include!("wave4_repository_returns.rs");
 include!("wave4_repository_customer_portal.rs");
 

@@ -156,8 +156,16 @@ async fn test_p0_2_relocation_by_location_code_and_timestamp(pool: PgPool) {
     let batch_id = Uuid::new_v4();
     let ctx = test_ctx(owner_id, user_id);
 
-    seed_test_location(&pool, owner_id, from_id, "LOC-SRC-01", "Z-01", "normal").await;
-    seed_test_location(&pool, owner_id, to_id, "LOC-DST-02", "Z-01", "normal").await;
+    seed_test_location(
+        &pool,
+        owner_id,
+        from_id,
+        "LOC-SRC-01",
+        "Z-01",
+        "normal_10_30",
+    )
+    .await;
+    seed_test_location(&pool, owner_id, to_id, "LOC-DST-02", "Z-01", "normal_10_30").await;
 
     sqlx::query(
         r#"
@@ -222,7 +230,15 @@ async fn test_p2_8_quick_spot_count_variance_calculation(pool: PgPool) {
     let batch_id = Uuid::new_v4();
     let ctx = test_ctx(owner_id, user_id);
 
-    seed_test_location(&pool, owner_id, loc_id, "LOC-SPOT-01", "Z-01", "normal").await;
+    seed_test_location(
+        &pool,
+        owner_id,
+        loc_id,
+        "LOC-SPOT-01",
+        "Z-01",
+        "normal_10_30",
+    )
+    .await;
 
     sqlx::query(
         r#"
@@ -355,52 +371,122 @@ async fn test_p1_7_batch_complete_pick_tasks_with_tote_and_trace_codes(pool: PgP
     let owner_id = Uuid::new_v4();
     let user_id = Uuid::new_v4();
     let order_id = Uuid::new_v4();
-    let warehouse_id = Uuid::new_v4();
+    let wave_id = Uuid::new_v4();
+    let order_warehouse_id = Uuid::new_v4();
+    let location_id = Uuid::new_v4();
     let customer_id = Uuid::new_v4();
+    let batch_1 = Uuid::new_v4();
+    let batch_2 = Uuid::new_v4();
+    let pick_task_1 = Uuid::new_v4();
+    let pick_task_2 = Uuid::new_v4();
     let ctx = test_ctx(owner_id, user_id);
     let op_time = Utc::now();
 
     sqlx::query(
-        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, 'OWNER_PICK_01', '拣货测试货主') ON CONFLICT (id) DO NOTHING",
+        "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, 'OWNER_PICK_01', '拣货测试货主')",
     )
     .bind(owner_id)
     .execute(&pool)
     .await
     .expect("seed owner");
+    sqlx::query(
+        "INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1, 'pick-user', '拣货员', 'unused', 'active')",
+    )
+    .bind(user_id)
+    .execute(&pool)
+    .await
+    .expect("seed pick user");
+    sqlx::query(
+        "INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary) VALUES ($1, $2, TRUE, TRUE)",
+    )
+    .bind(user_id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .expect("bind pick user");
 
     sqlx::query(
         r#"
         INSERT INTO warehouses (id, owner_id, warehouse_code, warehouse_name, warehouse_type, status)
-        VALUES ($1, $2, 'WH-PICK-01', '拣货测试仓', 'physical', 'active')
-        ON CONFLICT (id) DO NOTHING
+        VALUES ($1, $2, 'WH-PICK-ORDER', '订单仓', 'physical', 'active')
         "#,
     )
-    .bind(warehouse_id)
+    .bind(order_warehouse_id)
     .bind(owner_id)
     .execute(&pool)
     .await
-    .expect("seed warehouse");
+    .expect("seed order warehouse");
+
+    seed_test_location(
+        &pool,
+        owner_id,
+        location_id,
+        "LOC-PICK-01",
+        "Z-PICK-01",
+        "normal_10_30",
+    )
+    .await;
+    let (task_warehouse_id, zone_id): (Uuid, Uuid) =
+        sqlx::query_as("SELECT warehouse_id, zone_id FROM warehouse_locations WHERE id = $1")
+            .bind(location_id)
+            .fetch_one(&pool)
+            .await
+            .expect("load task warehouse and zone");
+
+    for (batch_id, product_code, batch_no, qty) in [
+        (batch_1, "MED-01", "BAT-01", 10_i64),
+        (batch_2, "MED-02", "BAT-02", 15_i64),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO inventory_batches (
+                id, owner_id, product_code, batch_no, production_date, expiry_date,
+                qty_on_hand, qty_frozen, status, location_id, location_code,
+                warehouse_id, zone_id
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                $7, 0, 'qualified', $8, 'LOC-PICK-01', $9, $10
+            )
+            "#,
+        )
+        .bind(batch_id)
+        .bind(owner_id)
+        .bind(product_code)
+        .bind(batch_no)
+        .bind(NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid production date"))
+        .bind(NaiveDate::from_ymd_opt(2028, 1, 1).expect("valid expiry date"))
+        .bind(qty)
+        .bind(location_id)
+        .bind(task_warehouse_id)
+        .bind(zone_id)
+        .execute(&pool)
+        .await
+        .expect("seed inventory batch");
+    }
 
     sqlx::query(
         r#"
         INSERT INTO outbound_orders (
             id, owner_id, wms_order_no, erp_order_no, customer_id,
             delivery_address_id, delivery_address_snapshot, warehouse_id, status
-        ) VALUES ($1, $2, 'OUT-BATCH-01', 'ERP-001', $3, gen_random_uuid(), '{}'::jsonb, $4, 'in_wave')
+        ) VALUES (
+            $1, $2, 'OUT-BATCH-01', 'ERP-001', $3,
+            gen_random_uuid(), '{}'::jsonb, $4, 'in_wave'
+        )
         "#,
     )
     .bind(order_id)
     .bind(owner_id)
     .bind(customer_id)
-    .bind(warehouse_id)
+    .bind(order_warehouse_id)
     .execute(&pool)
     .await
     .expect("seed outbound order");
-
     sqlx::query(
         r#"
         INSERT INTO outbound_order_lines (
-            id, outbound_order_id, owner_id, line_no, product_code, batch_no, planned_qty, picked_qty
+            id, outbound_order_id, owner_id, line_no,
+            product_code, batch_no, planned_qty, picked_qty
         ) VALUES
             ($1, $2, $3, 1, 'MED-01', 'BAT-01', 10, 0),
             ($4, $2, $3, 2, 'MED-02', 'BAT-02', 15, 0)
@@ -413,6 +499,133 @@ async fn test_p1_7_batch_complete_pick_tasks_with_tote_and_trace_codes(pool: PgP
     .execute(&pool)
     .await
     .expect("seed outbound order lines");
+    sqlx::query(
+        "INSERT INTO outbound_waves (id, owner_id, wave_no, status) VALUES ($1, $2, 'WAVE-PDA-01', 'released')",
+    )
+    .bind(wave_id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .expect("seed wave");
+    sqlx::query(
+        "INSERT INTO outbound_wave_orders (id, owner_id, wave_id, outbound_order_id) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(wave_id)
+    .bind(order_id)
+    .execute(&pool)
+    .await
+    .expect("seed wave order");
+
+    for (pick_task_id, line_no, batch_id, product_code, batch_no, planned_qty, route) in [
+        (
+            pick_task_1,
+            1_i32,
+            batch_1,
+            "MED-01",
+            "BAT-01",
+            10_i64,
+            1_i32,
+        ),
+        (
+            pick_task_2,
+            2_i32,
+            batch_2,
+            "MED-02",
+            "BAT-02",
+            15_i64,
+            2_i32,
+        ),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO outbound_pick_tasks (
+                id, owner_id, wave_id, outbound_order_id, line_no, batch_id,
+                product_code, batch_no, location_id, location_code,
+                planned_qty, picked_qty, status, route_sequence
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6,
+                $7, $8, $9, 'LOC-PICK-01',
+                $10, 0, 'in_progress', $11
+            )
+            "#,
+        )
+        .bind(pick_task_id)
+        .bind(owner_id)
+        .bind(wave_id)
+        .bind(order_id)
+        .bind(line_no)
+        .bind(batch_id)
+        .bind(product_code)
+        .bind(batch_no)
+        .bind(location_id)
+        .bind(planned_qty)
+        .bind(route)
+        .execute(&pool)
+        .await
+        .expect("seed outbound pick task");
+    }
+
+    let task_group_code = format!("default-{}", task_warehouse_id.simple());
+    sqlx::query(
+        r#"
+        INSERT INTO task_groups (
+            id, owner_id, task_group_code, task_group_name, warehouse_id,
+            zone_ids, task_type_codes, enabled
+        ) VALUES ($1, $2, $3, '默认拣货组', $4, '{}', ARRAY['pick'], TRUE)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(owner_id)
+    .bind(&task_group_code)
+    .bind(task_warehouse_id)
+    .execute(&pool)
+    .await
+    .expect("seed task group");
+
+    for (task_no, line_no, batch_id, product_code, batch_no, planned_qty) in [
+        ("TE-PICK-01", 1_i32, batch_1, "MED-01", "BAT-01", 10_i64),
+        ("TE-PICK-02", 2_i32, batch_2, "MED-02", "BAT-02", 15_i64),
+    ] {
+        sqlx::query(
+            r#"
+            INSERT INTO warehouse_tasks (
+                id, owner_id, task_no, task_type_code, source_module, source_doc_type,
+                source_doc_id, source_doc_no, source_line_no, source_task_key,
+                warehouse_id, task_group_code, product_code, batch_id, batch_no,
+                planned_qty, source_location_id, source_location_code,
+                priority, estimated_minutes, assignee_user_id, status,
+                released_at, started_at, created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, 'pick', 'M4', 'outbound_order',
+                $4, 'OUT-BATCH-01', $5, $6,
+                $7, $8, $9, $10, $11,
+                $12, $13, 'LOC-PICK-01',
+                100, 15, $14, 'in_progress',
+                $15, $15, $15, $15
+            )
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(owner_id)
+        .bind(task_no)
+        .bind(order_id)
+        .bind(line_no)
+        .bind(format!("M4:pick:{wave_id}:{order_id}:{line_no}:{batch_id}"))
+        .bind(task_warehouse_id)
+        .bind(&task_group_code)
+        .bind(product_code)
+        .bind(batch_id)
+        .bind(batch_no)
+        .bind(planned_qty)
+        .bind(location_id)
+        .bind(user_id)
+        .bind(op_time)
+        .execute(&pool)
+        .await
+        .expect("seed warehouse task");
+    }
 
     sqlx::query(
         "INSERT INTO lpn_containers (id, owner_id, lpn_code, container_type, status, created_at, updated_at) VALUES ($1, $2, 'TOT-PICK-99', 'tote', 'idle', now(), now())",
@@ -426,7 +639,7 @@ async fn test_p1_7_batch_complete_pick_tasks_with_tote_and_trace_codes(pool: PgP
     let repo = PgWave4Repository::new(pool.clone());
     let req = BatchCompletePickTaskRequest {
         order_id,
-        outbound_lpn: Some("TOT-PICK-99".to_string()),
+        outbound_lpn: Some(" tot-pick-99 ".to_string()),
         items: vec![
             BatchCompletePickItem {
                 line_no: 1,
@@ -442,23 +655,16 @@ async fn test_p1_7_batch_complete_pick_tasks_with_tote_and_trace_codes(pool: PgP
         operated_at: Some(op_time),
     };
 
-    let audit_diff = req.operated_at.map(|t| {
-        wms_api::audit::AuditDiff::compute(
-            serde_json::json!({}),
-            serde_json::json!({ "operated_at": t }),
-        )
-    });
     let audit = wms_api::audit::AuditWriteRequest::from_auth_context(
         &ctx,
         "batch_complete_pick_task",
         "M4",
         "outbound_order",
         order_id.to_string(),
-        audit_diff,
+        None,
     );
-
     let res = repo
-        .batch_complete_pick_tasks(&ctx, req, op_time, "idem-pick-test-01", Some(audit))
+        .batch_complete_pick_tasks(&ctx, req, Utc::now(), "idem-pick-test-01", Some(audit))
         .await
         .expect("batch complete pick tasks");
 
@@ -467,17 +673,71 @@ async fn test_p1_7_batch_complete_pick_tasks_with_tote_and_trace_codes(pool: PgP
     assert_eq!(res.value.outbound_lpn.as_deref(), Some("TOT-PICK-99"));
     assert_eq!(res.value.status, "picked");
 
-    // Verify tote status changed from idle to in_use
-    let tote_status: String = sqlx::query_scalar(
-        "SELECT status FROM lpn_containers WHERE owner_id = $1 AND lpn_code = 'TOT-PICK-99'",
+    let outbound_task_rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT status, picked_qty::BIGINT FROM outbound_pick_tasks WHERE owner_id = $1 AND outbound_order_id = $2 ORDER BY line_no",
+    )
+    .bind(owner_id)
+    .bind(order_id)
+    .fetch_all(&pool)
+    .await
+    .expect("query outbound task states");
+    assert_eq!(
+        outbound_task_rows,
+        vec![("completed".to_string(), 10), ("completed".to_string(), 15),]
+    );
+
+    let warehouse_task_rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT status, actual_qty::BIGINT FROM warehouse_tasks WHERE owner_id = $1 AND source_doc_id = $2 ORDER BY source_line_no",
+    )
+    .bind(owner_id)
+    .bind(order_id)
+    .fetch_all(&pool)
+    .await
+    .expect("query M-TE task states");
+    assert_eq!(
+        warehouse_task_rows,
+        vec![("completed".to_string(), 10), ("completed".to_string(), 15),]
+    );
+
+    let trace_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::BIGINT FROM outbound_pick_trace_codes WHERE owner_id = $1 AND outbound_order_id = $2",
+    )
+    .bind(owner_id)
+    .bind(order_id)
+    .fetch_one(&pool)
+    .await
+    .expect("query trace codes");
+    assert_eq!(trace_count, 3);
+
+    let binding_order: Uuid = sqlx::query_scalar(
+        "SELECT outbound_order_id FROM outbound_pick_tote_bindings WHERE owner_id = $1 AND tote_code = 'TOT-PICK-99' AND status = 'active'",
     )
     .bind(owner_id)
     .fetch_one(&pool)
     .await
-    .expect("query tote status");
-    assert_eq!(tote_status, "in_use");
+    .expect("query tote binding");
+    assert_eq!(binding_order, order_id);
 
-    // Verify audit event diff recorded operated_at
+    let tote_status = PgWave5Repository::new(pool.clone())
+        .get_tote_status(&ctx, "tot-pick-99")
+        .await
+        .expect("get bound tote status");
+    assert_eq!(tote_status.status, "IN_USE");
+    assert_eq!(tote_status.current_order_id, Some(order_id));
+    assert_eq!(tote_status.loaded_sku_count, 2);
+
+    let summary = repo
+        .get_wave_pick_summary(&ctx, wave_id)
+        .await
+        .expect("get task-native wave summary");
+    assert_eq!(summary.total_lines, 2);
+    assert_eq!(summary.picking_route[0].picked_qty, Quantity::from(10));
+    assert_eq!(summary.picking_route[1].picked_qty, Quantity::from(15));
+    assert!(summary
+        .picking_route
+        .iter()
+        .all(|step| step.location_code == "LOC-PICK-01"));
+
     let audit_diff_val: Option<serde_json::Value> = sqlx::query_scalar(
         "SELECT diff FROM audit_event WHERE owner_id = $1 AND action = 'batch_complete_pick_task' ORDER BY id DESC LIMIT 1",
     )
@@ -485,7 +745,6 @@ async fn test_p1_7_batch_complete_pick_tasks_with_tote_and_trace_codes(pool: PgP
     .fetch_one(&pool)
     .await
     .expect("query audit event");
-
     let diff_json = audit_diff_val.expect("audit event should have diff");
     assert!(diff_json["after"]["operated_at"].is_string());
 }

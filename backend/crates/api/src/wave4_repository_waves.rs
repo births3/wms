@@ -255,25 +255,33 @@ impl PgWave4Repository {
         .map_err(map_db_error)?
         .ok_or(Wave4RepositoryError::NotFound)?;
 
-        let tasks = sqlx::query_as::<_, (i32, String, String, String, Option<String>, String, wms_domain::Quantity, wms_domain::Quantity, String)>(
+        let tasks = sqlx::query_as::<_, (
+            i32,
+            String,
+            String,
+            String,
+            Option<String>,
+            String,
+            wms_domain::Quantity,
+            wms_domain::Quantity,
+            String,
+        )>(
             r#"
-            SELECT
-                COALESCE(t.route_sequence, 1) AS step,
-                COALESCE(t.location_code, l.location_code, 'LOC-01') AS location_code,
-                COALESCE(t.product_code, l.product_code, '') AS product_code,
-                COALESCE(p.product_name, l.product_code, '') AS product_name,
-                p.specification AS spec,
-                COALESCE(t.batch_no, l.batch_no, '') AS batch_no,
-                COALESCE(t.planned_qty, l.planned_qty, 0) AS planned_qty,
-                COALESCE(l.picked_qty, 0) AS picked_qty,
-                COALESCE(t.status, 'pending') AS picking_category
-              FROM outbound_wave_orders wo
-              JOIN outbound_orders o ON o.id = wo.outbound_order_id AND o.owner_id = wo.owner_id
-              JOIN outbound_order_lines l ON l.outbound_order_id = o.id AND l.owner_id = o.owner_id
-              LEFT JOIN outbound_pick_tasks t ON t.outbound_order_id = o.id AND t.line_no = l.line_no AND t.owner_id = o.owner_id
-              LEFT JOIN products p ON p.product_code = l.product_code AND p.owner_id = l.owner_id
-             WHERE wo.owner_id = $1 AND wo.wave_id = $2
-             ORDER BY COALESCE(t.route_sequence, 1) ASC, l.line_no ASC
+            SELECT task.route_sequence,
+                   task.location_code,
+                   task.product_code,
+                   COALESCE(product.product_name, task.product_code),
+                   product.specification,
+                   task.batch_no,
+                   task.planned_qty,
+                   task.picked_qty,
+                   task.status
+              FROM outbound_pick_tasks task
+              LEFT JOIN products product
+                ON product.owner_id = task.owner_id
+               AND product.product_code = task.product_code
+             WHERE task.owner_id = $1 AND task.wave_id = $2
+             ORDER BY task.route_sequence, task.id
             "#,
         )
         .bind(ctx.owner_id)
@@ -282,14 +290,27 @@ impl PgWave4Repository {
         .await
         .map_err(map_db_error)?;
 
-        let total_lines = tasks.len() as u32;
+        let total_lines =
+            u32::try_from(tasks.len()).map_err(|_| Wave4RepositoryError::InvalidQuantity)?;
         let mut total_qty = wms_domain::Quantity::ZERO;
-        let mut picking_route = Vec::new();
+        let mut picking_route = Vec::with_capacity(tasks.len());
 
-        for (idx, (_step, location_code, product_code, product_name, spec, batch_no, planned_qty, picked_qty, picking_category)) in tasks.into_iter().enumerate() {
+        for (
+            step,
+            location_code,
+            product_code,
+            product_name,
+            spec,
+            batch_no,
+            planned_qty,
+            picked_qty,
+            picking_category,
+        ) in tasks
+        {
             total_qty += planned_qty;
             picking_route.push(wms_domain::WavePickRouteStep {
-                step: (idx + 1) as u32,
+                step: u32::try_from(step)
+                    .map_err(|_| Wave4RepositoryError::InvalidQuantity)?,
                 location_code,
                 product_code,
                 product_name,

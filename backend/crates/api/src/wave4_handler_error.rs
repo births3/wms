@@ -99,6 +99,8 @@ impl IntoResponse for Wave4HandlerError {
             Self::Repository(Wave4RepositoryError::EmptySelection)
             | Self::Repository(Wave4RepositoryError::BatchNotAffected(_))
             | Self::Repository(Wave4RepositoryError::InvalidQuantity)
+            | Self::Repository(Wave4RepositoryError::AmbiguousPickTask)
+            | Self::Repository(Wave4RepositoryError::InvalidOperationTime)
             | Self::Repository(Wave4RepositoryError::InvalidDocumentType)
             | Self::Repository(Wave4RepositoryError::InvalidDeliveryAddress)
             | Self::Repository(Wave4RepositoryError::InvalidTraceabilityEvent)

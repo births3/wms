@@ -177,6 +177,22 @@ impl From<crate::idempotency::IdempotencyError> for Wave3RepositoryError {
     }
 }
 
+pub(crate) fn validated_pda_operated_at(
+    requested: Option<DateTime<Utc>>,
+    server_now: DateTime<Utc>,
+) -> Result<DateTime<Utc>, Wave3RepositoryError> {
+    let operated_at = requested.unwrap_or(server_now);
+    if operated_at > server_now + chrono::Duration::minutes(5) {
+        return Err(Wave3RepositoryError::FutureTimestamp);
+    }
+    if operated_at < server_now - chrono::Duration::hours(24) {
+        return Err(Wave3RepositoryError::InvalidDate(
+            "operated_at exceeds the 24-hour PDA offline window".to_string(),
+        ));
+    }
+    Ok(operated_at)
+}
+
 #[derive(Clone, FromRow)]
 struct ReceivingOrderRow {
     id: Uuid,
