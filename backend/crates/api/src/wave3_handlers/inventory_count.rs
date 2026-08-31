@@ -12,8 +12,8 @@ use wms_domain::{
 };
 
 use super::{
-    require_any_permission, AuditWriteRequest, AuthContext, PgWave3Repository, Wave3AppState,
-    Wave3HandlerError, Wave3RepositoryError,
+    require_any_permission, AuditDiff, AuditWriteRequest, AuthContext, PgWave3Repository,
+    Wave3AppState, Wave3HandlerError, Wave3RepositoryError,
 };
 
 pub(super) fn apply_inventory_count_routes(router: Router<Wave3AppState>) -> Router<Wave3AppState> {
@@ -21,6 +21,10 @@ pub(super) fn apply_inventory_count_routes(router: Router<Wave3AppState>) -> Rou
         .route(
             "/api/v1/inventory/counts",
             get(list_inventory_counts_handler).post(create_inventory_count_handler),
+        )
+        .route(
+            "/api/v1/inventory/counts/quick-spot-count",
+            post(quick_spot_count_handler),
         )
         .route(
             "/api/v1/inventory/counts/:id",
@@ -162,6 +166,35 @@ async fn approve_inventory_count_handler(
         )
         .await?;
     Ok(Json(result.value))
+}
+
+async fn quick_spot_count_handler(
+    ctx: AuthContext,
+    State(state): State<Wave3AppState>,
+    headers: HeaderMap,
+    Json(req): Json<wms_domain::QuickSpotCountRequest>,
+) -> Result<Json<wms_domain::QuickSpotCountResponse>, Wave3HandlerError> {
+    require_any_permission(&ctx, &["m3.inventory_count.write", "m3.write"])?;
+    let idempotency_key = super::idempotency_key_from_headers(&headers)?;
+    let now = req.operated_at.unwrap_or_else(Utc::now);
+    let audit_diff = req.operated_at.map(|op_at| {
+        AuditDiff::compute(
+            serde_json::json!({}),
+            serde_json::json!({ "operated_at": op_at }),
+        )
+    });
+    let audit = AuditWriteRequest::from_auth_context(
+        &ctx,
+        "quick_spot_count",
+        "M3",
+        "inventory_count",
+        format!("{}:{}", req.location_code, req.product_code),
+        audit_diff,
+    );
+    let outcome = inventory_count_repository(&state)?
+        .quick_spot_count(&ctx, req, now, &idempotency_key, Some(audit))
+        .await?;
+    Ok(Json(outcome.value))
 }
 
 fn inventory_count_repository(

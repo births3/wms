@@ -72,8 +72,9 @@ pub struct ResilienceStatus {
 /// 登录请求。
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct LoginRequest {
-    /// 货主编码。
-    pub owner_code: String,
+    /// 货主编码（可选，未传时由系统根据账号绑定自动推导）。
+    #[serde(default)]
+    pub owner_code: Option<String>,
     /// 登录账号。
     pub username: String,
     /// 登录密码。

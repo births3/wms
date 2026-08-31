@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS inventory_counts (
     id               UUID PRIMARY KEY,
     owner_id         UUID NOT NULL,
-    count_type       TEXT NOT NULL CHECK (count_type IN ('cycle', 'full', 'blind')),
+    count_type       TEXT NOT NULL CHECK (count_type IN ('cycle', 'full', 'blind', 'spot')),
     warehouse_id     UUID,
     zone_id          UUID,
     product_code     TEXT,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS inventory_count_lines (
     id                  UUID PRIMARY KEY,
     count_id            UUID NOT NULL,
     owner_id            UUID NOT NULL,
-    inventory_batch_id  UUID NOT NULL,
+    inventory_batch_id  UUID,
     location_id         UUID NOT NULL,
     location_code       TEXT NOT NULL,
     product_code        TEXT NOT NULL,
@@ -35,10 +35,9 @@ CREATE TABLE IF NOT EXISTS inventory_count_lines (
     book_qty            BIGINT NOT NULL CHECK (book_qty >= 0),
     physical_qty        BIGINT CHECK (physical_qty >= 0),
     variance_qty        BIGINT,
-    variance_type       TEXT CHECK (variance_type IS NULL OR variance_type IN ('gain', 'loss', 'none')),
+    variance_type       TEXT CHECK (variance_type IS NULL OR variance_type IN ('gain', 'loss', 'none', 'MATCH', 'SURPLUS', 'SHORTAGE', 'match', 'surplus', 'shortage')),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (owner_id, count_id, inventory_batch_id),
     FOREIGN KEY (owner_id, count_id) REFERENCES inventory_counts(owner_id, id) ON DELETE CASCADE,
     FOREIGN KEY (owner_id, inventory_batch_id) REFERENCES inventory_batches(owner_id, id)
 );

@@ -8,6 +8,14 @@ use crate::{common::PageMeta, Quantity};
 pub const INVENTORY_COUNT_TYPE_CYCLE: &str = "cycle";
 pub const INVENTORY_COUNT_TYPE_FULL: &str = "full";
 pub const INVENTORY_COUNT_TYPE_BLIND: &str = "blind";
+pub const INVENTORY_COUNT_TYPE_SPOT: &str = "spot";
+
+pub const VARIANCE_TYPE_MATCH: &str = "MATCH";
+pub const VARIANCE_TYPE_SURPLUS: &str = "SURPLUS";
+pub const VARIANCE_TYPE_SHORTAGE: &str = "SHORTAGE";
+
+pub const COUNT_STATUS_APPROVED: &str = "approved";
+pub const COUNT_STATUS_PENDING_APPROVAL: &str = "pending_approval";
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateInventoryCountRequest {
@@ -27,6 +35,34 @@ pub struct SubmitInventoryCountLineRequest {
 pub struct ApproveInventoryCountRequest {
     pub approval_source: String,
     pub approval_id: String,
+}
+
+/// 现场快速动盘请求。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct QuickSpotCountRequest {
+    pub location_code: String,
+    pub product_code: String,
+    pub batch_no: String,
+    #[schema(value_type = String, format = "decimal")]
+    pub physical_qty: Quantity,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub operated_at: Option<DateTime<Utc>>,
+}
+
+/// 现场快速动盘响应。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct QuickSpotCountResponse {
+    pub count_id: Uuid,
+    #[schema(value_type = String, format = "decimal")]
+    pub book_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub physical_qty: Quantity,
+    #[schema(value_type = String, format = "decimal")]
+    pub variance_qty: Quantity,
+    /// 差异类型：MATCH 账实相符 | SHORTAGE 盘亏 | SURPLUS 盘盈
+    pub variance_type: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -165,9 +201,40 @@ pub fn calculate_variance(book_qty: Quantity, physical_qty: Quantity) -> (Quanti
     (variance, kind)
 }
 
+pub fn variance_kind_to_classification(kind: &str) -> &'static str {
+    match kind {
+        "gain" | VARIANCE_TYPE_SURPLUS => VARIANCE_TYPE_SURPLUS,
+        "loss" | VARIANCE_TYPE_SHORTAGE => VARIANCE_TYPE_SHORTAGE,
+        _ => VARIANCE_TYPE_MATCH,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn calculate_variance_computes_correct_variance_and_kind() {
+        assert_eq!(calculate_variance(10.into(), 15.into()), (5.into(), "gain"));
+        assert_eq!(
+            calculate_variance(15.into(), 10.into()),
+            ((-5).into(), "loss")
+        );
+        assert_eq!(calculate_variance(10.into(), 10.into()), (0.into(), "none"));
+    }
+
+    #[test]
+    fn variance_kind_to_classification_maps_properly() {
+        assert_eq!(
+            variance_kind_to_classification("gain"),
+            VARIANCE_TYPE_SURPLUS
+        );
+        assert_eq!(
+            variance_kind_to_classification("loss"),
+            VARIANCE_TYPE_SHORTAGE
+        );
+        assert_eq!(variance_kind_to_classification("none"), VARIANCE_TYPE_MATCH);
+    }
 
     #[test]
     fn variance_threshold_detects_over_ten_percent() {

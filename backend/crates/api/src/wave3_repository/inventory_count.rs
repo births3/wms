@@ -20,6 +20,7 @@ use super::{
 };
 
 mod approval;
+mod quick_spot;
 
 #[derive(Clone, FromRow)]
 struct InventoryCountRow {
