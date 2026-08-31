@@ -12,14 +12,19 @@ pub struct RelocateInventoryRequest {
     pub batch_id: Uuid,
     #[schema(value_type = String, format = "decimal")]
     pub qty: Quantity,
-    pub to_location_id: Uuid,
+    #[serde(default)]
+    pub to_location_id: Option<Uuid>,
     pub to_location_code: String,
+    #[serde(default)]
+    pub from_location_code: Option<String>,
     #[serde(default)]
     pub relocation_mode: Option<String>,
     #[serde(default)]
     pub lpn_code: Option<String>,
     #[serde(default)]
     pub reason: Option<String>,
+    #[serde(default)]
+    pub operated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

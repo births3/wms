@@ -14,8 +14,8 @@ use wms_domain::{
 };
 
 use super::{
-    require_any_permission, AuditWriteRequest, AuthContext, PgWave3Repository, Wave3AppState,
-    Wave3HandlerError, Wave3RepositoryError,
+    require_any_permission, AuditDiff, AuditWriteRequest, AuthContext, PgWave3Repository,
+    Wave3AppState, Wave3HandlerError, Wave3RepositoryError,
 };
 
 pub(super) fn apply_m3_ops_routes(router: Router<Wave3AppState>) -> Router<Wave3AppState> {
@@ -78,16 +78,23 @@ async fn relocate_inventory_handler(
     ctx.require_permission("m3.relocation.write")?;
     let idempotency_key = super::idempotency_key_from_headers(&headers)?;
     let repository = ops_repository(&state)?;
+    let audit_diff = req.operated_at.map(|op_at| {
+        AuditDiff::compute(
+            serde_json::json!({}),
+            serde_json::json!({ "operated_at": op_at }),
+        )
+    });
     let audit = AuditWriteRequest::from_auth_context(
         &ctx,
         "relocate_inventory",
         "M3",
         "inventory_relocation",
         req.batch_id.to_string(),
-        None,
+        audit_diff,
     );
+    let now = req.operated_at.unwrap_or_else(Utc::now);
     let result = repository
-        .relocate_inventory_with_audit(&ctx, req, Utc::now(), &idempotency_key, Some(audit))
+        .relocate_inventory_with_audit(&ctx, req, now, &idempotency_key, Some(audit))
         .await?;
     Ok(Json(result.value))
 }
