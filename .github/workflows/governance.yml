@@ -64,6 +64,9 @@ jobs:
         run: pnpm --dir prototypes exec playwright install --with-deps chromium
       - name: Secret scan
         run: gitleaks detect --redact --no-banner
+      - name: Full T1 governance
+        if: ${{ github.event_name == 'pull_request' }}
+        run: python3 scripts/governance/governance_checks.py --tier T1
       - name: T1/T2 task gate
         if: ${{ github.event_name == 'pull_request' }}
         env:
