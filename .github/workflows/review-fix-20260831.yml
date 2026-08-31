@@ -62,22 +62,31 @@ jobs:
           PY
           python3 /tmp/review_fix_20260831.py
 
-          # PostgreSQL TIMESTAMPTZ preserves microseconds, while chrono::Utc::now()
-          # may carry nanoseconds. Compare at the database's actual precision.
+          # PostgreSQL TIMESTAMPTZ stores microseconds, while chrono values may
+          # contain nanoseconds. Normalize the input inside the affected test.
           python3 - <<'PY'
-          import re
           from pathlib import Path
 
           path = Path('backend/crates/api/tests/pda_consistency_repairs_postgres.rs')
           text = path.read_text(encoding='utf-8')
-          text, count = re.subn(
-              r'assert_eq!\(\s*approved_at\s*,\s*operated_at\s*\);',
-              'assert_eq!(approved_at.timestamp_micros(), operated_at.timestamp_micros());',
-              text,
-              count=1,
+          function_marker = 'async fn quick_spot_count_rejects_ambiguous_states_and_records_auto_approval'
+          function_start = text.find(function_marker)
+          if function_start < 0:
+              raise SystemExit('quick spot count repair test function was not found')
+          assignment_start = text.find('let operated_at =', function_start)
+          if assignment_start < 0:
+              raise SystemExit('operated_at assignment was not found in quick spot count test')
+          assignment_end = text.find(';', assignment_start)
+          if assignment_end < 0:
+              raise SystemExit('operated_at assignment terminator was not found')
+          assignment_end += 1
+          insertion = (
+              '\n    let operated_at = operated_at\n'
+              '        - chrono::Duration::nanoseconds(i64::from(\n'
+              '            operated_at.timestamp_subsec_nanos() % 1_000,\n'
+              '        ));'
           )
-          if count != 1:
-              raise SystemExit('expected approved_at/operated_at assertion was not found')
+          text = text[:assignment_end] + insertion + text[assignment_end:]
           path.write_text(text, encoding='utf-8')
           PY
 
