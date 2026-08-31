@@ -186,7 +186,10 @@ export function useUpsertLpnTypePolicyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (body: UpsertLpnContainerTypePolicyRequest) => {
-      const result = await api.PUT("/api/v1/master-data/lpn-container-type-policies", { body });
+      const result = await api.PUT("/api/v1/master-data/lpn-container-type-policies", {
+        params: { header: { "Idempotency-Key": idempotencyKey() } },
+        body,
+      });
       if (!result.data) throw new ApiError(result.error, "保存类型策略失败", result.response.status);
       return result.data;
     },
