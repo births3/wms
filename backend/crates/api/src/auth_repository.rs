@@ -22,36 +22,65 @@ impl AuthRepository {
 
     pub async fn find_login_user(
         &self,
-        owner_code: &str,
+        owner_code: Option<&str>,
         username: &str,
     ) -> Result<Option<LoginUser>, AuthRepositoryError> {
-        sqlx::query_as::<_, LoginUser>(
-            r#"
-            SELECT
-                u.id AS user_id,
-                o.id AS owner_id,
-                o.owner_code,
-                u.username,
-                u.display_name,
-                u.password_hash,
-                u.status,
-                u.locked_until
-              FROM auth_users u
-              JOIN auth_user_owner_bindings b
-                ON b.user_id = u.id
-               AND b.is_active = true
-              JOIN auth_owners o
-                ON o.id = b.owner_id
-             WHERE lower(o.owner_code) = lower($1)
-               AND lower(u.username) = lower($2)
-             LIMIT 1
-            "#,
-        )
-        .bind(owner_code.trim())
-        .bind(username.trim())
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|_| AuthRepositoryError::Database)
+        let trimmed_code = owner_code.map(str::trim).filter(|c| !c.is_empty());
+        match trimmed_code {
+            Some(code) => sqlx::query_as::<_, LoginUser>(
+                r#"
+                SELECT
+                    u.id AS user_id,
+                    o.id AS owner_id,
+                    o.owner_code,
+                    u.username,
+                    u.display_name,
+                    u.password_hash,
+                    u.status,
+                    u.locked_until
+                  FROM auth_users u
+                  JOIN auth_user_owner_bindings b
+                    ON b.user_id = u.id
+                   AND b.is_active = true
+                  JOIN auth_owners o
+                    ON o.id = b.owner_id
+                 WHERE lower(o.owner_code) = lower($1)
+                   AND lower(u.username) = lower($2)
+                 LIMIT 1
+                "#,
+            )
+            .bind(code)
+            .bind(username.trim())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|_| AuthRepositoryError::Database),
+            None => sqlx::query_as::<_, LoginUser>(
+                r#"
+                SELECT
+                    u.id AS user_id,
+                    o.id AS owner_id,
+                    o.owner_code,
+                    u.username,
+                    u.display_name,
+                    u.password_hash,
+                    u.status,
+                    u.locked_until
+                  FROM auth_users u
+                  JOIN auth_user_owner_bindings b
+                    ON b.user_id = u.id
+                   AND b.is_active = true
+                  JOIN auth_owners o
+                    ON o.id = b.owner_id
+                 WHERE lower(u.username) = lower($1)
+                 ORDER BY b.is_primary DESC, b.created_at ASC
+                 LIMIT 1
+                "#,
+            )
+            .bind(username.trim())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|_| AuthRepositoryError::Database),
+        }
     }
 
     pub async fn current_user(

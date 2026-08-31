@@ -40,7 +40,7 @@ impl AuthService {
         let now = Utc::now();
         let Some(user) = self
             .repository
-            .find_login_user(&request.owner_code, &request.username)
+            .find_login_user(request.owner_code.as_deref(), &request.username)
             .await?
         else {
             return Err(AuthServiceError::InvalidCredentials);

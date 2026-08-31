@@ -354,6 +354,17 @@ impl AuthContext {
         }
     }
 
+    pub fn require_any_permission(&self, permissions: &[&str]) -> Result<(), AuthError> {
+        if permissions
+            .iter()
+            .any(|permission| self.has_permission(permission))
+        {
+            Ok(())
+        } else {
+            Err(AuthError::PermissionDenied(permissions.join("|")))
+        }
+    }
+
     pub fn require_owner(&self, owner_id: Uuid) -> Result<(), AuthError> {
         if self.owner_id == owner_id {
             Ok(())
