@@ -347,6 +347,7 @@ api_paths = [
   "POST /api/v1/master-data/warehouse-zones",
   "PATCH /api/v1/master-data/warehouse-zones/{id}",
   "GET /api/v1/master-data/locations",
+  "GET /api/v1/master-data/locations/by-code/{location_code}",
   "POST /api/v1/master-data/locations",
   "POST /api/v1/master-data/locations/batch-create",
   "PATCH /api/v1/master-data/locations/{id}",
@@ -378,6 +379,7 @@ evidence_refs = [
   "apps/web-admin/.e2e-artifacts/m1-real/screenshots/locations.png",
   "apps/web-admin/.e2e-artifacts/m1-real/screenshots/locations-batch-create.png",
   "apps/web-admin/.e2e-artifacts/m1-real/screenshots/negative-validation.png",
+  "tests/e2e/test_pda_api_suite.py",
   "docs/error-codes.md",
 ]
 
@@ -933,6 +935,7 @@ e2e_screenshots = [
 api_paths = [
   "GET /api/v1/inventory/counts",
   "POST /api/v1/inventory/counts",
+  "POST /api/v1/inventory/counts/quick-spot-count",
   "GET /api/v1/inventory/counts/{id}",
   "POST /api/v1/inventory/counts/{id}/lines/{line_id}/submit",
   "POST /api/v1/inventory/counts/{id}/approve",
@@ -946,11 +949,13 @@ evidence_refs = [
   "backend/migrations/202607140008_m3_inventory_counts.sql",
   "backend/crates/api/src/wave3_repository/inventory_count.rs",
   "backend/crates/api/src/wave3_repository/inventory_count/approval.rs",
+  "backend/crates/api/src/wave3_repository/inventory_count/quick_spot.rs",
   "backend/crates/api/src/wave3_handlers/inventory_count.rs",
   "backend/crates/api/tests/m3_inventory_count_postgres.rs",
   "apps/web-admin/src/pages/inventory/M3InventoryCountPage.tsx",
   "artifacts/screenshot-portal/real-web/m3-counts/count-page.png",
   "prototypes/e2e/web-admin-m3-real.spec.ts",
+  "tests/e2e/test_pda_api_suite.py",
 ]
 
 [stories.dimensions]
@@ -1006,6 +1011,7 @@ evidence_refs = [
   "apps/web-admin/src/pages/inventory/M3RelocationPage.tsx",
   "artifacts/screenshot-portal/real-web/m3-relocations/relocation-page.png",
   "prototypes/e2e/web-admin-m3-real.spec.ts",
+  "tests/e2e/test_pda_api_suite.py",
 ]
 
 [stories.dimensions]
@@ -1145,6 +1151,7 @@ evidence_refs = [
   "backend/crates/api/tests/auth_session_postgres.rs",
   "backend/crates/api/src/auth_service.rs",
   "backend/crates/api/src/auth_handlers.rs",
+  "tests/e2e/test_pda_api_suite.py",
 ]
 
 [stories.dimensions]
@@ -1341,7 +1348,10 @@ adversarial_checks = [
 frontend_pages = []
 api_paths = []
 test_checks = ["cargo test --manifest-path backend/Cargo.toml -p wms-api --test audit_postgres"]
-evidence_refs = ["backend/crates/api/tests/audit_postgres.rs"]
+evidence_refs = [
+  "backend/crates/api/tests/audit_postgres.rs",
+  "tests/e2e/test_pda_api_suite.py",
+]
 
 [stories.dimensions]
 requirement = "verified"
@@ -4099,9 +4109,37 @@ resume_when = "wave-model.md 进入已批准实施波次后实施，并补齐前
 id = "US-M4-003"
 title = "PDA 拣选作业"
 module = "M4"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。拣选入箱双模式（direct_box 直装=箱级等待 / bound_tote 绑定周转箱=任务级等待，pick_container_mode 模板字段）、出库箱（outbound_box 容器 + box_no/LPN 合一 + 拣选任务挂 box_id 按箱聚合）、周转箱绑定（1..N、一条箱明细只能绑定一个周转箱）与缺口处理三策略（wait_and_split 默认 / hold_wave 窗口 / fail_order + urgent 补货联动）已随 wave-model.md 定稿未实施（登记见 US-M4-002b）。"
+story_file = "docs/domain/user-stories-m4-outbound-pick.md"
+types = ["write", "api_change", "inventory_change", "concurrent_resource", "audit_compliance"]
+api_paths = [
+  "POST /api/v1/outbound/pick-tasks/batch-complete",
+  "GET /api/v1/outbound/waves/{wave_id}/pick-summary",
+]
+database_objects = [
+  "outbound_orders",
+  "outbound_order_lines",
+  "outbound_waves",
+  "inventory_allocations",
+  "inventory_batches",
+  "audit_event",
+  "idempotency_request",
+]
+test_checks = [
+  "python3 -m unittest tests/e2e/test_pda_api_suite.py",
+]
+evidence_refs = [
+  "docs/domain/user-stories-m4-outbound-pick.md",
+  "backend/crates/domain/src/receiving_outbound.rs",
+  "backend/crates/api/src/wave4_handlers_orders.rs",
+  "backend/crates/api/src/wave4_repository_actions.rs",
+  "backend/crates/api/src/wave4_handlers_waves.rs",
+  "backend/crates/api/src/wave4_repository_waves.rs",
+  "tests/e2e/test_pda_api_suite.py",
+  "shared/openapi/openapi.json",
+]
+reason = "已补 PDA 批量拣货提交与周转箱/追溯码绑定接口（POST /api/v1/outbound/pick-tasks/batch-complete）、波次拣货最优动线聚合接口（GET /api/v1/outbound/waves/{wave_id}/pick-summary）、物理操作时间戳与单据幂等审计留痕，并通过 E2E 测试套件验证；实体手持终端硬件扫码交互、整件/零件混拣动态调度、离线冲突决议和真实 PDA 运行证据尚未全部闭环，暂在 deferred_stories 中保留并跟踪。"
 owner = "M4 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "该故事进入已批准实施波次，并具备真实 PDA 硬件与端到端运行证据后移入 stories。"
 
 [[deferred_stories]]
 id = "US-M4-004"
@@ -5019,9 +5057,29 @@ resume_when = "该故事进入已批准实施波次，并具备前端、API、�
 id = "US-PK-002"
 title = "装箱作业"
 module = "PK"
-reason = "当前实现和证据不足以证明该故事全部验收标准，禁止以局部页面、接口或静态文件标记完成。"
+story_file = "docs/domain/user-stories-mpk-packing-station.md"
+types = ["read_only", "write", "api_change", "audit_compliance"]
+api_paths = [
+  "GET /api/v1/packing/totes/{tote_code}/status",
+]
+database_objects = [
+  "lpn_containers",
+  "outbound_orders",
+  "audit_event",
+]
+test_checks = [
+  "python3 -m unittest tests/e2e/test_pda_api_suite.py",
+]
+evidence_refs = [
+  "docs/domain/user-stories-mpk-packing-station.md",
+  "backend/crates/api/src/wave5_handlers.rs",
+  "backend/crates/api/src/wave5_repository_part1.rs",
+  "tests/e2e/test_pda_api_suite.py",
+  "shared/openapi/openapi.json",
+]
+reason = "已补周转箱条码状态秒级预检接口（GET /api/v1/packing/totes/{tote_code}/status）、可用/占用/封箱状态校验、OpenAPI 契约及 E2E 测试。故事仍保留延期：包装工位物理电子秤、称重校验联动、冷链保温箱选型及真实包装台操作证据待 Wave 5/6 实施。"
 owner = "PK 模块负责人"
-resume_when = "该故事进入已批准实施波次，并具备前端、API、后端、数据库、权限、审计和测试的完整验收资源。"
+resume_when = "包装工位设备联调与真实环境证据准备完成后移入 stories。"
 
 [[deferred_stories]]
 id = "US-PK-003"
