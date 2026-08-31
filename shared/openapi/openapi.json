@@ -2118,8 +2118,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。",
-        "x-idempotency-exempt-reason": "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。"
+        "x-idempotency-exempt-reason": "上传会话 ID 与令牌共同限定单一对象键，PUT 全量替换内容；重复同一请求得到相同字节与哈希。",
+        "x-auth-exempt-reason": "附件上传使用 5 分钟上传会话令牌鉴权，不依赖 Bearer token。"
       }
     },
     "/api/v1/attachments/{attachment_id}/content": {
@@ -3021,17 +3021,7 @@
             }
           },
           "401": {
-            "description": "认证失败（用户名或密码错误）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "请求参数缺失或格式非法",
+            "description": "认证失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -3042,8 +3032,8 @@
           }
         },
         "security": [],
-        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。",
-        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。"
+        "x-idempotency-exempt-reason": "登录用于签发 JWT，本身不执行业务写入；重复登录由认证服务语义处理。",
+        "x-auth-exempt-reason": "登录接口用于签发 JWT，调用前尚无 Bearer token。"
       }
     },
     "/api/v1/auth/logout": {
@@ -10917,8 +10907,8 @@
             }
           }
         },
-        "x-idempotency-exempt-reason": "上架 6 维前置探测只执行合规校验与拦截留痕，不修改库存；使用 POST 承载探测参数。",
-        "x-audit-exempt-reason": "上架 6 维探测端点不修改业务数据，拦截记录自动写入专有拦截审计表。"
+        "x-audit-exempt-reason": "上架 6 维探测端点不修改业务数据，拦截记录自动写入专有拦截审计表。",
+        "x-idempotency-exempt-reason": "上架 6 维前置探测只执行合规校验与拦截留痕，不修改库存；使用 POST 承载探测参数。"
       }
     },
     "/api/v1/inbound/receiving-dashboard": {
@@ -15686,27 +15676,7 @@
             }
           },
           "422": {
-            "description": "移库校验失败（移库数量超限、源库位不匹配或策略互斥）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "缺少或非法幂等键",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "移库批次或目标库位不存在",
+            "description": "移库校验失败",
             "content": {
               "application/json": {
                 "schema": {
@@ -34613,367 +34583,6 @@
         "security": [],
         "x-auth-exempt-reason": "生产只读 API 文档浏览页；访问边界由网关或内网 ACL 控制。"
       }
-    },
-    "/api/v1/master-data/locations/by-code/{location_code}": {
-      "get": {
-        "tags": [
-          "master-data",
-          "pda"
-        ],
-        "summary": "PDA 扫码直查单库位轻量档案",
-        "description": "扫码后毫秒级返回库位温区、容积、混批混放策略与当前状态",
-        "operationId": "get_pda_location_by_code",
-        "parameters": [
-          {
-            "name": "location_code",
-            "in": "path",
-            "required": true,
-            "description": "库位条码/编码",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "查询成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PdaLocationInfo"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "库位编码参数非法",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登录",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "库位不存在",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/outbound/pick-tasks/batch-complete": {
-      "post": {
-        "tags": [
-          "outbound",
-          "pda"
-        ],
-        "summary": "PDA 拣货批量提交与周转箱绑定",
-        "description": "单次事务批量提交整箱/多行拣货结果，支持绑定周转箱号与药品追溯码",
-        "operationId": "batch_complete_pick_tasks",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "description": "客户端生成的幂等键",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BatchCompletePickTaskRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "批量拣货完成",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BatchCompletePickTaskResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "缺少或非法幂等键",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登录",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "订单或明细行不存在",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "数量超限或状态非法",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/outbound/waves/{wave_id}/pick-summary": {
-      "get": {
-        "tags": [
-          "outbound",
-          "pda"
-        ],
-        "summary": "波次拣货动线聚合与步骤清单",
-        "description": "按最短路径动线排序输出当前波次的待拣货品汇总与位置指示",
-        "operationId": "get_wave_pick_summary",
-        "parameters": [
-          {
-            "name": "wave_id",
-            "in": "path",
-            "required": true,
-            "description": "波次 ID",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取波次动线成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WavePickSummary"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "波次 ID 格式非法",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登录",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "波次不存在",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/packing/totes/{tote_code}/status": {
-      "get": {
-        "tags": [
-          "packing",
-          "pda"
-        ],
-        "summary": "周转箱条码状态秒级预检",
-        "description": "扫码后预检周转箱是否空闲可用或处于封箱占用状态，杜绝混箱风险",
-        "operationId": "get_tote_status",
-        "parameters": [
-          {
-            "name": "tote_code",
-            "in": "path",
-            "required": true,
-            "description": "周转箱编码",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "预检状态成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ToteStatusResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "周转箱编码格式非法",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登录",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "周转箱不存在",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/inventory/counts/quick-spot-count": {
-      "post": {
-        "tags": [
-          "inventory",
-          "pda"
-        ],
-        "summary": "现场即时快速动盘与账实核对",
-        "description": "现场扫描库位、商品、批号并录入实盘数量，即时计算账实差异并生成抽盘记录",
-        "operationId": "quick_spot_count",
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "description": "客户端生成的幂等键",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QuickSpotCountRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "动盘核对完成",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QuickSpotCountResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "缺少或非法幂等键",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登录",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "库位不存在",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "参数非法（实盘数量负数或无效参数）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -37850,6 +37459,11 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          },
+          "operated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "picked_qty": {
             "type": "string",
@@ -46742,7 +46356,8 @@
         "properties": {
           "owner_code": {
             "type": "string",
-            "description": "货主编码（可选，未传时根据账号关联自动推导默认货主）"
+            "description": "货主编码（可选，未传时由系统根据账号绑定自动推导）。",
+            "nullable": true
           },
           "password": {
             "type": "string",
@@ -51450,8 +51065,17 @@
             "type": "string",
             "format": "uuid"
           },
+          "from_location_code": {
+            "type": "string",
+            "nullable": true
+          },
           "lpn_code": {
             "type": "string",
+            "nullable": true
+          },
+          "operated_at": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
           "qty": {
@@ -51471,16 +51095,8 @@
           },
           "to_location_id": {
             "type": "string",
-            "format": "uuid"
-          },
-          "from_location_code": {
-            "type": "string",
-            "description": "源库位编码（可选，提供时核对一致性）"
-          },
-          "operated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "手持终端操作物理时间戳"
+            "format": "uuid",
+            "nullable": true
           }
         }
       },
@@ -56923,346 +56539,6 @@
           "tolerance_percent": {
             "type": "integer",
             "format": "int32"
-          }
-        }
-      },
-      "PdaLocationInfo": {
-        "type": "object",
-        "description": "PDA 扫码查单库位轻量响应",
-        "required": [
-          "location_id",
-          "location_code",
-          "zone_code",
-          "temperature_zone",
-          "status",
-          "mix_product_policy",
-          "mix_batch_policy",
-          "max_volume_cm3",
-          "used_volume_cm3",
-          "remaining_volume_cm3"
-        ],
-        "properties": {
-          "location_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "库位 ID"
-          },
-          "location_code": {
-            "type": "string",
-            "description": "库位编码"
-          },
-          "zone_code": {
-            "type": "string",
-            "description": "库区编码"
-          },
-          "temperature_zone": {
-            "type": "string",
-            "description": "温区（normal/cool/cold/frozen）"
-          },
-          "status": {
-            "type": "string",
-            "description": "库位状态（available/occupied/disabled）"
-          },
-          "mix_product_policy": {
-            "type": "string",
-            "description": "混品策略（single_product_only/restricted_mix）"
-          },
-          "mix_batch_policy": {
-            "type": "string",
-            "description": "混批策略（single_batch/multi_batch）"
-          },
-          "max_volume_cm3": {
-            "type": "integer",
-            "format": "int64",
-            "description": "最大容积 (cm³)"
-          },
-          "used_volume_cm3": {
-            "type": "integer",
-            "format": "int64",
-            "description": "已用容积 (cm³)"
-          },
-          "remaining_volume_cm3": {
-            "type": "integer",
-            "format": "int64",
-            "description": "剩余可用容积 (cm³)"
-          }
-        }
-      },
-      "BatchCompletePickItem": {
-        "type": "object",
-        "required": [
-          "line_no",
-          "picked_qty"
-        ],
-        "properties": {
-          "line_no": {
-            "type": "integer",
-            "format": "int32",
-            "description": "出库单明细行号"
-          },
-          "picked_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "本次实拣数量"
-          },
-          "trace_codes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "采集的药品追溯码列表"
-          }
-        }
-      },
-      "BatchCompletePickTaskRequest": {
-        "type": "object",
-        "required": [
-          "order_id",
-          "items"
-        ],
-        "properties": {
-          "order_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "出库单 ID"
-          },
-          "outbound_lpn": {
-            "type": "string",
-            "description": "绑定的周转箱号/托盘号（可选）"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BatchCompletePickItem"
-            },
-            "description": "拣货明细列表"
-          },
-          "operated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "PDA 本地操作时间"
-          }
-        }
-      },
-      "BatchCompletePickTaskResponse": {
-        "type": "object",
-        "required": [
-          "order_id",
-          "completed_lines",
-          "status"
-        ],
-        "properties": {
-          "order_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "出库单 ID"
-          },
-          "completed_lines": {
-            "type": "integer",
-            "format": "int32",
-            "description": "本次完成明细行数"
-          },
-          "outbound_lpn": {
-            "type": "string",
-            "description": "周转箱号"
-          },
-          "status": {
-            "type": "string",
-            "description": "订单当前拣货状态（picked/partially_picked）"
-          }
-        }
-      },
-      "WavePickRouteStep": {
-        "type": "object",
-        "required": [
-          "step",
-          "location_code",
-          "product_code",
-          "product_name",
-          "batch_no",
-          "planned_qty",
-          "picked_qty",
-          "picking_category"
-        ],
-        "properties": {
-          "step": {
-            "type": "integer",
-            "format": "int32",
-            "description": "动线步骤号"
-          },
-          "location_code": {
-            "type": "string",
-            "description": "库位编码"
-          },
-          "product_code": {
-            "type": "string",
-            "description": "商品编码"
-          },
-          "product_name": {
-            "type": "string",
-            "description": "商品名称"
-          },
-          "spec": {
-            "type": "string",
-            "description": "规格型号"
-          },
-          "batch_no": {
-            "type": "string",
-            "description": "批号"
-          },
-          "planned_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "计划数量"
-          },
-          "picked_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "已拣数量"
-          },
-          "picking_category": {
-            "type": "string",
-            "description": "拣货品类/任务状态"
-          }
-        }
-      },
-      "WavePickSummary": {
-        "type": "object",
-        "required": [
-          "wave_id",
-          "wave_no",
-          "total_lines",
-          "total_qty",
-          "picking_route"
-        ],
-        "properties": {
-          "wave_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "波次 ID"
-          },
-          "wave_no": {
-            "type": "string",
-            "description": "波次编号"
-          },
-          "total_lines": {
-            "type": "integer",
-            "format": "int32",
-            "description": "总行数"
-          },
-          "total_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "总件数"
-          },
-          "picking_route": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/WavePickRouteStep"
-            },
-            "description": "按最优动线排序的拣货步骤列表"
-          }
-        }
-      },
-      "ToteStatusResponse": {
-        "type": "object",
-        "required": [
-          "tote_code",
-          "status",
-          "loaded_sku_count"
-        ],
-        "properties": {
-          "tote_code": {
-            "type": "string",
-            "description": "周转箱条码"
-          },
-          "status": {
-            "type": "string",
-            "description": "周转箱状态：AVAILABLE 空闲可用 | IN_USE 占用中 | SEALED 已封箱 | DISABLED 报废"
-          },
-          "current_order_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "当前绑定的出库订单 ID（若已占用）",
-            "nullable": true
-          },
-          "loaded_sku_count": {
-            "type": "integer",
-            "format": "int32",
-            "description": "已装载 SKU/追溯码数量"
-          }
-        }
-      },
-      "QuickSpotCountRequest": {
-        "type": "object",
-        "required": [
-          "location_code",
-          "product_code",
-          "batch_no",
-          "physical_qty"
-        ],
-        "properties": {
-          "location_code": {
-            "type": "string",
-            "description": "库位编码"
-          },
-          "product_code": {
-            "type": "string",
-            "description": "商品编码"
-          },
-          "batch_no": {
-            "type": "string",
-            "description": "批号"
-          },
-          "physical_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "现场实盘数量"
-          },
-          "reason": {
-            "type": "string",
-            "description": "动盘原因（可选）"
-          },
-          "operated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "PDA 操作物理时间"
-          }
-        }
-      },
-      "QuickSpotCountResponse": {
-        "type": "object",
-        "required": [
-          "count_id",
-          "book_qty",
-          "physical_qty",
-          "variance_qty",
-          "variance_type"
-        ],
-        "properties": {
-          "count_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "生成的动盘单 ID"
-          },
-          "book_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "账面在库数量"
-          },
-          "physical_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "实盘录入数量"
-          },
-          "variance_qty": {
-            "type": "string",
-            "format": "decimal",
-            "description": "差异数量（实盘 - 账面）"
-          },
-          "variance_type": {
-            "type": "string",
-            "description": "差异判定：MATCH 账实相符 | SHORTAGE 盘亏 | SURPLUS 盘盈"
           }
         }
       }
