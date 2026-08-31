@@ -17,25 +17,6 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[review-fix applied]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
-      CARGO_PROFILE_TEST_DEBUG: "0"
-      CARGO_PROFILE_TEST_INCREMENTAL: "false"
-
     steps:
       - name: Checkout repair branch
         uses: actions/checkout@v4
@@ -43,10 +24,7 @@ jobs:
           ref: fix/review-20260831-pda-consistency
           fetch-depth: 0
 
-      - name: Prepare Rust formatter
-        run: rustup component add rustfmt
-
-      - name: Decode and apply reviewed repair
+      - name: Decode repair and show failing test source
         shell: bash
         run: |
           set -euo pipefail
@@ -61,75 +39,5 @@ jobs:
           Path('/tmp/review_fix_20260831.py').write_bytes(source)
           PY
           python3 /tmp/review_fix_20260831.py
-
-          # PostgreSQL TIMESTAMPTZ stores microseconds, while chrono values may
-          # contain nanoseconds. Normalize the input inside the affected test.
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('backend/crates/api/tests/pda_consistency_repairs_postgres.rs')
-          text = path.read_text(encoding='utf-8')
-          function_marker = 'async fn quick_spot_count_rejects_ambiguous_states_and_records_auto_approval'
-          function_start = text.find(function_marker)
-          if function_start < 0:
-              raise SystemExit('quick spot count repair test function was not found')
-          assignment_start = text.find('let operated_at =', function_start)
-          if assignment_start < 0:
-              raise SystemExit('operated_at assignment was not found in quick spot count test')
-          assignment_end = text.find(';', assignment_start)
-          if assignment_end < 0:
-              raise SystemExit('operated_at assignment terminator was not found')
-          assignment_end += 1
-          insertion = (
-              '\n    let operated_at = operated_at\n'
-              '        - chrono::Duration::nanoseconds(i64::from(\n'
-              '            operated_at.timestamp_subsec_nanos() % 1_000,\n'
-              '        ));'
-          )
-          text = text[:assignment_end] + insertion + text[assignment_end:]
-          path.write_text(text, encoding='utf-8')
-          PY
-
-      - name: Format and whitespace checks
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo fmt --manifest-path backend/Cargo.toml --all
-          python3 - <<'PY'
-          from pathlib import Path
-
-          for path in [
-              Path('backend/crates/api/src/wave4_repository_actions.rs'),
-          ]:
-              path.write_text(path.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
-          PY
-          git diff --check
-
-      - name: Compile workspace
-        run: cargo check --manifest-path backend/Cargo.toml --workspace --all-targets
-
-      - name: Run backend unit tests
-        run: cargo test --manifest-path backend/Cargo.toml -p wms-api --lib
-
-      - name: Run PDA consistency integration tests
-        run: >-
-          cargo test --manifest-path backend/Cargo.toml -p wms-api
-          --test pda_enhancements_postgres
-          --test pda_consistency_repairs_postgres
-
-      - name: Run governance Tier 1
-        run: python3 scripts/governance/governance_checks.py --tier T1
-
-      - name: Commit verified repair
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -f .github/review-fix-payload-*.b64
-          rm -f .github/workflows/review-fix-20260831.yml
-          git config user.name "review-fix-bot"
-          git config user.email "review-fix-bot@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git diff --cached --stat
-          git commit -m "修复(后端)：收口 PDA 作业一致性 [review-fix applied]"
-          git push origin HEAD:fix/review-20260831-pda-consistency
+          nl -ba backend/crates/api/tests/pda_consistency_repairs_postgres.rs | sed -n '285,335p'
+          exit 1
