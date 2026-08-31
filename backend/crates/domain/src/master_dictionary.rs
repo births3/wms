@@ -526,6 +526,21 @@ pub struct Location {
     pub updated_at: DateTime<Utc>,
 }
 
+/// PDA 扫码查单库位轻量响应。
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PdaLocationInfo {
+    pub location_id: Uuid,
+    pub location_code: String,
+    pub zone_code: String,
+    pub temperature_zone: String,
+    pub status: String,
+    pub mix_product_policy: String,
+    pub mix_batch_policy: String,
+    pub max_volume_cm3: i64,
+    pub used_volume_cm3: i64,
+    pub remaining_volume_cm3: i64,
+}
+
 fn default_true() -> bool {
     true
 }

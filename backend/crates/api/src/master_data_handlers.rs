@@ -274,6 +274,39 @@ impl MasterDataAppState {
         Ok(memory_page(all, page, page_size))
     }
 
+    async fn get_pda_location_by_code(
+        &self,
+        ctx: &AuthContext,
+        location_code: &str,
+    ) -> Result<wms_domain::PdaLocationInfo, MasterDataHandlerError> {
+        if let Some(repository) = &self.read_repository {
+            return Ok(repository
+                .get_pda_location_by_code(ctx, location_code)
+                .await?);
+        }
+        let loc = self
+            .read_store()?
+            .list_locations(ctx)
+            .into_iter()
+            .find(|l| l.location_code.eq_ignore_ascii_case(location_code))
+            .ok_or(MasterDataHandlerError::MasterData(
+                MasterDataError::NotFound,
+            ))?;
+        let remaining_volume_cm3 = (loc.max_volume_cm3 - loc.used_volume_cm3).max(0);
+        Ok(wms_domain::PdaLocationInfo {
+            location_id: loc.id,
+            location_code: loc.location_code,
+            zone_code: "Z01".to_string(),
+            temperature_zone: "normal".to_string(),
+            status: loc.status,
+            mix_product_policy: loc.mix_product_policy,
+            mix_batch_policy: loc.mix_batch_policy,
+            max_volume_cm3: loc.max_volume_cm3,
+            used_volume_cm3: loc.used_volume_cm3,
+            remaining_volume_cm3,
+        })
+    }
+
     async fn create_warehouse(
         &self,
         ctx: &AuthContext,

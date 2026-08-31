@@ -207,7 +207,7 @@ async fn auth_login_issues_token_and_me_returns_current_user(pool: PgPool) {
     ))));
 
     let login_request = LoginRequest {
-        owner_code: "PY_OWNER".to_string(),
+        owner_code: Some("PY_OWNER".to_string()),
         username: "admin".to_string(),
         password: "CorrectHorse1!".to_string(),
     };

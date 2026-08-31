@@ -233,6 +233,10 @@ pub fn master_data_router(state: MasterDataAppState) -> Router {
             get(list_locations_handler).post(create_location_handler),
         )
         .route(
+            "/api/v1/master-data/locations/by-code/:location_code",
+            get(get_location_by_code_handler),
+        )
+        .route(
             "/api/v1/master-data/locations/batch-create",
             post(batch_create_locations_handler),
         )
@@ -655,6 +659,16 @@ async fn list_locations_handler(
         page: page_with_total(data.len(), total.clamp(0, u32::MAX as i64) as u32),
         data,
     }))
+}
+
+async fn get_location_by_code_handler(
+    ctx: AuthContext,
+    State(state): State<MasterDataAppState>,
+    Path(location_code): Path<String>,
+) -> Result<Json<wms_domain::PdaLocationInfo>, MasterDataHandlerError> {
+    ctx.require_permission(MASTER_DATA_READ_PERMISSION)?;
+    let data = state.get_pda_location_by_code(&ctx, &location_code).await?;
+    Ok(Json(data))
 }
 
 async fn create_location_handler(

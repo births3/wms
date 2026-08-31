@@ -1037,6 +1037,69 @@ impl PgMasterDataReadRepository {
         Ok((rows.into_iter().map(Location::from).collect(), total))
     }
 
+    pub async fn get_pda_location_by_code(
+        &self,
+        ctx: &AuthContext,
+        location_code: &str,
+    ) -> Result<wms_domain::PdaLocationInfo, MasterDataError> {
+        let row: Option<(Uuid, String, String, String, String, String, String, i64, i64)> = sqlx::query_as(
+            r#"
+            SELECT
+                l.id,
+                l.location_code,
+                z.zone_code,
+                z.temperature_zone,
+                l.status,
+                l.mix_product_policy,
+                l.mix_batch_policy,
+                l.max_volume_cm3,
+                l.used_volume_cm3
+              FROM warehouse_locations l
+              JOIN warehouse_zones z
+                ON z.id = l.zone_id
+               AND z.owner_id = l.owner_id
+             WHERE l.owner_id = $1
+               AND lower(l.location_code) = lower($2)
+             LIMIT 1
+            "#,
+        )
+        .bind(ctx.owner_id)
+        .bind(location_code.trim())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+
+        let Some((
+            location_id,
+            location_code,
+            zone_code,
+            temperature_zone,
+            status,
+            mix_product_policy,
+            mix_batch_policy,
+            max_volume_cm3,
+            used_volume_cm3,
+        )) = row
+        else {
+            return Err(MasterDataError::NotFound);
+        };
+
+        let remaining_volume_cm3 = (max_volume_cm3 - used_volume_cm3).max(0);
+
+        Ok(wms_domain::PdaLocationInfo {
+            location_id,
+            location_code,
+            zone_code,
+            temperature_zone,
+            status,
+            mix_product_policy,
+            mix_batch_policy,
+            max_volume_cm3,
+            used_volume_cm3,
+            remaining_volume_cm3,
+        })
+    }
+
     pub async fn batch_create_locations(
         &self,
         ctx: &AuthContext,
