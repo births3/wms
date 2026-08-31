@@ -62,6 +62,25 @@ jobs:
           PY
           python3 /tmp/review_fix_20260831.py
 
+          # PostgreSQL TIMESTAMPTZ preserves microseconds, while chrono::Utc::now()
+          # may carry nanoseconds. Compare at the database's actual precision.
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          path = Path('backend/crates/api/tests/pda_consistency_repairs_postgres.rs')
+          text = path.read_text(encoding='utf-8')
+          text, count = re.subn(
+              r'assert_eq!\(\s*approved_at\s*,\s*operated_at\s*\);',
+              'assert_eq!(approved_at.timestamp_micros(), operated_at.timestamp_micros());',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit('expected approved_at/operated_at assertion was not found')
+          path.write_text(text, encoding='utf-8')
+          PY
+
       - name: Format and whitespace checks
         shell: bash
         run: |
@@ -96,26 +115,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f .github/review-fix-payload-*.b64
+          rm -f .github/workflows/review-fix-20260831.yml
           git config user.name "review-fix-bot"
           git config user.email "review-fix-bot@users.noreply.github.com"
-          git add \
-            backend/crates/api/src/auth_repository.rs \
-            backend/crates/api/src/wave3_handlers/m3_ops.rs \
-            backend/crates/api/src/wave3_handlers/inventory_count.rs \
-            backend/crates/api/src/wave3_repository.rs \
-            backend/crates/api/src/wave3_repository/inventory_count/quick_spot.rs \
-            backend/crates/api/src/wave3_repository/relocation.rs \
-            backend/crates/api/src/wave4_handlers_orders.rs \
-            backend/crates/api/src/wave4_handler_error.rs \
-            backend/crates/api/src/wave4_repository.rs \
-            backend/crates/api/src/wave4_repository_part1.rs \
-            backend/crates/api/src/wave4_repository_actions.rs \
-            backend/crates/api/src/wave4_repository_pda.rs \
-            backend/crates/api/src/wave4_repository_waves.rs \
-            backend/crates/api/src/wave5_repository_part1.rs \
-            backend/crates/api/tests/pda_enhancements_postgres.rs \
-            backend/crates/api/tests/pda_consistency_repairs_postgres.rs \
-            backend/migrations/202608310001_pda_consistency_repairs.sql
+          git add -A
           git diff --cached --check
           git diff --cached --stat
           git commit -m "修复(后端)：收口 PDA 作业一致性 [review-fix applied]"
