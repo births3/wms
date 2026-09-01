@@ -97,6 +97,7 @@ jobs:
         run: cargo test --manifest-path backend/Cargo.toml --package wms-api --test openapi_pda_runtime
 
       - name: Verify generated OpenAPI contracts
+        id: t2_openapi
         if: ${{ github.event_name == 'pull_request' }}
         run: |
           python3 scripts/governance/check_openapi_in_sync.py --strict
@@ -106,18 +107,91 @@ jobs:
           git diff --exit-code
 
       - name: Full T1 governance
-        if: ${{ github.event_name == 'pull_request' }}
+        id: t1_governance
+        if: ${{ always() && github.event_name == 'pull_request' }}
         run: python3 scripts/governance/governance_checks.py --tier T1
 
-      - name: T1/T2 task gate
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: T2 Rust format
+        id: t2_fmt
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        run: cargo fmt --manifest-path backend/Cargo.toml --all --check
+
+      - name: T2 diff-driven governance
+        id: t2_diff
+        if: ${{ always() && github.event_name == 'pull_request' }}
         env:
           WMS_GOV_CONTEXT: pr
           WMS_GOV_BASE: origin/main
-        run: just task-check
+        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict
+
+      - name: T2 Rust clippy
+        id: t2_clippy
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps -- -D warnings -A clippy::too-many-arguments
+
+      - name: T2 backend unit tests
+        id: t2_backend_tests
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        run: cargo test --manifest-path backend/Cargo.toml --workspace --lib
+
+      - name: T2 web-admin self-checks
+        id: t2_web_checks
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        run: pnpm --dir apps/web-admin run test:self-checks
+
+      - name: T2 JavaScript unit tests
+        id: t2_js_tests
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        run: |
+          node packages/ui/tests/dialog-dismiss.test.ts
+          node packages/ui/tests/data-grid-advanced-filters.test.ts
+          node packages/ui/tests/data-grid-filter-history.test.ts
+          node packages/ui/tests/data-grid-pagination-prefetch.test.ts
+          node packages/ui/tests/data-grid-views.test.ts
+          node packages/ui/tests/query-panel-quick-filters.test.ts
+          node packages/ui/tests/scroll-bar-math.test.ts
+          node packages/ui/tests/viewport-math.test.ts
+          node packages/ui/tests/scroll-bar-wiring.test.ts
+          node packages/ui/tests/table-row-background.test.ts
+          node packages/ui/tests/data-grid-layout-expand.test.ts
+          node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
+
+      - name: T2 TypeScript contracts
+        id: t2_ts_contracts
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        run: |
+          pnpm --dir apps/web-admin exec tsc --noEmit
+          pnpm --dir packages/api-client run typecheck
+
+      - name: T2 gate summary
+        id: t2_summary
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        env:
+          T1_GOVERNANCE: ${{ steps.t1_governance.outcome }}
+          T2_FMT: ${{ steps.t2_fmt.outcome }}
+          T2_DIFF: ${{ steps.t2_diff.outcome }}
+          T2_CLIPPY: ${{ steps.t2_clippy.outcome }}
+          T2_BACKEND_TESTS: ${{ steps.t2_backend_tests.outcome }}
+          T2_WEB_CHECKS: ${{ steps.t2_web_checks.outcome }}
+          T2_JS_TESTS: ${{ steps.t2_js_tests.outcome }}
+          T2_TS_CONTRACTS: ${{ steps.t2_ts_contracts.outcome }}
+          T2_OPENAPI: ${{ steps.t2_openapi.outcome }}
+        run: |
+          failed=0
+          for name in \
+            T1_GOVERNANCE T2_FMT T2_DIFF T2_CLIPPY T2_BACKEND_TESTS \
+            T2_WEB_CHECKS T2_JS_TESTS T2_TS_CONTRACTS T2_OPENAPI
+          do
+            outcome="${!name}"
+            printf '%-20s %s\n' "$name" "$outcome"
+            if [[ "$outcome" != "success" ]]; then
+              failed=1
+            fi
+          done
+          exit "$failed"
 
       - name: Risk-triggered T3 governance
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && steps.t2_summary.outcome == 'success' }}
         env:
           WMS_GOV_CONTEXT: pr
           WMS_GOV_BASE: origin/main
