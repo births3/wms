@@ -32,18 +32,6 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache Rust build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            backend/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -62,6 +50,18 @@ jobs:
 
       - name: Secret scan
         run: gitleaks detect --redact --no-banner
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            backend/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Install governance dependencies
         run: python3 -m pip install -r requirements-governance.txt
