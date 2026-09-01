@@ -1,0 +1,34 @@
+name: t3-diagnostic
+
+"on":
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install governance dependencies
+        run: python3 -m pip install -r requirements-governance.txt
+      - name: Run T3 checks independently
+        run: |
+          set +e
+          python3 scripts/governance/check_audit_trail_coverage.py --json --no-shrink
+          audit_status=$?
+          python3 scripts/governance/check_idempotency_test.py --json --no-shrink
+          idempotency_status=$?
+          set -e
+          echo "audit_status=${audit_status}"
+          echo "idempotency_status=${idempotency_status}"
+          if [[ ${audit_status} -ne 0 || ${idempotency_status} -ne 0 ]]; then
+            exit 1
+          fi
