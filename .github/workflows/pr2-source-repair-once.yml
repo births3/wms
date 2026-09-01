@@ -110,6 +110,34 @@ jobs:
               "fragrant Option predicate",
           )
 
+          location_test_path = Path(
+              "backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs"
+          )
+          replace_once(
+              location_test_path,
+              "    assert_eq!(first.is_agv_managed, false);",
+              "    assert!(!first.is_agv_managed);",
+              "location preview non-AGV assertion",
+          )
+          replace_once(
+              location_test_path,
+              "    assert_eq!(loc_f2_g3.is_agv_managed, true);",
+              "    assert!(loc_f2_g3.is_agv_managed);",
+              "location floor-grid AGV assertion",
+          )
+          replace_once(
+              location_test_path,
+              "    assert_eq!(loc_p2_f3_g4.is_agv_managed, true);",
+              "    assert!(loc_p2_f3_g4.is_agv_managed);",
+              "location position-floor-grid AGV assertion",
+          )
+          replace_once(
+              location_test_path,
+              "    assert_eq!(res.locations[0].allows_container, false);",
+              "    assert!(!res.locations[0].allows_container);",
+              "location container permission assertion",
+          )
+
           # 每个 integration test 都会把公共夹具编译为独立 test crate；某个测试只用夹具子集是预期行为。
           for support_path in (
               Path("backend/crates/api/tests/support/lpn_container.rs"),
@@ -225,6 +253,7 @@ jobs:
             backend/crates/api/src/openapi_paths/inventory_count.rs \
             backend/crates/api/src/wave3_repository/putaway_validation.rs \
             backend/crates/api/tests/openapi_pda_runtime.rs \
+            backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs \
             backend/crates/api/tests/postgres_test_support/mod.rs \
             backend/crates/api/tests/support/lpn_container.rs \
             backend/crates/domain/src/putaway_validation.rs \
