@@ -1,10 +1,7 @@
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
-use wms_api::{
-    auth::AuthContext,
-    lpn_container_repository::PgLpnContainerRepository,
-};
+use wms_api::{auth::AuthContext, lpn_container_repository::PgLpnContainerRepository};
 use wms_domain::{UpsertLpnContainerTypePolicyRequest, LPN_CONTAINER_TYPE_PALLET};
 
 mod postgres_test_support;
@@ -73,7 +70,10 @@ async fn lpn_type_policy_put_replays_idempotency_and_writes_audit(pool: PgPool) 
     .fetch_one(&pool)
     .await
     .expect("policy audit");
-    assert_eq!(action_count, 1, "idempotent replay must not duplicate audit");
+    assert_eq!(
+        action_count, 1,
+        "idempotent replay must not duplicate audit"
+    );
 
     postgres_test_support::audit_event(&pool, owner_id, 1).await;
     postgres_test_support::idempotency_request(&pool, owner_id, "lpn-policy-put-1").await;

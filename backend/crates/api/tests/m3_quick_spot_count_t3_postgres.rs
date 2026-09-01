@@ -1,11 +1,7 @@
 use chrono::{NaiveDate, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
-use wms_api::{
-    audit::AuditWriteRequest,
-    auth::AuthContext,
-    wave3_repository::PgWave3Repository,
-};
+use wms_api::{audit::AuditWriteRequest, auth::AuthContext, wave3_repository::PgWave3Repository};
 use wms_domain::{Quantity, QuickSpotCountRequest};
 
 mod postgres_test_support;

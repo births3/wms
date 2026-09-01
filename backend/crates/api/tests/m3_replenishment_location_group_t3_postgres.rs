@@ -2,8 +2,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 use wms_api::{
-    auth::AuthContext,
-    replenishment_repository::PgReplenishmentRepository,
+    auth::AuthContext, replenishment_repository::PgReplenishmentRepository,
     replenishment_service::ReplenishmentService,
 };
 use wms_domain::UpsertReplenishmentLocationGroupRequest;
@@ -63,7 +62,12 @@ async fn location_group_create_update_and_disable_replays(pool: PgPool) {
         location_ids: vec![],
     };
     let updated = service
-        .update_location_group(&actor, created.id, update_request.clone(), "rp-group-update")
+        .update_location_group(
+            &actor,
+            created.id,
+            update_request.clone(),
+            "rp-group-update",
+        )
         .await
         .expect("update group");
     let update_replay = service

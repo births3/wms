@@ -1,9 +1,6 @@
 use sqlx::PgPool;
 use uuid::Uuid;
-use wms_api::{
-    auth::AuthContext,
-    lpn_container_repository::PgLpnContainerRepository,
-};
+use wms_api::{auth::AuthContext, lpn_container_repository::PgLpnContainerRepository};
 use wms_domain::{
     ApplyContainerQualityLockRequest, ChangeContainerQualityLockReasonRequest,
     ReleaseContainerQualityLockRequest, CONTAINER_QUARANTINE_REASON_SALES_RETURN_PENDING,

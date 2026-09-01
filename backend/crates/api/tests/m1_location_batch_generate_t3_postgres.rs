@@ -186,7 +186,11 @@ async fn batch_generate_locations_replays_with_audit_and_idempotency(pool: PgPoo
         serde_json::from_slice(&replay_body).expect("replay response");
     assert_eq!(replay.total_generated, first.total_generated);
     assert_eq!(
-        replay.locations.iter().map(|row| row.id).collect::<Vec<_>>(),
+        replay
+            .locations
+            .iter()
+            .map(|row| row.id)
+            .collect::<Vec<_>>(),
         first.locations.iter().map(|row| row.id).collect::<Vec<_>>()
     );
 
@@ -198,7 +202,10 @@ async fn batch_generate_locations_replays_with_audit_and_idempotency(pool: PgPoo
     .fetch_one(&pool)
     .await
     .expect("location count");
-    assert_eq!(location_count, 2, "idempotent replay must not duplicate locations");
+    assert_eq!(
+        location_count, 2,
+        "idempotent replay must not duplicate locations"
+    );
 
     postgres_test_support::audit_event(&pool, owner_id, 1).await;
     postgres_test_support::idempotency_request(&pool, owner_id, idempotency_key).await;
