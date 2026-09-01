@@ -15,6 +15,8 @@ use wms_api::{
 };
 use wms_domain::Quantity;
 
+mod postgres_test_support;
+
 fn manage_ctx(owner_id: Uuid) -> AuthContext {
     ctx(owner_id, Uuid::new_v4(), "m3.replenishment.manage")
 }
@@ -322,6 +324,7 @@ async fn cancel_blocked_when_picked_qty_positive(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn cancel_pending_releases_transit(pool: PgPool) {
+    // POST /api/v1/replenishment/tasks/{id}/cancel
     let world = seed_world(&pool, 10).await;
     let task = create_task(&pool, &world, 10, "ex-10-create").await;
     let (status, body) = post(
@@ -345,6 +348,7 @@ async fn cancel_pending_releases_transit(pool: PgPool) {
     .await
     .expect("events");
     assert_eq!(events, 1);
+    postgres_test_support::idempotency_request(&pool, world.owner_id, "ex-10-cancel").await;
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -443,6 +447,7 @@ async fn confirm_when_source_frozen_suspends_task(pool: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn reassign_returns_to_pool_keeping_picked_qty(pool: PgPool) {
+    // POST /api/v1/replenishment/tasks/{id}/reassign
     let world = seed_world(&pool, 10).await;
     let task = create_task(&pool, &world, 10, "ex-24-create").await;
     let picked = claim_pick(&pool, &world, &task, 2, "ex-24").await.1;
@@ -462,6 +467,7 @@ async fn reassign_returns_to_pool_keeping_picked_qty(pool: PgPool) {
     let (after_on, after_out) = transit(&pool, world.source_batch_id).await;
     assert_eq!(after_on, before_on);
     assert_eq!(after_out, before_out);
+    postgres_test_support::idempotency_request(&pool, world.owner_id, "ex-24-reassign").await;
 }
 
 #[sqlx::test(migrations = "../../migrations")]
