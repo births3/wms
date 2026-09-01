@@ -5,6 +5,10 @@ name: pr2-source-repair-once-v2
     branches:
       - fix/governance-tier1-backlog-20260831
 
+concurrency:
+  group: pr2-source-repair
+  cancel-in-progress: true
+
 jobs:
   repair:
     runs-on: ubuntu-latest
@@ -22,7 +26,6 @@ jobs:
       - name: Apply durable source fixes
         run: |
           python3 - <<'PY'
-          import re
           from pathlib import Path
 
           def replace_once(path: str | Path, old: str, new: str, label: str) -> None:
@@ -77,25 +80,29 @@ jobs:
               "PDA location lookup row alias",
           )
 
-          # Name the SQL row shape without depending on rustfmt's precise wrapping.
+          # Name the SQL row shape by deterministic delimiters. This is independent
+          # of line wrapping inside the tuple and runs in linear time.
           pda_test_path = Path("backend/crates/api/tests/pda_consistency_repairs_postgres.rs")
           pda_test = pda_test_path.read_text(encoding="utf-8")
           if "type QuickSpotApprovalRow = (" not in pda_test:
-              pattern = re.compile(
-                  r"(?ms)^    let approval: \(\n"
-                  r"(?P<body>(?:        .*\n)+?)"
-                  r"^    \) = sqlx::query_as\("
-              )
-              match = pattern.search(pda_test)
-              if match is None:
+              prefix = "    let approval: "
+              suffix = "    ) = sqlx::query_as("
+              start = pda_test.find(prefix)
+              end = pda_test.find(suffix, start + len(prefix))
+              if start < 0 or end < 0:
                   raise SystemExit("quick-spot approval row shape not found")
+              tuple_shape = pda_test[start + len(prefix) : end + len("    )")]
               replacement = (
-                  "    type QuickSpotApprovalRow = (\n"
-                  + match.group("body")
-                  + "    );\n"
+                  "    type QuickSpotApprovalRow = "
+                  + tuple_shape
+                  + ";\n"
                   + "    let approval: QuickSpotApprovalRow = sqlx::query_as("
               )
-              pda_test = pda_test[:match.start()] + replacement + pda_test[match.end():]
+              pda_test = (
+                  pda_test[:start]
+                  + replacement
+                  + pda_test[end + len(suffix) :]
+              )
               pda_test_path.write_text(pda_test, encoding="utf-8")
 
           # Shared integration-test helpers are compiled into many independent test
