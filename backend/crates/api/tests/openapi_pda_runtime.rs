@@ -4,11 +4,7 @@ use wms_api::ApiDoc;
 
 const SCHEMA_REF_PREFIX: &str = "#/components/schemas/";
 
-fn operation<'a>(
-    paths: &'a Map<String, Value>,
-    path: &str,
-    method: &str,
-) -> &'a Value {
+fn operation<'a>(paths: &'a Map<String, Value>, path: &str, method: &str) -> &'a Value {
     paths
         .get(path)
         .and_then(|item| item.get(method))
@@ -24,10 +20,10 @@ fn operation<'a>(
 fn collect_local_schema_refs<'a>(value: &'a Value, refs: &mut Vec<&'a str>) {
     match value {
         Value::Object(object) => {
-            if let Some(reference) = object.get("$ref").and_then(Value::as_str)
-                && reference.starts_with(SCHEMA_REF_PREFIX)
-            {
-                refs.push(reference);
+            if let Some(reference) = object.get("$ref").and_then(Value::as_str) {
+                if reference.starts_with(SCHEMA_REF_PREFIX) {
+                    refs.push(reference);
+                }
             }
             for child in object.values() {
                 collect_local_schema_refs(child, refs);
