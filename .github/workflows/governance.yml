@@ -32,6 +32,18 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            backend/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -136,21 +148,60 @@ jobs:
           set +e
           cargo test \
             --manifest-path backend/Cargo.toml \
-            --workspace --lib --no-fail-fast -- --nocapture \
-            2>&1 | tee /tmp/backend-unit-tests.log
-          status=${PIPESTATUS[0]}
+            --workspace --lib --no-fail-fast \
+            > /tmp/backend-unit-tests.log 2>&1
+          status=$?
           set -e
 
-          echo "=== backend unit test failure summary ==="
-          grep -nE 'panicked at|test result: FAILED|^failures:|^    [^ ]+::[^ ]+$|error: test failed|FAILED$' \
-            /tmp/backend-unit-tests.log | tail -200 || true
+          python3 - <<'PY'
+          from pathlib import Path
+
+          log = Path("/tmp/backend-unit-tests.log").read_text(
+              encoding="utf-8", errors="replace"
+          ).splitlines()
+          markers = []
+          for index, line in enumerate(log):
+              stripped = line.strip()
+              if (
+                  (line.startswith("---- ") and line.endswith(" stdout ----"))
+                  or stripped == "failures:"
+                  or "test result: FAILED" in line
+                  or "error: test failed" in line
+                  or line.endswith(" ... FAILED")
+                  or "panicked at" in line
+              ):
+                  markers.append(index)
+
+          ranges = []
+          for index in markers:
+              start = max(0, index - 3)
+              end = min(len(log), index + 35)
+              if ranges and start <= ranges[-1][1]:
+                  ranges[-1] = (ranges[-1][0], max(ranges[-1][1], end))
+              else:
+                  ranges.append((start, end))
+
+          if ranges:
+              chunks = []
+              for start, end in ranges:
+                  chunks.extend(log[start:end])
+                  chunks.append("---")
+              summary = "\n".join(chunks[-500:])
+          else:
+              summary = "\n".join(log[-300:])
+
+          print("=== backend unit test diagnostic ===")
+          print(summary)
+          Path("/tmp/backend-unit-tests-summary.txt").write_text(
+              summary + "\n", encoding="utf-8"
+          )
+          PY
 
           {
-            echo '## Backend unit-test failure summary'
+            echo '## Backend unit-test diagnostic'
             echo
             echo '```text'
-            grep -nE 'panicked at|test result: FAILED|^failures:|^    [^ ]+::[^ ]+$|error: test failed|FAILED$' \
-              /tmp/backend-unit-tests.log | tail -200 || true
+            cat /tmp/backend-unit-tests-summary.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
