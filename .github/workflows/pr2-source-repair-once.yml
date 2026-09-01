@@ -1,0 +1,196 @@
+name: pr2-source-repair-once
+
+"on":
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/governance-tier1-backlog-20260831
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Apply source fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str, label: str) -> None:
+              text = path.read_text(encoding="utf-8")
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f"repair anchor missing ({label}) in {path}")
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          inventory_path = Path("backend/crates/api/src/openapi_paths/inventory_count.rs")
+          inventory = inventory_path.read_text(encoding="utf-8")
+          inventory = inventory.replace(
+              "use wms_domain::{PdaLocationInfo, QuickSpotCountRequest, QuickSpotCountResponse};\n",
+              "",
+              1,
+          )
+          inventory = inventory.replace(
+              "request_body = QuickSpotCountRequest,",
+              "request_body = wms_domain::QuickSpotCountRequest,",
+              1,
+          )
+          inventory = inventory.replace(
+              "body = QuickSpotCountResponse)",
+              "body = wms_domain::QuickSpotCountResponse)",
+              1,
+          )
+          inventory = inventory.replace(
+              "body = PdaLocationInfo)",
+              "body = wms_domain::PdaLocationInfo)",
+              1,
+          )
+          for required in (
+              "request_body = wms_domain::QuickSpotCountRequest,",
+              "body = wms_domain::QuickSpotCountResponse)",
+              "body = wms_domain::PdaLocationInfo)",
+          ):
+              if required not in inventory:
+                  raise SystemExit(f"OpenAPI type qualification missing: {required}")
+          inventory_path.write_text(inventory, encoding="utf-8")
+
+          replace_once(
+              Path("backend/crates/domain/src/putaway_validation.rs"),
+              '        assert!(is_temperature_zone_subset("cold_2_8", "cool_le_20") == false);',
+              '        assert!(!is_temperature_zone_subset("cold_2_8", "cool_le_20"));',
+              "temperature subset bool assertion",
+          )
+          replace_once(
+              Path("backend/crates/domain/src/wcs_task.rs"),
+              "        assert!(ptl_qty_diff_within_threshold(10, 1, 0.2, 10) == false); // ratio 0.9 > 0.2",
+              "        assert!(!ptl_qty_diff_within_threshold(10, 1, 0.2, 10)); // ratio 0.9 > 0.2",
+              "PTL threshold bool assertion",
+          )
+          replace_once(
+              Path("backend/crates/api/src/master_data_postgres_part1.rs"),
+              "        let row: Option<(Uuid, String, String, String, String, String, String, i64, i64)> = sqlx::query_as(",
+              "        type PdaLocationLookupRow = (\n"
+              "            Uuid, String, String, String, String, String, String, i64, i64,\n"
+              "        );\n"
+              "        let row: Option<PdaLocationLookupRow> = sqlx::query_as(",
+              "PDA location lookup row alias",
+          )
+          replace_once(
+              Path("backend/crates/api/src/wave3_repository/putaway_validation.rs"),
+              '''        let is_special_drug = product.map_or(false, |p| {
+              p.special_drug_category
+                  .as_deref()
+                  .map_or(false, |c| c != "none" && c != "normal" && !c.is_empty())
+          }) || loc_zone.is_special_drug_zone;
+
+          let prod_is_external = product.map_or(false, |p| p.is_external_use);
+          let prod_is_fragrant = product.map_or(false, |p| p.is_fragrant);''',
+              '''        let is_special_drug = product.is_some_and(|p| {
+              p.special_drug_category
+                  .as_deref()
+                  .is_some_and(|c| c != "none" && c != "normal" && !c.is_empty())
+          }) || loc_zone.is_special_drug_zone;
+
+          let prod_is_external = product.is_some_and(|p| p.is_external_use);
+          let prod_is_fragrant = product.is_some_and(|p| p.is_fragrant);''',
+              "putaway Option predicates",
+          )
+
+          baseline_path = Path("governance/backend-module-fragments-baseline.toml")
+          baseline = baseline_path.read_text(encoding="utf-8")
+          pda_entry = '''[[fragments]]
+          parent = "backend/crates/api/src/wave4_repository.rs"
+          include = "wave4_repository_pda.rs"
+
+          '''
+          if pda_entry not in baseline:
+              anchor = '''[[fragments]]
+          parent = "backend/crates/api/src/wave4_repository.rs"
+          include = "wave4_repository_customer_portal.rs"
+
+          '''
+              if anchor not in baseline:
+                  raise SystemExit("backend module baseline insertion anchor missing")
+              baseline = baseline.replace(anchor, anchor + pda_entry, 1)
+              baseline_path.write_text(baseline, encoding="utf-8")
+
+          test_path = Path("backend/crates/api/tests/openapi_pda_runtime.rs")
+          test_path.parent.mkdir(parents=True, exist_ok=True)
+          test_path.write_text(
+              '''use serde_json::Value;
+          use utoipa::OpenApi;
+          use wms_api::ApiDoc;
+
+          #[test]
+          fn pda_runtime_openapi_registrations_are_complete() {
+              let document = serde_json::to_value(ApiDoc::openapi())
+                  .expect("OpenAPI document should serialize");
+              let paths = document
+                  .get("paths")
+                  .and_then(Value::as_object)
+                  .expect("OpenAPI document should contain paths");
+
+              for (path, method) in [
+                  ("/api/v1/master-data/locations/by-code/{location_code}", "get"),
+                  ("/api/v1/inventory/counts/quick-spot-count", "post"),
+              ] {
+                  let operation = paths.get(path).and_then(|item| item.get(method));
+                  assert!(
+                      operation.is_some(),
+                      "missing OpenAPI operation: {} {}",
+                      method.to_uppercase(),
+                      path
+                  );
+              }
+
+              let schemas = document
+                  .get("components")
+                  .and_then(|value| value.get("schemas"))
+                  .and_then(Value::as_object)
+                  .expect("OpenAPI document should contain component schemas");
+              for schema in [
+                  "PdaLocationInfo",
+                  "QuickSpotCountRequest",
+                  "QuickSpotCountResponse",
+              ] {
+                  assert!(schemas.contains_key(schema), "missing OpenAPI schema: {schema}");
+              }
+          }
+          ''',
+              encoding="utf-8",
+          )
+          PY
+          cargo fmt --manifest-path backend/Cargo.toml --all
+      - name: Verify repaired governance evidence
+        run: |
+          python3 scripts/governance/check_backend_module_fragments.py
+          python3 scripts/governance/check_handler_test_coverage.py
+          git diff --check
+      - name: Verify workspace Clippy
+        run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps -- -D warnings -A clippy::too-many-arguments
+      - name: Commit repaired sources
+        run: |
+          if git diff --quiet; then
+            echo "PR #2 source fixes are already present"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            backend/crates/api/src/openapi_paths/inventory_count.rs \
+            backend/crates/api/src/master_data_postgres_part1.rs \
+            backend/crates/api/src/wave3_repository/putaway_validation.rs \
+            backend/crates/api/tests/openapi_pda_runtime.rs \
+            backend/crates/domain/src/putaway_validation.rs \
+            backend/crates/domain/src/wcs_task.rs \
+            governance/backend-module-fragments-baseline.toml
+          git commit -m "修复: 收口 PR #2 后端与 OpenAPI 门禁"
+          git push origin HEAD:fix/governance-tier1-backlog-20260831
