@@ -110,6 +110,35 @@ jobs:
               "fragrant Option predicate",
           )
 
+          # 每个 integration test 都会把公共夹具编译为独立 test crate；某个测试只用夹具子集是预期行为。
+          for support_path in (
+              Path("backend/crates/api/tests/support/lpn_container.rs"),
+              Path("backend/crates/api/tests/postgres_test_support/mod.rs"),
+          ):
+              support = support_path.read_text(encoding="utf-8")
+              module_allow = "#![allow(dead_code)]\n\n"
+              if not support.startswith(module_allow):
+                  support_path.write_text(module_allow + support, encoding="utf-8")
+
+          # 保持生产代码在前、测试模块在文件末尾，而不是压制 items_after_test_module。
+          inventory_source_path = Path("backend/crates/api/src/inventory.rs")
+          inventory_source = inventory_source_path.read_text(encoding="utf-8")
+          test_marker = "#[cfg(test)]\nmod tests {"
+          production_marker = "/// 设备中台 PTL 拍灯/称重/RFID 确认的上架落账"
+          test_start = inventory_source.index(test_marker)
+          production_start = inventory_source.index(production_marker)
+          if test_start < production_start:
+              test_block = inventory_source[test_start:production_start].rstrip()
+              inventory_source = (
+                  inventory_source[:test_start].rstrip()
+                  + "\n\n"
+                  + inventory_source[production_start:].rstrip()
+                  + "\n\n"
+                  + test_block
+                  + "\n"
+              )
+              inventory_source_path.write_text(inventory_source, encoding="utf-8")
+
           baseline_path = Path("governance/backend-module-fragments-baseline.toml")
           baseline = baseline_path.read_text(encoding="utf-8")
           pda_entry = '''[[fragments]]
@@ -191,10 +220,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
-            backend/crates/api/src/openapi_paths/inventory_count.rs \
+            backend/crates/api/src/inventory.rs \
             backend/crates/api/src/master_data_postgres_part1.rs \
+            backend/crates/api/src/openapi_paths/inventory_count.rs \
             backend/crates/api/src/wave3_repository/putaway_validation.rs \
             backend/crates/api/tests/openapi_pda_runtime.rs \
+            backend/crates/api/tests/postgres_test_support/mod.rs \
+            backend/crates/api/tests/support/lpn_container.rs \
             backend/crates/domain/src/putaway_validation.rs \
             backend/crates/domain/src/wcs_task.rs \
             governance/backend-module-fragments-baseline.toml
