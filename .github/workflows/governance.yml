@@ -72,8 +72,7 @@ jobs:
           corepack prepare pnpm@11.5.2 --activate
           pnpm install --frozen-lockfile
 
-      - name: Start PostgreSQL for T3/T4
-        if: ${{ github.event_name != 'pull_request' }}
+      - name: Start PostgreSQL for backend tests and T3/T4
         run: |
           export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
           echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
@@ -92,8 +91,7 @@ jobs:
           docker logs wms-governance-postgres
           exit 1
 
-      - name: Apply PostgreSQL migrations for T3/T4
-        if: ${{ github.event_name != 'pull_request' }}
+      - name: Apply PostgreSQL migrations
         run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
 
       - name: Install Chromium for T3/T4
@@ -289,5 +287,5 @@ jobs:
         run: just verify
 
       - name: Stop PostgreSQL
-        if: ${{ always() && github.event_name != 'pull_request' }}
+        if: ${{ always() }}
         run: docker rm --force wms-governance-postgres || true
