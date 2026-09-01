@@ -1,0 +1,75 @@
+name: pr2-last-alias-once
+
+"on":
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+concurrency:
+  group: pr2-last-alias
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/governance-tier1-backlog-20260831
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Name baseline location SQL row
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/crates/api/tests/phase1_baseline_postgres.rs")
+          text = path.read_text(encoding="utf-8")
+          alias = "BaselineLocationRow"
+          if f"type {alias} = (" not in text:
+              tuple_type = '''(
+                  String,
+                  Option<Uuid>,
+                  String,
+                  bool,
+                  String,
+                  String,
+                  String,
+                  Option<String>,
+                  Option<i32>,
+                  Option<i32>,
+                  bool,
+                  Option<String>,
+              )'''
+              old = f'''): {tuple_type} = sqlx::query_as('''
+              new = f'''): {alias} = sqlx::query_as('''
+              if old not in text:
+                  raise SystemExit("baseline location row type anchor missing")
+              marker = "    // Verify all fields\n"
+              if marker not in text:
+                  raise SystemExit("baseline location verification marker missing")
+              text = text.replace(
+                  marker,
+                  marker + f"    type {alias} = {tuple_type};\n\n",
+                  1,
+              )
+              text = text.replace(old, new, 1)
+              path.write_text(text, encoding="utf-8")
+          PY
+          cargo fmt --manifest-path backend/Cargo.toml --all
+          git diff --check
+      - name: Commit type alias
+        run: |
+          if git diff --quiet; then
+            echo "Baseline SQL row alias already present"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/crates/api/tests/phase1_baseline_postgres.rs
+          git commit -m "修复: 命名基线库位查询行类型"
+          git push origin HEAD:fix/governance-tier1-backlog-20260831
