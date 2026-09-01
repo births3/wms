@@ -180,6 +180,21 @@ async fn warehouse_locations_status_3_values_lock_status_and_attributes(pool: Pg
     .expect("insert staging location");
 
     // Verify all fields
+    type BaselineLocationRow = (
+        String,
+        Option<Uuid>,
+        String,
+        bool,
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<i32>,
+        Option<i32>,
+        bool,
+        Option<String>,
+    );
+
     let (
         loc_type,
         current_owner,
@@ -193,20 +208,7 @@ async fn warehouse_locations_status_3_values_lock_status_and_attributes(pool: Pg
         put_seq,
         agv_mng,
         pod_code,
-    ): (
-        String,
-        Option<Uuid>,
-        String,
-        bool,
-        String,
-        String,
-        String,
-        Option<String>,
-        Option<i32>,
-        Option<i32>,
-        bool,
-        Option<String>,
-    ) = sqlx::query_as(
+    ): BaselineLocationRow = sqlx::query_as(
         r#"
         SELECT location_type, current_owner_id, status, allows_container,
                mix_product_policy, mix_batch_policy, lock_status,
