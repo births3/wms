@@ -500,6 +500,19 @@ impl DeviceService {
         )
         .await
         .map_err(idempotency_err)?;
+        append_event_in_tx(
+            &mut tx,
+            &AuditWriteRequest::from_auth_context(
+                ctx,
+                "heartbeat_device",
+                "M1",
+                "iot_device",
+                id.to_string(),
+                None,
+            ),
+        )
+        .await
+        .map_err(|error| DeviceError::Database(format!("{error:?}")))?;
         tx.commit().await.map_err(db_err)?;
         Ok(response)
     }
