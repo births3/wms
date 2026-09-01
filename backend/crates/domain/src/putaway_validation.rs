@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn temperature_subset_uses_containment_not_equality() {
         assert!(is_temperature_zone_subset("cold_2_8", "cold_2_8"));
-        assert!(is_temperature_zone_subset("cold_2_8", "cool_le_20") == false);
+        assert!(!is_temperature_zone_subset("cold_2_8", "cool_le_20"));
         assert!(is_temperature_zone_subset("cool_le_20", "normal_10_30"));
         assert!(!is_temperature_zone_subset("normal_10_30", "cold_2_8"));
         assert!(parse_temperature_range("frozen").is_some());

@@ -1042,7 +1042,10 @@ impl PgMasterDataReadRepository {
         ctx: &AuthContext,
         location_code: &str,
     ) -> Result<wms_domain::PdaLocationInfo, MasterDataError> {
-        let row: Option<(Uuid, String, String, String, String, String, String, i64, i64)> = sqlx::query_as(
+        type PdaLocationLookupRow = (
+            Uuid, String, String, String, String, String, String, i64, i64,
+        );
+        let row: Option<PdaLocationLookupRow> = sqlx::query_as(
             r#"
             SELECT
                 l.id,

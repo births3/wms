@@ -200,7 +200,7 @@ async fn test_batch_generate_high_rack_locations_success(pool: PgPool) {
     assert_eq!(first.status, "available");
     assert_eq!(first.max_volume_cm3, 120000);
     assert_eq!(first.max_sku_count, 5);
-    assert_eq!(first.is_agv_managed, false);
+    assert!(!first.is_agv_managed);
     assert_eq!(first.agv_pod_code, None);
     assert_eq!(first.pick_sequence_no, Some(1));
     assert_eq!(first.putaway_sequence_no, Some(1));
@@ -284,7 +284,7 @@ async fn test_batch_generate_agv_pod_locations_success(pool: PgPool) {
         .iter()
         .find(|l| l.location_code == "POD01-F2-03")
         .expect("found POD01-F2-03");
-    assert_eq!(loc_f2_g3.is_agv_managed, true);
+    assert!(loc_f2_g3.is_agv_managed);
     assert_eq!(loc_f2_g3.agv_pod_code, Some("POD01".to_string()));
     assert_eq!(loc_f2_g3.row_no, 1);
     assert_eq!(loc_f2_g3.layer_no, 2);
@@ -296,7 +296,7 @@ async fn test_batch_generate_agv_pod_locations_success(pool: PgPool) {
         .iter()
         .find(|l| l.location_code == "POD02-F3-04")
         .expect("found POD02-F3-04");
-    assert_eq!(loc_p2_f3_g4.is_agv_managed, true);
+    assert!(loc_p2_f3_g4.is_agv_managed);
     assert_eq!(loc_p2_f3_g4.agv_pod_code, Some("POD02".to_string()));
     assert_eq!(loc_p2_f3_g4.row_no, 2);
     assert_eq!(loc_p2_f3_g4.layer_no, 3);
@@ -365,7 +365,7 @@ async fn test_batch_generate_custom_defaults_and_sequence_steps(pool: PgPool) {
 
     assert_eq!(res.total_generated, 3);
     assert_eq!(res.locations[0].location_type, "piece_pick");
-    assert_eq!(res.locations[0].allows_container, false);
+    assert!(!res.locations[0].allows_container);
     assert_eq!(res.locations[0].mix_product_policy, "restricted_mix");
     assert_eq!(res.locations[0].mix_batch_policy, "multi_batch");
     assert_eq!(res.locations[0].pick_zone_level.as_deref(), Some("gold"));

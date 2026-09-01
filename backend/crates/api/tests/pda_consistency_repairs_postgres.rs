@@ -290,7 +290,7 @@ async fn quick_spot_count_rejects_ambiguous_states_and_records_auto_approval(poo
         .expect("quick spot count");
     assert_eq!(response.value.variance_type, "MATCH");
 
-    let approval: (
+    type QuickSpotApprovalRow = (
         String,
         Option<Uuid>,
         Option<chrono::DateTime<Utc>>,
@@ -299,7 +299,8 @@ async fn quick_spot_count_rejects_ambiguous_states_and_records_auto_approval(poo
         Option<String>,
         chrono::DateTime<Utc>,
         chrono::DateTime<Utc>,
-    ) = sqlx::query_as(
+    );
+    let approval: QuickSpotApprovalRow = sqlx::query_as(
         r#"
         SELECT status, approved_by, approved_at, approval_source, approval_id, reason,
                started_at, created_at

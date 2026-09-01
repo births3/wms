@@ -149,7 +149,7 @@ mod tests {
     fn ptl_diff_threshold_rules() {
         assert!(ptl_qty_diff_within_threshold(10, 10, 0.2, 10));
         assert!(ptl_qty_diff_within_threshold(10, 11, 0.2, 10));
-        assert!(ptl_qty_diff_within_threshold(10, 1, 0.2, 10) == false); // ratio 0.9 > 0.2
+        assert!(!ptl_qty_diff_within_threshold(10, 1, 0.2, 10)); // ratio 0.9 > 0.2
         assert!(!ptl_qty_diff_within_threshold(10, 12, 0.2, 1)); // 绝对值超限
         assert!(!ptl_qty_diff_within_threshold(10, 5, 0.2, 10)); // 比例超限
     }
