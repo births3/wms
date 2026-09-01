@@ -1,0 +1,90 @@
+name: backend-unit-diagnostic
+
+"on":
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+concurrency:
+  group: backend-unit-diagnostic
+  cancel-in-progress: true
+
+jobs:
+  backend-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            backend/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run backend library tests and print only failures
+        run: |
+          set +e
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --workspace --lib --no-fail-fast \
+            > /tmp/backend-unit-tests.log 2>&1
+          status=$?
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          lines = Path("/tmp/backend-unit-tests.log").read_text(
+              encoding="utf-8", errors="replace"
+          ).splitlines()
+          markers = []
+          for index, line in enumerate(lines):
+              stripped = line.strip()
+              if (
+                  (line.startswith("---- ") and line.endswith(" stdout ----"))
+                  or stripped == "failures:"
+                  or "test result: FAILED" in line
+                  or "error: test failed" in line
+                  or line.endswith(" ... FAILED")
+                  or "panicked at" in line
+              ):
+                  markers.append(index)
+
+          ranges = []
+          for index in markers:
+              start = max(0, index - 5)
+              end = min(len(lines), index + 45)
+              if ranges and start <= ranges[-1][1]:
+                  ranges[-1] = (ranges[-1][0], max(ranges[-1][1], end))
+              else:
+                  ranges.append((start, end))
+
+          if ranges:
+              selected = []
+              for start, end in ranges:
+                  selected.extend(lines[start:end])
+                  selected.append("---")
+              output = "\n".join(selected[-800:])
+          else:
+              output = "\n".join(lines[-500:])
+
+          print(output)
+          with Path("/tmp/backend-unit-summary.md").open("w", encoding="utf-8") as summary:
+              summary.write("## Backend unit-test diagnostic\n\n```text\n")
+              summary.write(output)
+              summary.write("\n```\n")
+          PY
+
+          cat /tmp/backend-unit-summary.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
