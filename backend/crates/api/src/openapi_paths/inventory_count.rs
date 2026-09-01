@@ -1,5 +1,9 @@
 #[allow(unused_imports)]
 use super::*;
+// Utoipa consumes these short names from attribute-macro tokens. Keeping them
+// unqualified preserves refs such as `#/components/schemas/PdaLocationInfo`.
+#[allow(unused_imports)]
+use wms_domain::{PdaLocationInfo, QuickSpotCountRequest, QuickSpotCountResponse};
 
 #[utoipa::path(
     post,
@@ -82,9 +86,9 @@ pub(crate) fn approve_inventory_count() {}
     path = "/api/v1/inventory/counts/quick-spot-count",
     tag = "inventory-count",
     params(("Idempotency-Key" = String, Header, description = "客户端生成的幂等键")),
-    request_body = wms_domain::QuickSpotCountRequest,
+    request_body = QuickSpotCountRequest,
     responses(
-        (status = 200, description = "按库位与商品执行快速抽盘并返回差异", body = wms_domain::QuickSpotCountResponse),
+        (status = 200, description = "按库位与商品执行快速抽盘并返回差异", body = QuickSpotCountResponse),
         (status = 400, description = "缺少幂等键", body = ErrorResponse),
         (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "无盘点执行权限", body = ErrorResponse),
@@ -101,7 +105,7 @@ pub(crate) fn quick_spot_count() {}
     tag = "master-data",
     params(("location_code" = String, Path, description = "库位编码")),
     responses(
-        (status = 200, description = "按编码获取 PDA 库位信息", body = wms_domain::PdaLocationInfo),
+        (status = 200, description = "按编码获取 PDA 库位信息", body = PdaLocationInfo),
         (status = 401, description = "未登录", body = ErrorResponse),
         (status = 403, description = "无基础档案读取权限", body = ErrorResponse),
         (status = 404, description = "库位不存在", body = ErrorResponse),
