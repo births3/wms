@@ -1,0 +1,247 @@
+name: pr2-source-repair-once-v2
+
+"on":
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/governance-tier1-backlog-20260831
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Apply durable non-automatic fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str | Path, old: str, new: str, label: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f"repair anchor missing ({label}) in {target}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # Utoipa needs these types at macro expansion time, but an explicit import is
+          # otherwise unused. Qualify them at their use sites instead of suppressing lint.
+          path = Path("backend/crates/api/src/openapi_paths/inventory_count.rs")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              "use wms_domain::{PdaLocationInfo, QuickSpotCountRequest, QuickSpotCountResponse};\n",
+              "",
+              1,
+          )
+          text = text.replace(
+              "request_body = QuickSpotCountRequest,",
+              "request_body = wms_domain::QuickSpotCountRequest,",
+              1,
+          )
+          text = text.replace(
+              "body = QuickSpotCountResponse)",
+              "body = wms_domain::QuickSpotCountResponse)",
+              1,
+          )
+          text = text.replace(
+              "body = PdaLocationInfo)",
+              "body = wms_domain::PdaLocationInfo)",
+              1,
+          )
+          for required in (
+              "request_body = wms_domain::QuickSpotCountRequest,",
+              "body = wms_domain::QuickSpotCountResponse)",
+              "body = wms_domain::PdaLocationInfo)",
+          ):
+              if required not in text:
+                  raise SystemExit(f"OpenAPI type qualification missing: {required}")
+          path.write_text(text, encoding="utf-8")
+
+          replace_once(
+              "backend/crates/api/src/master_data_postgres_part1.rs",
+              "        let row: Option<(Uuid, String, String, String, String, String, String, i64, i64)> = sqlx::query_as(",
+              "        type PdaLocationLookupRow = (\n"
+              "            Uuid, String, String, String, String, String, String, i64, i64,\n"
+              "        );\n"
+              "        let row: Option<PdaLocationLookupRow> = sqlx::query_as(",
+              "PDA location lookup row alias",
+          )
+
+          replace_once(
+              "backend/crates/api/tests/pda_consistency_repairs_postgres.rs",
+              """    let approval: (
+              String,
+              Option<Uuid>,
+              Option<chrono::DateTime<Utc>>,
+              Option<String>,
+              Option<String>,
+              Option<String>,
+              chrono::DateTime<Utc>,
+              chrono::DateTime<Utc>,
+          ) = sqlx::query_as(""",
+              """    type QuickSpotApprovalRow = (
+              String,
+              Option<Uuid>,
+              Option<chrono::DateTime<Utc>>,
+              Option<String>,
+              Option<String>,
+              Option<String>,
+              chrono::DateTime<Utc>,
+              chrono::DateTime<Utc>,
+          );
+          let approval: QuickSpotApprovalRow = sqlx::query_as(""",
+              "quick-spot approval row alias",
+          )
+
+          # Each integration test compiles shared helpers as its own test crate and
+          # intentionally consumes only a subset of them.
+          for support_path in (
+              Path("backend/crates/api/tests/support/lpn_container.rs"),
+              Path("backend/crates/api/tests/postgres_test_support/mod.rs"),
+          ):
+              support = support_path.read_text(encoding="utf-8")
+              module_allow = "#![allow(dead_code)]\n\n"
+              if not support.startswith(module_allow):
+                  support_path.write_text(module_allow + support, encoding="utf-8")
+
+          # Keep production items before the test module instead of suppressing
+          # clippy::items_after_test_module.
+          inventory_path = Path("backend/crates/api/src/inventory.rs")
+          inventory = inventory_path.read_text(encoding="utf-8")
+          test_marker = "#[cfg(test)]\nmod tests {"
+          production_marker = "/// 设备中台 PTL 拍灯/称重/RFID 确认的上架落账"
+          test_start = inventory.index(test_marker)
+          production_start = inventory.index(production_marker)
+          if test_start < production_start:
+              tests = inventory[test_start:production_start].rstrip()
+              inventory_path.write_text(
+                  inventory[:test_start].rstrip()
+                  + "\n\n"
+                  + inventory[production_start:].rstrip()
+                  + "\n\n"
+                  + tests
+                  + "\n",
+                  encoding="utf-8",
+              )
+
+          baseline_path = Path("governance/backend-module-fragments-baseline.toml")
+          baseline = baseline_path.read_text(encoding="utf-8")
+          pda_entry = '''[[fragments]]
+          parent = "backend/crates/api/src/wave4_repository.rs"
+          include = "wave4_repository_pda.rs"
+
+          '''
+          if pda_entry not in baseline:
+              anchor = '''[[fragments]]
+          parent = "backend/crates/api/src/wave4_repository.rs"
+          include = "wave4_repository_customer_portal.rs"
+
+          '''
+              if anchor not in baseline:
+                  raise SystemExit("backend module baseline insertion anchor missing")
+              baseline_path.write_text(
+                  baseline.replace(anchor, anchor + pda_entry, 1), encoding="utf-8"
+              )
+
+          Path("backend/crates/api/tests/openapi_pda_runtime.rs").write_text(
+              '''use serde_json::Value;
+          use utoipa::OpenApi;
+          use wms_api::ApiDoc;
+
+          #[test]
+          fn pda_runtime_openapi_registrations_are_complete() {
+              let document = serde_json::to_value(ApiDoc::openapi())
+                  .expect("OpenAPI document should serialize");
+              let paths = document
+                  .get("paths")
+                  .and_then(Value::as_object)
+                  .expect("OpenAPI document should contain paths");
+
+              for (path, method) in [
+                  ("/api/v1/master-data/locations/by-code/{location_code}", "get"),
+                  ("/api/v1/inventory/counts/quick-spot-count", "post"),
+              ] {
+                  assert!(
+                      paths.get(path).and_then(|item| item.get(method)).is_some(),
+                      "missing OpenAPI operation: {} {}",
+                      method.to_uppercase(),
+                      path
+                  );
+              }
+
+              let schemas = document
+                  .get("components")
+                  .and_then(|value| value.get("schemas"))
+                  .and_then(Value::as_object)
+                  .expect("OpenAPI document should contain component schemas");
+              for schema in [
+                  "PdaLocationInfo",
+                  "QuickSpotCountRequest",
+                  "QuickSpotCountResponse",
+              ] {
+                  assert!(schemas.contains_key(schema), "missing OpenAPI schema: {schema}");
+              }
+          }
+          ''',
+              encoding="utf-8",
+          )
+          PY
+          cargo fmt --manifest-path backend/Cargo.toml --all
+
+      - name: Apply machine-safe Clippy fixes
+        run: |
+          set +e
+          cargo clippy --fix \
+            --manifest-path backend/Cargo.toml \
+            --workspace --all-targets --no-deps \
+            --allow-dirty --allow-staged \
+            -- -D warnings -A clippy::too-many-arguments
+          autofix_status=$?
+          set -e
+          echo "Clippy autofix exit status: ${autofix_status}"
+          cargo fmt --manifest-path backend/Cargo.toml --all
+          git diff --check
+
+      - name: Verify repaired governance evidence
+        run: |
+          python3 scripts/governance/check_backend_module_fragments.py
+          python3 scripts/governance/check_handler_test_coverage.py
+
+      - name: Verify workspace Clippy strictly
+        run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps -- -D warnings -A clippy::too-many-arguments
+
+      - name: Validate and commit repaired sources
+        run: |
+          python3 - <<'PY'
+          import subprocess
+
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only"], text=True
+          ).splitlines()
+          unexpected = [
+              path for path in changed
+              if not path.startswith("backend/")
+              and path != "governance/backend-module-fragments-baseline.toml"
+          ]
+          if unexpected:
+              raise SystemExit(f"unexpected files changed by source repair: {unexpected}")
+          print(f"validated {len(changed)} repaired source files")
+          PY
+          if git diff --quiet; then
+            echo "PR #2 source fixes are already present"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend governance/backend-module-fragments-baseline.toml
+          git commit -m "修复: 收口 PR #2 后端与 OpenAPI 门禁"
+          git push origin HEAD:fix/governance-tier1-backlog-20260831
