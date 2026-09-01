@@ -63,11 +63,7 @@ fn pda_runtime_openapi_registrations_are_complete() {
         );
     }
 
-    let quick_spot_count = operation(
-        paths,
-        "/api/v1/inventory/counts/quick-spot-count",
-        "post",
-    );
+    let quick_spot_count = operation(paths, "/api/v1/inventory/counts/quick-spot-count", "post");
     assert_eq!(
         quick_spot_count
             .pointer("/requestBody/content/application~1json/schema/$ref")
