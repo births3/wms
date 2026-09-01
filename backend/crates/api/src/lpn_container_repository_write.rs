@@ -298,4 +298,92 @@ impl PgLpnContainerRepository {
         tx.commit().await.map_err(map_db_error)?;
         Ok(response)
     }
+
+    pub async fn upsert_type_policy_idempotent(
+        &self,
+        ctx: &AuthContext,
+        req: UpsertLpnContainerTypePolicyRequest,
+        idempotency_key: &str,
+    ) -> Result<LpnContainerTypePolicy, LpnContainerRepositoryError> {
+        if !wms_domain::is_valid_lpn_container_type(req.container_type.trim()) {
+            return Err(LpnContainerRepositoryError::TypeInvalid);
+        }
+        let now = Utc::now();
+        let container_type = req.container_type.trim().to_string();
+        let request_hash = request_hash(&serde_json::json!({
+            "container_type": &container_type,
+            "allow_mix_batch": req.allow_mix_batch,
+            "allow_mix_sku": req.allow_mix_sku,
+        }))?;
+        let path = "/api/v1/master-data/lpn-container-type-policies";
+        let mut tx = self.pool.begin().await.map_err(map_db_error)?;
+        lock_idempotency_key(&mut tx, ctx.owner_id, idempotency_key).await?;
+        if let Some(replay) = replay_idempotency::<LpnContainerTypePolicy>(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PUT",
+            path,
+            now,
+        )
+        .await?
+        {
+            return Ok(replay);
+        }
+        let policy = LpnContainerTypePolicy {
+            owner_id: ctx.owner_id,
+            container_type,
+            allow_mix_batch: req.allow_mix_batch,
+            allow_mix_sku: req.allow_mix_sku,
+        };
+        sqlx::query(
+            r#"
+            INSERT INTO lpn_container_type_policies (
+                owner_id, container_type, allow_mix_batch, allow_mix_sku, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (owner_id, container_type)
+            DO UPDATE SET
+                allow_mix_batch = EXCLUDED.allow_mix_batch,
+                allow_mix_sku = EXCLUDED.allow_mix_sku,
+                updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(policy.owner_id)
+        .bind(&policy.container_type)
+        .bind(policy.allow_mix_batch)
+        .bind(policy.allow_mix_sku)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db_error)?;
+        let mut audit = AuditWriteRequest::from_auth_context(
+            ctx,
+            "upsert_lpn_type_policy",
+            "M1",
+            "lpn_container_type_policy",
+            policy.container_type.clone(),
+            None,
+        );
+        audit.occurred_at = now;
+        append_event_in_tx(&mut tx, &audit)
+            .await
+            .map_err(|error| LpnContainerRepositoryError::Audit(format!("{error:?}")))?;
+        store_idempotency_success(
+            &mut tx,
+            ctx.owner_id,
+            idempotency_key,
+            &request_hash,
+            "PUT",
+            path,
+            "lpn_container_type_policy",
+            &policy.container_type,
+            &policy,
+            now,
+        )
+        .await?;
+        tx.commit().await.map_err(map_db_error)?;
+        Ok(policy)
+    }
 }
