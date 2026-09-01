@@ -132,7 +132,29 @@ jobs:
       - name: T2 backend unit tests
         id: t2_backend_tests
         if: ${{ always() && github.event_name == 'pull_request' }}
-        run: cargo test --manifest-path backend/Cargo.toml --workspace --lib
+        run: |
+          set +e
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --workspace --lib --no-fail-fast -- --nocapture \
+            2>&1 | tee /tmp/backend-unit-tests.log
+          status=${PIPESTATUS[0]}
+          set -e
+
+          echo "=== backend unit test failure summary ==="
+          grep -nE 'panicked at|test result: FAILED|^failures:|^    [^ ]+::[^ ]+$|error: test failed|FAILED$' \
+            /tmp/backend-unit-tests.log | tail -200 || true
+
+          {
+            echo '## Backend unit-test failure summary'
+            echo
+            echo '```text'
+            grep -nE 'panicked at|test result: FAILED|^failures:|^    [^ ]+::[^ ]+$|error: test failed|FAILED$' \
+              /tmp/backend-unit-tests.log | tail -200 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$status"
 
       - name: T2 web-admin self-checks
         id: t2_web_checks
@@ -198,7 +220,7 @@ jobs:
         run: python3 scripts/governance/task_check.py --tier T3 --context pr --base origin/main --strict
 
       - name: Verify PR checks did not rewrite tracked files
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ always() && github.event_name == 'pull_request' }}
         run: |
           git diff --check
           git diff --exit-code
