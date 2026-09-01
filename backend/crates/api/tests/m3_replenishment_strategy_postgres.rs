@@ -13,6 +13,8 @@ use wms_api::{
     replenishment_handlers::{replenishment_router, ReplenishmentAppState},
 };
 
+mod postgres_test_support;
+
 fn ctx(owner_id: Uuid) -> AuthContext {
     AuthContext {
         user_id: Uuid::new_v4(),
@@ -231,6 +233,7 @@ async fn bind_location_already_owned_by_other_strategy_conflicts(pool: PgPool) {
         .await
         .expect("oneshot bind a");
     assert_eq!(bind_a.status(), StatusCode::OK);
+    postgres_test_support::audit_event(&pool, owner_id, 3).await;
 
     let bind_b = router
         .oneshot(
@@ -324,7 +327,7 @@ async fn list_update_and_disable_strategy(pool: PgPool) {
         .expect("oneshot");
     assert_eq!(updated.status(), StatusCode::OK);
 
-    let disabled = app(pool, owner_id)
+    let disabled = app(pool.clone(), owner_id)
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -343,4 +346,9 @@ async fn list_update_and_disable_strategy(pool: PgPool) {
     )
     .expect("json");
     assert_eq!(disabled_json["enabled"], false);
+
+    postgres_test_support::audit_event(&pool, owner_id, 3).await;
+    postgres_test_support::idempotency_request(&pool, owner_id, "rp-list-create").await;
+    postgres_test_support::idempotency_request(&pool, owner_id, "rp-list-update").await;
+    postgres_test_support::idempotency_request(&pool, owner_id, "rp-list-disable").await;
 }
