@@ -23,32 +23,132 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace_once(path: Path, old: str, new: str, label: str) -> None:
-              text = path.read_text(encoding="utf-8")
+          def replace_once(path: str | Path, old: str, new: str, label: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
               if new in text:
                   return
               if old not in text:
-                  raise SystemExit(f"repair anchor missing ({label}) in {path}")
-              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+                  raise SystemExit(f"repair anchor missing ({label}) in {target}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
 
-          inventory_path = Path("backend/crates/api/src/openapi_paths/inventory_count.rs")
-          inventory = inventory_path.read_text(encoding="utf-8")
-          inventory = inventory.replace(
+          simple_replacements = [
+              (
+                  "backend/crates/domain/src/putaway_validation.rs",
+                  '        assert!(is_temperature_zone_subset("cold_2_8", "cool_le_20") == false);',
+                  '        assert!(!is_temperature_zone_subset("cold_2_8", "cool_le_20"));',
+                  "temperature subset bool assertion",
+              ),
+              (
+                  "backend/crates/domain/src/wcs_task.rs",
+                  "        assert!(ptl_qty_diff_within_threshold(10, 1, 0.2, 10) == false); // ratio 0.9 > 0.2",
+                  "        assert!(!ptl_qty_diff_within_threshold(10, 1, 0.2, 10)); // ratio 0.9 > 0.2",
+                  "PTL threshold bool assertion",
+              ),
+              (
+                  "backend/crates/api/src/master_data_postgres_part1.rs",
+                  "        let row: Option<(Uuid, String, String, String, String, String, String, i64, i64)> = sqlx::query_as(",
+                  "        type PdaLocationLookupRow = (\n"
+                  "            Uuid, String, String, String, String, String, String, i64, i64,\n"
+                  "        );\n"
+                  "        let row: Option<PdaLocationLookupRow> = sqlx::query_as(",
+                  "PDA location lookup row alias",
+              ),
+              (
+                  "backend/crates/api/src/wave3_repository/putaway_validation.rs",
+                  "product.map_or(false, |p| {",
+                  "product.is_some_and(|p| {",
+                  "special-drug Option predicate",
+              ),
+              (
+                  "backend/crates/api/src/wave3_repository/putaway_validation.rs",
+                  '.map_or(false, |c| c != "none" && c != "normal" && !c.is_empty())',
+                  '.is_some_and(|c| c != "none" && c != "normal" && !c.is_empty())',
+                  "special-drug category predicate",
+              ),
+              (
+                  "backend/crates/api/src/wave3_repository/putaway_validation.rs",
+                  "product.map_or(false, |p| p.is_external_use)",
+                  "product.is_some_and(|p| p.is_external_use)",
+                  "external-use Option predicate",
+              ),
+              (
+                  "backend/crates/api/src/wave3_repository/putaway_validation.rs",
+                  "product.map_or(false, |p| p.is_fragrant)",
+                  "product.is_some_and(|p| p.is_fragrant)",
+                  "fragrant Option predicate",
+              ),
+              (
+                  "backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs",
+                  "    assert_eq!(first.is_agv_managed, false);",
+                  "    assert!(!first.is_agv_managed);",
+                  "location preview non-AGV assertion",
+              ),
+              (
+                  "backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs",
+                  "    assert_eq!(loc_f2_g3.is_agv_managed, true);",
+                  "    assert!(loc_f2_g3.is_agv_managed);",
+                  "location floor-grid AGV assertion",
+              ),
+              (
+                  "backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs",
+                  "    assert_eq!(loc_p2_f3_g4.is_agv_managed, true);",
+                  "    assert!(loc_p2_f3_g4.is_agv_managed);",
+                  "location position-floor-grid AGV assertion",
+              ),
+              (
+                  "backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs",
+                  "    assert_eq!(res.locations[0].allows_container, false);",
+                  "    assert!(!res.locations[0].allows_container);",
+                  "location container permission assertion",
+              ),
+              (
+                  "backend/crates/api/tests/pda_consistency_repairs_postgres.rs",
+                  """    let approval: (
+                  String,
+                  Option<Uuid>,
+                  Option<chrono::DateTime<Utc>>,
+                  Option<String>,
+                  Option<String>,
+                  Option<String>,
+                  chrono::DateTime<Utc>,
+                  chrono::DateTime<Utc>,
+              ) = sqlx::query_as(""",
+                  """    type QuickSpotApprovalRow = (
+                  String,
+                  Option<Uuid>,
+                  Option<chrono::DateTime<Utc>>,
+                  Option<String>,
+                  Option<String>,
+                  Option<String>,
+                  chrono::DateTime<Utc>,
+                  chrono::DateTime<Utc>,
+              );
+              let approval: QuickSpotApprovalRow = sqlx::query_as(""",
+                  "quick-spot approval row alias",
+              ),
+          ]
+          for replacement in simple_replacements:
+              replace_once(*replacement)
+
+          openapi_path = Path("backend/crates/api/src/openapi_paths/inventory_count.rs")
+          openapi = openapi_path.read_text(encoding="utf-8")
+          openapi = openapi.replace(
               "use wms_domain::{PdaLocationInfo, QuickSpotCountRequest, QuickSpotCountResponse};\n",
               "",
               1,
           )
-          inventory = inventory.replace(
+          openapi = openapi.replace(
               "request_body = QuickSpotCountRequest,",
               "request_body = wms_domain::QuickSpotCountRequest,",
               1,
           )
-          inventory = inventory.replace(
+          openapi = openapi.replace(
               "body = QuickSpotCountResponse)",
               "body = wms_domain::QuickSpotCountResponse)",
               1,
           )
-          inventory = inventory.replace(
+          openapi = openapi.replace(
               "body = PdaLocationInfo)",
               "body = wms_domain::PdaLocationInfo)",
               1,
@@ -58,114 +158,40 @@ jobs:
               "body = wms_domain::QuickSpotCountResponse)",
               "body = wms_domain::PdaLocationInfo)",
           ):
-              if required not in inventory:
+              if required not in openapi:
                   raise SystemExit(f"OpenAPI type qualification missing: {required}")
-          inventory_path.write_text(inventory, encoding="utf-8")
+          openapi_path.write_text(openapi, encoding="utf-8")
 
-          replace_once(
-              Path("backend/crates/domain/src/putaway_validation.rs"),
-              '        assert!(is_temperature_zone_subset("cold_2_8", "cool_le_20") == false);',
-              '        assert!(!is_temperature_zone_subset("cold_2_8", "cool_le_20"));',
-              "temperature subset bool assertion",
-          )
-          replace_once(
-              Path("backend/crates/domain/src/wcs_task.rs"),
-              "        assert!(ptl_qty_diff_within_threshold(10, 1, 0.2, 10) == false); // ratio 0.9 > 0.2",
-              "        assert!(!ptl_qty_diff_within_threshold(10, 1, 0.2, 10)); // ratio 0.9 > 0.2",
-              "PTL threshold bool assertion",
-          )
-          replace_once(
-              Path("backend/crates/api/src/master_data_postgres_part1.rs"),
-              "        let row: Option<(Uuid, String, String, String, String, String, String, i64, i64)> = sqlx::query_as(",
-              "        type PdaLocationLookupRow = (\n"
-              "            Uuid, String, String, String, String, String, String, i64, i64,\n"
-              "        );\n"
-              "        let row: Option<PdaLocationLookupRow> = sqlx::query_as(",
-              "PDA location lookup row alias",
-          )
-
-          putaway_path = Path("backend/crates/api/src/wave3_repository/putaway_validation.rs")
-          replace_once(
-              putaway_path,
-              "product.map_or(false, |p| {",
-              "product.is_some_and(|p| {",
-              "special-drug Option predicate",
-          )
-          replace_once(
-              putaway_path,
-              '.map_or(false, |c| c != "none" && c != "normal" && !c.is_empty())',
-              '.is_some_and(|c| c != "none" && c != "normal" && !c.is_empty())',
-              "special-drug category predicate",
-          )
-          replace_once(
-              putaway_path,
-              "product.map_or(false, |p| p.is_external_use)",
-              "product.is_some_and(|p| p.is_external_use)",
-              "external-use Option predicate",
-          )
-          replace_once(
-              putaway_path,
-              "product.map_or(false, |p| p.is_fragrant)",
-              "product.is_some_and(|p| p.is_fragrant)",
-              "fragrant Option predicate",
-          )
-
-          location_test_path = Path(
-              "backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs"
-          )
-          replace_once(
-              location_test_path,
-              "    assert_eq!(first.is_agv_managed, false);",
-              "    assert!(!first.is_agv_managed);",
-              "location preview non-AGV assertion",
-          )
-          replace_once(
-              location_test_path,
-              "    assert_eq!(loc_f2_g3.is_agv_managed, true);",
-              "    assert!(loc_f2_g3.is_agv_managed);",
-              "location floor-grid AGV assertion",
-          )
-          replace_once(
-              location_test_path,
-              "    assert_eq!(loc_p2_f3_g4.is_agv_managed, true);",
-              "    assert!(loc_p2_f3_g4.is_agv_managed);",
-              "location position-floor-grid AGV assertion",
-          )
-          replace_once(
-              location_test_path,
-              "    assert_eq!(res.locations[0].allows_container, false);",
-              "    assert!(!res.locations[0].allows_container);",
-              "location container permission assertion",
-          )
-
-          # 每个 integration test 都会把公共夹具编译为独立 test crate；某个测试只用夹具子集是预期行为。
+          # Integration-test helper modules are compiled independently by every test crate;
+          # each crate intentionally consumes only a subset of the shared helpers.
           for support_path in (
               Path("backend/crates/api/tests/support/lpn_container.rs"),
               Path("backend/crates/api/tests/postgres_test_support/mod.rs"),
           ):
-              support = support_path.read_text(encoding="utf-8")
+              text = support_path.read_text(encoding="utf-8")
               module_allow = "#![allow(dead_code)]\n\n"
-              if not support.startswith(module_allow):
-                  support_path.write_text(module_allow + support, encoding="utf-8")
+              if not text.startswith(module_allow):
+                  support_path.write_text(module_allow + text, encoding="utf-8")
 
-          # 保持生产代码在前、测试模块在文件末尾，而不是压制 items_after_test_module。
-          inventory_source_path = Path("backend/crates/api/src/inventory.rs")
-          inventory_source = inventory_source_path.read_text(encoding="utf-8")
+          # Keep production items before the test module instead of suppressing
+          # clippy::items_after_test_module.
+          inventory_path = Path("backend/crates/api/src/inventory.rs")
+          inventory = inventory_path.read_text(encoding="utf-8")
           test_marker = "#[cfg(test)]\nmod tests {"
           production_marker = "/// 设备中台 PTL 拍灯/称重/RFID 确认的上架落账"
-          test_start = inventory_source.index(test_marker)
-          production_start = inventory_source.index(production_marker)
+          test_start = inventory.index(test_marker)
+          production_start = inventory.index(production_marker)
           if test_start < production_start:
-              test_block = inventory_source[test_start:production_start].rstrip()
-              inventory_source = (
-                  inventory_source[:test_start].rstrip()
+              tests = inventory[test_start:production_start].rstrip()
+              inventory_path.write_text(
+                  inventory[:test_start].rstrip()
                   + "\n\n"
-                  + inventory_source[production_start:].rstrip()
+                  + inventory[production_start:].rstrip()
                   + "\n\n"
-                  + test_block
-                  + "\n"
+                  + tests
+                  + "\n",
+                  encoding="utf-8",
               )
-              inventory_source_path.write_text(inventory_source, encoding="utf-8")
 
           baseline_path = Path("governance/backend-module-fragments-baseline.toml")
           baseline = baseline_path.read_text(encoding="utf-8")
@@ -182,12 +208,12 @@ jobs:
           '''
               if anchor not in baseline:
                   raise SystemExit("backend module baseline insertion anchor missing")
-              baseline = baseline.replace(anchor, anchor + pda_entry, 1)
-              baseline_path.write_text(baseline, encoding="utf-8")
+              baseline_path.write_text(
+                  baseline.replace(anchor, anchor + pda_entry, 1),
+                  encoding="utf-8",
+              )
 
-          test_path = Path("backend/crates/api/tests/openapi_pda_runtime.rs")
-          test_path.parent.mkdir(parents=True, exist_ok=True)
-          test_path.write_text(
+          Path("backend/crates/api/tests/openapi_pda_runtime.rs").write_text(
               '''use serde_json::Value;
           use utoipa::OpenApi;
           use wms_api::ApiDoc;
@@ -205,9 +231,8 @@ jobs:
                   ("/api/v1/master-data/locations/by-code/{location_code}", "get"),
                   ("/api/v1/inventory/counts/quick-spot-count", "post"),
               ] {
-                  let operation = paths.get(path).and_then(|item| item.get(method));
                   assert!(
-                      operation.is_some(),
+                      paths.get(path).and_then(|item| item.get(method)).is_some(),
                       "missing OpenAPI operation: {} {}",
                       method.to_uppercase(),
                       path
@@ -253,6 +278,7 @@ jobs:
             backend/crates/api/src/openapi_paths/inventory_count.rs \
             backend/crates/api/src/wave3_repository/putaway_validation.rs \
             backend/crates/api/tests/openapi_pda_runtime.rs \
+            backend/crates/api/tests/pda_consistency_repairs_postgres.rs \
             backend/crates/api/tests/phase1_location_batch_wizard_postgres.rs \
             backend/crates/api/tests/postgres_test_support/mod.rs \
             backend/crates/api/tests/support/lpn_container.rs \
