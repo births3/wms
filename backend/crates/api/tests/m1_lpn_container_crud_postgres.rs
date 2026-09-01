@@ -21,6 +21,9 @@ use postgres_test_support::ensure_audit_partition;
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn get_update_and_soft_delete_idle_container(pool: PgPool) {
+    // POST /api/v1/master-data/lpn-containers
+    // PATCH /api/v1/master-data/lpn-containers/{id}
+    // DELETE /api/v1/master-data/lpn-containers/{id}
     ensure_audit_partition(&pool, at(0)).await;
     let owner_id = Uuid::new_v4();
     seed_lpn_numbering(&pool, at(0), owner_id).await;
@@ -89,6 +92,11 @@ async fn get_update_and_soft_delete_idle_container(pool: PgPool) {
         .expect("delete replay");
     assert_eq!(replay.id, created.id);
     assert_eq!(replay.status, LPN_CONTAINER_STATUS_DISABLED);
+
+    postgres_test_support::audit_event(&pool, owner_id, 3).await;
+    postgres_test_support::idempotency_request(&pool, owner_id, "lpn-crud-create").await;
+    postgres_test_support::idempotency_request(&pool, owner_id, "lpn-crud-update").await;
+    postgres_test_support::idempotency_request(&pool, owner_id, "lpn-crud-delete").await;
 }
 
 #[sqlx::test(migrations = "../../migrations")]
