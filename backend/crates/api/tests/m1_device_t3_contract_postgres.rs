@@ -144,12 +144,7 @@ async fn heartbeat_bind_and_unbind_replay_with_audit(pool: PgPool) {
         .await
         .expect("unbind device");
     service
-        .unbind(
-            &actor,
-            binding.id,
-            unbind_request,
-            "device-t3-unbind",
-        )
+        .unbind(&actor, binding.id, unbind_request, "device-t3-unbind")
         .await
         .expect("unbind replay");
 
@@ -163,8 +158,14 @@ async fn heartbeat_bind_and_unbind_replay_with_audit(pool: PgPool) {
         audit_total, 4,
         "idempotent replays must not create duplicate audit events"
     );
-    assert_eq!(audit_action_count(&pool, owner_id, "register_device").await, 1);
-    assert_eq!(audit_action_count(&pool, owner_id, "heartbeat_device").await, 1);
+    assert_eq!(
+        audit_action_count(&pool, owner_id, "register_device").await,
+        1
+    );
+    assert_eq!(
+        audit_action_count(&pool, owner_id, "heartbeat_device").await,
+        1
+    );
     assert_eq!(
         audit_action_count(&pool, owner_id, "bind_device_location").await,
         1
