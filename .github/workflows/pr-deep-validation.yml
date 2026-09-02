@@ -16,6 +16,9 @@ jobs:
     env:
       CI: "true"
       RUST_BACKTRACE: "1"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_DEV_INCREMENTAL: "false"
       CARGO_PROFILE_TEST_DEBUG: "0"
       CARGO_PROFILE_TEST_INCREMENTAL: "false"
 
@@ -38,18 +41,27 @@ jobs:
 
       - uses: taiki-e/install-action@just
 
-      - name: Cache Rust build
+      - name: Reclaim runner disk
+        run: |
+          echo "=== disk before cleanup ==="
+          df -h /
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          echo "=== disk after cleanup ==="
+          df -h /
+
+      - name: Cache Rust registry
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-            backend/target
-          key: ${{ runner.os }}-cargo-deep-${{ hashFiles('backend/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-deep-v2-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-deep-
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-registry-deep-v2-
 
       - name: Install governance and workspace dependencies
         run: |
@@ -93,10 +105,23 @@ jobs:
 
       - name: Full Rust workspace tests
         run: |
+          echo "=== disk before full Rust tests ==="
+          df -h /
           cargo test \
             --manifest-path backend/Cargo.toml \
             --workspace \
-            --no-fail-fast
+            --no-fail-fast \
+            --jobs 2
+          echo "=== disk after full Rust tests ==="
+          df -h /
+          du -sh backend/target || true
+
+      - name: Reclaim Rust build disk for browser validation
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: |
+          rm -rf backend/target
+          echo "=== disk before browser validation ==="
+          df -h /
 
       - name: Prototype TypeScript and Vite build
         run: |
