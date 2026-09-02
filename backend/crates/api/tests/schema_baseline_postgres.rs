@@ -37,7 +37,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL indexes");
-    assert_eq!(static_index_count, 643);
+    assert_eq!(static_index_count, 642);
 
     let fingerprint: String = sqlx::query_scalar(
         r#"
