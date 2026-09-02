@@ -20,8 +20,18 @@ fn ctx(owner_id: Uuid) -> AuthContext {
     }
 }
 
+async fn audit_action_count(pool: &PgPool, owner_id: Uuid, action: &str) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM audit_event WHERE owner_id = $1 AND action = $2")
+        .bind(owner_id)
+        .bind(action)
+        .fetch_one(pool)
+        .await
+        .expect("audit action count should query")
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn heartbeat_bind_and_unbind_replay_with_audit(pool: PgPool) {
+    // POST /api/v1/iot-devices
     // POST /api/v1/iot-devices/{id}/heartbeat
     // POST /api/v1/location-device-bindings
     // POST /api/v1/location-device-bindings/{id}/unbind
@@ -100,28 +110,35 @@ async fn heartbeat_bind_and_unbind_replay_with_audit(pool: PgPool) {
         .expect("heartbeat replay");
     assert_eq!(heartbeat.id, heartbeat_replay.id);
     assert_eq!(heartbeat.online_status, "online");
+    assert_eq!(heartbeat_replay.online_status, "online");
 
+    let bind_request = BindDeviceRequest {
+        location_id,
+        device_id: device.id,
+        binding_role: "ptl_light".to_string(),
+        point_address: Some("A-01".to_string()),
+    };
     let binding = service
-        .bind(
-            &actor,
-            BindDeviceRequest {
-                location_id,
-                device_id: device.id,
-                binding_role: "ptl_light".to_string(),
-                point_address: Some("A-01".to_string()),
-            },
-            "device-t3-bind",
-        )
+        .bind(&actor, bind_request.clone(), "device-t3-bind")
         .await
         .expect("bind device");
+    let binding_replay = service
+        .bind(&actor, bind_request, "device-t3-bind")
+        .await
+        .expect("bind replay");
+    assert_eq!(binding_replay.id, binding.id);
+    assert_eq!(binding_replay.location_id, binding.location_id);
+    assert_eq!(binding_replay.device_id, binding.device_id);
+    assert_eq!(binding_replay.binding_role, binding.binding_role);
 
+    let unbind_request = UnbindRequest {
+        reason: "T3 合同验证".to_string(),
+    };
     service
         .unbind(
             &actor,
             binding.id,
-            UnbindRequest {
-                reason: "T3 合同验证".to_string(),
-            },
+            unbind_request.clone(),
             "device-t3-unbind",
         )
         .await
@@ -130,15 +147,34 @@ async fn heartbeat_bind_and_unbind_replay_with_audit(pool: PgPool) {
         .unbind(
             &actor,
             binding.id,
-            UnbindRequest {
-                reason: "T3 合同验证".to_string(),
-            },
+            unbind_request,
             "device-t3-unbind",
         )
         .await
         .expect("unbind replay");
 
-    postgres_test_support::audit_event(&pool, owner_id, 4).await;
+    let audit_total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_event WHERE owner_id = $1")
+        .bind(owner_id)
+        .fetch_one(&pool)
+        .await
+        .expect("device audit total should query");
+    assert_eq!(
+        audit_total, 4,
+        "idempotent replays must not create duplicate audit events"
+    );
+    assert_eq!(audit_action_count(&pool, owner_id, "register_device").await, 1);
+    assert_eq!(audit_action_count(&pool, owner_id, "heartbeat_device").await, 1);
+    assert_eq!(
+        audit_action_count(&pool, owner_id, "bind_device_location").await,
+        1
+    );
+    assert_eq!(
+        audit_action_count(&pool, owner_id, "unbind_device_location").await,
+        1
+    );
+
+    postgres_test_support::idempotency_request(&pool, owner_id, "device-t3-register").await;
     postgres_test_support::idempotency_request(&pool, owner_id, "device-t3-heartbeat").await;
+    postgres_test_support::idempotency_request(&pool, owner_id, "device-t3-bind").await;
     postgres_test_support::idempotency_request(&pool, owner_id, "device-t3-unbind").await;
 }
