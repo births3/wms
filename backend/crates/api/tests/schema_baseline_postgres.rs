@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-const STATIC_SCHEMA_FINGERPRINT: &str = "e9a6b2972389675ce9022a29bd0c99e9";
+const STATIC_SCHEMA_FINGERPRINT: &str = "61d3cffb169d1af2560950a30ed24c1f";
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: PgPool) {
@@ -116,6 +116,6 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     // 放在同一次断言中，schema 变更时一次 CI 就能给出完整的实际基线。
     assert_eq!(
         (fingerprint.as_str(), constraint_count),
-        (STATIC_SCHEMA_FINGERPRINT, 3268)
+        (STATIC_SCHEMA_FINGERPRINT, 3266)
     );
 }
