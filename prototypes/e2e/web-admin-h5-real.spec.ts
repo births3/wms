@@ -147,15 +147,16 @@ async function createWaybill(page: Page, label: string) {
   await waybillDialog.getByLabel("收件人").fill("E2E 客户");
   await waybillDialog.getByLabel("收件电话").fill("13900000000");
   await waybillDialog.getByLabel("收件地址").fill("上海市黄浦区 E2E 门店");
-  const waybillResponse = page.waitForResponse(
+  const waybillResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith("/api/v1/express/waybills") && response.request().method() === "POST",
   );
   await waybillDialog.getByRole("button", { name: "下单", exact: true }).click();
-  expect((await waybillResponse).status()).toBe(200);
-  const notice = page.getByText(/已生成$/).last();
-  await expect(notice).toBeVisible();
-  const waybillNo = (await notice.textContent())?.replace(/ 已生成$/, "");
-  if (!waybillNo) throw new Error("真实下单未返回运单号");
+  const waybillResponse = await waybillResponsePromise;
+  expect(waybillResponse.status()).toBe(200);
+  const created = await waybillResponse.json() as { waybill_no?: string };
+  const waybillNo = created.waybill_no;
+  if (!waybillNo) throw new Error("真实下单响应未返回 waybill_no");
+  await expect(page.getByText(waybillNo, { exact: true })).toBeVisible();
   return { waybillNo };
 }
 
