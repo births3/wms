@@ -103,6 +103,18 @@ jobs:
             echo "required=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Focused PostgreSQL regression tests
+        run: |
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --package wms-api \
+            --test m3_replenishment_location_group_t3_postgres \
+            --test m3_replenishment_wave_postgres \
+            --test schema_baseline_postgres \
+            --test wave4_postgres \
+            --no-fail-fast \
+            --jobs 2
+
       - name: Full Rust workspace tests
         run: |
           echo "=== disk before full Rust tests ==="
