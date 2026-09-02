@@ -1,6 +1,5 @@
 import type {
   DataGridAdvancedFilterState,
-  DataGridFilterItem,
   DataGridFilterOperator,
 } from "./data-grid-operators";
 

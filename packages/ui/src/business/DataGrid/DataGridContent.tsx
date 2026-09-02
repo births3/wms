@@ -136,8 +136,6 @@ export function DataGridContent<T>({
   onPageIndexChange,
   onClearSelected,
   serverPagination,
-  querySummaryItems,
-  onClearQueryState,
   fieldsOpen,
   fieldListId,
   fieldsPanelPosition,
