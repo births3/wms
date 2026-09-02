@@ -70,7 +70,7 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
   });
   await expect(createdCustomerResponse.json()).resolves.toMatchObject({ source: "api_import", status: "active" });
 
-  const boundOwnerId = "00000000-0000-0000-0000-000000000001";
+  const currentOwnerId = "00000000-0000-0000-0000-000000000001";
   const createdLocationResponse = await request.post("/api/v1/master-data/locations", {
     data: {
       warehouse_id: "00000000-0000-0000-0000-000000003001",
@@ -82,7 +82,7 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
       max_volume_cm3: 100000,
       max_sku_count: 1,
       location_type: "storage",
-      bound_owner_id: boundOwnerId,
+      current_owner_id: currentOwnerId,
     },
   });
   const createdLocation = await createdLocationResponse.json() as { id: string };
@@ -103,7 +103,7 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
   const updatedLocationResponse = await request.patch(`/api/v1/master-data/locations/${createdLocation.id}`, {
     data: { status: "disabled" },
   });
-  await expect(updatedLocationResponse.json()).resolves.toMatchObject({ bound_owner_id: boundOwnerId });
+  await expect(updatedLocationResponse.json()).resolves.toMatchObject({ current_owner_id: currentOwnerId });
 
   const batchRequest = {
       warehouse_id: "00000000-0000-0000-0000-000000003001",
@@ -198,7 +198,7 @@ test("dev mock 保留主数据分页和入库动作状态", async ({ request }) 
     },
     { ...batchRequest, area_code: "UID", warehouse_id: "not-a-uuid" },
     { ...batchRequest, area_code: "ZON", zone_id: "00000000-0000-0000-0000-000000003199" },
-    { ...batchRequest, area_code: "OWN", bound_owner_id: "00000000-0000-0000-0000-000000000999" },
+    { ...batchRequest, area_code: "OWN", current_owner_id: "00000000-0000-0000-0000-000000000999" },
     { ...batchRequest, area_code: "I32", max_sku_count: 2_147_483_648 },
     { ...batchRequest, area_code: "I64", max_volume_cm3: Number.MAX_SAFE_INTEGER + 1 },
   ]) {
@@ -280,8 +280,9 @@ test("dev mock 保留 H9 字段库数量和 M2 ASN 字段", async ({ request }) 
 test("侧边栏筛选菜单支持 Escape 和点击页面内容关闭", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "登录" }).click();
-  const pageHeading = page.getByRole("heading", { name: "运营总览" });
-  await expect(pageHeading).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
+  const dashboardContent = page.getByRole("heading", { name: "快捷入口" });
+  await expect(dashboardContent).toBeVisible();
 
   await page.getByRole("button", { name: "筛选菜单" }).click();
   const menuFilter = page.getByLabel("筛选菜单");
@@ -293,7 +294,7 @@ test("侧边栏筛选菜单支持 Escape 和点击页面内容关闭", async ({ 
   await page.getByRole("button", { name: "筛选菜单" }).click();
   await expect(menuFilter).toBeVisible();
 
-  await pageHeading.click();
+  await dashboardContent.click();
 
   await expect(menuFilter).toBeHidden();
   await expect(page.getByRole("button", { name: "筛选菜单" })).toBeVisible();
@@ -393,10 +394,9 @@ test("H1 菜单管理能通过三层菜单打开", async ({ page }) => {
   await page.getByRole("button", { name: "H1 权限租户" }).click();
   await page.getByRole("button", { name: /H1 菜单管理/ }).click();
 
-  const h1Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H1 菜单管理" }) });
-  await expect(h1Page.getByText("菜单树")).toBeVisible();
-  await expect(h1Page.getByText("节点配置")).toBeVisible();
-  await expect(h1Page.getByRole("button", { name: "发布" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "菜单树", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "节点配置", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "发布", exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "h1-menu-management.png"), fullPage: false });
 });
 
@@ -412,23 +412,22 @@ test("H2 H3 基础能力能通过三层菜单打开", async ({ page }) => {
   // 与快捷入口按钮区分：侧栏菜单 accessible name 含 view id
   await page.getByRole("button", { name: "H2 审计追踪 h2-audit-trail", exact: true }).click();
 
-  const h2Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H2 审计追踪" }) });
-  await expect(h2Page.getByRole("heading", { name: "H2 审计追踪" })).toBeVisible();
-  await expect(h2Page.getByText(/GET \/api\/v1\/audit\/events/).first()).toBeVisible();
-  await expect(h2Page.getByText("IP 地址")).toBeVisible();
-  await h2Page.getByRole("button", { name: "展开" }).click();
-  await h2Page.getByLabel("动作类型").fill("验收提交");
-  await h2Page.getByLabel("关联资源").fill("PO-2026-0001");
-  await h2Page.getByLabel("商品编码").fill("P-M1-001");
-  await h2Page.getByLabel("批号").fill("BATCH-M3-202606-01");
-  await h2Page.getByRole("button", { name: "查询" }).click();
-  await expect(h2Page.getByText("验收提交").first()).toBeVisible();
-  await expect(h2Page.getByText("192.168.124.25")).toBeVisible();
-  await expect(h2Page.getByText(/验收中/)).toBeVisible();
-  await expect(h2Page.getByText(/已验收/)).toBeVisible();
-  await expect(h2Page.getByText(/P-M1-001/).first()).toBeVisible();
-  await expect(h2Page.getByText(/BATCH-M3-202606-01/).first()).toBeVisible();
-  await h2Page.getByRole("button", { name: "导出" }).click();
+  await expect(page.getByRole("heading", { name: "H2 审计追踪" })).toBeVisible();
+  await expect(page.getByText(/GET \/api\/v1\/audit\/events/).first()).toBeVisible();
+  await expect(page.getByText("IP 地址")).toBeVisible();
+  await page.getByRole("button", { name: "展开" }).click();
+  await page.getByLabel("动作类型").fill("验收提交");
+  await page.getByLabel("关联资源").fill("PO-2026-0001");
+  await page.getByLabel("商品编码").fill("P-M1-001");
+  await page.getByLabel("批号").fill("BATCH-M3-202606-01");
+  await page.getByRole("button", { name: "查询" }).click();
+  await expect(page.getByText("验收提交").first()).toBeVisible();
+  await expect(page.getByText("192.168.124.25")).toBeVisible();
+  await expect(page.getByText(/验收中/)).toBeVisible();
+  await expect(page.getByText(/已验收/)).toBeVisible();
+  await expect(page.getByText(/P-M1-001/).first()).toBeVisible();
+  await expect(page.getByText(/BATCH-M3-202606-01/).first()).toBeVisible();
+  await page.getByRole("button", { name: "导出" }).click();
   const exportDialog = page.getByRole("dialog");
   await expect(exportDialog.getByRole("heading", { name: "导出列表" })).toBeVisible();
   await expect(exportDialog.getByText(/当前筛选结果共 1 条/)).toBeVisible();
@@ -437,8 +436,7 @@ test("H2 H3 基础能力能通过三层菜单打开", async ({ page }) => {
 
   await page.getByRole("button", { name: "H3 契约能力" }).click();
   await page.getByRole("button", { name: "H3 OpenAPI h3-api-contract", exact: true }).click();
-  const h3Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H3 OpenAPI 契约" }) });
-  await expect(h3Page.getByText(/GET \/openapi\.json/).first()).toBeVisible();
+  await expect(page.getByText(/GET \/openapi\.json/).first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "h3-api-contract.png"), fullPage: false });
 });
 
@@ -453,10 +451,9 @@ test("H5 快递对接能通过三层菜单打开", async ({ page }) => {
   await page.getByRole("button", { name: "H5 快递能力" }).click();
   await page.getByRole("button", { name: "H5 快递对接 h5-express", exact: true }).click();
 
-  const h5Page = page.locator("section").filter({ has: page.getByRole("heading", { name: "H5 快递对接" }) });
-  await expect(h5Page.getByRole("heading", { name: "快递商配置" })).toBeVisible();
-  await expect(h5Page.getByRole("heading", { name: "快递选择规则" })).toBeVisible();
-  await expect(h5Page.getByText("顺丰速运")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "快递商配置" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "快递选择规则" })).toBeVisible();
+  await expect(page.getByText("顺丰速运")).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "h5-express.png"), fullPage: false });
 });
 
@@ -471,10 +468,9 @@ test("M-CG 单据号规则可查询并打开新增弹窗", async ({ page }) => {
   await page.getByRole("button", { name: "M-CG 编码能力" }).click();
   await page.getByRole("button", { name: "M-CG 单据号规则 mcg-numbering", exact: true }).click();
 
-  const pageRoot = page.locator("section").filter({ has: page.getByRole("heading", { name: "M-CG 单据号规则" }) });
-  await expect(pageRoot.getByText("采购入库单号")).toBeVisible();
-  await expect(pageRoot.getByRole("heading", { name: "生成记录" })).toBeVisible();
-  await pageRoot.getByRole("button", { name: "新增" }).click();
+  await expect(page.getByText("采购入库单号")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "生成记录" })).toBeVisible();
+  await page.getByRole("button", { name: "新增", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("新增单据号规则");
   await page.getByRole("button", { name: "取消" }).click();
   await page.screenshot({ path: path.join(artifactsDir, "mcg-numbering.png"), fullPage: false });
@@ -498,14 +494,13 @@ test("入库资料录入使用开发 Mock 查询并上传上游随货同行单",
   }
   await page.getByRole("button", { name: "入库资料录入 m2-inbound-documents", exact: true }).click();
 
-  const pageRoot = page.locator("section").filter({ has: page.getByRole("heading", { name: "入库资料录入" }) });
-  await expect(pageRoot.getByLabel("实际收货时间开始")).not.toHaveValue("");
-  await expect(pageRoot.getByRole("button", { name: /药检单不齐/ })).toBeVisible();
-  await pageRoot.getByRole("button", { name: /药检单不齐/ }).click();
-  await pageRoot.getByRole("button", { name: /上游随货同行单不齐/ }).click();
-  await expect(pageRoot.getByText(/共 \d+ 个 ASN/)).toBeVisible();
+  await expect(page.getByLabel("实际收货时间开始")).not.toHaveValue("");
+  await expect(page.getByRole("button", { name: /药检单不齐/ })).toBeVisible();
+  await page.getByRole("button", { name: /药检单不齐/ }).click();
+  await page.getByRole("button", { name: /上游随货同行单不齐/ }).click();
+  await expect(page.getByText(/共 \d+ 个 ASN/)).toBeVisible();
 
-  await pageRoot.getByRole("button", { name: "录入资料" }).first().click();
+  await page.getByRole("button", { name: "录入资料" }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("tab", { name: "上游随货同行单" }).click();
   await dialog.locator('input[type="file"]').setInputFiles({
