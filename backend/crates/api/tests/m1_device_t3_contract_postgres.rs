@@ -153,11 +153,12 @@ async fn heartbeat_bind_and_unbind_replay_with_audit(pool: PgPool) {
         .await
         .expect("unbind replay");
 
-    let audit_total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_event WHERE owner_id = $1")
-        .bind(owner_id)
-        .fetch_one(&pool)
-        .await
-        .expect("device audit total should query");
+    let audit_total: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM audit_event WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_one(&pool)
+            .await
+            .expect("device audit total should query");
     assert_eq!(
         audit_total, 4,
         "idempotent replays must not create duplicate audit events"
