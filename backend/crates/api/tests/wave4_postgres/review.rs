@@ -158,6 +158,20 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
             10,
         )]
     );
+    let pick_task_id: Uuid = sqlx::query_scalar(
+        r#"
+        SELECT id
+          FROM outbound_pick_tasks
+         WHERE owner_id = $1 AND outbound_order_id = $2 AND line_no = 1
+         ORDER BY route_sequence, id
+         LIMIT 1
+        "#,
+    )
+    .bind(owner_id)
+    .bind(order.id)
+    .fetch_one(&pool)
+    .await
+    .expect("wave release should create the outbound pick task");
 
     let locked: (i64, i64, i64) = sqlx::query_as(
         r#"
@@ -180,7 +194,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     let short = repo
         .complete_pick_task(
             &picker_ctx,
-            order.id,
+            pick_task_id,
             CompletePickTaskRequest {
                 line_no: 1,
                 picked_qty: 8.into(),
@@ -353,7 +367,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     let replenished = repo
         .complete_pick_task(
             &picker_ctx,
-            order.id,
+            pick_task_id,
             replenished_request.clone(),
             now,
             "outbound-pick-replenished-1",
@@ -364,7 +378,7 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     let pick_replay = repo
         .complete_pick_task(
             &picker_ctx,
-            order.id,
+            pick_task_id,
             replenished_request,
             now,
             "outbound-pick-replenished-1",
