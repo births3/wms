@@ -16,7 +16,7 @@ test("H4 管理端菜单能打开通知配置和发送记录", async ({ page }) 
   await page.getByRole("button", { name: /H4 参数设置/ }).click();
   await expect(page.getByRole("heading", { name: "H4 参数设置" })).toBeVisible();
   await expect(page.getByText("ww-demo-corp")).toBeVisible();
-  const settingsPage = page.locator("section").filter({ has: page.getByRole("heading", { name: "H4 参数设置" }) });
+  const settingsPage = page.getByRole("heading", { name: "H4 参数设置" }).locator("..");
   await settingsPage.getByRole("row").filter({ hasText: "ww-demo-corp" }).getByRole("checkbox").check();
   await settingsPage.getByRole("button", { name: "修改" }).click();
   const settingsDialog = page.getByRole("dialog", { name: "企业微信参数设置" });
@@ -295,15 +295,16 @@ test("H4 管理端菜单能打开通知配置和发送记录", async ({ page }) 
 
   await page.getByRole("button", { name: /H4 通知配置/ }).click();
   await expect(page.getByRole("heading", { name: "H4 通知配置" })).toBeVisible();
-  const configsPage = page.locator("section").filter({ has: page.getByRole("heading", { name: "H4 通知配置" }) });
+  const configsPage = page.getByRole("heading", { name: "H4 通知配置" }).locator("..");
   await expect(configsPage.getByText("asn_arrived").first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "notify-configs.png"), fullPage: false });
 
   await page.getByRole("button", { name: /H4 发送记录/ }).click();
   await expect(page.getByRole("heading", { name: "H4 发送记录" })).toBeVisible();
-  const recordsPage = page.locator("section").filter({ has: page.getByRole("heading", { name: "H4 发送记录" }) });
-  await expect(recordsPage.getByText("asn_arrived").first()).toBeVisible();
-  const sentRow = recordsPage.getByRole("row").filter({ hasText: "ASN-H4-E2E" }).first();
+  const recordsPage = page.getByRole("heading", { name: "H4 发送记录" }).locator("..");
+  const sentRow = recordsPage.getByRole("row").filter({ hasText: "ASN-H4-E2E", visible: true }).first();
+  await expect(sentRow).toBeVisible();
+  await expect(sentRow.getByText("asn_arrived")).toBeVisible();
   await sentRow.getByRole("checkbox").check();
   const resendResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/v1/wechat-notify/records/")
