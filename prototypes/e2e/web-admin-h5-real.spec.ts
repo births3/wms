@@ -103,9 +103,8 @@ async function openH5(page: Page) {
   await page.getByRole("button", { name: "基础能力", exact: true }).click();
   await page.getByRole("button", { name: "H5 快递能力", exact: true }).click();
   await page.getByRole("button", { name: /H5 快递对接 platform\.h5\.express/ }).click();
-  const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "H5 快递对接" }) });
-  await expect(section.getByRole("heading", { name: "快递商配置" })).toBeVisible();
-  await expect(section.getByRole("heading", { name: "快递选择规则" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运单作业", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "快递选择规则", exact: true })).toBeVisible();
 }
 
 async function login(page: Page) {
