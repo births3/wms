@@ -1,0 +1,206 @@
+name: PR Deep Validation
+
+on:
+  pull_request:
+
+concurrency:
+  group: pr-deep-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deep-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      RUST_BACKTRACE: "1"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_PROFILE_TEST_INCREMENTAL: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: taiki-e/install-action@just
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            backend/target
+          key: ${{ runner.os }}-cargo-deep-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-deep-
+            ${{ runner.os }}-cargo-
+
+      - name: Install governance and workspace dependencies
+        run: |
+          python3 -m pip install -r requirements-governance.txt
+          corepack enable
+          corepack prepare pnpm@11.5.2 --activate
+          pnpm install --frozen-lockfile
+
+      - name: Start PostgreSQL
+        run: |
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr-deep-postgres \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_DB=wms_test \
+            --publish 5432:5432 \
+            postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec wms-pr-deep-postgres pg_isready --username postgres --dbname wms_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-pr-deep-postgres
+          exit 1
+
+      - name: Apply PostgreSQL migrations
+        run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
+
+      - name: Detect browser/runtime validation scope
+        id: runtime_scope
+        run: |
+          git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" > /tmp/pr-deep-changed-files.txt
+          cat /tmp/pr-deep-changed-files.txt
+          if grep -qE '^(prototypes/|apps/web-admin/|apps/customer-portal/|backend/crates/api/src/|governance/quality-matrix\.toml|scripts/governance/)' /tmp/pr-deep-changed-files.txt; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Full Rust workspace tests
+        run: |
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --workspace \
+            --no-fail-fast
+
+      - name: Prototype TypeScript and Vite build
+        run: |
+          pnpm --dir prototypes exec tsc --noEmit
+          pnpm --dir prototypes run build
+
+      - name: Install Chromium for browser validation
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: pnpm --dir prototypes exec playwright install --with-deps chromium
+
+      - name: Prototype full matrix browser gate
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: just matrix-e2e-full
+
+      - name: Web Admin dev browser smoke
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: |
+          pnpm --dir apps/web-admin run test:e2e:shell-dev
+          pnpm --dir apps/web-admin run test:e2e:h4-dev
+          pnpm --dir apps/web-admin run test:e2e:h9-dev
+
+      - name: Real backend Playwright evidence suite
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          run_isolated_config() {
+            local config="$1"
+            local slug
+            slug="$(printf '%s' "$config" | sha256sum | cut -c1-12)"
+            local database_name="wms_pr_${slug}_${RANDOM}"
+            local test_url="${DATABASE_URL%/*}/${database_name}"
+
+            echo "▶ real E2E: ${config}"
+            docker exec wms-pr-deep-postgres \
+              psql --username postgres --dbname postgres --set ON_ERROR_STOP=1 --quiet \
+              --command "CREATE DATABASE \"${database_name}\""
+
+            set +e
+            DATABASE_URL="$test_url" \
+            WMS_DB_URL="$test_url" \
+            PORTAL_DATABASE_URL="$test_url" \
+              pnpm --dir prototypes exec playwright test --config="$config"
+            status=$?
+            set -e
+
+            docker exec wms-pr-deep-postgres \
+              psql --username postgres --dbname postgres --quiet \
+              --command "DROP DATABASE IF EXISTS \"${database_name}\" WITH (FORCE)" || true
+
+            return "$status"
+          }
+
+          configs=(
+            playwright-web-admin-h1-real-config.ts
+            playwright-web-admin-h5-real-config.ts
+            playwright-web-admin-h8-interface-real-config.ts
+            playwright-web-admin-h8-real-config.ts
+            playwright-web-admin-hal-real-config.ts
+            playwright-web-admin-m1-real-config.ts
+            playwright-web-admin-m10-real-config.ts
+            playwright-web-admin-m2-real-config.ts
+            playwright-web-admin-m3-real-config.ts
+            playwright-web-admin-m4-real-config.ts
+            playwright-web-admin-m9-real-config.ts
+            playwright-web-admin-mcg-real-config.ts
+            playwright-web-admin-mdi-real-config.ts
+            playwright-web-admin-mrc-real-config.ts
+            playwright-web-admin-mte-real-config.ts
+            playwright-customer-portal-real-config.ts
+          )
+
+          for config in "${configs[@]}"; do
+            test -f "prototypes/${config}" || {
+              echo "missing Playwright config: prototypes/${config}" >&2
+              exit 1
+            }
+            run_isolated_config "$config"
+          done
+
+      - name: Verify real screenshot files
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: python3 scripts/governance/check_baseline_completeness.py --require-files
+
+      - name: Upload browser and screenshot evidence
+        if: ${{ always() && steps.runtime_scope.outputs.required == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-deep-validation-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            artifacts/screenshot-portal/real-web/**
+            prototypes/.e2e-artifacts/**
+            apps/**/.e2e-artifacts/**
+
+      - name: Ensure deep validation did not rewrite tracked files
+        if: ${{ always() }}
+        run: |
+          git diff --check
+          git diff --exit-code
+
+      - name: Stop PostgreSQL
+        if: ${{ always() }}
+        run: docker rm --force wms-pr-deep-postgres || true
