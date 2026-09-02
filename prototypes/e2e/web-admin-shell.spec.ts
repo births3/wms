@@ -419,7 +419,7 @@ test("H2 H3 基础能力能通过三层菜单打开", async ({ page }) => {
   await page.getByLabel("动作类型").fill("验收提交");
   await page.getByLabel("关联资源").fill("PO-2026-0001");
   await page.getByLabel("商品编码").fill("P-M1-001");
-  await page.getByLabel("批号").fill("BATCH-M3-202606-01");
+  await page.getByRole("textbox", { name: "批号", exact: true }).fill("BATCH-M3-202606-01");
   await page.getByRole("button", { name: "查询" }).click();
   await expect(page.getByText("验收提交").first()).toBeVisible();
   await expect(page.getByText("192.168.124.25")).toBeVisible();
@@ -451,7 +451,7 @@ test("H5 快递对接能通过三层菜单打开", async ({ page }) => {
   await page.getByRole("button", { name: "H5 快递能力" }).click();
   await page.getByRole("button", { name: "H5 快递对接 h5-express", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "快递商配置" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运单作业", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "快递选择规则" })).toBeVisible();
   await expect(page.getByText("顺丰速运")).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "h5-express.png"), fullPage: false });
