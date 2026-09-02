@@ -106,11 +106,12 @@ async fn lpn_type_policy_put_replays_idempotency_and_writes_audit(pool: PgPool) 
         "replay or conflict must not duplicate audit"
     );
 
-    let audit_total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_event WHERE owner_id = $1")
-        .bind(owner_id)
-        .fetch_one(&pool)
-        .await
-        .expect("policy audit total");
+    let audit_total: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM audit_event WHERE owner_id = $1")
+            .bind(owner_id)
+            .fetch_one(&pool)
+            .await
+            .expect("policy audit total");
     assert_eq!(audit_total, 1);
 
     postgres_test_support::idempotency_request(&pool, owner_id, "lpn-policy-put-1").await;
