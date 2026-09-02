@@ -59,7 +59,8 @@ test.describe("H5 快递对接真实链路", () => {
     await expect(dialog).toContainText(waybillNo);
     await screenshot(page, "US-H5-003-waybill-print-preview.png");
     await dialog.getByRole("button", { name: "打印", exact: true }).click();
-    await expect(page.getByText("面单预览已发送到浏览器打印", { exact: true })).toBeVisible();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText(waybillNo, { exact: true })).toBeVisible();
   });
 
   test("US-H5-004 快递下单与取消在真实 PostgreSQL 中闭环", async ({ page }) => {
@@ -77,7 +78,11 @@ test.describe("H5 快递对接真实链路", () => {
     await dialog.getByRole("button", { name: "确认取消", exact: true }).click();
     const response = await responsePromise;
     expect(response.status()).toBe(200);
-    await expect(page.getByText(`${waybillNo} 已取消`, { exact: true })).toBeVisible();
+    const cancelled = await response.json() as { waybill_no?: string; status?: string };
+    expect(cancelled).toMatchObject({ waybill_no: waybillNo, status: "cancelled" });
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("button", { name: "取消", exact: true })).toBeDisabled();
+    await expect(page.getByText("已取消", { exact: true })).toBeVisible();
     await screenshot(page, "US-H5-004-waybill-cancelled.png");
   });
 
