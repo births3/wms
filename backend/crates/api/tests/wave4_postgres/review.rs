@@ -29,6 +29,22 @@ async fn outbound_complete_pick_review_ship_replays_and_deducts_inventory(pool: 
     .await
     .expect("seed outbound review owner");
     sqlx::query(
+        "INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1, $2, '拣货员', 'test-hash', 'active')",
+    )
+    .bind(picker_ctx.user_id)
+    .bind(format!("m4-picker-{}", &picker_ctx.user_id.to_string()[..8]))
+    .execute(&pool)
+    .await
+    .expect("seed picker");
+    sqlx::query(
+        "INSERT INTO auth_user_owner_bindings (user_id, owner_id, is_active, is_primary) VALUES ($1, $2, TRUE, TRUE)",
+    )
+    .bind(picker_ctx.user_id)
+    .bind(owner_id)
+    .execute(&pool)
+    .await
+    .expect("bind picker");
+    sqlx::query(
         "INSERT INTO auth_users (id, username, display_name, password_hash, status) VALUES ($1, $2, '第一复核员', 'test-hash', 'active')",
     )
     .bind(reviewer_ctx.user_id)
