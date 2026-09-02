@@ -261,8 +261,23 @@ jobs:
           done
           exit "$failed"
 
-      - name: Risk-triggered T3 governance
+      - name: T3 critical PostgreSQL integration tests
+        id: t3_postgres_tests
         if: ${{ github.event_name == 'pull_request' && steps.t2_summary.outcome == 'success' }}
+        run: |
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --package wms-api \
+            --test m1_lpn_type_policy_idempotency_postgres \
+            --no-fail-fast
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --package wms-api \
+            --test m1_device_t3_contract_postgres \
+            --no-fail-fast
+
+      - name: Risk-triggered T3 governance
+        if: ${{ github.event_name == 'pull_request' && steps.t2_summary.outcome == 'success' && steps.t3_postgres_tests.outcome == 'success' }}
         env:
           WMS_GOV_CONTEXT: pr
           WMS_GOV_BASE: origin/main
