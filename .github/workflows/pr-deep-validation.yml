@@ -143,12 +143,12 @@ jobs:
           df -h /
           du -sh backend/target || true
 
-      - name: Reclaim Rust build disk for browser validation
+      - name: Check disk before browser validation
         if: ${{ steps.runtime_scope.outputs.required == 'true' }}
         run: |
-          rm -rf backend/target
           echo "=== disk before browser validation ==="
           df -h /
+          du -sh backend/target || true
 
       - name: Prototype TypeScript and Vite build
         run: |
@@ -180,7 +180,7 @@ jobs:
             local config="$1"
             local slug
             slug="$(printf '%s' "$config" | sha256sum | cut -c1-12)"
-            local database_name="wms_pr_${slug}_${RANDOM}"
+            local database_name="wms_pr_${slug}_${RANDOM}_e2e"
             local test_url="${DATABASE_URL%/*}/${database_name}"
 
             echo "▶ real E2E: ${config}"
