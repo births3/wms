@@ -89,6 +89,21 @@ jobs:
           docker logs wms-pr-deep-postgres
           exit 1
 
+      - name: Start Redis
+        run: |
+          echo "WMS_REDIS_URL=redis://127.0.0.1:6379" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr-deep-redis \
+            --publish 6379:6379 \
+            redis:8-alpine
+          for attempt in $(seq 1 30); do
+            if docker exec wms-pr-deep-redis redis-cli ping | grep -q '^PONG$'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-pr-deep-redis
+          exit 1
+
       - name: Apply PostgreSQL migrations
         run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
 
@@ -237,6 +252,10 @@ jobs:
         run: |
           git diff --check
           git diff --exit-code
+
+      - name: Stop Redis
+        if: ${{ always() }}
+        run: docker rm --force wms-pr-deep-redis || true
 
       - name: Stop PostgreSQL
         if: ${{ always() }}
