@@ -170,7 +170,45 @@ jobs:
           pnpm --dir apps/web-admin run test:e2e:h4-dev
           pnpm --dir apps/web-admin run test:e2e:h9-dev
 
-      - name: Real backend Playwright evidence suite
+      - name: Detect external H8 interface-table scope
+        id: h8_interface_scope
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        shell: bash
+        env:
+          H8_INTERFACE_ENABLED: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_ENABLED }}
+          H8_INTERFACE_BASE_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_BASE_URL }}
+          H8_INTERFACE_API_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_URL }}
+          H8_INTERFACE_USERNAME: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_USERNAME }}
+          H8_INTERFACE_PASSWORD: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_PASSWORD }}
+          H8_INTERFACE_API_KEY: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${H8_INTERFACE_ENABLED}" != "true" ]]; then
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=External H8 interface-table suite not run::Set WMS_WEB_ADMIN_H8_INTERFACE_REAL_ENABLED=true and configure its URL/credential variables and secrets to enable this external acceptance suite."
+            {
+              echo "### H8 interface-table external acceptance suite"
+              echo
+              echo "Not run for this PR: the suite requires an externally hosted Web/API pair and explicit repository configuration."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          missing=0
+          for name in \
+            H8_INTERFACE_BASE_URL H8_INTERFACE_API_URL H8_INTERFACE_USERNAME \
+            H8_INTERFACE_PASSWORD H8_INTERFACE_API_KEY
+          do
+            if [[ -z "${!name}" ]]; then
+              echo "::error title=Incomplete H8 interface-table configuration::${name} is required when the external suite is enabled."
+              missing=1
+            fi
+          done
+          [[ "$missing" == "0" ]] || exit 1
+          echo "required=true" >> "$GITHUB_OUTPUT"
+
+      - name: Self-contained real backend Playwright evidence suite
         if: ${{ steps.runtime_scope.outputs.required == 'true' }}
         shell: bash
         run: |
@@ -206,7 +244,6 @@ jobs:
           configs=(
             playwright-web-admin-h1-real-config.ts
             playwright-web-admin-h5-real-config.ts
-            playwright-web-admin-h8-interface-real-config.ts
             playwright-web-admin-h8-real-config.ts
             playwright-web-admin-hal-real-config.ts
             playwright-web-admin-m1-real-config.ts
@@ -230,6 +267,17 @@ jobs:
             run_isolated_config "$config"
           done
 
+      - name: External H8 interface-table Playwright evidence suite
+        if: ${{ steps.runtime_scope.outputs.required == 'true' && steps.h8_interface_scope.outputs.required == 'true' }}
+        working-directory: prototypes
+        env:
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_BASE_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_BASE_URL }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_URL }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_USERNAME: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_USERNAME }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_PASSWORD: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_PASSWORD }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_KEY: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_KEY }}
+        run: pnpm exec playwright test --config=playwright-web-admin-h8-interface-real-config.ts
+
       - name: Verify real screenshot files
         if: ${{ steps.runtime_scope.outputs.required == 'true' }}
         run: python3 scripts/governance/check_baseline_completeness.py --require-files
@@ -245,6 +293,8 @@ jobs:
           path: |
             artifacts/screenshot-portal/real-web/**
             prototypes/.e2e-artifacts/**
+            prototypes/test-results/playwright-web-admin-h8-interface-real/**
+            prototypes/playwright-report/web-admin-h8-interface-real/**
             apps/**/.e2e-artifacts/**
 
       - name: Ensure deep validation did not rewrite tracked files
