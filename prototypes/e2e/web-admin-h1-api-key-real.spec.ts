@@ -8,7 +8,7 @@ test("H1 API Key 管理使用真实 API 完成创建、轮换、吊销和截图�
   fs.mkdirSync(artifactsDir, { recursive: true });
   await login(page);
   await openApiKeyPage(page);
-  await expect(page.getByRole("heading", { name: "H1 API Key 生命周期" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "H1 API Key 管理" })).toBeVisible();
 
   const caller = `E2E 外部系统 ${Date.now()}`;
   await page.getByRole("button", { name: "创建 Key", exact: true }).click();
@@ -57,5 +57,6 @@ async function openApiKeyPage(page: import("@playwright/test").Page) {
     const group = navigation.getByRole("button", { name: "H1 权限租户", exact: true });
     if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
   }
+  await expect(target).toBeVisible();
   await target.click();
 }
