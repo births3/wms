@@ -24,7 +24,7 @@ import {
 import { errorText } from "@/lib/error-text";
 import { formatDateTime } from "@/lib/format";
 import { queryString, queryValueFromUnknown } from "@/lib/query-value";
-import { BUTTON_REFRESH, COLUMN_BATCH_NO, COLUMN_CREATED_AT, COLUMN_PRODUCT_CODE, ERROR_AUTH_API_CHECK } from "@/lib/ui-strings";
+import { BUTTON_REFRESH, COLUMN_BATCH_NO, COLUMN_PRODUCT_CODE, ERROR_AUTH_API_CHECK } from "@/lib/ui-strings";
 import { usePageQueryState } from "@/lib/use-page-query-state";
 
 const PENDING_LOCATION_KEY = "m3-location-history-code";
@@ -94,16 +94,6 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
 
   const columns = React.useMemo<DataGridColumn<LocationHistoryMovement>[]>(
     () => [
-      {
-        key: "created_at",
-        header: COLUMN_CREATED_AT,
-        width: 180,
-        minWidth: 160,
-        sortable: true,
-        sortValue: (row) => row.occurred_at,
-        copyValue: (row) => row.occurred_at,
-        render: (row) => <span className="font-mono text-xs">{formatDateTime(row.occurred_at)}</span>,
-      },
       {
         key: "occurred_at",
         header: "操作时间",
