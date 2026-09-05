@@ -82,7 +82,7 @@ test("H8 ERP 消息真实链路：高级查询、重放、Worker 控制与加密
   await page.getByRole("button", { name: "详情", exact: true }).click();
   await expect(page.getByRole("dialog").getByText("h8-msg-e2e-dead-digest")).toBeVisible();
   await page.screenshot({ path: path.join(screenshotDir, "dead-detail-real.png"), fullPage: false });
-  await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).first().click();
 
   await page.getByRole("button", { name: "重放", exact: true }).click();
   await page.getByPlaceholder("说明重放原因").fill("真实 E2E 故障恢复");
