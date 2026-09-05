@@ -20,7 +20,7 @@ test("M-CG 规则配置使用真实 API 完成新增、预览、编辑和停用"
   await editor.getByLabel("流水位数").fill("6");
   await editor.getByLabel("编码模板").fill("{OWNER}-E2E-{YY}{MM}{DD}-{SEQ}");
   await editor.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("规匙已新增");
+  await expect(page.getByRole("status")).toContainText("规则已新增");
   await expect(page.getByText(ruleCode).first()).toBeVisible();
   await page.screenshot({ path: path.join(artifactsDir, "rule-created.png"), fullPage: false });
 
@@ -34,7 +34,7 @@ test("M-CG 规则配置使用真实 API 完成新增、预览、编辑和停用"
 
   await page.getByRole("button", { name: "编辑", exact: true }).click();
   const editDialog = page.getByRole("dialog", { name: "编辑单据号规则" });
-  await editDialog.getByLabel("规匙名称").fill("E2E 编码规则已更新");
+  await editDialog.getByLabel("规则名称").fill("E2E 编码规则已更新");
   await editDialog.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("规则已更新");
 
