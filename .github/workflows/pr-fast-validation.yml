@@ -45,15 +45,12 @@ jobs:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-
           zero=0000000000000000000000000000000000000000
           base="$PR_BASE_SHA"
           head="$PR_HEAD"
           mode="full PR fallback"
 
-          if [[ "$PR_ACTION" == "synchronize" \
-                && -n "$PR_BEFORE" \
-                && "$PR_BEFORE" != "$zero" ]]; then
+          if [[ "$PR_ACTION" == "synchronize" && -n "$PR_BEFORE" && "$PR_BEFORE" != "$zero" ]]; then
             previous_runs="$(curl --fail-with-body --silent --show-error \
               --header "Authorization: Bearer $GH_TOKEN" \
               --header "Accept: application/vnd.github+json" \
@@ -99,14 +96,12 @@ jobs:
           set_output backend_worker '^backend/crates/h8-erp-worker/'
           set_output backend_openapi '^backend/crates/openapi-export/'
           set_output openapi '^(backend/crates/(api|domain|openapi-export)/|shared/openapi/|packages/api-client/src/schema\.ts)'
-
           set_output frontend '^(apps/(web-admin|customer-portal)/|packages/(ui|api-client)/|prototypes/)'
           set_output web_admin '^(apps/web-admin/|packages/ui/|packages/api-client/)'
           set_output customer_portal '^apps/customer-portal/'
           set_output ui '^packages/ui/'
           set_output api_client '^packages/api-client/'
           set_output prototypes '^prototypes/'
-
           set_output governance '^(scripts/governance/|governance/|docs/|mkdocs\.yml$|AGENTS\.md$|requirements-governance\.txt$|\.github/workflows/)'
 
       - name: Reject whitespace errors
@@ -160,46 +155,60 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           if [[ "${{ steps.scope.outputs.backend_workspace }}" == "true" ]]; then
             cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps --jobs 2 -- -D warnings -A clippy::too-many-arguments
             exit 0
           fi
-
           targets=()
           [[ "${{ steps.scope.outputs.backend_api }}" == "true" ]] && targets+=( -p wms-api )
           [[ "${{ steps.scope.outputs.backend_portal }}" == "true" ]] && targets+=( -p wms-customer-portal-api )
           [[ "${{ steps.scope.outputs.backend_worker }}" == "true" ]] && targets+=( -p h8-erp-worker )
           [[ "${{ steps.scope.outputs.backend_openapi }}" == "true" ]] && targets+=( -p openapi-export )
-
           if ((${#targets[@]} == 0)); then
             echo "No Rust crate source changed; clippy is not required for this delta."
             exit 0
           fi
-
           cargo clippy --manifest-path backend/Cargo.toml "${targets[@]}" --all-targets --no-deps --jobs 2 -- -D warnings -A clippy::too-many-arguments
+
+      - name: Start PostgreSQL for Rust tests
+        if: ${{ steps.scope.outputs.rust == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr-fast-postgres \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_DB=wms_test \
+            --publish 5432:5432 \
+            postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec wms-pr-fast-postgres pg_isready --username postgres --dbname wms_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-pr-fast-postgres
+          exit 1
 
       - name: Incremental Rust unit tests
         if: ${{ steps.scope.outputs.rust == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-
           if [[ "${{ steps.scope.outputs.backend_workspace }}" == "true" ]]; then
             cargo test --manifest-path backend/Cargo.toml --workspace --lib --no-fail-fast --jobs 2
             exit 0
           fi
-
           targets=()
           [[ "${{ steps.scope.outputs.backend_api }}" == "true" ]] && targets+=( -p wms-api )
           [[ "${{ steps.scope.outputs.backend_portal }}" == "true" ]] && targets+=( -p wms-customer-portal-api )
           [[ "${{ steps.scope.outputs.backend_worker }}" == "true" ]] && targets+=( -p h8-erp-worker )
-
           if ((${#targets[@]} == 0)); then
             echo "No library/unit-test target changed; unit tests are not required for this delta."
             exit 0
           fi
-
           cargo test --manifest-path backend/Cargo.toml "${targets[@]}" --lib --no-fail-fast --jobs 2
 
       - uses: pnpm/action-setup@v4
@@ -265,7 +274,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import yaml
-
           for path in sorted(Path('.github/workflows').glob('*.yml')):
               with path.open(encoding='utf-8') as handle:
                   payload = yaml.safe_load(handle)
@@ -294,3 +302,7 @@ jobs:
             echo "Incremental mode is used only when the previous Head already has a successful fast gate."
             echo "Full Governance and PR Deep Validation remain the merge-ready gates."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop PostgreSQL
+        if: ${{ always() }}
+        run: docker rm --force wms-pr-fast-postgres || true
