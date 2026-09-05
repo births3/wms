@@ -157,6 +157,25 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps --jobs 2 -- -D warnings -A clippy::too-many-arguments
 
+      - name: Start PostgreSQL
+        run: |
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-governance-postgres \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_DB=wms_test \
+            --publish 5432:5432 \
+            postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec wms-governance-postgres pg_isready --username postgres --dbname wms_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-governance-postgres
+          exit 1
+
       - name: Backend unit tests
         if: ${{ github.event_name == 'pull_request' }}
         run: |
@@ -221,25 +240,6 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           exit "$status"
-
-      - name: Start PostgreSQL
-        run: |
-          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
-          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
-          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
-          docker run --detach --rm --name wms-governance-postgres \
-            --env POSTGRES_PASSWORD \
-            --env POSTGRES_DB=wms_test \
-            --publish 5432:5432 \
-            postgres:18
-          for attempt in $(seq 1 30); do
-            if docker exec wms-governance-postgres pg_isready --username postgres --dbname wms_test; then
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs wms-governance-postgres
-          exit 1
 
       - name: Apply PostgreSQL migrations
         run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
