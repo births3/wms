@@ -10,12 +10,14 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::auth::AuthContext;
 use crate::device_platform_error::{
     idempotency_key, require_manage, require_monitor, DevicePlatformHandlerError,
 };
+use crate::device_service::DeviceError;
 use crate::wcs_task_service::{
     ConfirmSkipRequest, CreateWcsTaskRequest, DeviceDashboardSummary, DeviceEventLog,
     DeviceEventRequest, ReceiptRequest, ResendRequest, VoidRequest, WcsTaskResponse,
@@ -25,12 +27,14 @@ use crate::wcs_task_service::{
 #[derive(Clone)]
 pub struct WcsTaskAppState {
     pub service: WcsTaskService,
+    pool: PgPool,
 }
 
 impl WcsTaskAppState {
-    pub fn with_postgres(pool: sqlx::PgPool) -> Self {
+    pub fn with_postgres(pool: PgPool) -> Self {
         Self {
-            service: WcsTaskService::new(pool),
+            service: WcsTaskService::new(pool.clone()),
+            pool,
         }
     }
 }
@@ -90,6 +94,7 @@ async fn dashboard_handler(
 ) -> Result<Json<DeviceDashboardSummary>, DevicePlatformHandlerError> {
     let Query(query) = request?;
     require_monitor(&ctx)?;
+    ensure_warehouse_owner(&state.pool, &ctx, query.warehouse_id).await?;
     Ok(Json(
         state
             .service
@@ -105,6 +110,10 @@ async fn list_events_handler(
 ) -> Result<Json<Vec<DeviceEventLog>>, DevicePlatformHandlerError> {
     let Query(query) = request?;
     require_monitor(&ctx)?;
+    ensure_warehouse_owner(&state.pool, &ctx, query.warehouse_id).await?;
+    if let Some(device_id) = query.device_id {
+        ensure_device_owner(&state.pool, &ctx, device_id).await?;
+    }
     Ok(Json(
         state
             .service
@@ -127,6 +136,7 @@ async fn create_task_handler(
 ) -> Result<(StatusCode, Json<WcsTaskResponse>), DevicePlatformHandlerError> {
     let Json(req) = request?;
     require_manage(&ctx)?;
+    ensure_device_owner(&state.pool, &ctx, req.device_id).await?;
     let key = idempotency_key(&headers)?;
     let created = state.service.create_task(&ctx, req, &key).await?;
     let status = if created.created {
@@ -250,10 +260,50 @@ async fn device_event_handler(
     let Path(id) = path?;
     let Json(req) = request?;
     require_manage(&ctx)?;
+    ensure_device_owner(&state.pool, &ctx, id).await?;
     let key = idempotency_key(&headers)?;
     state
         .service
         .handle_event_command(&ctx, id, req, &key)
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn ensure_warehouse_owner(
+    pool: &PgPool,
+    ctx: &AuthContext,
+    warehouse_id: Uuid,
+) -> Result<(), DevicePlatformHandlerError> {
+    let owner_id: Option<Uuid> = sqlx::query_scalar("SELECT owner_id FROM warehouses WHERE id = $1")
+        .bind(warehouse_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|error| DeviceError::Database(error.to_string()))?;
+    if owner_id.is_some_and(|owner_id| owner_id != ctx.owner_id) {
+        return Err(DeviceError::WarehouseForbidden.into());
+    }
+    Ok(())
+}
+
+async fn ensure_device_owner(
+    pool: &PgPool,
+    ctx: &AuthContext,
+    device_id: Uuid,
+) -> Result<(), DevicePlatformHandlerError> {
+    let owner_id: Option<Uuid> = sqlx::query_scalar(
+        r#"
+        SELECT warehouse.owner_id
+          FROM iot_devices device
+          JOIN warehouses warehouse ON warehouse.id = device.warehouse_id
+         WHERE device.id = $1
+        "#,
+    )
+    .bind(device_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| DeviceError::Database(error.to_string()))?;
+    if owner_id.is_some_and(|owner_id| owner_id != ctx.owner_id) {
+        return Err(DeviceError::WarehouseForbidden.into());
+    }
+    Ok(())
 }
