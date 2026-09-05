@@ -108,7 +108,7 @@ jobs:
         env:
           WMS_GOV_CONTEXT: pr
           WMS_GOV_BASE: origin/main
-        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict
+        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict --skip-t1-fallback
 
       - name: Web Admin self-checks
         if: ${{ github.event_name == 'pull_request' }}
