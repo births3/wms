@@ -1,0 +1,344 @@
+name: PR Deep Targeted Replay
+
+"on":
+  pull_request:
+    types: [synchronize]
+
+concurrency:
+  group: pr-deep-targeted-replay-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  targeted-real-e2e:
+    if: ${{ github.event.pull_request.draft == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+    env:
+      CI: "true"
+      RUST_BACKTRACE: "1"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_DEV_INCREMENTAL: "false"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_PROFILE_TEST_INCREMENTAL: "false"
+
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect explicit replay request
+        id: replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          message="$(git log -1 --pretty=%B)"
+          configs="$(printf '%s\n' "$message" | sed -n 's/^Deep-Replay:[[:space:]]*//p' | head -n 1)"
+
+          if [[ -z "$configs" ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No Deep-Replay trailer on the latest commit; targeted replay is disabled."
+            exit 0
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "configs=$configs" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Targeted Deep replay"
+            echo
+            echo "Requested configs: \`$configs\`"
+            echo "The replay waits for PR Fast Validation to pass on this exact Head before starting browser tests."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Wait for same-head Fast gate
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/pr-fast-validation.yml/runs?head_sha=${HEAD_SHA}&event=pull_request&per_page=10"
+
+          for attempt in $(seq 1 90); do
+            payload="$(curl --fail-with-body --silent --show-error \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "$api")"
+
+            status="$(jq -r '.workflow_runs | sort_by(.run_number) | reverse | .[0].status // "missing"' <<<"$payload")"
+            conclusion="$(jq -r '.workflow_runs | sort_by(.run_number) | reverse | .[0].conclusion // ""' <<<"$payload")"
+
+            if [[ "$status" == "completed" && "$conclusion" == "success" ]]; then
+              echo "Same-head PR Fast Validation is green."
+              exit 0
+            fi
+
+            if [[ "$status" == "completed" && -n "$conclusion" && "$conclusion" != "success" ]]; then
+              echo "::error title=Fast gate failed::Same-head PR Fast Validation concluded ${conclusion}; targeted Deep replay will not start."
+              exit 1
+            fi
+
+            echo "Fast gate status: ${status}${conclusion:+/${conclusion}} (attempt ${attempt}/90)"
+            sleep 10
+          done
+
+          echo "::error title=Fast gate timeout::No successful same-head PR Fast Validation was observed before the replay timeout."
+          exit 1
+
+      - name: Set up Rust
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up pnpm
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - name: Set up Node
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Reclaim runner disk
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Cache Rust registry
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-v3-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-v3-
+
+      - name: Install workspace dependencies
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Start PostgreSQL
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr-deep-targeted-postgres \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_DB=wms_test \
+            --publish 5432:5432 \
+            postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec wms-pr-deep-targeted-postgres pg_isready --username postgres --dbname wms_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-pr-deep-targeted-postgres
+          exit 1
+
+      - name: Start Redis
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "WMS_REDIS_URL=redis://127.0.0.1:6379" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr-deep-targeted-redis \
+            --publish 6379:6379 \
+            redis:8-alpine
+          for attempt in $(seq 1 30); do
+            if docker exec wms-pr-deep-targeted-redis redis-cli ping | grep -q '^PONG$'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-pr-deep-targeted-redis
+          exit 1
+
+      - name: Apply PostgreSQL migrations
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-v1-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium system dependencies
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        run: pnpm --dir prototypes exec playwright install-deps chromium
+
+      - name: Install Chromium browser
+        if: ${{ steps.replay.outputs.enabled == 'true' && steps.playwright-cache.outputs.cache-hit != 'true' }}
+        run: pnpm --dir prototypes exec playwright install chromium
+
+      - name: Prebuild real E2E backend
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        run: cargo build --manifest-path backend/Cargo.toml --package wms-api --example wms_api_e2e --jobs 2
+
+      - name: Run requested self-contained real backend configs
+        if: ${{ steps.replay.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          REPLAY_CONFIGS: ${{ steps.replay.outputs.configs }}
+        run: |
+          set -euo pipefail
+
+          allowed_configs=(
+            playwright-web-admin-h1-real-config.ts
+            playwright-web-admin-h5-real-config.ts
+            playwright-web-admin-h8-real-config.ts
+            playwright-web-admin-hal-real-config.ts
+            playwright-web-admin-m1-real-config.ts
+            playwright-web-admin-m10-real-config.ts
+            playwright-web-admin-m2-real-config.ts
+            playwright-web-admin-m3-real-config.ts
+            playwright-web-admin-m4-real-config.ts
+            playwright-web-admin-m9-real-config.ts
+            playwright-web-admin-mcg-real-config.ts
+            playwright-web-admin-mdi-real-config.ts
+            playwright-web-admin-mrc-real-config.ts
+            playwright-web-admin-mte-real-config.ts
+            playwright-customer-portal-real-config.ts
+          )
+
+          is_allowed() {
+            local requested="$1"
+            local candidate
+            for candidate in "${allowed_configs[@]}"; do
+              [[ "$candidate" == "$requested" ]] && return 0
+            done
+            return 1
+          }
+
+          run_isolated_config() {
+            local config="$1"
+            local slug
+            slug="$(printf '%s' "$config" | sha256sum | cut -c1-12)"
+            local database_name="wms_pr_targeted_${slug}_${RANDOM}_e2e"
+            local test_url="${DATABASE_URL%/*}/${database_name}"
+
+            echo "▶ targeted real E2E: ${config}"
+            docker exec wms-pr-deep-targeted-postgres \
+              psql --username postgres --dbname postgres --set ON_ERROR_STOP=1 --quiet \
+              --command "CREATE DATABASE \"${database_name}\""
+
+            set +e
+            DATABASE_URL="$test_url" \
+            WMS_DB_URL="$test_url" \
+            PORTAL_DATABASE_URL="$test_url" \
+              pnpm --dir prototypes exec playwright test --config="$config"
+            status=$?
+            set -e
+
+            docker exec wms-pr-deep-targeted-postgres \
+              psql --username postgres --dbname postgres --quiet \
+              --command "DROP DATABASE IF EXISTS \"${database_name}\" WITH (FORCE)" || true
+
+            return "$status"
+          }
+
+          IFS=',' read -r -a requested_configs <<< "$REPLAY_CONFIGS"
+          if ((${#requested_configs[@]} == 0)); then
+            echo "No replay configs were supplied." >&2
+            exit 1
+          fi
+
+          failures=()
+          executed=0
+          for raw_config in "${requested_configs[@]}"; do
+            config="$(printf '%s' "$raw_config" | xargs)"
+            [[ -n "$config" ]] || continue
+
+            if ! is_allowed "$config"; then
+              echo "Unsupported targeted replay config: $config" >&2
+              failures+=("${config} (unsupported)")
+              continue
+            fi
+
+            if [[ ! -f "prototypes/${config}" ]]; then
+              echo "Missing Playwright config: prototypes/${config}" >&2
+              failures+=("${config} (missing)")
+              continue
+            fi
+
+            executed=$((executed + 1))
+            if ! run_isolated_config "$config"; then
+              failures+=("$config")
+            fi
+          done
+
+          if ((executed == 0)); then
+            echo "No valid targeted replay configs were executed." >&2
+            exit 1
+          fi
+
+          if ((${#failures[@]} > 0)); then
+            {
+              echo "### Failed targeted real-backend Playwright configs"
+              echo
+              printf -- '- `%s`\n' "${failures[@]}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf 'failed targeted real E2E config: %s\n' "${failures[@]}" >&2
+            exit 1
+          fi
+
+          {
+            echo "### Targeted real-backend replay passed"
+            echo
+            echo "Executed ${executed} requested config(s); all passed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload targeted browser evidence
+        if: ${{ always() && steps.replay.outputs.enabled == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-deep-targeted-replay-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            artifacts/screenshot-portal/real-web/**
+            prototypes/.e2e-artifacts/**
+            prototypes/test-results/**
+            prototypes/playwright-report/**
+            apps/**/.e2e-artifacts/**
+
+      - name: Ensure targeted replay did not rewrite tracked files
+        if: ${{ always() && steps.replay.outputs.enabled == 'true' }}
+        run: |
+          git diff --check
+          git diff --exit-code
+
+      - name: Stop Redis
+        if: ${{ always() && steps.replay.outputs.enabled == 'true' }}
+        run: docker rm --force wms-pr-deep-targeted-redis || true
+
+      - name: Stop PostgreSQL
+        if: ${{ always() && steps.replay.outputs.enabled == 'true' }}
+        run: docker rm --force wms-pr-deep-targeted-postgres || true
