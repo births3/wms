@@ -211,21 +211,20 @@ jobs:
           fi
           cargo test --manifest-path backend/Cargo.toml "${targets[@]}" --lib --no-fail-fast --jobs 2
 
+      # T1 always executes and some T1 governance scripts use the TypeScript compiler API,
+      # so workspace Node dependencies must exist even for an empty or docs-only delta.
       - uses: pnpm/action-setup@v4
-        if: ${{ steps.scope.outputs.frontend == 'true' || steps.scope.outputs.governance == 'true' }}
         with:
           version: 11.5.2
           run_install: false
 
       - uses: actions/setup-node@v4
-        if: ${{ steps.scope.outputs.frontend == 'true' || steps.scope.outputs.governance == 'true' }}
         with:
           node-version: "22"
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install workspace dependencies
-        if: ${{ steps.scope.outputs.frontend == 'true' || steps.scope.outputs.governance == 'true' }}
         run: pnpm install --frozen-lockfile
 
       - name: Web Admin fast checks
