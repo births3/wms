@@ -1,0 +1,137 @@
+name: PR2 warmed H8 real-backend validation
+
+on:
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+permissions:
+  contents: write
+
+jobs:
+  h8-real:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      RUST_BACKTRACE: "1"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_DEV_INCREMENTAL: "false"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_PROFILE_TEST_INCREMENTAL: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/governance-tier1-backlog-20260831
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Reclaim runner disk
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install -r requirements-governance.txt
+          corepack enable
+          corepack prepare pnpm@11.5.2 --activate
+          pnpm install --frozen-lockfile
+
+      - name: Start PostgreSQL and Redis
+        run: |
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_REDIS_URL=redis://127.0.0.1:6379" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr2-h8-postgres \
+            --env POSTGRES_PASSWORD --env POSTGRES_DB=wms_test --publish 5432:5432 postgres:18
+          docker run --detach --rm --name wms-pr2-h8-redis --publish 6379:6379 redis:8-alpine
+          for attempt in $(seq 1 30); do
+            docker exec wms-pr2-h8-postgres pg_isready --username postgres --dbname wms_test >/dev/null 2>&1 && \
+            docker exec wms-pr2-h8-redis redis-cli ping | grep -q '^PONG$' && exit 0
+            sleep 1
+          done
+          docker logs wms-pr2-h8-postgres || true
+          docker logs wms-pr2-h8-redis || true
+          exit 1
+
+      - name: Prebuild the real E2E backend
+        run: |
+          cargo build \
+            --manifest-path backend/Cargo.toml \
+            --package wms-api \
+            --example wms_api_e2e \
+            --jobs 2
+
+      - name: Install Chromium
+        run: pnpm --dir prototypes exec playwright install --with-deps chromium
+
+      - name: Run isolated H8 real-backend suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          database_name="wms_pr2_h8_${RANDOM}_e2e"
+          test_url="${DATABASE_URL%/*}/${database_name}"
+          docker exec wms-pr2-h8-postgres \
+            psql --username postgres --dbname postgres --set ON_ERROR_STOP=1 --quiet \
+            --command "CREATE DATABASE \"${database_name}\""
+          set +e
+          DATABASE_URL="$test_url" WMS_DB_URL="$test_url" PORTAL_DATABASE_URL="$test_url" \
+            pnpm --dir prototypes exec playwright test --config=playwright-web-admin-h8-real-config.ts
+          status=$?
+          set -e
+          docker exec wms-pr2-h8-postgres \
+            psql --username postgres --dbname postgres --quiet \
+            --command "DROP DATABASE IF EXISTS \"${database_name}\" WITH (FORCE)" || true
+          exit "$status"
+
+      - name: Upload targeted evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr2-h8-warmed-${{ github.run_id }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 3
+          path: |
+            artifacts/screenshot-portal/real-web/h8-erp-messages/**
+            artifacts/screenshot-portal/real-web/h8-erp/**
+            apps/web-admin/.e2e-artifacts/h8-real/**
+            prototypes/test-results/**
+
+      - name: Stop services
+        if: always()
+        run: |
+          docker rm --force wms-pr2-h8-redis || true
+          docker rm --force wms-pr2-h8-postgres || true
+
+  cleanup:
+    if: always() && github.actor != 'github-actions[bot]'
+    needs: h8-real
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/governance-tier1-backlog-20260831
+          fetch-depth: 0
+      - name: Remove targeted workflow from the branch
+        run: |
+          set -euo pipefail
+          rm .github/workflows/pr2-h8-targeted-validation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/pr2-h8-targeted-validation.yml
+          git commit -m "chore(ci): remove warmed H8 validation workflow"
+          git push origin HEAD:fix/governance-tier1-backlog-20260831
