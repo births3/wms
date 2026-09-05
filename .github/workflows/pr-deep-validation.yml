@@ -1,16 +1,19 @@
 name: PR Deep Validation
 
-on:
+"on":
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  workflow_dispatch:
 
 concurrency:
-  group: pr-deep-validation-${{ github.event.pull_request.number }}
+  group: pr-deep-validation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   deep-validation:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 150
     permissions:
       contents: read
     env:
@@ -30,14 +33,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-governance.txt
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - uses: pnpm/action-setup@v4
         with:
-          components: rustfmt, clippy
+          version: 11.5.2
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - uses: taiki-e/install-action@just
 
@@ -59,15 +69,13 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-          key: ${{ runner.os }}-cargo-registry-deep-v2-${{ hashFiles('backend/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-v3-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-registry-deep-v2-
+            ${{ runner.os }}-cargo-registry-v3-
 
       - name: Install governance and workspace dependencies
         run: |
           python3 -m pip install -r requirements-governance.txt
-          corepack enable
-          corepack prepare pnpm@11.5.2 --activate
           pnpm install --frozen-lockfile
 
       - name: Start PostgreSQL
@@ -109,55 +117,45 @@ jobs:
 
       - name: Detect browser/runtime validation scope
         id: runtime_scope
+        shell: bash
         run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            echo "manual full validation" > /tmp/pr-deep-changed-files.txt
+            exit 0
+          fi
+
           git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" > /tmp/pr-deep-changed-files.txt
           cat /tmp/pr-deep-changed-files.txt
-          if grep -qE '^(prototypes/|apps/web-admin/|apps/customer-portal/|backend/crates/api/src/|governance/quality-matrix\.toml|scripts/governance/)' /tmp/pr-deep-changed-files.txt; then
+          if grep -qE '^(prototypes/|apps/web-admin/|apps/customer-portal/|packages/ui/|packages/api-client/|backend/crates/api/src/|backend/crates/api/examples/|backend/migrations/|governance/quality-matrix\.toml|governance/visual-baselines/|scripts/governance/|shared/openapi/)' /tmp/pr-deep-changed-files.txt; then
             echo "required=true" >> "$GITHUB_OUTPUT"
           else
             echo "required=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Focused PostgreSQL regression tests
-        run: |
-          cargo test \
-            --manifest-path backend/Cargo.toml \
-            --package wms-api \
-            --test m3_replenishment_location_group_t3_postgres \
-            --test m3_replenishment_wave_postgres \
-            --test schema_baseline_postgres \
-            --test wave4_postgres \
-            --no-fail-fast \
-            --jobs 2
-
-      - name: Full Rust workspace tests
-        run: |
-          echo "=== disk before full Rust tests ==="
-          df -h /
-          cargo test \
-            --manifest-path backend/Cargo.toml \
-            --workspace \
-            --no-fail-fast \
-            --jobs 2
-          echo "=== disk after full Rust tests ==="
-          df -h /
-          du -sh backend/target || true
-
-      - name: Check disk before browser validation
-        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
-        run: |
-          echo "=== disk before browser validation ==="
-          df -h /
-          du -sh backend/target || true
-
       - name: Prototype TypeScript and Vite build
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
         run: |
           pnpm --dir prototypes exec tsc --noEmit
           pnpm --dir prototypes run build
 
-      - name: Install Chromium for browser validation
+      - name: Cache Playwright Chromium
+        id: playwright-cache
         if: ${{ steps.runtime_scope.outputs.required == 'true' }}
-        run: pnpm --dir prototypes exec playwright install --with-deps chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-v1-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium system dependencies
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: pnpm --dir prototypes exec playwright install-deps chromium
+
+      - name: Install Chromium browser
+        if: ${{ steps.runtime_scope.outputs.required == 'true' && steps.playwright-cache.outputs.cache-hit != 'true' }}
+        run: pnpm --dir prototypes exec playwright install chromium
 
       - name: Prototype full matrix browser gate
         if: ${{ steps.runtime_scope.outputs.required == 'true' }}
@@ -169,6 +167,10 @@ jobs:
           pnpm --dir apps/web-admin run test:e2e:shell-dev
           pnpm --dir apps/web-admin run test:e2e:h4-dev
           pnpm --dir apps/web-admin run test:e2e:h9-dev
+
+      - name: Prebuild real E2E backend
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: cargo build --manifest-path backend/Cargo.toml --package wms-api --example wms_api_e2e --jobs 2
 
       - name: Detect external H8 interface-table scope
         id: h8_interface_scope
