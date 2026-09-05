@@ -14,7 +14,7 @@ test("H8 ERP 连接：新建 → 测试 → 启用 → 停用（真实 API）", 
   await login(page);
   await openPage(page);
   await expect(page.getByRole("heading", { name: "H8 ERP 连接" })).toBeVisible();
-  await expect(page.getByText(/可维护/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "新建连接", exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(screenshotDir, "page-loaded.png"), fullPage: false });
 
   const code = `e2e-h8-${Date.now()}`;
@@ -121,7 +121,7 @@ test("H8 ERP 连接：仓库主管只读（无写操作）", async ({ page }) =>
   await login(page, "wh-manager");
   await openPage(page);
   await expect(page.getByRole("heading", { name: "H8 ERP 连接" })).toBeVisible();
-  await expect(page.getByText(/集成中心 · US-H8-001 · .* · 只读 ·/)).toBeVisible();
+  await expect(page.getByText("只读可见连接", { exact: true })).toBeVisible();
   await expect(page.getByText(code)).toBeVisible();
   await expect(page.getByRole("button", { name: "新建连接", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "测试", exact: true })).toHaveCount(0);

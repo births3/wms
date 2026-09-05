@@ -45,11 +45,15 @@ test("H8 ERP 消息真实链路：高级查询、重放、Worker 控制与加密
   await expect(page.getByText("H8-MSG-E2E-OTHER-OWNER", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "展开", exact: true }).click();
-  await page.getByLabel("消息类型", { exact: true }).selectOption("asn");
-  await page.getByLabel("通道", { exact: true }).selectOption("interface_table");
-  await page.getByLabel("状态", { exact: true }).selectOption("dead");
+  await page.locator('summary[aria-label="消息类型"]').click();
+  await page.getByRole("checkbox", { name: "预到货通知（ASN）", exact: true }).check();
+  await page.locator('summary[aria-label="通道"]').click();
+  await page.getByRole("checkbox", { name: "接口表", exact: true }).check();
+  await page.locator('summary[aria-label="状态"]').click();
+  await page.getByRole("checkbox", { name: "死信", exact: true }).check();
   await page.getByLabel("连接编码", { exact: true }).fill("H8-IF-E2E");
-  await page.getByLabel("仓库", { exact: true }).selectOption(warehouseId);
+  await page.locator('summary[aria-label="仓库"]').click();
+  await page.getByRole("checkbox", { name: warehouseId, exact: true }).check();
   await page.getByLabel("外部业务标识", { exact: true }).fill("H8-MSG-E2E-DEAD");
   await page.getByLabel("幂等键（Idempotency-Key）", { exact: true }).fill("h8-msg-e2e-dead-idem");
   await page.getByLabel("关联标识（Correlation）", { exact: true }).fill("h8-msg-e2e-dead-corr");
