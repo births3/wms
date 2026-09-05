@@ -1,0 +1,247 @@
+name: PR Fast Validation
+
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-fast-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  fast-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      RUST_BACKTRACE: "1"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_DEV_INCREMENTAL: "false"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_PROFILE_TEST_INCREMENTAL: "false"
+
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect incremental validation scope
+        id: scope
+        shell: bash
+        env:
+          PR_ACTION: ${{ github.event.action }}
+          PR_BEFORE: ${{ github.event.before }}
+          PR_AFTER: ${{ github.event.after }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$PR_ACTION" == "synchronize" && -n "$PR_BEFORE" && -n "$PR_AFTER" ]]; then
+            base="$PR_BEFORE"
+            head="$PR_AFTER"
+          else
+            base="origin/${GITHUB_BASE_REF}"
+            head="$PR_HEAD"
+          fi
+
+          git diff --name-only "$base...$head" > /tmp/pr-fast-changed-files.txt
+          echo "Fast validation diff: $base...$head"
+          cat /tmp/pr-fast-changed-files.txt
+          echo "FAST_BASE=$base" >> "$GITHUB_ENV"
+
+          set_output() {
+            local name="$1"
+            local pattern="$2"
+            if grep -qE "$pattern" /tmp/pr-fast-changed-files.txt; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          set_output rust '^(backend/|shared/openapi/)'
+          set_output backend_workspace '^backend/(Cargo\.toml|Cargo\.lock|crates/domain/)'
+          set_output backend_api '^backend/(crates/api/|migrations/)'
+          set_output backend_portal '^backend/crates/customer-portal-api/'
+          set_output backend_worker '^backend/crates/h8-erp-worker/'
+          set_output backend_openapi '^backend/crates/openapi-export/'
+          set_output openapi '^(backend/crates/(api|domain|openapi-export)/|shared/openapi/|packages/api-client/src/schema\.ts)'
+
+          set_output frontend '^(apps/(web-admin|customer-portal)/|packages/(ui|api-client)/|prototypes/)'
+          set_output web_admin '^(apps/web-admin/|packages/ui/|packages/api-client/)'
+          set_output customer_portal '^apps/customer-portal/'
+          set_output ui '^packages/ui/'
+          set_output api_client '^packages/api-client/'
+          set_output prototypes '^prototypes/'
+
+          set_output governance '^(scripts/governance/|governance/|docs/|mkdocs\.yml$|AGENTS\.md$|requirements-governance\.txt$|\.github/workflows/)'
+
+      - name: Reject whitespace errors
+        run: git diff --check "$FAST_BASE...HEAD"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-governance.txt
+
+      - name: Install governance dependencies
+        run: python3 -m pip install -r requirements-governance.txt
+
+      - name: Install gitleaks
+        run: |
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_checksums.txt
+          grep 'gitleaks_8.21.2_linux_x64.tar.gz' gitleaks_8.21.2_checksums.txt | sha256sum --check --strict
+          tar -xzf gitleaks_8.21.2_linux_x64.tar.gz gitleaks
+          mkdir -p "$HOME/.local/bin"
+          mv gitleaks "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Incremental secret scan
+        run: gitleaks detect --redact --no-banner --log-opts="$FAST_BASE..HEAD"
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ steps.scope.outputs.rust == 'true' }}
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust registry
+        if: ${{ steps.scope.outputs.rust == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-v3-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-v3-
+
+      - name: Rust format
+        if: ${{ steps.scope.outputs.rust == 'true' }}
+        run: cargo fmt --manifest-path backend/Cargo.toml --all --check
+
+      - name: Incremental Rust clippy
+        if: ${{ steps.scope.outputs.rust == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ steps.scope.outputs.backend_workspace }}" == "true" ]]; then
+            cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps --jobs 2 -- -D warnings -A clippy::too-many-arguments
+            exit 0
+          fi
+
+          targets=()
+          [[ "${{ steps.scope.outputs.backend_api }}" == "true" ]] && targets+=( -p wms-api )
+          [[ "${{ steps.scope.outputs.backend_portal }}" == "true" ]] && targets+=( -p wms-customer-portal-api )
+          [[ "${{ steps.scope.outputs.backend_worker }}" == "true" ]] && targets+=( -p h8-erp-worker )
+          [[ "${{ steps.scope.outputs.backend_openapi }}" == "true" ]] && targets+=( -p openapi-export )
+
+          if ((${#targets[@]} == 0)); then
+            echo "No Rust crate source changed; clippy is not required for this delta."
+            exit 0
+          fi
+
+          cargo clippy --manifest-path backend/Cargo.toml "${targets[@]}" --all-targets --no-deps --jobs 2 -- -D warnings -A clippy::too-many-arguments
+
+      - name: Incremental Rust unit tests
+        if: ${{ steps.scope.outputs.rust == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ steps.scope.outputs.backend_workspace }}" == "true" ]]; then
+            cargo test --manifest-path backend/Cargo.toml --workspace --lib --no-fail-fast --jobs 2
+            exit 0
+          fi
+
+          targets=()
+          [[ "${{ steps.scope.outputs.backend_api }}" == "true" ]] && targets+=( -p wms-api )
+          [[ "${{ steps.scope.outputs.backend_portal }}" == "true" ]] && targets+=( -p wms-customer-portal-api )
+          [[ "${{ steps.scope.outputs.backend_worker }}" == "true" ]] && targets+=( -p h8-erp-worker )
+
+          if ((${#targets[@]} == 0)); then
+            echo "No library/unit-test target changed; unit tests are not required for this delta."
+            exit 0
+          fi
+
+          cargo test --manifest-path backend/Cargo.toml "${targets[@]}" --lib --no-fail-fast --jobs 2
+
+      - uses: pnpm/action-setup@v4
+        if: ${{ steps.scope.outputs.frontend == 'true' }}
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        if: ${{ steps.scope.outputs.frontend == 'true' }}
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        if: ${{ steps.scope.outputs.frontend == 'true' }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Web Admin fast checks
+        if: ${{ steps.scope.outputs.web_admin == 'true' }}
+        run: |
+          pnpm --dir apps/web-admin exec tsc --noEmit
+          pnpm --dir packages/api-client run typecheck
+          pnpm --dir apps/web-admin run test:self-checks
+
+      - name: Customer Portal typecheck
+        if: ${{ steps.scope.outputs.customer_portal == 'true' }}
+        run: pnpm --dir apps/customer-portal exec tsc --noEmit
+
+      - name: UI unit tests
+        if: ${{ steps.scope.outputs.ui == 'true' }}
+        run: |
+          node packages/ui/tests/dialog-dismiss.test.ts
+          node packages/ui/tests/data-grid-advanced-filters.test.ts
+          node packages/ui/tests/data-grid-filter-history.test.ts
+          node packages/ui/tests/data-grid-pagination-prefetch.test.ts
+          node packages/ui/tests/data-grid-views.test.ts
+          node packages/ui/tests/query-panel-quick-filters.test.ts
+          node packages/ui/tests/scroll-bar-math.test.ts
+          node packages/ui/tests/viewport-math.test.ts
+          node packages/ui/tests/scroll-bar-wiring.test.ts
+          node packages/ui/tests/table-row-background.test.ts
+          node packages/ui/tests/data-grid-layout-expand.test.ts
+
+      - name: Prototype TypeScript check
+        if: ${{ steps.scope.outputs.prototypes == 'true' }}
+        run: pnpm --dir prototypes exec tsc --noEmit
+
+      - name: Fast OpenAPI contract check
+        if: ${{ steps.scope.outputs.openapi == 'true' }}
+        run: |
+          cargo build --manifest-path backend/Cargo.toml --package openapi-export --jobs 2
+          python3 scripts/governance/check_openapi_in_sync.py --strict
+          python3 scripts/governance/validate_openapi_artifacts.py
+          python3 scripts/governance/check_openapi_contract.py
+          git diff --check
+          git diff --exit-code
+
+      - name: Diff-driven T2 checks without duplicate T1 fallback
+        env:
+          WMS_GOV_CONTEXT: pr
+        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base "$FAST_BASE" --strict --skip-t1-fallback
+
+      - name: Fast validation summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### PR Fast Validation"
+            echo
+            echo "Validated only the latest PR delta: \`$FAST_BASE...HEAD\`."
+            echo "Full Governance and PR Deep Validation remain the merge-ready gates."
+          } >> "$GITHUB_STEP_SUMMARY"
