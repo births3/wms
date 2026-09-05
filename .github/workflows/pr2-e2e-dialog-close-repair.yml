@@ -1,0 +1,47 @@
+name: PR2 one-shot H8 dialog selector repair
+
+on:
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/governance-tier1-backlog-20260831
+          fetch-depth: 0
+
+      - name: Disambiguate the detail-dialog close button
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("prototypes/e2e/web-admin-h8-messages-real.spec.ts")
+          text = path.read_text(encoding="utf-8")
+          old = '  await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();'
+          new = '  await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).first().click();'
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f"expected exactly one close-button selector, found {count}")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+      - name: Remove one-shot workflow and commit repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/pr2-e2e-dialog-close-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f prototypes/e2e/web-admin-h8-messages-real.spec.ts
+          git add .github/workflows/pr2-e2e-dialog-close-repair.yml
+          git diff --cached --check
+          git commit -m "test(e2e): disambiguate H8 detail dialog close"
+          git push origin HEAD:fix/governance-tier1-backlog-20260831
