@@ -87,7 +87,7 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
     new URL(response.url()).searchParams.get("location_code") === "A01-01-02-03",
   );
   await locationSummary.getByRole("button", { name: "历史追踪", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "M3 库位历史追踪" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "M3 库位历史", exact: true })).toBeVisible();
   const historyResponse = await historyResponsePromise;
   expect(historyResponse.ok()).toBeTruthy();
   await expect(page.getByRole("region", { name: "商品分布" }).or(page.getByText("暂无库位历史"))).toBeVisible();
@@ -131,7 +131,7 @@ test("M3 库存状态规则使用真实 API 保存货主覆盖", async ({ page }
     if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
   }
   await target.click();
-  await expect(page.getByRole("heading", { name: "M3 库存状态管理" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "M3 状态规则", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "新增", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "新增库存状态转换规则" });
