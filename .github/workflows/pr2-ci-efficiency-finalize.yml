@@ -1,0 +1,103 @@
+name: PR2 one-shot CI efficiency finalizer
+
+"on":
+  push:
+    branches:
+      - fix/governance-tier1-backlog-20260831
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/governance-tier1-backlog-20260831
+          fetch-depth: 0
+
+      - name: Finalize staged CI optimization
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      f"expected exactly one match in {path}, found {count}: {old!r}"
+                  )
+              file_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              ".github/workflows/pr-fast.yml",
+              '        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base "${WMS_GOV_BASE}" --strict',
+              '        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base "${WMS_GOV_BASE}" --strict --skip-t1-fallback',
+          )
+
+          replace_once(
+              ".github/workflows/governance.yml",
+              "        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict",
+              "        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict --skip-t1-fallback",
+          )
+
+          deep_path = Path(".github/workflows/pr-deep-validation.yml")
+          deep = deep_path.read_text(encoding="utf-8")
+          if "Focused PostgreSQL regression tests" in deep or "Full Rust workspace tests" in deep:
+              raise SystemExit("deep validation regression steps are already present")
+
+          marker = '''      - name: Prototype TypeScript and Vite build
+'''
+          insertion = '''      - name: Focused PostgreSQL regression tests
+        run: |
+          cargo test \\
+            --manifest-path backend/Cargo.toml \\
+            --package wms-api \\
+            --test m3_replenishment_location_group_t3_postgres \\
+            --test m3_replenishment_wave_postgres \\
+            --test schema_baseline_postgres \\
+            --test wave4_postgres \\
+            --no-fail-fast \\
+            --jobs 2
+
+      - name: Full Rust workspace tests
+        run: |
+          echo "=== disk before full Rust tests ==="
+          df -h /
+          cargo test \\
+            --manifest-path backend/Cargo.toml \\
+            --workspace \\
+            --no-fail-fast \\
+            --jobs 2
+          echo "=== disk after full Rust tests ==="
+          df -h /
+          du -sh backend/target || true
+
+      - name: Prototype TypeScript and Vite build
+'''
+          if deep.count(marker) != 1:
+              raise SystemExit(
+                  f"expected exactly one prototype-build marker, found {deep.count(marker)}"
+              )
+          deep_path.write_text(deep.replace(marker, insertion, 1), encoding="utf-8")
+
+      - name: Remove one-shot workflow and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/pr2-ci-efficiency-finalize.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .github/workflows/pr-fast.yml \
+            .github/workflows/governance.yml \
+            .github/workflows/pr-deep-validation.yml \
+            .github/workflows/pr2-ci-efficiency-finalize.yml
+          git diff --cached --check
+          git commit -m "ci: finish staged validation optimization"
+          git push origin HEAD:fix/governance-tier1-backlog-20260831
