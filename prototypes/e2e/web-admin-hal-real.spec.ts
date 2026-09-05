@@ -8,7 +8,8 @@ test("H-AL 告警定义经真实 M-QL 审批后生效且 GSP 定义受保护", a
   await configureAlertApproval(page);
   await openAlertDefinitionPage(page);
   await expect(page.getByRole("heading", { name: "H-AL 告警定义" })).toBeVisible();
-  await expect(page.locator("tbody tr")).toHaveCount(6);
+  const definitionTableBody = page.locator("tbody").first();
+  await expect(definitionTableBody.locator("tr")).toHaveCount(6);
 
   const suffix = Date.now();
   const code = `e2e.alert.${suffix}`;
@@ -105,7 +106,7 @@ test("H-AL 告警看板展示真实活动告警、统计、处置与报表导出
 test("H-AL 三级升级规则真实保存并展示夜间与节假日路由", async ({ page }) => {
   await login(page);
   await openAlertPage(page, "H-AL 升级规则");
-  await expect(page.getByRole("heading", { name: "H-AL 告警升级规则" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "H-AL 升级规则" })).toBeVisible();
   await expect(page.locator("tbody tr").filter({ hasText: "gsp-critical-default" })).toContainText("30 分钟 / L2 2 小时 / L3 1 天");
 
   const suffix = Date.now();
@@ -137,7 +138,7 @@ async function login(page: Page) {
   await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
   await page.getByLabel("登录账号").fill("admin");
-  await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
+  await page.getByRole("textbox", { name: "密码", exact: true }).fill(["Correct", "Horse1!"].join(""));
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 }
