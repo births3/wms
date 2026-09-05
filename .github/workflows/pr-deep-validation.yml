@@ -259,13 +259,28 @@ jobs:
             playwright-customer-portal-real-config.ts
           )
 
+          failures=()
           for config in "${configs[@]}"; do
-            test -f "prototypes/${config}" || {
+            if [[ ! -f "prototypes/${config}" ]]; then
               echo "missing Playwright config: prototypes/${config}" >&2
-              exit 1
-            }
-            run_isolated_config "$config"
+              failures+=("${config} (missing)")
+              continue
+            fi
+
+            if ! run_isolated_config "$config"; then
+              failures+=("$config")
+            fi
           done
+
+          if ((${#failures[@]} > 0)); then
+            {
+              echo "### Failed self-contained real-backend Playwright configs"
+              echo
+              printf -- '- `%s`\n' "${failures[@]}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf 'failed real E2E config: %s\n' "${failures[@]}" >&2
+            exit 1
+          fi
 
       - name: External H8 interface-table Playwright evidence suite
         if: ${{ steps.runtime_scope.outputs.required == 'true' && steps.h8_interface_scope.outputs.required == 'true' }}
@@ -293,8 +308,8 @@ jobs:
           path: |
             artifacts/screenshot-portal/real-web/**
             prototypes/.e2e-artifacts/**
-            prototypes/test-results/playwright-web-admin-h8-interface-real/**
-            prototypes/playwright-report/web-admin-h8-interface-real/**
+            prototypes/test-results/**
+            prototypes/playwright-report/**
             apps/**/.e2e-artifacts/**
 
       - name: Ensure deep validation did not rewrite tracked files
