@@ -36,7 +36,7 @@ test("US-M10-001 真实后端接收路径规划结果并保留浏览器证据", 
   await login(page);
   await openRoutePlanPage(page);
 
-  await expect(page.getByRole("heading", { name: "接收 TMS 路径规划结果", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "M10 路径规划接收", exact: true })).toBeVisible();
   for (const label of [
     "配送日期",
     "TMS 调度结果 ID",

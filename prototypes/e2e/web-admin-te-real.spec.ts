@@ -46,7 +46,7 @@ test("M-TE 任务组和调度使用真实 API 完成创建、自动分派与下�
   await configurePutawayRelease(page, "scheduled");
   await assertTaskEngineReads(page);
   await openTaskGroupPage(page);
-  await expect(page.getByRole("heading", { name: "M-TE 任务组与人员资格" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "M-TE 任务组资格" })).toBeVisible();
 
   const suffix = Date.now();
   const groupCode = `e2e_group_${suffix}`;
