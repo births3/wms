@@ -138,7 +138,7 @@ async function login(page: Page) {
   await page.goto("/");
   await page.getByLabel("货主编码").fill("PY_OWNER");
   await page.getByLabel("登录账号").fill("admin");
-  await page.getByRole("textbox", { name: "密码", exact: true }).fill(["Correct", "Horse1!"].join(""));
+  await page.getByRole("textbox", { name: "密码", exact: true }).fill("CorrectHorse1!");
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "运营总览" })).toBeVisible();
 }
