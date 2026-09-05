@@ -1,1 +1,0 @@
-Temporary trigger for PR #2 validation; removed by the next commit.
