@@ -23,7 +23,7 @@ test("US-M9-001 真实后端创建计费规则并保留浏览器证据", async (
   fs.mkdirSync(artifactsDir, { recursive: true });
   await login(page);
   await openBillingPage(page);
-  await expect(page.getByRole("heading", { name: "M9 计费规则配置" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "M9 计费规则", exact: true })).toBeVisible();
   for (const id of [
     "billing-charge-item",
     "billing-unit",
