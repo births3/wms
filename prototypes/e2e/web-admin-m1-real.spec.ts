@@ -31,7 +31,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
     { group: "仓储资料", menu: /M1 仓库管理/, title: "M1 仓库管理", text: "WH-M1-E2E-001", shot: "warehouses.png" },
     { group: "仓储资料", menu: /M1 库区管理/, title: "M1 库区管理", text: "A01", shot: "zones.png" },
     { group: "仓储资料", menu: /M1 库位管理/, title: "M1 库位管理", text: "A01-01-02-03", shot: "locations.png" },
-    { group: "系统配置", menu: /M1 (功能开关|Feature Flag)/, title: "配置中心", text: "m3_inventory_batches_config_center_smoke", shot: "feature-flags.png" },
+    { group: "系统配置", menu: /M1 (功能开关|Feature Flag)/, title: "M1 功能开关", text: "m3_inventory_batches_config_center_smoke", shot: "feature-flags.png" },
     { group: "系统配置", menu: /M1 系统字典/, title: "M1 系统字典", text: "purchase_inbound", shot: "dictionary.png" },
   ];
 
@@ -70,7 +70,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
         fullPage: false,
       });
     }
-    if (item.title === "配置中心") {
+    if (item.title === "M1 功能开关") {
       await page.getByRole("button", { name: "从文件源迁移" }).click();
     }
     if (item.title === "M1 仓库管理") {
@@ -97,7 +97,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
         ),
       });
     }
-    if (item.title === "配置中心") {
+    if (item.title === "M1 功能开关") {
       fs.mkdirSync(featureFlagEvidenceDir, { recursive: true });
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: path.join(featureFlagEvidenceDir, "feature-flags-current.png"), fullPage: false });
