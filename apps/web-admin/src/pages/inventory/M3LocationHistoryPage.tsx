@@ -95,8 +95,8 @@ export function M3LocationHistoryPage({ onBack, initialLocationCode }: M3Locatio
   const columns = React.useMemo<DataGridColumn<LocationHistoryMovement>[]>(
     () => [
       {
-        key: "occurred_at",
-        header: "操作时间",
+        key: "created_at",
+        header: "创建时间",
         width: 180,
         minWidth: 160,
         sortable: true,
