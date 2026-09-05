@@ -274,11 +274,12 @@ async fn ensure_warehouse_owner(
     ctx: &AuthContext,
     warehouse_id: Uuid,
 ) -> Result<(), DevicePlatformHandlerError> {
-    let owner_id: Option<Uuid> = sqlx::query_scalar("SELECT owner_id FROM warehouses WHERE id = $1")
-        .bind(warehouse_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|error| DeviceError::Database(error.to_string()))?;
+    let owner_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT owner_id FROM warehouses WHERE id = $1")
+            .bind(warehouse_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|error| DeviceError::Database(error.to_string()))?;
     if owner_id.is_some_and(|owner_id| owner_id != ctx.owner_id) {
         return Err(DeviceError::WarehouseForbidden.into());
     }
