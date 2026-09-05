@@ -729,10 +729,21 @@ impl DeviceService {
         for device in &stale {
             let mut tx = self.pool.begin().await.map_err(db_err)?;
             mark_offline_in_tx(&mut tx, device.id, now).await?;
+            let owner_id: Uuid = sqlx::query_scalar("SELECT owner_id FROM warehouses WHERE id = $1")
+                .bind(device.warehouse_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(db_err)?
+                .ok_or_else(|| {
+                    DeviceError::Database(format!(
+                        "warehouse {} missing while publishing device offline event",
+                        device.warehouse_id
+                    ))
+                })?;
             // H4 离线告警（business.device_offline）与离线状态同事务。
             publish_event_in_tx(
                 &mut tx,
-                device.warehouse_id,
+                owner_id,
                 &format!("device_offline:{}", device.id),
                 "business.device_offline",
                 "M1",
