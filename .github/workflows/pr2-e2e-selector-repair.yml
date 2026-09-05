@@ -85,7 +85,8 @@ jobs:
           rm .github/workflows/pr2-e2e-selector-repair.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add prototypes/e2e/web-admin-h8-messages-real.spec.ts prototypes/e2e/web-admin-h8-real.spec.ts .github/workflows/pr2-e2e-selector-repair.yml
+          git add -f prototypes/e2e/web-admin-h8-messages-real.spec.ts prototypes/e2e/web-admin-h8-real.spec.ts
+          git add .github/workflows/pr2-e2e-selector-repair.yml
           git diff --cached --check
           git commit -m "test(e2e): align H8 selectors with current controls"
           git push origin HEAD:fix/governance-tier1-backlog-20260831
