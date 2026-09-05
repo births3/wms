@@ -2,6 +2,7 @@ name: governance
 
 "on":
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   push:
     branches: [main]
   workflow_dispatch:
@@ -12,6 +13,7 @@ concurrency:
 
 jobs:
   governance:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -24,22 +26,35 @@ jobs:
       CARGO_PROFILE_DEV_INCREMENTAL: "false"
       CARGO_PROFILE_TEST_DEBUG: "0"
       CARGO_PROFILE_TEST_INCREMENTAL: "false"
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
+      - name: Rust format
+        run: cargo fmt --manifest-path backend/Cargo.toml --all --check
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-governance.txt
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - uses: taiki-e/install-action@just
 
@@ -74,55 +89,62 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-          key: ${{ runner.os }}-cargo-registry-governance-v2-${{ hashFiles('backend/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-v3-${{ hashFiles('backend/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-registry-governance-v2-
+            ${{ runner.os }}-cargo-registry-v3-
 
       - name: Install governance dependencies
         run: python3 -m pip install -r requirements-governance.txt
 
       - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Full T1 governance
+        if: ${{ github.event_name == 'pull_request' }}
+        run: python3 scripts/governance/governance_checks.py --tier T1
+
+      - name: T2 diff-driven governance
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          WMS_GOV_CONTEXT: pr
+          WMS_GOV_BASE: origin/main
+        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict
+
+      - name: Web Admin self-checks
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm --dir apps/web-admin run test:self-checks
+
+      - name: JavaScript unit tests
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          corepack enable
-          corepack prepare pnpm@11.5.2 --activate
-          pnpm install --frozen-lockfile
+          node packages/ui/tests/dialog-dismiss.test.ts
+          node packages/ui/tests/data-grid-advanced-filters.test.ts
+          node packages/ui/tests/data-grid-filter-history.test.ts
+          node packages/ui/tests/data-grid-pagination-prefetch.test.ts
+          node packages/ui/tests/data-grid-views.test.ts
+          node packages/ui/tests/query-panel-quick-filters.test.ts
+          node packages/ui/tests/scroll-bar-math.test.ts
+          node packages/ui/tests/viewport-math.test.ts
+          node packages/ui/tests/scroll-bar-wiring.test.ts
+          node packages/ui/tests/table-row-background.test.ts
+          node packages/ui/tests/data-grid-layout-expand.test.ts
+          node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
 
-      - name: Start PostgreSQL for backend tests and T3/T4
+      - name: TypeScript contracts
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
-          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
-          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
-          docker run --detach --rm --name wms-governance-postgres \
-            --env POSTGRES_PASSWORD \
-            --env POSTGRES_DB=wms_test \
-            --publish 5432:5432 \
-            postgres:18
-          for attempt in $(seq 1 30); do
-            if docker exec wms-governance-postgres pg_isready --username postgres --dbname wms_test; then
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs wms-governance-postgres
-          exit 1
-
-      - name: Apply PostgreSQL migrations
-        run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
-
-      - name: Install Chromium for T3/T4
-        if: ${{ github.event_name != 'pull_request' }}
-        run: pnpm --dir prototypes exec playwright install --with-deps chromium
+          pnpm --dir apps/web-admin exec tsc --noEmit
+          pnpm --dir packages/api-client run typecheck
 
       - name: Warm OpenAPI exporter
         if: ${{ github.event_name == 'pull_request' }}
-        run: cargo build --manifest-path backend/Cargo.toml --package openapi-export
+        run: cargo build --manifest-path backend/Cargo.toml --package openapi-export --jobs 2
 
       - name: Verify OpenAPI runtime registrations
         if: ${{ github.event_name == 'pull_request' }}
-        run: cargo test --manifest-path backend/Cargo.toml --package wms-api --test openapi_pda_runtime
+        run: cargo test --manifest-path backend/Cargo.toml --package wms-api --test openapi_pda_runtime --jobs 2
 
       - name: Verify generated OpenAPI contracts
-        id: t2_openapi
         if: ${{ github.event_name == 'pull_request' }}
         run: |
           python3 scripts/governance/check_openapi_in_sync.py --strict
@@ -131,37 +153,17 @@ jobs:
           git diff --check
           git diff --exit-code
 
-      - name: Full T1 governance
-        id: t1_governance
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        run: python3 scripts/governance/governance_checks.py --tier T1
+      - name: Rust clippy
+        if: ${{ github.event_name == 'pull_request' }}
+        run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps --jobs 2 -- -D warnings -A clippy::too-many-arguments
 
-      - name: T2 Rust format
-        id: t2_fmt
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        run: cargo fmt --manifest-path backend/Cargo.toml --all --check
-
-      - name: T2 diff-driven governance
-        id: t2_diff
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        env:
-          WMS_GOV_CONTEXT: pr
-          WMS_GOV_BASE: origin/main
-        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict
-
-      - name: T2 Rust clippy
-        id: t2_clippy
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps -- -D warnings -A clippy::too-many-arguments
-
-      - name: T2 backend unit tests
-        id: t2_backend_tests
-        if: ${{ always() && github.event_name == 'pull_request' }}
+      - name: Backend unit tests
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
           set +e
           cargo test \
             --manifest-path backend/Cargo.toml \
-            --workspace --lib --no-fail-fast \
+            --workspace --lib --no-fail-fast --jobs 2 \
             > /tmp/backend-unit-tests.log 2>&1
           status=$?
           set -e
@@ -220,89 +222,58 @@ jobs:
 
           exit "$status"
 
-      - name: T2 web-admin self-checks
-        id: t2_web_checks
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        run: pnpm --dir apps/web-admin run test:self-checks
-
-      - name: T2 JavaScript unit tests
-        id: t2_js_tests
-        if: ${{ always() && github.event_name == 'pull_request' }}
+      - name: Start PostgreSQL
         run: |
-          node packages/ui/tests/dialog-dismiss.test.ts
-          node packages/ui/tests/data-grid-advanced-filters.test.ts
-          node packages/ui/tests/data-grid-filter-history.test.ts
-          node packages/ui/tests/data-grid-pagination-prefetch.test.ts
-          node packages/ui/tests/data-grid-views.test.ts
-          node packages/ui/tests/query-panel-quick-filters.test.ts
-          node packages/ui/tests/scroll-bar-math.test.ts
-          node packages/ui/tests/viewport-math.test.ts
-          node packages/ui/tests/scroll-bar-wiring.test.ts
-          node packages/ui/tests/table-row-background.test.ts
-          node packages/ui/tests/data-grid-layout-expand.test.ts
-          node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
-
-      - name: T2 TypeScript contracts
-        id: t2_ts_contracts
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        run: |
-          pnpm --dir apps/web-admin exec tsc --noEmit
-          pnpm --dir packages/api-client run typecheck
-
-      - name: T2 gate summary
-        id: t2_summary
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        env:
-          T1_GOVERNANCE: ${{ steps.t1_governance.outcome }}
-          T2_FMT: ${{ steps.t2_fmt.outcome }}
-          T2_DIFF: ${{ steps.t2_diff.outcome }}
-          T2_CLIPPY: ${{ steps.t2_clippy.outcome }}
-          T2_BACKEND_TESTS: ${{ steps.t2_backend_tests.outcome }}
-          T2_WEB_CHECKS: ${{ steps.t2_web_checks.outcome }}
-          T2_JS_TESTS: ${{ steps.t2_js_tests.outcome }}
-          T2_TS_CONTRACTS: ${{ steps.t2_ts_contracts.outcome }}
-          T2_OPENAPI: ${{ steps.t2_openapi.outcome }}
-        run: |
-          failed=0
-          for name in \
-            T1_GOVERNANCE T2_FMT T2_DIFF T2_CLIPPY T2_BACKEND_TESTS \
-            T2_WEB_CHECKS T2_JS_TESTS T2_TS_CONTRACTS T2_OPENAPI
-          do
-            outcome="${!name}"
-            printf '%-20s %s\n' "$name" "$outcome"
-            if [[ "$outcome" != "success" ]]; then
-              failed=1
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-governance-postgres \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_DB=wms_test \
+            --publish 5432:5432 \
+            postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec wms-governance-postgres pg_isready --username postgres --dbname wms_test; then
+              exit 0
             fi
+            sleep 1
           done
-          exit "$failed"
+          docker logs wms-governance-postgres
+          exit 1
+
+      - name: Apply PostgreSQL migrations
+        run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
 
       - name: T3 critical PostgreSQL integration tests
-        id: t3_postgres_tests
-        if: ${{ github.event_name == 'pull_request' && steps.t2_summary.outcome == 'success' }}
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
           cargo test \
             --manifest-path backend/Cargo.toml \
             --package wms-api \
             --test m1_lpn_type_policy_idempotency_postgres \
-            --no-fail-fast
+            --no-fail-fast --jobs 2
           cargo test \
             --manifest-path backend/Cargo.toml \
             --package wms-api \
             --test m1_device_t3_contract_postgres \
-            --no-fail-fast
+            --no-fail-fast --jobs 2
 
       - name: Risk-triggered T3 governance
-        if: ${{ github.event_name == 'pull_request' && steps.t2_summary.outcome == 'success' && steps.t3_postgres_tests.outcome == 'success' }}
+        if: ${{ github.event_name == 'pull_request' }}
         env:
           WMS_GOV_CONTEXT: pr
           WMS_GOV_BASE: origin/main
         run: python3 scripts/governance/task_check.py --tier T3 --context pr --base origin/main --strict
 
       - name: Verify PR checks did not rewrite tracked files
-        if: ${{ always() && github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
           git diff --check
           git diff --exit-code
+
+      - name: Install Chromium for main/release validation
+        if: ${{ github.event_name != 'pull_request' }}
+        run: pnpm --dir prototypes exec playwright install --with-deps chromium
 
       - name: Main preflight
         if: ${{ github.event_name == 'push' }}
