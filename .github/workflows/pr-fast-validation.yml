@@ -2,7 +2,7 @@ name: PR Fast Validation
 
 "on":
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, converted_to_draft]
 
 concurrency:
   group: pr-fast-validation-${{ github.event.pull_request.number }}
@@ -10,6 +10,7 @@ concurrency:
 
 jobs:
   fast-validation:
+    if: ${{ github.event.pull_request.draft == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -230,6 +231,11 @@ jobs:
           python3 scripts/governance/check_openapi_contract.py
           git diff --check
           git diff --exit-code
+
+      - name: Diff-driven T1 checks
+        env:
+          WMS_GOV_CONTEXT: pr
+        run: python3 scripts/governance/task_check.py --tier T1 --context pr --base "$FAST_BASE" --strict
 
       - name: Diff-driven T2 checks without duplicate T1 fallback
         env:
