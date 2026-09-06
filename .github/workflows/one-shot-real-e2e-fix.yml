@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   fix:
-    if: ${{ contains(github.event.head_commit.message, '测试: 启动 real E2E 一次性修复') }}
+    if: "${{ contains(github.event.head_commit.message, '测试: 启动 real E2E 一次性修复') }}"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,7 +39,6 @@ jobs:
               '  await expect(definitionTableBody.locator("tr").first()).toBeVisible();\n'
               '  await expect(definitionTableBody.locator("tr").filter({ hasText: "qualification_expiry_30d" })).toBeVisible();',
           )
-
           replace(
               "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
               '  await expect(page.getByRole("status")).toContainText(group.delivery_note_no);\n',
@@ -56,7 +55,6 @@ jobs:
               '  await expect(page.getByRole("status")).toContainText("测试打印已下发");\n',
               "",
           )
-
           replace(
               "prototypes/e2e/web-admin-m1-real.spec.ts",
               '        actionName: "标签",',
@@ -72,14 +70,12 @@ jobs:
               '  await page.getByRole("button", { name: "客入", exact: true }).click();',
               '  await page.getByRole("button", { name: "导入客户", exact: true }).click();',
           )
-
           replace(
               "prototypes/e2e/web-admin-m2-real.spec.ts",
               '  await page.getByRole("button", { name: "新增", exact: true }).click();',
               '  await page.getByTitle("新建 ASN").click();',
               expected=1,
           )
-
           replace(
               "prototypes/e2e/web-admin-m3-real.spec.ts",
               '.fill("cold");',
@@ -100,7 +96,6 @@ jobs:
               '      const result = await api.GET("/api/v1/inventory/maintenance/tasks", { params: { query: {} } });',
               '      const result = await api.GET("/api/v1/inventory/maintenance/tasks", { params: { query: { page: 1, page_size: 200 } } });',
           )
-
           replace(
               "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
               '      loading={ordersQuery.isPending || ordersQuery.isFetching || wavesQuery.isPending || returnsQuery.isPending}',
@@ -112,7 +107,6 @@ jobs:
               '            : ordersQuery.isPending || ordersQuery.isFetching\n'
               '      }',
           )
-
           replace(
               "apps/web-admin/src/pages/reconciliation/MrcReconciliationPage.tsx",
               '  const canExecute = currentUser.permissions.includes("rc.reconciliation.execute");\n'
@@ -152,7 +146,6 @@ jobs:
               '  await field.locator("summary").click();',
               expected=2,
           )
-
           replace(
               "prototypes/e2e/web-admin-mdi-real-ui.ts",
               '        const payload = await response.json();\n'
