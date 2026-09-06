@@ -107,8 +107,7 @@ pub fn validate_category_zone(
     if arr.is_empty() {
         return true;
     }
-    arr.iter()
-        .any(|v| v.as_str().map_or(false, |c| c == product_category))
+    arr.iter().any(|v| v.as_str() == Some(product_category))
 }
 
 pub fn zone_treats_as_qualified(zone_quality_color: &str) -> bool {
@@ -244,7 +243,7 @@ mod tests {
     #[test]
     fn temperature_subset_uses_containment_not_equality() {
         assert!(is_temperature_zone_subset("cold_2_8", "cold_2_8"));
-        assert!(is_temperature_zone_subset("cold_2_8", "cool_le_20") == false);
+        assert!(!is_temperature_zone_subset("cold_2_8", "cool_le_20"));
         assert!(is_temperature_zone_subset("cool_le_20", "normal_10_30"));
         assert!(!is_temperature_zone_subset("normal_10_30", "cold_2_8"));
         assert!(parse_temperature_range("frozen").is_some());

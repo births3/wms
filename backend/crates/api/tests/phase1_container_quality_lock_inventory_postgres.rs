@@ -649,7 +649,7 @@ async fn test_http_idempotency_key_replay_no_duplicate_events(pool: PgPool) {
         "reason_desc": "HTTP 幂等重放加锁",
         "witness_id": witness_id
     });
-    let mut post_lock = || {
+    let post_lock = || {
         Request::builder()
             .method("POST")
             .uri(format!(
@@ -705,7 +705,7 @@ async fn test_http_idempotency_key_replay_no_duplicate_events(pool: PgPool) {
         "witness_id": witness_id,
         "reason_desc": "HTTP 幂等解锁"
     });
-    let mut post_release = || {
+    let post_release = || {
         Request::builder()
             .method("POST")
             .uri(format!(

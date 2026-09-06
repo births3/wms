@@ -1,241 +1,195 @@
 #!/usr/bin/env python3
-"""check_baseline_completeness.py — 原型 baseline 完整性治理
+"""check_baseline_completeness.py — ADR-0043 真实页面证据完整性兼容入口。
 
-类别：6. 原型治理
-Tier：T1（强制；diff 触发：prototypes/src/Tabs.tsx 或 manifest.toml 改动）
-
-校验三者一致性：
-  1. Tabs.tsx 中 TABS 数组的 value （来源）
-  2. governance/visual-baselines/manifest.toml 的 [[snapshots]].tab
-  3. governance/visual-baselines/<file>.png 实际文件
-
-任意一项缺失即报错（PR 阻断）：
-  - 加了 tab 但忘记 manifest 条目 → "tab '{value}' 在 Tabs.tsx 但 manifest.toml 无条目"
-  - 加了 tab 但忘记入 baseline → "tab '{value}' 在 manifest.toml 但 baseline PNG 文件不存在"
-  - manifest 有条目但 Tabs.tsx 已删 → "tab '{value}' 在 manifest 但 Tabs.tsx 无对应"
-
-依赖：仅 stdlib（无需 PIL）
+默认模式保持 T1 的纯静态契约检查：生产页面必须登记真实 Playwright E2E、截图路径和
+quality-matrix evidence_refs。使用 ``--require-files`` 时进入运行时证据模式，除静态契约外还
+会逐个验证 quality matrix 中声明的真实截图文件确实存在、不是空文件，并且是可解析出正数
+尺寸的 PNG。CI 的 PR deep-validation 在真实 E2E 完成后使用该模式，避免“只登记路径就变绿”。
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
-import re
+import struct
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
+
+from _direct_production_frontend import replacement_contract_errors
 
 _THIS = Path(__file__).resolve()
+SCRIPTS_DIR = _THIS.parent
 REPO_ROOT = _THIS.parent.parent.parent
-TABS_FILE = REPO_ROOT / "prototypes" / "src" / "Tabs.tsx"
-FULL_MATRIX_SPECS_FILE = REPO_ROOT / "prototypes" / "src" / "prototype-kit" / "full-matrix-specs.ts"
-MANIFEST_TOML = REPO_ROOT / "governance" / "visual-baselines" / "manifest.toml"
-BASELINE_DIR = REPO_ROOT / "governance" / "visual-baselines"
+REPLACEMENT = SCRIPTS_DIR / "check_scope_gap_discovery.py"
+QUALITY_MATRIX = REPO_ROOT / "governance" / "quality-matrix.toml"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+MIN_SCREENSHOT_BYTES = 1024
 
 
-def _review_metadata_errors(changed_pngs: list[str], manifest_diff: str) -> list[str]:
-    hunks = re.split(r"(?=^@@)", manifest_diff, flags=re.MULTILINE)
-    errors = []
-    for png in changed_pngs:
-        reviewed = any(
-            f'file = "{png}"' in hunk
-            and re.search(r'^\+reviewed_by\s*=\s*"[^"?\-]+"', hunk, re.MULTILINE)
-            and re.search(r'^\+reviewed_at\s*=\s*"\d{4}-\d{2}-\d{2}"', hunk, re.MULTILINE)
-            for hunk in hunks
-        )
-        if not reviewed:
-            errors.append(f"baseline PNG '{png}' 已修改，但对应 manifest 区块未同步更新审核人和审核日期")
+def _static_contract_errors() -> list[str]:
+    errors = replacement_contract_errors()
+    if errors:
+        return errors
+    if not REPLACEMENT.is_file():
+        return ["真实页面证据检查器 check_scope_gap_discovery.py 不存在"]
+
+    result = subprocess.run(
+        [sys.executable, str(REPLACEMENT), "--json"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return []
+    detail = result.stdout.strip() or result.stderr.strip() or f"exit={result.returncode}"
+    return [f"生产页面真实 E2E/截图契约未闭环: {detail[:3000]}"]
+
+
+def _matrix_records() -> list[tuple[str, str, str, str]]:
+    if not QUALITY_MATRIX.is_file():
+        return []
+    data = tomllib.loads(QUALITY_MATRIX.read_text(encoding="utf-8"))
+    records: list[tuple[str, str, str, str]] = []
+    for section in ("stories", "deferred_stories"):
+        values = data.get(section, [])
+        if not isinstance(values, list):
+            continue
+        for story in values:
+            if not isinstance(story, dict):
+                continue
+            story_id = str(story.get("id", "-"))
+            screenshots = story.get("e2e_screenshots", [])
+            if not isinstance(screenshots, list):
+                continue
+            for record in screenshots:
+                if not isinstance(record, dict):
+                    continue
+                page = record.get("page")
+                spec = record.get("spec")
+                screenshot = record.get("screenshot")
+                if all(isinstance(value, str) and value for value in (page, spec, screenshot)):
+                    records.append((story_id, page, spec, screenshot))
+    return records
+
+
+def _png_dimensions(path: Path) -> tuple[int, int] | None:
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(24)
+    except OSError:
+        return None
+    if len(header) < 24 or header[:8] != PNG_SIGNATURE or header[12:16] != b"IHDR":
+        return None
+    width, height = struct.unpack(">II", header[16:24])
+    if width <= 0 or height <= 0:
+        return None
+    return width, height
+
+
+def _runtime_file_errors() -> list[str]:
+    if not QUALITY_MATRIX.is_file():
+        return ["缺少 governance/quality-matrix.toml，无法验证真实截图文件"]
+
+    errors: list[str] = []
+    records = _matrix_records()
+    if not records:
+        return ["quality matrix 未声明任何 e2e_screenshots，运行时截图门禁没有可验证对象"]
+
+    seen: set[str] = set()
+    for story_id, page, spec, screenshot in records:
+        if screenshot in seen:
+            continue
+        seen.add(screenshot)
+
+        spec_path = REPO_ROOT / spec
+        screenshot_path = REPO_ROOT / screenshot
+        label = f"{story_id}/{page}"
+
+        if not screenshot.startswith("artifacts/screenshot-portal/real-web/"):
+            errors.append(f"{label}: 截图证据不在 real-web 目录：{screenshot}")
+            continue
+        if not spec.startswith("prototypes/e2e/") or not spec.endswith("-real.spec.ts"):
+            errors.append(f"{label}: 截图证据未绑定真实 Playwright spec：{spec}")
+            continue
+        if not spec_path.is_file():
+            errors.append(f"{label}: Playwright spec 不存在：{spec}")
+            continue
+        if Path(screenshot).name not in spec_path.read_text(encoding="utf-8"):
+            errors.append(f"{label}: spec 未引用声明的截图文件名：{screenshot}")
+            continue
+        if not screenshot_path.is_file():
+            errors.append(f"{label}: 真实截图文件不存在：{screenshot}")
+            continue
+
+        size = screenshot_path.stat().st_size
+        if size < MIN_SCREENSHOT_BYTES:
+            errors.append(
+                f"{label}: 截图文件异常小：{screenshot} ({size} bytes < {MIN_SCREENSHOT_BYTES})"
+            )
+            continue
+        dimensions = _png_dimensions(screenshot_path)
+        if dimensions is None:
+            errors.append(f"{label}: 截图不是有效 PNG/IHDR：{screenshot}")
+            continue
+
     return errors
 
 
-def _duplicate_baseline_errors(manifest_files: dict[str, str | None]) -> list[str]:
-    file_tabs: dict[str, list[str]] = {}
-    for tab, filename in manifest_files.items():
-        if filename:
-            file_tabs.setdefault(filename, []).append(tab)
-    return [
-        f"baseline PNG '{filename}' 被多个 tab 引用：{', '.join(sorted(tabs))}"
-        for filename, tabs in file_tabs.items()
-        if len(tabs) > 1
-    ]
-
-
-def _pending_baseline_review_errors(base_ref: str | None = None) -> list[str]:
-    diffs = [["git", "diff", "--cached"], ["git", "diff"]]
-    if base_ref:
-        verify = subprocess.run(
-            ["git", "rev-parse", "--verify", base_ref],
-            cwd=REPO_ROOT,
-            capture_output=True,
-        )
-        if verify.returncode == 0:
-            diffs.append(["git", "diff", f"{base_ref}...HEAD"])
-    errors: list[str] = []
-    for base in diffs:
-        changed = subprocess.run(
-            base + ["--name-only", "--diff-filter=ACMRT"],
-            cwd=REPO_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.splitlines()
-        pngs = [Path(path).name for path in changed if path.startswith("governance/visual-baselines/") and path.endswith(".png")]
-        if not pngs:
-            continue
-        diff = subprocess.run(
-            base + ["--unified=5", "--", str(MANIFEST_TOML.relative_to(REPO_ROOT))],
-            cwd=REPO_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        errors.extend(_review_metadata_errors(pngs, diff))
-    return list(dict.fromkeys(errors))
-
-
-def _load_toml(path: Path) -> dict:
-    text = path.read_text(encoding="utf-8")
-    try:
-        import tomllib
-        return tomllib.loads(text)
-    except ModuleNotFoundError:
-        import tomli
-        return tomli.loads(text)
-
-
-def _extract_tab_values_from_tabs_tsx(content: str) -> list[str]:
-    """从 Tabs.tsx 中抽取所有 tab 的 value 字符串。
-    匹配形如：{ value: "h2-audit", ... }
-    """
-    # 匹配 value: "xxx" 形式（不在注释里）
-    pattern = re.compile(r'\{\s*value:\s*"([a-z0-9-]+)"', re.MULTILINE)
-    return pattern.findall(content)
-
-
-def _extract_tab_values_from_full_matrix_specs(content: str) -> list[str]:
-    """抽取数据驱动全量矩阵 tab 的 slug 字符串。"""
-    pattern = re.compile(r'^\s*slug:\s*"([a-z0-9-]+)"', re.MULTILINE)
-    return pattern.findall(content)
+def run(*, require_files: bool = False) -> list[str]:
+    errors = _static_contract_errors()
+    if require_files:
+        errors.extend(_runtime_file_errors())
+    return errors
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--base", default=os.environ.get("WMS_GIT_BASE", "main"))
+    parser.add_argument("--base", default=None, help="保留历史 CLI 兼容；ADR-0043 模式由质量矩阵决定证据范围")
+    parser.add_argument(
+        "--require-files",
+        action="store_true",
+        help="真实 E2E 完成后验证 quality matrix 声明的 PNG 文件确实存在且有效",
+    )
     args = parser.parse_args()
 
-    errors: list[str] = []
-    errors.extend(_pending_baseline_review_errors(args.base))
-
-    # 1. 读 Tabs.tsx
-    if not TABS_FILE.exists():
-        errors.append(f"缺少 {TABS_FILE.relative_to(REPO_ROOT)}")
+    try:
+        errors = run(require_files=args.require_files)
+    except Exception as exc:  # noqa: BLE001
         if args.json:
-            print(json.dumps({"status": "fail", "errors": errors}))
+            print(json.dumps({"status": "error", "message": str(exc)}, ensure_ascii=False))
         else:
-            print(f"check_baseline_completeness — 致命错误")
-            for e in errors:
-                print(f"  - {e}")
-        return 1
+            print(f"[ERROR] {exc}", file=sys.stderr)
+        return 2
 
-    tabs_tsx_values = _extract_tab_values_from_tabs_tsx(TABS_FILE.read_text(encoding="utf-8"))
-    if FULL_MATRIX_SPECS_FILE.exists():
-        tabs_tsx_values.extend(
-            _extract_tab_values_from_full_matrix_specs(
-                FULL_MATRIX_SPECS_FILE.read_text(encoding="utf-8")
-            )
-        )
-    if not tabs_tsx_values:
-        errors.append(f"Tabs.tsx 解析失败：未找到任何 tab value")
-
-    # 2. 读 manifest.toml
-    if not MANIFEST_TOML.exists():
-        errors.append(f"缺少 {MANIFEST_TOML.relative_to(REPO_ROOT)}")
-    manifest_data = _load_toml(MANIFEST_TOML) if MANIFEST_TOML.exists() else {"snapshots": []}
-    manifest_snaps = manifest_data.get("snapshots", [])
-    manifest_tabs = [s["tab"] for s in manifest_snaps]
-    manifest_files = {s["tab"]: s.get("file") for s in manifest_snaps}
-    errors.extend(_duplicate_baseline_errors(manifest_files))
-
-    # 3. 三者一致性校验
-    set_tabs = set(tabs_tsx_values)
-    set_manifest = set(manifest_tabs)
-
-    # a) Tabs.tsx 有但 manifest 无
-    missing_in_manifest = set_tabs - set_manifest
-    for tab in sorted(missing_in_manifest):
-        errors.append(f"tab '{tab}' 在 Tabs.tsx 但 manifest.toml 无 [[snapshots]] 条目（请加 manifest + 截图）")
-
-    # b) manifest 有但 Tabs.tsx 已删
-    orphan_in_manifest = set_manifest - set_tabs
-    for tab in sorted(orphan_in_manifest):
-        errors.append(f"tab '{tab}' 在 manifest.toml 但 Tabs.tsx 已无对应（请删 manifest 条目）")
-
-    # c) baseline PNG 文件存在 + reviewed 字段必填 + reviewed_at >= PNG mtime
-    import datetime
-    for tab in set_tabs & set_manifest:
-        snap = next((s for s in manifest_snaps if s["tab"] == tab), None)
-        if snap is None:
-            continue
-        png_name = snap.get("file")
-        if not png_name:
-            errors.append(f"tab '{tab}' 在 manifest 缺 file 字段")
-            continue
-        png_path = BASELINE_DIR / png_name
-        if not png_path.exists():
-            errors.append(f"tab '{tab}' 缺 baseline PNG 文件：{png_path.relative_to(REPO_ROOT)}")
-            continue
-        if png_path.stat().st_size < 1024:  # < 1KB 视为空文件
-            errors.append(f"tab '{tab}' baseline PNG 异常小（{png_path.stat().st_size} bytes，疑似截图失败）")
-            continue
-
-        # reviewed_by 必填（不能为空字符串或 'TODO'）
-        reviewed_by = snap.get("reviewed_by", "").strip()
-        if not reviewed_by or reviewed_by.lower() in ("todo", "tbd", "?", "-"):
-            errors.append(f"tab '{tab}' manifest.reviewed_by 缺失或占位（'{reviewed_by}'），必须填实际 review 人")
-
-        # reviewed_at 必填 + 格式 YYYY-MM-DD
-        reviewed_at = snap.get("reviewed_at", "").strip()
-        if not reviewed_at:
-            errors.append(f"tab '{tab}' manifest.reviewed_at 缺失")
-            continue
-        try:
-            datetime.date.fromisoformat(reviewed_at)
-        except ValueError:
-            errors.append(f"tab '{tab}' manifest.reviewed_at 格式错误（'{reviewed_at}'，需 YYYY-MM-DD）")
-            continue
-
-        # 注：PNG mtime 与 reviewed_at 的比较已移除，原因：
-        # - mtime 在 cp / git checkout 时会被刷新，不可靠
-        # - 'PNG 改了视觉是否健康' 由视觉回归和人工走查替代治理
-        # - 真要追溯 review 历史，看 git log 即可
-
-    # d) 反向：baseline 目录里有 .png 但 manifest 无引用
-    referenced = {f for f in manifest_files.values() if f}
-    for png in BASELINE_DIR.glob("*.png"):
-        if png.name not in referenced:
-            errors.append(f"baseline PNG 孤儿（manifest 无引用）：{png.name}")
+    payload: dict[str, Any] = {
+        "status": "fail" if errors else "pass",
+        "errors": errors,
+        "ok": not errors,
+        "require_files": args.require_files,
+    }
+    if args.require_files:
+        payload["declared_screenshot_count"] = len({record[3] for record in _matrix_records()})
 
     if args.json:
-        print(json.dumps({
-            "status": "fail" if errors else "pass",
-            "errors": errors,
-            "ok": not errors,
-            "tabs_in_code": sorted(set_tabs),
-            "tabs_in_manifest": sorted(set_manifest),
-        }))
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif errors:
+        mode = "运行时真实截图" if args.require_files else "静态截图契约"
+        print(f"✗ check_baseline_completeness: {mode}发现 {len(errors)} 项缺口")
+        for error in errors:
+            print(f"  - {error}")
+    elif args.require_files:
+        count = len({record[3] for record in _matrix_records()})
+        print(f"✓ check_baseline_completeness: {count} 个真实页面 PNG 文件存在且有效")
     else:
-        total = len(set_tabs)
-        print(f"check_baseline_completeness — Tabs.tsx({len(set_tabs)}) ↔ manifest({len(set_manifest)}) ↔ PNG({len(referenced)})")
-        if errors:
-            print(f"  ✘ {len(errors)} violation(s):")
-            for e in errors:
-                print(f"    - {e}")
-        else:
-            print(f"  ✓ 全部 {total} 个 tab 三者一致")
-            print(f"  规范：加新 page → 同步加 Tabs.tsx + manifest.toml + 跑 capture 入 baseline")
-
+        print("✓ check_baseline_completeness: ADR-0043 真实页面 E2E/截图静态契约完整")
     return 1 if errors else 0
 
 

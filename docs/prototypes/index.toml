@@ -1,0 +1,1497 @@
+# docs/prototypes/index.toml — 原型必有清单（治理唯一真相源）
+#
+# 由 docs/prototypes/prototype-matrix-r3.md 逐行展开：非豁免 UI 故事按端生成一个 required 条目。
+# priority: P0=Wave 0.5 / P1=Wave 1.5 / P2=Wave 2.5 / P3=Wave 3.5 / P4=Wave 4.5
+#
+# prototype_slug 命名规则：<端>-<模块码小写>-<序号3位>
+#   端       = pc / pda / pad / h5
+#   模块码   = 见 docs/architecture-dependencies.md §1.0（如 m2 / h1 / mpm）
+#   序号     = 该端该模块下的原型序号，3 位补零（001 起）；
+#              若对应故事是拆分子故事（如 US-M1-004a），序号沿用故事号可带字母后缀（004a）
+#   示例     = pc-m2-001（PC 端 M2 采购入库第 1 个原型）、pda-h1-001、pc-m1-004a（US-M1-004a 子故事）
+#   注：手工精品页可另用语义 slug（如 m1-items），经 Tabs.tsx 的 LEGACY_SLUGS 映射。
+
+[meta]
+current_wave = "5"
+source = "docs/prototypes/prototype-matrix-r3.md"
+total_required = 170
+
+# ============================================================
+# 全量 UI 原型清单（170 个 story/end 组合）
+# ============================================================
+
+[[required]]
+story_id = "US-H1-001"
+prototype_slug = "pc-h1-001"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "登录页三角色入口"
+
+[[required]]
+story_id = "US-H1-001"
+prototype_slug = "pda-h1-001"
+end = "pda"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "登录页三角色入口"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-H1-002"
+prototype_slug = "pc-h1-002"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "权限矩阵交互复杂"
+
+[[required]]
+story_id = "US-H1-005"
+prototype_slug = "pc-h1-005"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "登出交互+过期提示"
+
+[[required]]
+story_id = "US-H1-005"
+prototype_slug = "pda-h1-005"
+end = "pda"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "登出交互+过期提示"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-H1-006"
+prototype_slug = "pc-h1-006"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "密钥管理页"
+
+[[required]]
+story_id = "US-H2-002"
+prototype_slug = "pc-h2-002"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "查询界面+时间线展示"
+
+[[required]]
+story_id = "US-H2-004"
+prototype_slug = "pc-h2-004"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "归档策略配置页"
+
+[[required]]
+story_id = "US-H2-006"
+prototype_slug = "pc-h2-006"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "归档规则+执行记录页"
+
+[[required]]
+story_id = "US-H3-004"
+prototype_slug = "pc-h3-004"
+end = "pc"
+priority = "P0"
+status = "ready_for_walkthrough"
+reason = "Swagger UI 定制页"
+
+[[required]]
+story_id = "US-H4-001"
+prototype_slug = "pc-h4-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "通知模板+渠道配置"
+
+[[required]]
+story_id = "US-H4-004"
+prototype_slug = "pc-h4-004"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "发送记录列表页"
+
+[[required]]
+story_id = "US-H5-001"
+prototype_slug = "pc-h5-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "快递商管理页"
+
+[[required]]
+story_id = "US-H5-002"
+prototype_slug = "pc-h5-002"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "规则配置表单"
+
+[[required]]
+story_id = "US-H5-003"
+prototype_slug = "pc-h5-003"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "打印预览+模板选择"
+
+[[required]]
+story_id = "US-H5-003"
+prototype_slug = "pad-h5-003"
+end = "pad"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "打印预览+模板选择"
+
+[[required]]
+story_id = "US-H5-005"
+prototype_slug = "pc-h5-005"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "轨迹时间线（PC+门店可查）"
+
+[[required]]
+story_id = "US-H5-005"
+prototype_slug = "h5-h5-005"
+end = "h5"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "轨迹时间线（PC+门店可查）"
+
+[[required]]
+story_id = "US-AL-001"
+prototype_slug = "pc-al-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "告警规则配置页"
+
+[[required]]
+story_id = "US-AL-003"
+prototype_slug = "pc-al-003"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "升级策略配置"
+
+[[required]]
+story_id = "US-AL-004"
+prototype_slug = "pc-al-004"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "实时告警大屏"
+
+[[required]]
+story_id = "US-AL-005"
+prototype_slug = "pc-al-005"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "通道+静默规则配置"
+
+[[required]]
+story_id = "US-DOCK-001"
+prototype_slug = "pc-dock-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "月台CRUD+状态管理"
+
+[[required]]
+story_id = "US-DOCK-002"
+prototype_slug = "pc-dock-002"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "预约表单+时间窗选择"
+
+[[required]]
+story_id = "US-DOCK-002"
+prototype_slug = "pda-dock-002"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "预约表单+时间窗选择"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-DOCK-003"
+prototype_slug = "pc-dock-003"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "甘特图式冲突可视化"
+
+[[required]]
+story_id = "US-DOCK-004"
+prototype_slug = "pc-dock-004"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "变更流程+审批"
+
+[[required]]
+story_id = "US-DOCK-005"
+prototype_slug = "pda-dock-005"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 扫码对账"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-DOCK-006"
+prototype_slug = "pc-dock-006"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "实时占用大屏"
+
+[[required]]
+story_id = "US-DOCK-006"
+prototype_slug = "pad-dock-006"
+end = "pad"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "实时占用大屏"
+
+[[required]]
+story_id = "US-DOCK-007"
+prototype_slug = "pc-dock-007"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "报表页"
+
+[[required]]
+story_id = "US-DR-001"
+prototype_slug = "h5-dr-001"
+end = "h5"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "司机移动端首页"
+
+[[required]]
+story_id = "US-DR-002"
+prototype_slug = "h5-dr-002"
+end = "h5"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "扫码+签字+拍照"
+
+[[required]]
+story_id = "US-DR-003"
+prototype_slug = "h5-dr-003"
+end = "h5"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "异常类型选择+拍照+定位"
+
+[[required]]
+story_id = "US-DR-004"
+prototype_slug = "h5-dr-004"
+end = "h5"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "客户手写签字+拍照"
+
+[[required]]
+story_id = "US-DR-005"
+prototype_slug = "h5-dr-005"
+end = "h5"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "日志列表+绩效统计"
+
+[[required]]
+story_id = "US-ST-001"
+prototype_slug = "pc-st-001"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "门店端首页+快捷入口"
+
+[[required]]
+story_id = "US-ST-001"
+prototype_slug = "pad-st-001"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "门店端首页+快捷入口"
+
+[[required]]
+story_id = "US-ST-002"
+prototype_slug = "pc-st-002"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "商品目录+购物车+下单"
+
+[[required]]
+story_id = "US-ST-002"
+prototype_slug = "pad-st-002"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "商品目录+购物车+下单"
+
+[[required]]
+story_id = "US-ST-003"
+prototype_slug = "pc-st-003"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "扫码签收+温控确认"
+
+[[required]]
+story_id = "US-ST-003"
+prototype_slug = "pad-st-003"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "扫码签收+温控确认"
+
+[[required]]
+story_id = "US-ST-004"
+prototype_slug = "pc-st-004"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "退货申请表单"
+
+[[required]]
+story_id = "US-ST-004"
+prototype_slug = "pad-st-004"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "退货申请表单"
+
+[[required]]
+story_id = "US-ST-005"
+prototype_slug = "pc-st-005"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "订单列表+详情+筛选"
+
+[[required]]
+story_id = "US-ST-005"
+prototype_slug = "pad-st-005"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "订单列表+详情+筛选"
+
+[[required]]
+story_id = "US-ST-006"
+prototype_slug = "pc-st-006"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "温度曲线+超标标记"
+
+[[required]]
+story_id = "US-ST-006"
+prototype_slug = "pad-st-006"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "温度曲线+超标标记"
+
+[[required]]
+story_id = "US-M1-001"
+prototype_slug = "pc-m1-001"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "商品详情页字段多+资质附件"
+
+[[required]]
+story_id = "US-M1-002"
+prototype_slug = "pc-m1-002"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "资质有效期+证照管理"
+
+[[required]]
+story_id = "US-M1-003"
+prototype_slug = "pc-m1-003"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "客户+门店层级管理"
+
+[[required]]
+story_id = "US-M1-004"
+prototype_slug = "pc-m1-004"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "库位可视化+温区标记"
+
+[[required]]
+story_id = "US-M1-004a"
+prototype_slug = "pc-m1-004a"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "LPN 绑定/解绑+PDA 扫码"
+
+[[required]]
+story_id = "US-M1-004a"
+prototype_slug = "pda-m1-004a"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "LPN 绑定/解绑+PDA 扫码"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M1-006"
+prototype_slug = "pc-m1-006"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "用户+角色+权限矩阵（建议与 H1-002 合并为 1 个原型）"
+
+[[required]]
+story_id = "US-M1-007"
+prototype_slug = "pc-m1-007"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "货主切换+数据隔离可视化"
+
+[[required]]
+story_id = "US-M1-008"
+prototype_slug = "pc-m1-008"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "配置项分组+搜索+变更历史"
+
+[[required]]
+story_id = "US-M1-009"
+prototype_slug = "pc-m1-009"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "仓库列表+切换+权限"
+
+[[required]]
+story_id = "US-M1-010"
+prototype_slug = "pc-m1-010"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "分类树+规则绑定"
+
+[[required]]
+story_id = "US-M2-001"
+prototype_slug = "pc-m2-001"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "ASN 表单+ERP 推送状态"
+
+[[required]]
+story_id = "US-M2-002"
+prototype_slug = "pda-m2-002"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PDA 扫码收货+月台对接"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M2-002"
+prototype_slug = "pc-m2-002"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PC Web USB 扫码枪+手工收货"
+
+[[required]]
+story_id = "US-M2-003"
+prototype_slug = "pda-m2-003"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "14项验收+离线+档案补录子流程"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M2-003"
+prototype_slug = "pc-m2-003"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PC Web USB 扫码枪+手工验收"
+
+[[required]]
+story_id = "US-M2-004"
+prototype_slug = "pda-m2-004"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "三档策略动态切换"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M2-005"
+prototype_slug = "pda-m2-005"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "库位推荐+扫码确认"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M2-005"
+prototype_slug = "pc-m2-005"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PC Web 库位推荐+扫码枪/手工确认"
+
+[[required]]
+story_id = "US-M2-006"
+prototype_slug = "pda-m2-006"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "异常类型+处理流程"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M2-006"
+prototype_slug = "pc-m2-006"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "异常类型+处理流程"
+
+[[required]]
+story_id = "US-M2-007"
+prototype_slug = "pc-m2-007"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "打印预览+模板"
+
+[[required]]
+story_id = "US-M2-007"
+prototype_slug = "pad-m2-007"
+end = "pad"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "打印预览+模板"
+
+[[required]]
+story_id = "US-M2-008"
+prototype_slug = "pc-m2-008"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "实时进度大屏"
+
+[[required]]
+story_id = "US-M2-008"
+prototype_slug = "pad-m2-008"
+end = "pad"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "实时进度大屏"
+
+[[required]]
+story_id = "US-M2-009"
+prototype_slug = "pc-m2-009"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "模板编辑器（拖拽式，极复杂交互）"
+
+[[required]]
+story_id = "US-M2-010"
+prototype_slug = "pc-m2-010"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "策略规则配置"
+
+[[required]]
+story_id = "US-M3-001"
+prototype_slug = "pc-m3-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "多维筛选+批次展开"
+
+[[required]]
+story_id = "US-M3-002"
+prototype_slug = "pc-m3-002"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "批次列表+近效期预警"
+
+[[required]]
+story_id = "US-M3-003"
+prototype_slug = "pc-m3-003"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "状态流转+隔离/解隔离"
+
+[[required]]
+story_id = "US-M3-004"
+prototype_slug = "pda-m3-004"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 养护记录+PC 计划"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M3-004"
+prototype_slug = "pc-m3-004"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 养护记录+PC 计划"
+
+[[required]]
+story_id = "US-M3-005"
+prototype_slug = "pda-m3-005"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 盘点扫码+差异处理"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M3-006"
+prototype_slug = "pda-m3-006"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 扫码移库"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M3-009"
+prototype_slug = "pc-m3-009"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "预警规则+告警列表"
+
+[[required]]
+story_id = "US-M3-010"
+prototype_slug = "pc-m3-010"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "分类规则+结果展示"
+
+[[required]]
+story_id = "US-M3-011"
+prototype_slug = "pc-m3-011"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "库位时间线"
+
+[[required]]
+story_id = "US-M4-001"
+prototype_slug = "pc-m4-001"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "订单列表+状态筛选+详情"
+
+[[required]]
+story_id = "US-M4-002"
+prototype_slug = "pc-m4-002"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "波次创建+订单分配+策略"
+
+[[required]]
+story_id = "US-M4-003"
+prototype_slug = "pda-m4-003"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 拣选路径+扫码确认"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M4-004"
+prototype_slug = "pda-m4-004"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA/PAD 扫码复核"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M4-004"
+prototype_slug = "pad-m4-004"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA/PAD 扫码复核"
+
+[[required]]
+story_id = "US-M4-005"
+prototype_slug = "pc-m4-005"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "打印预览+GSP 格式"
+
+[[required]]
+story_id = "US-M4-005"
+prototype_slug = "pad-m4-005"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "打印预览+GSP 格式"
+
+[[required]]
+story_id = "US-M4-006"
+prototype_slug = "pda-m4-006"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 交接扫码+PC 确认"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M4-006"
+prototype_slug = "pc-m4-006"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 交接扫码+PC 确认"
+
+[[required]]
+story_id = "US-M4-007"
+prototype_slug = "pc-m4-007"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "实时进度大屏"
+
+[[required]]
+story_id = "US-M4-007"
+prototype_slug = "pad-m4-007"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "实时进度大屏"
+
+[[required]]
+story_id = "US-M4-008"
+prototype_slug = "pda-m4-008"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 退货验收+PC 审批"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M4-008"
+prototype_slug = "pc-m4-008"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 退货验收+PC 审批"
+
+[[required]]
+story_id = "US-M4-010"
+prototype_slug = "pc-m4-010"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "路径可视化+策略配置"
+
+[[required]]
+story_id = "US-M4-011"
+prototype_slug = "pc-m4-011"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "合并/拆单规则+预览"
+
+[[required]]
+story_id = "US-M5-001"
+prototype_slug = "pc-m5-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "设备列表+校准记录"
+
+[[required]]
+story_id = "US-M5-002"
+prototype_slug = "pc-m5-002"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "温度曲线+实时监控"
+
+[[required]]
+story_id = "US-M5-003"
+prototype_slug = "pc-m5-003"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "超标告警+批次隔离联动"
+
+[[required]]
+story_id = "US-M6-001"
+prototype_slug = "pc-m6-001"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "台账模板+生成+导出"
+
+[[required]]
+story_id = "US-M6-002"
+prototype_slug = "pc-m6-002"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "高级查询+时间线（与H2-002联动）"
+
+[[required]]
+story_id = "US-M6-003"
+prototype_slug = "pc-m6-003"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "多维报表+图表+导出"
+
+[[required]]
+story_id = "US-M6-004"
+prototype_slug = "pc-m6-004"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "麻精/放射/血液制品专用格式"
+
+[[required]]
+story_id = "US-M8-001"
+prototype_slug = "pc-m8-001"
+end = "pc"
+priority = "P4"
+status = "ready_for_walkthrough"
+reason = "水位配置+补货建议预览"
+
+[[required]]
+story_id = "US-M8-002"
+prototype_slug = "pda-m8-002"
+end = "pda"
+priority = "P4"
+status = "ready_for_walkthrough"
+reason = "PDA 越库扫码+PC 调度"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M8-002"
+prototype_slug = "pc-m8-002"
+end = "pc"
+priority = "P4"
+status = "ready_for_walkthrough"
+reason = "PDA 越库扫码+PC 调度"
+
+[[required]]
+story_id = "US-M9-001"
+prototype_slug = "pc-m9-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "多维计费规则编辑器"
+
+[[required]]
+story_id = "US-M9-003"
+prototype_slug = "pc-m9-003"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "账单列表+明细+对账+导出"
+
+[[required]]
+story_id = "US-M10-002"
+prototype_slug = "pc-m10-002"
+end = "pc"
+priority = "P4"
+status = "ready_for_walkthrough"
+reason = "在途温度曲线+地图"
+
+[[required]]
+story_id = "US-M10-003"
+prototype_slug = "pc-m10-003"
+end = "pc"
+priority = "P4"
+status = "ready_for_walkthrough"
+reason = "PDA 扫码回收+PC 追踪"
+
+[[required]]
+story_id = "US-M10-003"
+prototype_slug = "pda-m10-003"
+end = "pda"
+priority = "P4"
+status = "ready_for_walkthrough"
+reason = "PDA 扫码回收+PC 追踪"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-M10-004"
+prototype_slug = "pc-m10-004"
+end = "pc"
+priority = "P4"
+status = "ready_for_walkthrough"
+reason = "订单推送状态+调度结果"
+
+[[required]]
+story_id = "US-TE-004"
+prototype_slug = "pc-te-004"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "优先级规则编辑器"
+
+[[required]]
+story_id = "US-TE-005"
+prototype_slug = "pc-te-005"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "分配策略+手动调整"
+
+[[required]]
+story_id = "US-TE-006"
+prototype_slug = "pc-te-006"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "释放规则+队列管理"
+
+[[required]]
+story_id = "US-TE-007"
+prototype_slug = "pc-te-007"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "合并规则+预览"
+
+[[required]]
+story_id = "US-TE-008"
+prototype_slug = "pda-te-008"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 任务列表+执行+完成"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-TE-009"
+prototype_slug = "pc-te-009"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "实时任务大屏"
+
+[[required]]
+story_id = "US-TE-009"
+prototype_slug = "pad-te-009"
+end = "pad"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "实时任务大屏"
+
+[[required]]
+story_id = "US-TE-010"
+prototype_slug = "pc-te-010"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "绩效报表+排名"
+
+[[required]]
+story_id = "US-RP-001"
+prototype_slug = "pc-rp-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "阈值配置+批量设置"
+
+[[required]]
+story_id = "US-RP-002"
+prototype_slug = "pda-rp-002"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 补货任务执行"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-RP-003"
+prototype_slug = "pda-rp-003"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 紧急补货"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-RP-004"
+prototype_slug = "pda-rp-004"
+end = "pda"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "PDA 补拣"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-RP-005"
+prototype_slug = "pc-rp-005"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "补货记录列表+统计"
+
+[[required]]
+story_id = "US-PK-001"
+prototype_slug = "pc-pk-001"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "工位配置+状态"
+
+[[required]]
+story_id = "US-PK-001"
+prototype_slug = "pad-pk-001"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "工位配置+状态"
+
+[[required]]
+story_id = "US-PK-002"
+prototype_slug = "pad-pk-002"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PAD 装箱扫码+Put-to-Light"
+
+[[required]]
+story_id = "US-PK-003"
+prototype_slug = "pad-pk-003"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "电子秤对接+差异提示"
+
+[[required]]
+story_id = "US-PK-004"
+prototype_slug = "pc-pk-004"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "保温箱规格+温区匹配"
+
+[[required]]
+story_id = "US-PK-005"
+prototype_slug = "pad-pk-005"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PAD 扫码核验"
+
+[[required]]
+story_id = "US-PK-006"
+prototype_slug = "pad-pk-006"
+end = "pad"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "面单预览+打印"
+
+[[required]]
+story_id = "US-VR-001"
+prototype_slug = "pc-vr-001"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "规则编辑器+条件组合"
+
+[[required]]
+story_id = "US-VR-003"
+prototype_slug = "pc-vr-003"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "异常队列+处理表单"
+
+[[required]]
+story_id = "US-VR-005"
+prototype_slug = "pc-vr-005"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "规则沙箱测试+结果"
+
+[[required]]
+story_id = "US-VR-006"
+prototype_slug = "pc-vr-006"
+end = "pc"
+priority = "P2"
+status = "ready_for_walkthrough"
+reason = "矩阵配置+策略预览"
+
+[[required]]
+story_id = "US-QL-001"
+prototype_slug = "pc-ql-001"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "模板配置+审批流设计"
+
+[[required]]
+story_id = "US-QL-002"
+prototype_slug = "pda-ql-002"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 触发+PC 补充"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-QL-002"
+prototype_slug = "pc-ql-002"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 触发+PC 补充"
+
+[[required]]
+story_id = "US-QL-003"
+prototype_slug = "pc-ql-003"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "审批流程+意见+驳回"
+
+[[required]]
+story_id = "US-QL-005"
+prototype_slug = "pc-ql-005"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "列表+统计+导出"
+
+[[required]]
+story_id = "US-SA-001"
+prototype_slug = "pda-sa-001"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 发起+PC 审批"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-SA-001"
+prototype_slug = "pc-sa-001"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 发起+PC 审批"
+
+[[required]]
+story_id = "US-SA-002"
+prototype_slug = "pda-sa-002"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 发起+PC 审批"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-SA-002"
+prototype_slug = "pc-sa-002"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 发起+PC 审批"
+
+[[required]]
+story_id = "US-SA-003"
+prototype_slug = "pc-sa-003"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "列表+统计+导出"
+
+[[required]]
+story_id = "US-RC-002"
+prototype_slug = "pc-rc-002"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "差异列表+处理流程"
+
+[[required]]
+story_id = "US-RC-003"
+prototype_slug = "pc-rc-003"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "触发按钮+进度"
+
+[[required]]
+story_id = "US-RC-004"
+prototype_slug = "pc-rc-004"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "对账结果+历史"
+
+[[required]]
+story_id = "US-DI-001"
+prototype_slug = "pc-di-001"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "ASN资料清单+药检单复用上传+上游随货同行单录入"
+
+[[required]]
+story_id = "US-DI-002"
+prototype_slug = "pc-di-002"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PC 审核走查+副本对比"
+
+[[required]]
+story_id = "US-DI-003"
+prototype_slug = "pc-di-003"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "地址订单查询+批量下载"
+
+[[required]]
+story_id = "US-BA-001"
+prototype_slug = "pc-ba-001"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "调整单表单+原因选择"
+
+[[required]]
+story_id = "US-BA-002"
+prototype_slug = "pc-ba-002"
+end = "pc"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "审批流程"
+
+[[required]]
+story_id = "US-BA-003"
+prototype_slug = "pda-ba-003"
+end = "pda"
+priority = "P3"
+status = "ready_for_walkthrough"
+reason = "PDA 实物核对+扫码"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-TC-001"
+prototype_slug = "pc-tc-001"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "分类配置+码规则"
+
+[[required]]
+story_id = "US-TC-002"
+prototype_slug = "pc-tc-002"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "码库列表+层级关系"
+
+[[required]]
+story_id = "US-TC-003"
+prototype_slug = "pc-tc-003"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "绑定关系管理"
+
+[[required]]
+story_id = "US-TC-004"
+prototype_slug = "pda-tc-004"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "PDA 扫码建立关系"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-TC-006"
+prototype_slug = "pda-tc-006"
+end = "pda"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "扫码核验+差异提示"
+
+[required.viewport]
+touch_target_min_pt = 48
+font_size_min_pt = 16
+
+[[required]]
+story_id = "US-TC-006"
+prototype_slug = "pad-tc-006"
+end = "pad"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "扫码核验+差异提示"
+
+[[required]]
+story_id = "US-TC-007"
+prototype_slug = "pc-tc-007"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "上报状态+重试+日志"
+
+[[required]]
+story_id = "US-MPM-002"
+prototype_slug = "pc-mpm-002"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "规则编辑器+条件"
+
+[[required]]
+story_id = "US-MPM-003"
+prototype_slug = "pc-mpm-003"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "队列列表+处理"
+
+[[required]]
+story_id = "US-MPM-005"
+prototype_slug = "pc-mpm-005"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "追溯链路可视化"
+
+[[required]]
+story_id = "US-MPM-006"
+prototype_slug = "pc-mpm-006"
+end = "pc"
+priority = "P1"
+status = "ready_for_walkthrough"
+reason = "字典+映射关系"

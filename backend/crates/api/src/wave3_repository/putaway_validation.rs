@@ -313,14 +313,14 @@ impl PgWave3Repository {
             .and_then(|p| p.storage_condition.as_deref())
             .unwrap_or("normal_10_30");
 
-        let is_special_drug = product.map_or(false, |p| {
+        let is_special_drug = product.is_some_and(|p| {
             p.special_drug_category
                 .as_deref()
-                .map_or(false, |c| c != "none" && c != "normal" && !c.is_empty())
+                .is_some_and(|c| c != "none" && c != "normal" && !c.is_empty())
         }) || loc_zone.is_special_drug_zone;
 
-        let prod_is_external = product.map_or(false, |p| p.is_external_use);
-        let prod_is_fragrant = product.map_or(false, |p| p.is_fragrant);
+        let prod_is_external = product.is_some_and(|p| p.is_external_use);
+        let prod_is_fragrant = product.is_some_and(|p| p.is_fragrant);
         let resolved_product_id = product.map(|p| p.id);
 
         // ① Category Zone Isolation

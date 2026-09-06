@@ -112,12 +112,15 @@ async fn complete_locked_pick_task(
     if picked_qty < wms_domain::Quantity::ZERO || picked_qty > task.planned_qty {
         return Err(Wave4RepositoryError::InvalidQuantity);
     }
+    if task.status == "exception" && picked_qty <= task.picked_qty {
+        return Err(Wave4RepositoryError::InvalidQuantity);
+    }
     if !matches!(
         task.status.as_str(),
-        "pending_assignment" | "assigned" | "dispatched" | "in_progress"
+        "pending_assignment" | "assigned" | "dispatched" | "in_progress" | "exception"
     ) {
         return Err(Wave4RepositoryError::InvalidStatus {
-            expected: "pending_assignment|assigned|dispatched|in_progress".to_string(),
+            expected: "pending_assignment|assigned|dispatched|in_progress|exception".to_string(),
             actual: task.status.clone(),
         });
     }
@@ -158,10 +161,10 @@ async fn complete_locked_pick_task(
     }
     if !matches!(
         warehouse_task.status.as_str(),
-        "pending_assignment" | "assigned" | "dispatched" | "in_progress"
+        "pending_assignment" | "assigned" | "dispatched" | "in_progress" | "exception"
     ) {
         return Err(Wave4RepositoryError::InvalidStatus {
-            expected: "pending_assignment|assigned|dispatched|in_progress".to_string(),
+            expected: "pending_assignment|assigned|dispatched|in_progress|exception".to_string(),
             actual: warehouse_task.status,
         });
     }
@@ -586,9 +589,12 @@ impl PgWave4Repository {
             return Err(Wave4RepositoryError::InvalidQuantity);
         }
         let order = lock_outbound_order(&mut tx, ctx.owner_id, task.outbound_order_id).await?;
-        if !matches!(order.status.as_str(), OUTBOUND_STATUS_IN_WAVE | "inventory_locked") {
+        if !matches!(
+            order.status.as_str(),
+            OUTBOUND_STATUS_IN_WAVE | "inventory_locked" | "picked_short" | OUTBOUND_STATUS_REVIEWED_SHORT
+        ) {
             return Err(Wave4RepositoryError::InvalidStatus {
-                expected: "in_wave|inventory_locked".to_string(),
+                expected: "in_wave|inventory_locked|picked_short|reviewed_short".to_string(),
                 actual: order.status,
             });
         }

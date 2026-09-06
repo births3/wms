@@ -628,7 +628,13 @@ export function M4OutboundPage({ mode }: M4OutboundPageProps) {
       }}
       coreQueryFieldKeys={m4OutboundCoreQueryFieldKeys}
       queryValue={draftQuery}
-      loading={ordersQuery.isPending || ordersQuery.isFetching || wavesQuery.isPending || returnsQuery.isPending}
+      loading={
+        mode === "waves"
+          ? wavesQuery.isPending || wavesQuery.isFetching
+          : mode === "returns"
+            ? returnsQuery.isPending || returnsQuery.isFetching
+            : ordersQuery.isPending || ordersQuery.isFetching
+      }
       onQueryValueChange={(next) => setDraftQuery(normalizeM4OutboundQueryValue(next))}
       onQuery={() => {
         applyQuery(draftQuery);

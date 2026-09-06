@@ -1,0 +1,292 @@
+name: governance
+
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  governance:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      RUST_BACKTRACE: "1"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_DEV_INCREMENTAL: "false"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_PROFILE_TEST_INCREMENTAL: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust format
+        run: cargo fmt --manifest-path backend/Cargo.toml --all --check
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-governance.txt
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: taiki-e/install-action@just
+
+      - name: Reclaim runner disk
+        run: |
+          echo "=== disk before cleanup ==="
+          df -h /
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          echo "=== disk after cleanup ==="
+          df -h /
+
+      - name: Install gitleaks
+        run: |
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_checksums.txt
+          grep 'gitleaks_8.21.2_linux_x64.tar.gz' gitleaks_8.21.2_checksums.txt | sha256sum --check --strict
+          tar -xzf gitleaks_8.21.2_linux_x64.tar.gz gitleaks
+          mkdir -p "$HOME/.local/bin"
+          mv gitleaks "$HOME/.local/bin/gitleaks"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Secret scan
+        run: gitleaks detect --redact --no-banner
+
+      - name: Cache Rust registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-v3-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-v3-
+
+      - name: Install governance dependencies
+        run: python3 -m pip install -r requirements-governance.txt
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Full T1 governance
+        if: ${{ github.event_name == 'pull_request' }}
+        run: python3 scripts/governance/governance_checks.py --tier T1
+
+      - name: T2 diff-driven governance
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          WMS_GOV_CONTEXT: pr
+          WMS_GOV_BASE: origin/main
+        run: python3 scripts/governance/task_check.py --tier T2 --context pr --base origin/main --strict --skip-t1-fallback
+
+      - name: Web Admin self-checks
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm --dir apps/web-admin run test:self-checks
+
+      - name: JavaScript unit tests
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          node packages/ui/tests/dialog-dismiss.test.ts
+          node packages/ui/tests/data-grid-advanced-filters.test.ts
+          node packages/ui/tests/data-grid-filter-history.test.ts
+          node packages/ui/tests/data-grid-pagination-prefetch.test.ts
+          node packages/ui/tests/data-grid-views.test.ts
+          node packages/ui/tests/query-panel-quick-filters.test.ts
+          node packages/ui/tests/scroll-bar-math.test.ts
+          node packages/ui/tests/viewport-math.test.ts
+          node packages/ui/tests/scroll-bar-wiring.test.ts
+          node packages/ui/tests/table-row-background.test.ts
+          node packages/ui/tests/data-grid-layout-expand.test.ts
+          node apps/web-admin/src/pages/inbound/inbound-document-entry-model.test.ts
+
+      - name: TypeScript contracts
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          pnpm --dir apps/web-admin exec tsc --noEmit
+          pnpm --dir packages/api-client run typecheck
+
+      - name: Warm OpenAPI exporter
+        if: ${{ github.event_name == 'pull_request' }}
+        run: cargo build --manifest-path backend/Cargo.toml --package openapi-export --jobs 2
+
+      - name: Verify OpenAPI runtime registrations
+        if: ${{ github.event_name == 'pull_request' }}
+        run: cargo test --manifest-path backend/Cargo.toml --package wms-api --test openapi_pda_runtime --jobs 2
+
+      - name: Verify generated OpenAPI contracts
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          python3 scripts/governance/check_openapi_in_sync.py --strict
+          python3 scripts/governance/validate_openapi_artifacts.py
+          python3 scripts/governance/check_openapi_contract.py
+          git diff --check
+          git diff --exit-code
+
+      - name: Rust clippy
+        if: ${{ github.event_name == 'pull_request' }}
+        run: cargo clippy --manifest-path backend/Cargo.toml --workspace --all-targets --no-deps --jobs 2 -- -D warnings -A clippy::too-many-arguments
+
+      - name: Start PostgreSQL
+        run: |
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-governance-postgres \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_DB=wms_test \
+            --publish 5432:5432 \
+            postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec wms-governance-postgres pg_isready --username postgres --dbname wms_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-governance-postgres
+          exit 1
+
+      - name: Backend unit tests
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set +e
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --workspace --lib --no-fail-fast --jobs 2 \
+            > /tmp/backend-unit-tests.log 2>&1
+          status=$?
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          log = Path("/tmp/backend-unit-tests.log").read_text(
+              encoding="utf-8", errors="replace"
+          ).splitlines()
+          markers = []
+          for index, line in enumerate(log):
+              stripped = line.strip()
+              if (
+                  (line.startswith("---- ") and line.endswith(" stdout ----"))
+                  or stripped == "failures:"
+                  or "test result: FAILED" in line
+                  or "error: test failed" in line
+                  or line.endswith(" ... FAILED")
+                  or "panicked at" in line
+              ):
+                  markers.append(index)
+
+          ranges = []
+          for index in markers:
+              start = max(0, index - 3)
+              end = min(len(log), index + 35)
+              if ranges and start <= ranges[-1][1]:
+                  ranges[-1] = (ranges[-1][0], max(ranges[-1][1], end))
+              else:
+                  ranges.append((start, end))
+
+          if ranges:
+              chunks = []
+              for start, end in ranges:
+                  chunks.extend(log[start:end])
+                  chunks.append("---")
+              summary = "\n".join(chunks[-500:])
+          else:
+              summary = "\n".join(log[-300:])
+
+          print("=== backend unit test diagnostic ===")
+          print(summary)
+          Path("/tmp/backend-unit-tests-summary.txt").write_text(
+              summary + "\n", encoding="utf-8"
+          )
+          PY
+
+          {
+            echo '## Backend unit-test diagnostic'
+            echo
+            echo '```text'
+            cat /tmp/backend-unit-tests-summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$status"
+
+      - name: Apply PostgreSQL migrations
+        run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
+
+      - name: T3 critical PostgreSQL integration tests
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --package wms-api \
+            --test m1_lpn_type_policy_idempotency_postgres \
+            --no-fail-fast --jobs 2
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --package wms-api \
+            --test m1_device_t3_contract_postgres \
+            --no-fail-fast --jobs 2
+
+      - name: Risk-triggered T3 governance
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          WMS_GOV_CONTEXT: pr
+          WMS_GOV_BASE: origin/main
+        run: python3 scripts/governance/task_check.py --tier T3 --context pr --base origin/main --strict
+
+      - name: Verify PR checks did not rewrite tracked files
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          git diff --check
+          git diff --exit-code
+
+      - name: Install Chromium for main/release validation
+        if: ${{ github.event_name != 'pull_request' }}
+        run: pnpm --dir prototypes exec playwright install --with-deps chromium
+
+      - name: Main preflight
+        if: ${{ github.event_name == 'push' }}
+        env:
+          WMS_GOV_CONTEXT: main
+        run: just preflight
+
+      - name: T4 and release evidence
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          WMS_GOV_CONTEXT: release
+        run: just verify
+
+      - name: Stop PostgreSQL
+        if: ${{ always() }}
+        run: docker rm --force wms-governance-postgres || true

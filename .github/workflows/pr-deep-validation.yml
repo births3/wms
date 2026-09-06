@@ -1,0 +1,354 @@
+name: PR Deep Validation
+
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-deep-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deep-validation:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      RUST_BACKTRACE: "1"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_DEV_INCREMENTAL: "false"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_PROFILE_TEST_INCREMENTAL: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-governance.txt
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: taiki-e/install-action@just
+
+      - name: Reclaim runner disk
+        run: |
+          echo "=== disk before cleanup ==="
+          df -h /
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          echo "=== disk after cleanup ==="
+          df -h /
+
+      - name: Cache Rust registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-registry-v3-${{ hashFiles('backend/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-v3-
+
+      - name: Install governance and workspace dependencies
+        run: |
+          python3 -m pip install -r requirements-governance.txt
+          pnpm install --frozen-lockfile
+
+      - name: Start PostgreSQL
+        run: |
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          echo "DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          echo "WMS_DB_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/wms_test" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr-deep-postgres \
+            --env POSTGRES_PASSWORD \
+            --env POSTGRES_DB=wms_test \
+            --publish 5432:5432 \
+            postgres:18
+          for attempt in $(seq 1 30); do
+            if docker exec wms-pr-deep-postgres pg_isready --username postgres --dbname wms_test; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-pr-deep-postgres
+          exit 1
+
+      - name: Start Redis
+        run: |
+          echo "WMS_REDIS_URL=redis://127.0.0.1:6379" >> "$GITHUB_ENV"
+          docker run --detach --rm --name wms-pr-deep-redis \
+            --publish 6379:6379 \
+            redis:8-alpine
+          for attempt in $(seq 1 30); do
+            if docker exec wms-pr-deep-redis redis-cli ping | grep -q '^PONG$'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs wms-pr-deep-redis
+          exit 1
+
+      - name: Apply PostgreSQL migrations
+        run: cargo run --quiet --manifest-path backend/Cargo.toml --package wms-api --bin wms-db-migrate
+
+      - name: Detect browser/runtime validation scope
+        id: runtime_scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            echo "manual full validation" > /tmp/pr-deep-changed-files.txt
+            exit 0
+          fi
+
+          git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" > /tmp/pr-deep-changed-files.txt
+          cat /tmp/pr-deep-changed-files.txt
+          if grep -qE '^(prototypes/|apps/web-admin/|apps/customer-portal/|packages/ui/|packages/api-client/|backend/crates/api/src/|backend/crates/api/examples/|backend/migrations/|governance/quality-matrix\.toml|governance/visual-baselines/|scripts/governance/|shared/openapi/)' /tmp/pr-deep-changed-files.txt; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Focused PostgreSQL regression tests
+        run: |
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --package wms-api \
+            --test m3_replenishment_location_group_t3_postgres \
+            --test m3_replenishment_wave_postgres \
+            --test schema_baseline_postgres \
+            --test wave4_postgres \
+            --no-fail-fast \
+            --jobs 2
+
+      - name: Full Rust workspace tests
+        run: |
+          echo "=== disk before full Rust tests ==="
+          df -h /
+          cargo test \
+            --manifest-path backend/Cargo.toml \
+            --workspace \
+            --no-fail-fast \
+            --jobs 2
+          echo "=== disk after full Rust tests ==="
+          df -h /
+          du -sh backend/target || true
+
+      - name: Prototype TypeScript and Vite build
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: |
+          pnpm --dir prototypes exec tsc --noEmit
+          pnpm --dir prototypes run build
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-v1-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium system dependencies
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: pnpm --dir prototypes exec playwright install-deps chromium
+
+      - name: Install Chromium browser
+        if: ${{ steps.runtime_scope.outputs.required == 'true' && steps.playwright-cache.outputs.cache-hit != 'true' }}
+        run: pnpm --dir prototypes exec playwright install chromium
+
+      - name: Prototype full matrix browser gate
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: just matrix-e2e-full
+
+      - name: Web Admin dev browser smoke
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: |
+          pnpm --dir apps/web-admin run test:e2e:shell-dev
+          pnpm --dir apps/web-admin run test:e2e:h4-dev
+          pnpm --dir apps/web-admin run test:e2e:h9-dev
+
+      - name: Prebuild real E2E backend
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: cargo build --manifest-path backend/Cargo.toml --package wms-api --example wms_api_e2e --jobs 2
+
+      - name: Detect external H8 interface-table scope
+        id: h8_interface_scope
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        shell: bash
+        env:
+          H8_INTERFACE_ENABLED: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_ENABLED }}
+          H8_INTERFACE_BASE_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_BASE_URL }}
+          H8_INTERFACE_API_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_URL }}
+          H8_INTERFACE_USERNAME: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_USERNAME }}
+          H8_INTERFACE_PASSWORD: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_PASSWORD }}
+          H8_INTERFACE_API_KEY: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${H8_INTERFACE_ENABLED}" != "true" ]]; then
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=External H8 interface-table suite not run::Set WMS_WEB_ADMIN_H8_INTERFACE_REAL_ENABLED=true and configure its URL/credential variables and secrets to enable this external acceptance suite."
+            {
+              echo "### H8 interface-table external acceptance suite"
+              echo
+              echo "Not run for this PR: the suite requires an externally hosted Web/API pair and explicit repository configuration."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          missing=0
+          for name in \
+            H8_INTERFACE_BASE_URL H8_INTERFACE_API_URL H8_INTERFACE_USERNAME \
+            H8_INTERFACE_PASSWORD H8_INTERFACE_API_KEY
+          do
+            if [[ -z "${!name}" ]]; then
+              echo "::error title=Incomplete H8 interface-table configuration::${name} is required when the external suite is enabled."
+              missing=1
+            fi
+          done
+          [[ "$missing" == "0" ]] || exit 1
+          echo "required=true" >> "$GITHUB_OUTPUT"
+
+      - name: Self-contained real backend Playwright evidence suite
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          run_isolated_config() {
+            local config="$1"
+            local slug
+            slug="$(printf '%s' "$config" | sha256sum | cut -c1-12)"
+            local database_name="wms_pr_${slug}_${RANDOM}_e2e"
+            local test_url="${DATABASE_URL%/*}/${database_name}"
+
+            echo "▶ real E2E: ${config}"
+            docker exec wms-pr-deep-postgres \
+              psql --username postgres --dbname postgres --set ON_ERROR_STOP=1 --quiet \
+              --command "CREATE DATABASE \"${database_name}\""
+
+            set +e
+            DATABASE_URL="$test_url" \
+            WMS_DB_URL="$test_url" \
+            PORTAL_DATABASE_URL="$test_url" \
+              pnpm --dir prototypes exec playwright test --config="$config"
+            status=$?
+            set -e
+
+            docker exec wms-pr-deep-postgres \
+              psql --username postgres --dbname postgres --quiet \
+              --command "DROP DATABASE IF EXISTS \"${database_name}\" WITH (FORCE)" || true
+
+            return "$status"
+          }
+
+          configs=(
+            playwright-web-admin-h1-real-config.ts
+            playwright-web-admin-h5-real-config.ts
+            playwright-web-admin-h8-real-config.ts
+            playwright-web-admin-hal-real-config.ts
+            playwright-web-admin-m1-real-config.ts
+            playwright-web-admin-m10-real-config.ts
+            playwright-web-admin-m2-real-config.ts
+            playwright-web-admin-m3-real-config.ts
+            playwright-web-admin-m4-real-config.ts
+            playwright-web-admin-m9-real-config.ts
+            playwright-web-admin-mcg-real-config.ts
+            playwright-web-admin-mdi-real-config.ts
+            playwright-web-admin-mrc-real-config.ts
+            playwright-web-admin-mte-real-config.ts
+            playwright-customer-portal-real-config.ts
+          )
+
+          failures=()
+          for config in "${configs[@]}"; do
+            if [[ ! -f "prototypes/${config}" ]]; then
+              echo "missing Playwright config: prototypes/${config}" >&2
+              failures+=("${config} (missing)")
+              continue
+            fi
+
+            if ! run_isolated_config "$config"; then
+              failures+=("$config")
+            fi
+          done
+
+          if ((${#failures[@]} > 0)); then
+            {
+              echo "### Failed self-contained real-backend Playwright configs"
+              echo
+              printf -- '- `%s`\n' "${failures[@]}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            printf 'failed real E2E config: %s\n' "${failures[@]}" >&2
+            exit 1
+          fi
+
+      - name: External H8 interface-table Playwright evidence suite
+        if: ${{ steps.runtime_scope.outputs.required == 'true' && steps.h8_interface_scope.outputs.required == 'true' }}
+        working-directory: prototypes
+        env:
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_BASE_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_BASE_URL }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_URL: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_URL }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_USERNAME: ${{ vars.WMS_WEB_ADMIN_H8_INTERFACE_REAL_USERNAME }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_PASSWORD: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_PASSWORD }}
+          WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_KEY: ${{ secrets.WMS_WEB_ADMIN_H8_INTERFACE_REAL_API_KEY }}
+        run: pnpm exec playwright test --config=playwright-web-admin-h8-interface-real-config.ts
+
+      - name: Verify real screenshot files
+        if: ${{ steps.runtime_scope.outputs.required == 'true' }}
+        run: python3 scripts/governance/check_baseline_completeness.py --require-files
+
+      - name: Upload browser and screenshot evidence
+        if: ${{ always() && steps.runtime_scope.outputs.required == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-deep-validation-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            artifacts/screenshot-portal/real-web/**
+            prototypes/.e2e-artifacts/**
+            prototypes/test-results/**
+            prototypes/playwright-report/**
+            apps/**/.e2e-artifacts/**
+
+      - name: Ensure deep validation did not rewrite tracked files
+        if: ${{ always() }}
+        run: |
+          git diff --check
+          git diff --exit-code
+
+      - name: Stop Redis
+        if: ${{ always() }}
+        run: docker rm --force wms-pr-deep-redis || true
+
+      - name: Stop PostgreSQL
+        if: ${{ always() }}
+        run: docker rm --force wms-pr-deep-postgres || true

@@ -9,5 +9,5 @@ assert.doesNotMatch(dialogSource, /<DialogPrimitive\.Close asChild>[\s\S]*<Dialo
 assert.match(dialogSource, /pointer-events-none/);
 assert.match(dialogSource, /<DialogOverlay \/>[\s\S]*<DialogPrimitive\.Content/);
 assert.match(dialogSource, /<DialogPrimitive\.Close className="absolute right-4 top-4/);
-// 中文系统的屏幕阅读器必须读到中文关闭说明
-assert.match(dialogSource, /<span className="sr-only">关闭<\/span>/);
+// 中文系统的图标关闭按钮使用独立可访问名称，避免与页脚“关闭”动作重名。
+assert.match(dialogSource, /<span className="sr-only">关闭弹窗<\/span>/);

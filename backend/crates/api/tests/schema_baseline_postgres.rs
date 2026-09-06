@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 
-const STATIC_SCHEMA_FINGERPRINT: &str = "e9a6b2972389675ce9022a29bd0c99e9";
+const STATIC_SCHEMA_FINGERPRINT: &str = "61d3cffb169d1af2560950a30ed24c1f";
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: PgPool) {
@@ -19,7 +19,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL relations");
-    assert_eq!(static_table_count, 207);
+    assert_eq!(static_table_count, 209);
 
     let static_index_count: i64 = sqlx::query_scalar(
         r#"
@@ -37,7 +37,7 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL indexes");
-    assert_eq!(static_index_count, 634);
+    assert_eq!(static_index_count, 642);
 
     let fingerprint: String = sqlx::query_scalar(
         r#"
@@ -85,7 +85,6 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("calculate static PostgreSQL schema fingerprint");
-    assert_eq!(fingerprint, STATIC_SCHEMA_FINGERPRINT);
 
     let constraint_count: i64 = sqlx::query_scalar(
         r#"
@@ -102,8 +101,6 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     .fetch_one(&pool)
     .await
     .expect("count static PostgreSQL constraints");
-    // PostgreSQL 18 把 NOT NULL 登记为 pg_constraint.contype='n'，约束总数高于 16。
-    assert_eq!(constraint_count, 3236);
 
     let (permission_count, category_count, item_count): (i64, i64, i64) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM auth_permissions), (SELECT count(*) FROM system_dictionary_categories), (SELECT count(*) FROM system_dictionary_items)",
@@ -114,4 +111,11 @@ async fn empty_database_migrations_have_stable_schema_and_seeded_contract(pool: 
     assert_eq!(permission_count, 133);
     assert_eq!(category_count, 13);
     assert_eq!(item_count, 65);
+
+    // PostgreSQL 18 把 NOT NULL 登记为 pg_constraint.contype='n'。把指纹和约束数
+    // 放在同一次断言中，schema 变更时一次 CI 就能给出完整的实际基线。
+    assert_eq!(
+        (fingerprint.as_str(), constraint_count),
+        (STATIC_SCHEMA_FINGERPRINT, 3266)
+    );
 }

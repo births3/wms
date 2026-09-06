@@ -399,9 +399,12 @@ async fn upsert_lpn_type_policy_handler(
     Json(request): Json<UpsertLpnContainerTypePolicyRequest>,
 ) -> Result<Json<LpnContainerTypePolicy>, LpnContainerHandlerError> {
     ctx.require_permission(WRITE_PERMISSION)?;
-    let _idempotency_key = idempotency_key_from_headers(&headers)?;
+    let idempotency_key = idempotency_key_from_headers(&headers)?;
     Ok(Json(
-        state.repository.upsert_type_policy(&ctx, request).await?,
+        state
+            .repository
+            .upsert_type_policy_idempotent(&ctx, request, &idempotency_key)
+            .await?,
     ))
 }
 

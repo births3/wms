@@ -9,11 +9,20 @@ export type ReplenishmentTaskListResponse =
   components["schemas"]["ReplenishmentTaskListResponse"];
 export type CreateReplenishmentTaskRequest =
   components["schemas"]["CreateReplenishmentTaskRequest"];
+type ErrorResponse = components["schemas"]["ErrorResponse"];
 
 export const replenishmentTasksQueryKey = ["replenishment", "tasks"] as const;
 
 function idempotencyKey() {
   return `web-m3-replenishment-task-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+}
+
+function asErrorResponse(error: unknown): ErrorResponse | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const candidate = error as Partial<ErrorResponse>;
+  return typeof candidate.code === "string" && typeof candidate.message === "string"
+    ? (error as ErrorResponse)
+    : undefined;
 }
 
 function requireData<T>(
@@ -23,7 +32,7 @@ function requireData<T>(
   fallback: string,
 ): T {
   if (data === undefined) {
-    throw new ApiError(error, fallback, status);
+    throw new ApiError(asErrorResponse(error), fallback, status);
   }
   return data;
 }

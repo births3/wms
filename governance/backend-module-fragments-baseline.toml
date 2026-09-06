@@ -83,6 +83,10 @@ include = "wave4_repository_customer_portal.rs"
 
 [[fragments]]
 parent = "backend/crates/api/src/wave4_repository.rs"
+include = "wave4_repository_pda.rs"
+
+[[fragments]]
+parent = "backend/crates/api/src/wave4_repository.rs"
 include = "wave4_repository_returns.rs"
 
 [[fragments]]

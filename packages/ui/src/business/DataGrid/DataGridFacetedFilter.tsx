@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, PlusCircle, X } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
@@ -57,7 +57,7 @@ export const DataGridFacetedFilter = React.forwardRef<HTMLDivElement, DataGridFa
   };
 
   return (
-    <div ref={containerRef} className={cn("relative inline-block text-xs", className)}>
+    <div ref={containerRef} {...rest} className={cn("relative inline-block text-xs", className)}>
       <Button
         type="button"
         variant="outline"
@@ -115,4 +115,3 @@ export const DataGridFacetedFilter = React.forwardRef<HTMLDivElement, DataGridFa
   );
 });
 DataGridFacetedFilter.displayName = "DataGridFacetedFilter";
-

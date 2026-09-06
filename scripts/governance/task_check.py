@@ -20,6 +20,7 @@ Tier：作为入口，根据 git diff 与 governance/gate-rules.toml 决定跑�
 - 本地渐进模式下，未实现的脚本仅提示并跳过。
 - `--strict` 下未实现脚本记为 `error` 并阻塞，CI 必须使用该模式。
 - `--context` 与 Tier 正交；CI 可通过 `WMS_GOV_CONTEXT` 提供默认场景。
+- `--skip-t1-fallback` 供已经单独执行过 Full T1 的调用方使用，避免未知路径再次重复执行整套 T1。
 """
 from __future__ import annotations
 
@@ -155,8 +156,16 @@ def main(argv: list[str] | None = None) -> int:
         default=os.environ.get("WMS_GOV_CONTEXT"),
         help="执行场景；省略时保持默认，不按场景过滤",
     )
-    parser.add_argument("--strict", action="store_true",
-                        help="--strict 模式下，gate-rules.toml 引用的占位脚本视为失败（Wave 1+ 推荐启用）")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="--strict 模式下，gate-rules.toml 引用的占位脚本视为失败（Wave 1+ 推荐启用）",
+    )
+    parser.add_argument(
+        "--skip-t1-fallback",
+        action="store_true",
+        help="调用方已执行 Full T1 时跳过未知路径的重复 T1 兜底；默认仍保持 fail-safe 兜底",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -184,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  · triggered checks: {len(triggered)}")
 
     fallback_result: ScriptResult | None = None
-    if changed and unknown_files:
+    if changed and unknown_files and not args.skip_t1_fallback:
         fallback_result = run_t1_fallback(machine_output)
         fallback_result.matched_files = len(unknown_files)
         if not specifically_matched:
@@ -206,9 +215,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if fallback.exit_code == 0 else 1
         if args.tier == "T1":
             triggered = match_rules(changed, specific_rules)
+    elif changed and unknown_files and args.skip_t1_fallback and not machine_output:
+        print(
+            f"  · {len(unknown_files)} 个未知路径：调用方已声明 Full T1 已单独覆盖，跳过重复 T1 兜底"
+        )
 
     if not triggered:
-        if changed:
+        if changed and not args.skip_t1_fallback:
             fallback = run_t1_fallback(machine_output)
             fallback.matched_files = len(changed)
             payload = {
@@ -227,17 +240,27 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {'✓' if fallback.exit_code == 0 else '✘'} governance_t1_fallback")
             return 0 if fallback.exit_code == 0 else 1
 
-        msg = "no changed files"
+        msg = (
+            "changed files matched no tier-specific rule; T1 fallback skipped by caller"
+            if changed and args.skip_t1_fallback
+            else "no changed files"
+        )
         if machine_output:
-            print(json.dumps({
-                "tier": args.tier,
-                "context": args.context,
-                "base": args.base,
-                "changed": len(changed),
-                "triggered": [],
-                "note": msg,
-                "ok": True,
-            }, ensure_ascii=False, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "tier": args.tier,
+                        "context": args.context,
+                        "base": args.base,
+                        "changed": len(changed),
+                        "triggered": [],
+                        "note": msg,
+                        "ok": True,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
         else:
             print(f"  {msg}")
         return 0
@@ -259,25 +282,35 @@ def main(argv: list[str] | None = None) -> int:
         if r.exit_code == -1:
             if args.strict:
                 if not machine_output:
-                    print(f"    ✘ script not implemented yet: {check_name} (--strict 模式下视为失败)")
+                    print(
+                        f"    ✘ script not implemented yet: {check_name} (--strict 模式下视为失败)"
+                    )
                 r.set_exit_code(2)
             else:
                 if not machine_output:
-                    print(f"    ⚠ script not implemented yet: {check_name} (placeholder, 加 --strict 视为失败)")
+                    print(
+                        f"    ⚠ script not implemented yet: {check_name} (placeholder, 加 --strict 视为失败)"
+                    )
                 r.set_exit_code(0)
         results.append(r)
 
     failed = [r for r in results if r.exit_code != 0]
 
     if machine_output:
-        print(json.dumps({
-            "tier": args.tier,
-            "context": args.context,
-            "base": args.base,
-            "changed": len(changed),
-            "triggered": [asdict(r) for r in results],
-            "ok": not failed,
-        }, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {
+                    "tier": args.tier,
+                    "context": args.context,
+                    "base": args.base,
+                    "changed": len(changed),
+                    "triggered": [asdict(r) for r in results],
+                    "ok": not failed,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     else:
         print(f"\n▶ task_check summary: {len(results) - len(failed)}/{len(results)} ok")
         for r in results:

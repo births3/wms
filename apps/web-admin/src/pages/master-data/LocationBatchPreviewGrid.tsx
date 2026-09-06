@@ -58,7 +58,7 @@ export function MatrixTable({
   activeGroupKey,
   onSelect,
 }: {
-  viewportRef: React.RefObject<HTMLDivElement | null>;
+  viewportRef: React.RefObject<HTMLDivElement>;
   previewRows: number[];
   previewColumns: number[];
   previewGroupMap: Map<string, { codes: string[] }>;

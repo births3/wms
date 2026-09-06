@@ -9,6 +9,16 @@ pub async fn seed_outbound_route_binding(
     customer_id: Uuid,
     now: DateTime<Utc>,
 ) -> Uuid {
+    // Outbound route fixtures are immediately followed by audited M4/H9 writes.
+    // sqlx::test creates an isolated database per test, so provision the audit
+    // partition for the fixture's business timestamp instead of relying on the
+    // runner's current month.
+    sqlx::query("SELECT create_audit_partition($1)")
+        .bind(now.date_naive())
+        .execute(pool)
+        .await
+        .expect("route fixture audit partition should exist");
+
     sqlx::query(
         "INSERT INTO auth_owners (id, owner_code, owner_name) VALUES ($1, $2, '出库线路测试货主') ON CONFLICT (id) DO NOTHING",
     )

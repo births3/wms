@@ -20,12 +20,21 @@ export type BindReplenishmentLocationsResponse =
   components["schemas"]["BindReplenishmentLocationsResponse"];
 export type UpsertReplenishmentLocationGroupRequest =
   components["schemas"]["UpsertReplenishmentLocationGroupRequest"];
+type ErrorResponse = components["schemas"]["ErrorResponse"];
 
 export const replenishmentStrategiesQueryKey = ["replenishment", "strategies"] as const;
 export const replenishmentLocationGroupsQueryKey = ["replenishment", "location-groups"] as const;
 
 function idempotencyKey() {
   return `web-m3-replenishment-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+}
+
+function asErrorResponse(error: unknown): ErrorResponse | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const candidate = error as Partial<ErrorResponse>;
+  return typeof candidate.code === "string" && typeof candidate.message === "string"
+    ? (error as ErrorResponse)
+    : undefined;
 }
 
 function requireData<T>(
@@ -35,7 +44,7 @@ function requireData<T>(
   fallback: string,
 ): T {
   if (data === undefined) {
-    throw new ApiError(error, fallback, status);
+    throw new ApiError(asErrorResponse(error), fallback, status);
   }
   return data;
 }
