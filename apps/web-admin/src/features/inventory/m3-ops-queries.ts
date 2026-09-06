@@ -92,7 +92,7 @@ export function useMaintenanceTasksQuery() {
   return useQuery<MaintenanceTask[], ApiError>({
     queryKey: ["inventory", "maintenance-tasks"],
     queryFn: async () => {
-      const result = await api.GET("/api/v1/inventory/maintenance/tasks", { params: { query: {} } });
+      const result = await api.GET("/api/v1/inventory/maintenance/tasks", { params: { query: { page: 1, page_size: 200 } } });
       if (!result.data) throw new ApiError(result.error, "读取养护任务失败", result.response.status);
       return result.data.data;
     },

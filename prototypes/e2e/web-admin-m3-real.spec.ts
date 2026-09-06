@@ -28,7 +28,7 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
   await page.locator('input[aria-label="商品编码"][placeholder="按商品编码模糊查询"]').fill("P-M1-E2E-001");
   await page.locator('input[aria-label="批号"][placeholder="按批号模糊查询"]').fill("B-M4-E2E-001");
   await page.locator('input[aria-label="库位"][placeholder="按库位编码模糊查询"]').fill("A01-01-02-03");
-  await page.locator('input[aria-label="温区"][placeholder*="normal"]').fill("cold");
+  await page.locator('input[aria-label="温区"][placeholder*="normal"]').fill("cold_2_8");
 
   const responsePromise = page.waitForResponse((response) => {
     if (!response.url().includes("/api/v1/inventory/batches") || response.request().method() !== "GET") return false;
@@ -36,7 +36,7 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
     return url.searchParams.get("product_code") === "P-M1-E2E-001" &&
       url.searchParams.get("batch_no") === "B-M4-E2E-001" &&
       url.searchParams.get("location_code") === "A01-01-02-03" &&
-      url.searchParams.get("temperature_zone") === "cold";
+      url.searchParams.get("temperature_zone") === "cold_2_8";
   });
   await page.getByRole("button", { name: "查询", exact: true }).click();
   const response = await responsePromise;
@@ -49,7 +49,7 @@ test("M3 库存查询使用真实 API 传递组合筛选并展示结果", async 
   await expect(page.getByText("B-M4-E2E-001", { exact: true })).toBeVisible();
   const locationSummary = page.getByRole("region", { name: "库位维度专项视图" });
   await expect(locationSummary).toContainText("库位 A01-01-02-03 当前内容");
-  await expect(locationSummary).toContainText("A01 / cold");
+  await expect(locationSummary).toContainText("A01 / cold_2_8");
   await expect(locationSummary).toContainText("1-2-3");
   await expect(page.getByText("E2E 冷藏胰岛素", { exact: true })).toBeVisible();
   await expect(page.getByText("LPN-E2E-001", { exact: true })).toBeVisible();

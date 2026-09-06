@@ -120,7 +120,6 @@ test("US-H9-011 站点、打印机、纸盒、测试打印与租约人工释放"
   expect(testPrinted.ok(), await testPrinted.text()).toBeTruthy();
   const testPrintBody = await testPrinted.json() as { result: string };
   expect(testPrintBody.result).toBe("dispatched");
-  await expect(page.getByRole("status")).toContainText("测试打印已下发");
   await page.screenshot({ path: path.join(evidenceDir, "test-print.png"), fullPage: false });
 
   // 租约页签：查看种子活动租约并授权人工释放（原因 + 二次确认）

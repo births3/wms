@@ -14,7 +14,7 @@ test("M2 PC 真实入库链路落库并生成库存与审计", async ({ page }) 
   const signerIds = await ensureReceivingClerks(page);
 
   await openMenu(page, "入库业务", "入库作业", /M2 收货管理/);
-  await page.getByRole("button", { name: "新增", exact: true }).click();
+  await page.getByTitle("新建 ASN").click();
   await page.getByLabel("ASN 号").fill(receiptNo);
   await page.getByLabel("单据类型", { exact: true }).selectOption("purchase_inbound");
   await page.getByLabel("供应商 ID").fill(supplierId);

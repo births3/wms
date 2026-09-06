@@ -94,10 +94,16 @@ export async function createReceivedAsn(
           },
           body: JSON.stringify(body),
         });
-        const payload = await response.json();
+        const text = await response.text();
+        let payload: unknown;
+        try {
+          payload = text ? JSON.parse(text) : null;
+        } catch {
+          payload = text;
+        }
         if (!response.ok) {
           throw new Error(
-            `${url} ${response.status}: ${JSON.stringify(payload)}`,
+            `${url} ${response.status}: ${typeof payload === "string" ? payload : JSON.stringify(payload)}`,
           );
         }
         return payload as { id: string };

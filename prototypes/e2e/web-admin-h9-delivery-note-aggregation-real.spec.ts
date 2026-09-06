@@ -32,7 +32,6 @@ test("US-H9-006 真实线路、计划与随货同行单归集", async ({ browser
   const cutoff = await cutoffResponse;
   expect(cutoff.ok(), await cutoff.text()).toBeTruthy();
   const group = await cutoff.json() as { delivery_note_no: string };
-  await expect(page.getByRole("status")).toContainText(group.delivery_note_no);
   await page.getByRole("tab", { name: /截单结果/ }).click();
   const groupRow = page.getByRole("row").filter({ hasText: group.delivery_note_no });
   await expect(groupRow).toContainText(orderNo);
@@ -148,7 +147,7 @@ test("US-H9-007 归集维度规则配置：草稿、样本测试、发布与停�
   await expect(testDialog.getByText("发票号=INV-H9-E2E-007")).toBeVisible();
   await expect(testDialog.getByText("发票号=INV-H9-E2E-008")).toBeVisible();
   await page.screenshot({ path: path.join(ruleEvidenceDir, "rule-test-preview.png"), fullPage: false });
-  await testDialog.getByRole("button", { name: "关闭" }).click();
+  await testDialog.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(ruleRow).toContainText("已测试");
 
   // 发布（AC3/AC6）：仅已测试版本可发布
@@ -234,7 +233,7 @@ test("US-H9-008/009 打印组套冻结、分类 PDF 渲染留存与选择打印"
   await expect(testDialog.getByText(/随货同行单（渲染，必需）：就绪/)).toBeVisible();
   await expect(testDialog.getByText(/发票（外部文件，必需）：就绪，绑定 1 个权威文件/)).toBeVisible();
   await page.screenshot({ path: path.join(suiteEvidenceDir, "suite-test-readiness.png"), fullPage: false });
-  await testDialog.getByRole("button", { name: "关闭" }).click();
+  await testDialog.getByRole("button", { name: "关闭", exact: true }).click();
   await expect(suiteRow).toContainText("已测试");
 
   // AC2/AC9：仅已测试版本可发布

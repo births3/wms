@@ -42,7 +42,7 @@ test("M-RC 真实差异查询、选择隔离和频率配置", async ({ page }) =
   ]));
   await expect(page.getByText("P-M1-E2E-001", { exact: true })).toBeVisible();
   await expect(page.getByText("P-RC-E2E-ERP", { exact: true })).toBeVisible();
-  await expect(page.getByText(/待处理表示真实对账已发现差异/)).toBeVisible();
+  await expect(page.getByText(/差异不会自动隔离；主管勾选后才执行对账隔离/)).toBeVisible();
   await expectNoDocumentOverflow(page);
   await page.getByRole("heading", { name: "M-RC 库存对账" }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(screenshotDir, "difference-list.png"), fullPage: false });
@@ -60,7 +60,7 @@ test("M-RC 真实差异查询、选择隔离和频率配置", async ({ page }) =
   const differenceType = page.locator('summary[aria-label="差异类型"]').locator("..");
   await differenceType.locator("summary").click();
   await differenceType.getByText("ERP 多", { exact: true }).click();
-  await page.getByRole("heading", { name: "M-RC 库存对账" }).click();
+  await differenceType.locator("summary").click();
   await expect(differenceType).not.toHaveAttribute("open", "");
   const filteredResponsePromise = page.waitForResponse((candidate) => {
     if (!candidate.url().includes("/api/v1/reconciliation/items") || candidate.request().method() !== "GET") return false;
@@ -321,7 +321,7 @@ async function selectAdditionalResolutionStatus(
   const field = page.locator('summary[aria-label="处理状态"]').locator("..");
   await field.locator("summary").click();
   await field.getByRole("checkbox", { name: label, exact: true }).check();
-  await page.getByRole("heading", { name: "M-RC 库存对账" }).click();
+  await field.locator("summary").click();
 }
 
 async function replaceResolutionStatus(
@@ -332,7 +332,7 @@ async function replaceResolutionStatus(
   await field.locator("summary").click();
   await field.getByRole("checkbox", { name: "待处理", exact: true }).uncheck();
   await field.getByRole("checkbox", { name: label, exact: true }).check();
-  await page.getByRole("heading", { name: "M-RC 库存对账" }).click();
+  await field.locator("summary").click();
 }
 
 function collectBrowserErrors(page: import("@playwright/test").Page) {

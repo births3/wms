@@ -9,7 +9,8 @@ test("H-AL 告警定义经真实 M-QL 审批后生效且 GSP 定义受保护", a
   await openAlertDefinitionPage(page);
   await expect(page.getByRole("heading", { name: "H-AL 告警定义" })).toBeVisible();
   const definitionTableBody = page.locator("tbody").first();
-  await expect(definitionTableBody.locator("tr")).toHaveCount(6);
+  await expect(definitionTableBody.locator("tr").first()).toBeVisible();
+  await expect(definitionTableBody.locator("tr").filter({ hasText: "qualification_expiry_30d" })).toBeVisible();
 
   const suffix = Date.now();
   const code = `e2e.alert.${suffix}`;

@@ -85,7 +85,7 @@ test("M1 管理端读取真实后端数据", async ({ page }) => {
       const row = page.locator("tr", { hasText: item.text }).first();
       await row.getByRole("checkbox", { name: "选择此行" }).check();
       await completeH9BusinessPrint(page, {
-        actionName: "标签",
+        actionName: "打印",
         dialogName: isProduct ? "M1 商品标签 E2E 模板" : "M1 库位标签 E2E 模板",
         businessModule: "M1",
         templateType: isProduct ? "product_label" : "location_label",
@@ -388,7 +388,7 @@ test("M1 供应商批量导入调用原子批量接口", async ({ page }) => {
   const marker = Date.now();
   const firstCode = `S-E2E-BATCH-${marker}-1`;
   const secondCode = `S-E2E-BATCH-${marker}-2`;
-  await page.getByRole("button", { name: "供入", exact: true }).click();
+  await page.getByRole("button", { name: "导入供应商", exact: true }).click();
   await page.getByRole("textbox", { name: "批量导入供应商" }).fill([
     "supplier_code,supplier_name,license_no,contact_name",
     `${firstCode},E2E 批量供应商一,91310110666007217T,联系人一`,
@@ -427,7 +427,7 @@ test("M1 客户批量导入调用原子批量接口", async ({ page }) => {
   const marker = Date.now();
   const firstCode = `C-E2E-BATCH-${marker}-1`;
   const secondCode = `C-E2E-BATCH-${marker}-2`;
-  await page.getByRole("button", { name: "客入", exact: true }).click();
+  await page.getByRole("button", { name: "导入客户", exact: true }).click();
   await page.getByRole("textbox", { name: "批量导入客户" }).fill([
     "customer_code,customer_name,license_no",
     `${firstCode},E2E 批量客户一,LIC-E2E-1`,

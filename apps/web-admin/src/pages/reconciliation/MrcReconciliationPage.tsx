@@ -175,6 +175,13 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
   const busy = isolationMutation.isPending || resolveMutation.isPending || ruleMutation.isPending;
   const canExecute = currentUser.permissions.includes("rc.reconciliation.execute");
   const canResolve = currentUser.permissions.includes("rc.reconciliation.resolve");
+  const pageNotice = ruleQuery.isError
+    ? { kind: "error" as const, text: `读取对账频率失败：${errorText(ruleQuery.error, "请稍后重试")}` }
+    : !canExecute && !canResolve
+      ? { kind: "info" as const, text: "当前账号只读：仅可查看库存对账差异" }
+      : notice
+        ? { kind: notice.type === "success" ? "success" as const : "error" as const, text: notice.text }
+        : null;
   const refreshAction: DataGridRefreshAction = {
     label: BUTTON_REFRESH,
     description: "刷新真实对账差异",
@@ -337,7 +344,7 @@ export function MrcReconciliationPage({ currentUser }: { currentUser: CurrentUse
           </Button>
         ) : undefined,
       }}
-      notice={notice ? { kind: notice.type === "success" ? "success" : "error", text: notice.text } : null}
+      notice={pageNotice}
       queryFields={mRcReconciliationQueryFields}
       coreQueryFieldKeys={mRcReconciliationCoreQueryFieldKeys}
       queryValue={draftQuery}
