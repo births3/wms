@@ -72,9 +72,10 @@ jobs:
           )
           replace(
               "prototypes/e2e/web-admin-m2-real.spec.ts",
+              '  await openMenu(page, "入库业务", "入库作业", /M2 收货管理/);\n'
               '  await page.getByRole("button", { name: "新增", exact: true }).click();',
+              '  await openMenu(page, "入库业务", "入库作业", /M2 收货管理/);\n'
               '  await page.getByTitle("新建 ASN").click();',
-              expected=1,
           )
           replace(
               "prototypes/e2e/web-admin-m3-real.spec.ts",
