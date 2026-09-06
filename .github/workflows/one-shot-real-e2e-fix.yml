@@ -33,7 +33,6 @@ jobs:
               p.write_text(text.replace(old, new), encoding="utf-8")
               print(f"updated {path}: {count} replacement(s)")
 
-          # H-AL: fixed seed-count assertion drifted as the real definition catalog expanded.
           replace(
               "prototypes/e2e/web-admin-hal-real.spec.ts",
               '  await expect(definitionTableBody.locator("tr")).toHaveCount(6);',
@@ -41,7 +40,6 @@ jobs:
               '  await expect(definitionTableBody.locator("tr").filter({ hasText: "qualification_expiry_30d" })).toBeVisible();',
           )
 
-          # H9: API success + resulting rows are authoritative; stale transient status assertions and ambiguous close selectors are removed.
           replace(
               "prototypes/e2e/web-admin-h9-delivery-note-aggregation-real.spec.ts",
               '  await expect(page.getByRole("status")).toContainText(group.delivery_note_no);\n',
@@ -59,7 +57,6 @@ jobs:
               "",
           )
 
-          # M1: current production action names are explicit, not old abbreviations.
           replace(
               "prototypes/e2e/web-admin-m1-real.spec.ts",
               '        actionName: "标签",',
@@ -76,7 +73,6 @@ jobs:
               '  await page.getByRole("button", { name: "导入客户", exact: true }).click();',
           )
 
-          # M2: bind to the stable semantic title of the create action rather than a generic toolbar label.
           replace(
               "prototypes/e2e/web-admin-m2-real.spec.ts",
               '  await page.getByRole("button", { name: "新增", exact: true }).click();',
@@ -84,7 +80,6 @@ jobs:
               expected=1,
           )
 
-          # M3: real seed uses cold_2_8; maintenance list must not silently truncate at the backend default 20 rows.
           replace(
               "prototypes/e2e/web-admin-m3-real.spec.ts",
               '.fill("cold");',
@@ -106,7 +101,6 @@ jobs:
               '      const result = await api.GET("/api/v1/inventory/maintenance/tasks", { params: { query: { page: 1, page_size: 200 } } });',
           )
 
-          # M4: disabled queries can remain isPending; loading must be scoped to the active mode.
           replace(
               "apps/web-admin/src/pages/outbound/M4OutboundPage.tsx",
               '      loading={ordersQuery.isPending || ordersQuery.isFetching || wavesQuery.isPending || returnsQuery.isPending}',
@@ -119,7 +113,6 @@ jobs:
               '      }',
           )
 
-          # M-RC: surface rule-read failures/read-only state and close multi-selects through their own summary controls.
           replace(
               "apps/web-admin/src/pages/reconciliation/MrcReconciliationPage.tsx",
               '  const canExecute = currentUser.permissions.includes("rc.reconciliation.execute");\n'
@@ -157,18 +150,9 @@ jobs:
               '  await page.getByRole("heading", { name: "M-RC 库存对账" }).click();',
               '  await field.getByRole("checkbox", { name: label, exact: true }).check();\n'
               '  await field.locator("summary").click();',
-              expected=1,
-          )
-          replace(
-              "prototypes/e2e/web-admin-mrc-real.spec.ts",
-              '  await field.getByRole("checkbox", { name: label, exact: true }).check();\n'
-              '  await page.getByRole("heading", { name: "M-RC 库存对账" }).click();',
-              '  await field.getByRole("checkbox", { name: label, exact: true }).check();\n'
-              '  await field.locator("summary").click();',
-              expected=1,
+              expected=2,
           )
 
-          # M-DI: preserve plain-text backend errors instead of masking them as JSON parse failures.
           replace(
               "prototypes/e2e/web-admin-mdi-real-ui.ts",
               '        const payload = await response.json();\n'
